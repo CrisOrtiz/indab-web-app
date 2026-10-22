@@ -22,14 +22,14 @@ emulators with the offline project `demo-indab`, so no real Firebase project is 
 
 ## Connecting the real Firebase project
 
-1. In the [Firebase console](https://console.firebase.google.com), create the project and add a **Web app**.
-2. Copy its config object into `src/environments/environment.ts` (and into
-   `environment.development.ts` with `useEmulators: false` if you want `ng serve` to use it).
-   These values are public identifiers; access is enforced by the security rules.
-3. **Authentication > Sign-in method**: enable *Email/Password* and *Google*.
-4. **Firestore Database**: create the database, then set the project id in `.firebaserc`
-   and deploy the rules with `npm run deploy:rules`.
-5. Promote the first admin: in Firestore, edit `users/{uid}` of your account and set `role` to `admin`.
+The Firebase project is `indab-academy`; its web config is in `src/environments/environment.ts`
+(public identifiers; access is enforced by the security rules). To run `ng serve` against it,
+copy that config into `environment.development.ts` and set `useEmulators: false`.
+
+1. **Authentication > Sign-in method**: enable *Email/Password* and *Google*.
+2. **Firestore Database**: create the database, then deploy the rules with
+   `npx firebase login` and `npm run deploy:rules`.
+3. Promote the first admin: in Firestore, edit `users/{uid}` of your account and set `role` to `admin`.
 
 ## Access model
 
