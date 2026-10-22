@@ -1,0 +1,80 @@
+.auth {
+  display: flex;
+  justify-content: center;
+  padding: 48px 16px;
+}
+
+.card {
+  width: 100%;
+  max-width: 400px;
+  padding: 32px 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+
+  h1 {
+    margin: 0 0 24px;
+    font-size: 1.5rem;
+  }
+}
+
+form {
+  display: grid;
+  gap: 16px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+input {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font: inherit;
+}
+
+.hint,
+.error,
+.notice {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.error {
+  color: var(--color-error);
+}
+
+.notice {
+  color: var(--color-muted);
+}
+
+.divider {
+  margin: 16px 0;
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.btn {
+  width: 100%;
+}
+
+.links {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 0.9rem;
+
+  button {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+}

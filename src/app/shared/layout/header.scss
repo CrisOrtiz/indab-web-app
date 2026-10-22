@@ -1,0 +1,42 @@
+.header {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 64px;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-decoration: none;
+
+  img {
+    border-radius: 50%;
+  }
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+
+  a:not(.btn) {
+    color: var(--color-muted);
+    text-decoration: none;
+
+    &.active,
+    &:hover {
+      color: var(--color-text);
+    }
+  }
+}

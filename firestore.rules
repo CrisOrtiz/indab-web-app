@@ -1,0 +1,95 @@
+rules_version = '2';
+
+// Data model
+//   users/{uid}                          profile; created by the user, role changes by admins only
+//   enrollments/{uid}                    { academy: bool, courses: [courseId] }; admin-managed
+//   courses/{courseId}                   course catalog; published courses are public
+//   courses/{courseId}/lessons/{id}      lesson content; enrolled users only
+//   materials/{materialId}               learning-material repository; enrolled users only
+//   investors/{uid}                      Eleva Inversiones investor account; owner reads, admins write
+//
+// Admins are users whose profile has role == 'admin'. Promote the first admin by editing
+// their users/{uid} document in the Firebase console.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function enrollment() {
+      return get(/databases/$(database)/documents/enrollments/$(request.auth.uid)).data;
+    }
+
+    function hasEnrollment() {
+      return signedIn() && exists(/databases/$(database)/documents/enrollments/$(request.auth.uid));
+    }
+
+    function hasAcademyAccess() {
+      return isAdmin() || (hasEnrollment() && enrollment().academy == true);
+    }
+
+    function isEnrolledIn(courseId) {
+      return hasAcademyAccess()
+        || (hasEnrollment() && enrollment().courses is list && courseId in enrollment().courses);
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      // A new profile must belong to the caller and always starts as a student.
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'createdAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.role == 'student'
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 80;
+
+      // Users can edit their own profile but never their role or identity fields.
+      allow update: if isAdmin()
+        || (isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName'])
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() <= 80);
+
+      allow delete: if isAdmin();
+    }
+
+    match /enrollments/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /courses/{courseId} {
+      allow read: if resource.data.published == true || isAdmin();
+      allow write: if isAdmin();
+
+      match /lessons/{lessonId} {
+        allow read: if isEnrolledIn(courseId);
+        allow write: if isAdmin();
+      }
+    }
+
+    match /materials/{materialId} {
+      allow read: if hasAcademyAccess();
+      allow write: if isAdmin();
+    }
+
+    match /investors/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Everything else is closed by default.
+  }
+}

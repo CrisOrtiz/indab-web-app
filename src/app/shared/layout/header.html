@@ -1,0 +1,20 @@
+<header class="header">
+  <div class="container header-inner">
+    <a routerLink="/" class="brand">
+      <img src="logo.jpg" alt="INDAB Academy" width="40" height="40" />
+      <span>INDAB</span>
+    </a>
+    <nav class="nav">
+      <a routerLink="/eleva" routerLinkActive="active">Eleva Inversiones</a>
+      @if (auth.isLoggedIn()) {
+        <a routerLink="/academy" routerLinkActive="active">Academia</a>
+        @if (auth.hasAcademyAccess()) {
+          <a routerLink="/repository" routerLinkActive="active">Material</a>
+        }
+        <button type="button" class="btn btn-outline" (click)="signOut()">Cerrar sesión</button>
+      } @else {
+        <a routerLink="/login" class="btn">Ingresar</a>
+      }
+    </nav>
+  </div>
+</header>
