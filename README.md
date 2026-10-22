@@ -86,6 +86,38 @@ npm run deploy              # production build + deploy to Firebase Hosting
 
 `.firebaserc` makes `indab-academy` the default project, so no `--project` flag is needed.
 
+### Hosting
+
+The site is served from Firebase Hosting at **https://indab-academy.web.app** (also
+`indab-academy.firebaseapp.com`). `firebase.json` serves `dist/indab-web-app/browser`, rewrites every
+route to `index.html` (so deep links like `/academy` work) and caches hashed JS/CSS for a year
+while `index.html` is always revalidated. Manual deploy from your machine:
+
+```bash
+npx firebase login   # once per machine, opens the browser
+npm run deploy       # ng build + firebase deploy --only hosting
+```
+
+If the CLI reports that no Hosting site exists, open **Hosting** in the Firebase console, click
+**Comenzar** once, and run `npm run deploy` again. Both hosting domains are in **Authentication >
+Settings > Authorized domains** by default; add any custom domain there too, or Google sign-in fails on it.
+
+### Automatic deploys (GitHub Actions)
+
+`.github/workflows/firebase-hosting.yml` builds every push and pull request. When the repository
+secret `FIREBASE_SERVICE_ACCOUNT_INDAB_ACADEMY` exists, a merge to `main` deploys the live site and
+each pull request gets a 7-day preview URL posted as a PR comment. To create the secret (and a
+service account with exactly the Hosting roles it needs) run, from the repo folder:
+
+```bash
+npx firebase init hosting:github
+```
+
+Pick repository `CrisOrtiz/indab-web-app`; it uploads the secret to GitHub for you. Answer **No**
+to the build-script and automatic-deploy questions, and don't commit the
+`firebase-hosting-pull-request.yml` / `firebase-hosting-merge.yml` files it writes: delete them, this
+workflow already covers both.
+
 To run `ng serve` against the real project instead of the emulators, copy the config from
 `environment.ts` into `environment.development.ts` and set `useEmulators: false` (do not commit that change).
 
