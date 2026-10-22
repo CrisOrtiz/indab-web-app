@@ -7,8 +7,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "emulators": "firebase emulators:start --only auth,firestore",
-    "test:rules": "firebase emulators:exec --only firestore \"vitest run --config tests/vitest.config.mts\"",
+    "emulators": "firebase emulators:start --project demo-indab --only auth,firestore",
+    "test:rules": "firebase emulators:exec --project demo-indab --only firestore \"vitest run --config tests/vitest.config.mts\"",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
     "deploy": "ng build && firebase deploy --only hosting"
   },
