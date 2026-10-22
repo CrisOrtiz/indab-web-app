@@ -1,0 +1,118 @@
+---
+name: indab-dev
+description: Conventions for building the INDAB web app (Angular 22 + plain Firebase SDK). Use before adding or changing features, Firestore collections, security rules, routes or UI in this repo, including the landing page, learning-material repository, academy and Eleva Inversiones modules.
+---
+
+# Building the INDAB web app
+
+The app serves two businesses:
+
+- **INDAB Academy**: trading school. Public landing, accounts, academy area for students, and a
+  learning-material repository that only enrolled students can open.
+- **Eleva Inversiones**: INDAB's investment arm. Pools investor money, trades it and pays monthly
+  returns. Public info page plus a private investor area.
+
+## Stack (do not change without asking)
+
+- Angular 22.2: standalone components, signals, `inject()`, `@if`/`@for` control flow,
+  lazy `loadComponent` routes, SCSS. Unit tests run on Vitest through `ng test`.
+- Firebase JS SDK 13, modular API, **no AngularFire** (it lags behind Angular releases).
+- Firebase project `indab-academy` (Firestore in `southamerica-west1`). Local dev uses the
+  emulators with project `demo-indab` (`environment.development.ts`, `useEmulators: true`).
+- Node `^24.15.0` or `^22.22.3`; Java 21+ for the emulators. Cris develops on Windows + VS Code,
+  so keep scripts cross-platform (no bash-only npm scripts).
+
+## Firebase access
+
+Inject the instances through the tokens in `src/app/core/firebase/firebase.providers.ts`:
+
+```ts
+import { FIRESTORE, FIREBASE_AUTH } from '../../core/firebase/firebase.providers';
+
+private readonly firestore = inject(FIRESTORE);
+```
+
+Then call the modular SDK directly (`collection`, `query`, `where`, `onSnapshot`, `getDocs`, ...).
+Never call `getFirestore()`/`getAuth()` elsewhere, or the emulator wiring is skipped.
+
+For the current user, use `AuthService` (`src/app/core/auth/auth.service.ts`):
+`user()`, `profile()`, `enrollment()`, `isLoggedIn()`, `isAdmin()`, `hasAcademyAccess()`, and
+`whenReady()` before reading them in guards. Add new per-user state there only if it is global;
+otherwise create a feature service.
+
+## Access model
+
+| Collection | Read | Write |
+| --- | --- | --- |
+| `users/{uid}` | owner, admins | owner creates as `student`, edits `displayName`; admins all |
+| `enrollments/{uid}` `{academy, courses[], updatedAt}` | owner, admins | admins |
+| `courses/{id}` | everyone if `published`, admins | admins |
+| `courses/{id}/lessons/{id}` | enrolled in course or academy access | admins |
+| `materials/{id}` | academy access | admins |
+| `investors/{uid}` (Eleva) | owner, admins | admins |
+
+Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`,
+`hasAcademyAccess()`, `isEnrolledIn(courseId)`. Everything not matched is denied.
+
+Guards in `src/app/core/auth/auth.guards.ts`: `authGuard` (signed in), `guestGuard`
+(signed out), `enrolledGuard` (academy access). Guards are UX only; the rules are the security.
+Users can never grant themselves a role, enrollment or investor data from the client.
+
+## Layout and conventions
+
+```
+src/app/core/firebase/   DI tokens + provideFirebase()
+src/app/core/auth/       AuthService, guards
+src/app/core/models/     Firestore document interfaces (one file per domain)
+src/app/features/<name>/ one folder per feature; components named without suffix (Landing, Academy)
+src/app/shared/          reusable UI (layout/header, ...)
+src/styles.scss          global tokens: --color-*, --radius, --max-width, .container, .btn
+```
+
+- File names: `feature.ts`, `feature.html`, `feature.scss`, `feature.spec.ts` (Angular 20+
+  style, no `.component` suffix). Inline templates are fine for small components.
+- Selectors prefixed `app-`. Prefer `protected readonly` for template-only members.
+- State: signals and `computed`; convert Firestore listeners to signals in a service and
+  unsubscribe on destroy (`DestroyRef`).
+- Model types: `Timestamp` from `firebase/firestore` for dates; write with `serverTimestamp()`.
+- Styling: black and white brand (logo `public/logo.jpg`, tagline "Conocimiento. Disciplina.
+  Estrategia. Resultados."). Use the CSS variables in `src/styles.scss`, not hard-coded colors.
+- UI text in Spanish (route `title`s too, ending in `| INDAB`). Code, comments, commits in English.
+- Formatting: Prettier (`printWidth` 100, single quotes). Run `npx prettier --write` on changed files.
+
+## Adding a module
+
+1. **Model**: add interfaces in `src/app/core/models/<domain>.ts`.
+2. **Rules**: add a `match` block in `firestore.rules` (update the data-model comment at the top)
+   and tests in `tests/firestore.rules.test.ts` covering allowed and denied cases for
+   anonymous, student, enrolled, owner and admin.
+3. **Service**: `src/app/features/<name>/<name>.service.ts` (`providedIn: 'root'`) using `FIRESTORE`.
+4. **Component(s)** in `src/app/features/<name>/`, replacing the placeholder and its
+   `placeholder.scss` import.
+5. **Route** in `src/app/app.routes.ts` with `loadComponent`, a Spanish `title` and the right guard.
+   Add a header link in `src/app/shared/layout/header.html` if it is a main section.
+6. **Indexes**: composite queries need an entry in `firestore.indexes.json`.
+7. **Docs**: update the access-model and routes tables in `README.md` and this skill.
+8. **Verify**: `npm test`, `npm run test:rules`, `npm run build`.
+
+Module notes:
+
+- **Landing (`/`)**: public, no Firestore reads needed except published `courses`. Sections for
+  the academy, courses and a link to Eleva. Call to action goes to `/register`.
+- **Material repository (`/repository`)**: `materials/{id}` (title, description, category, type
+  such as pdf/video/link, url, createdAt). Gated by `enrolledGuard` + `hasAcademyAccess()` rule.
+  If files are uploaded, use Firebase Storage with `storage.rules` mirroring the same check
+  (add a `FIREBASE_STORAGE` token and emulator wiring in `firebase.providers.ts`).
+- **Academy (`/academy`)**: published `courses` and their `lessons`, filtered by
+  `enrollment().courses` or full academy access. Shows the pending notice when not enrolled.
+- **Eleva (`/eleva`, investor area)**: the public page stays unguarded. Investor data lives in
+  `investors/{uid}` and subcollections (e.g. `investors/{uid}/statements/{month}`), admin-written,
+  owner-read. Financial figures are never computed or written by the client.
+- **Admin tools**: any admin UI must still rely on rules (`isAdmin()`); never trust a client flag.
+
+## Do not
+
+- Commit service account keys, `.env` files or emulator exports.
+- Loosen a rule without a failing-then-passing test.
+- Switch the dev environment off the emulators in a commit.
+- Deploy rules or hosting without Cris asking for it.
