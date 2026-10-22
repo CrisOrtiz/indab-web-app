@@ -4,7 +4,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
@@ -41,13 +41,25 @@ const as = (uid: string | null) =>
 describe('users', () => {
   it('lets a user create their own student profile', async () => {
     await assertSucceeds(
-      setDoc(doc(as('new'), 'users/new'), { uid: 'new', email: 'a@b.co', displayName: 'Nuevo', role: 'student', createdAt: new Date() }),
+      setDoc(doc(as('new'), 'users/new'), {
+        uid: 'new',
+        email: 'a@b.co',
+        displayName: 'Nuevo',
+        role: 'student',
+        createdAt: new Date(),
+      }),
     );
   });
 
   it('blocks creating a profile with the admin role', async () => {
     await assertFails(
-      setDoc(doc(as('new'), 'users/new'), { uid: 'new', email: 'a@b.co', displayName: 'Nuevo', role: 'admin', createdAt: new Date() }),
+      setDoc(doc(as('new'), 'users/new'), {
+        uid: 'new',
+        email: 'a@b.co',
+        displayName: 'Nuevo',
+        role: 'admin',
+        createdAt: new Date(),
+      }),
     );
   });
 
@@ -61,8 +73,54 @@ describe('users', () => {
 describe('enrollments', () => {
   it('is readable by its owner and writable only by admins', async () => {
     await assertSucceeds(getDoc(doc(as('enrolled'), 'enrollments/enrolled')));
-    await assertFails(setDoc(doc(as('student'), 'enrollments/student'), { academy: true, courses: [] }));
-    await assertSucceeds(setDoc(doc(as('admin'), 'enrollments/student'), { academy: true, courses: [] }));
+    await assertFails(
+      setDoc(doc(as('student'), 'enrollments/student'), { academy: true, courses: [] }),
+    );
+    await assertSucceeds(
+      setDoc(doc(as('admin'), 'enrollments/student'), { academy: true, courses: [] }),
+    );
+  });
+});
+
+describe('admin user management', () => {
+  it('lets only admins list users and enrollments', async () => {
+    await assertSucceeds(getDocs(collection(as('admin'), 'users')));
+    await assertSucceeds(getDocs(collection(as('admin'), 'enrollments')));
+    await assertFails(getDocs(collection(as('student'), 'users')));
+    await assertFails(getDocs(collection(as('enrolled'), 'enrollments')));
+    await assertFails(getDocs(collection(as(null), 'users')));
+  });
+
+  it("lets admins change other users' roles, and nothing else", async () => {
+    await assertSucceeds(updateDoc(doc(as('admin'), 'users/student'), { role: 'admin' }));
+    await assertSucceeds(updateDoc(doc(as('admin'), 'users/student'), { role: 'student' }));
+    await assertFails(updateDoc(doc(as('admin'), 'users/student'), { role: 'owner' }));
+    await assertFails(updateDoc(doc(as('admin'), 'users/student'), { email: 'x@y.co' }));
+    await assertFails(updateDoc(doc(as('enrolled'), 'users/student'), { role: 'admin' }));
+  });
+
+  it('blocks admins from removing their own admin role', async () => {
+    await assertFails(updateDoc(doc(as('admin'), 'users/admin'), { role: 'student' }));
+  });
+
+  it('lets admins grant and revoke academy access with a valid enrollment', async () => {
+    const grant = { academy: true, courses: [], updatedAt: new Date(), updatedBy: 'admin' };
+    await assertSucceeds(setDoc(doc(as('admin'), 'enrollments/student'), grant));
+    await assertSucceeds(
+      setDoc(doc(as('admin'), 'enrollments/student'), { ...grant, academy: false }),
+    );
+    await assertSucceeds(deleteDoc(doc(as('admin'), 'enrollments/student')));
+    await assertFails(
+      setDoc(doc(as('admin'), 'enrollments/student'), { ...grant, academy: 'yes' }),
+    );
+    await assertFails(setDoc(doc(as('admin'), 'enrollments/student'), { ...grant, extra: 1 }));
+    await assertFails(
+      setDoc(doc(as('admin'), 'enrollments/student'), { ...grant, updatedBy: 'someone' }),
+    );
+    await assertFails(
+      setDoc(doc(as('student'), 'enrollments/student'), { ...grant, updatedBy: 'student' }),
+    );
+    await assertFails(deleteDoc(doc(as('enrolled'), 'enrollments/enrolled')));
   });
 });
 

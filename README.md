@@ -133,15 +133,18 @@ The service account needs the *Firebase Admin* and *Service Usage Consumer* role
 
 | Collection | Who can read | Who can write |
 | --- | --- | --- |
-| `users/{uid}` | owner, admins | owner creates as `student` and edits `displayName`; admins everything |
-| `enrollments/{uid}` | owner, admins | admins |
+| `users/{uid}` | owner, admins | owner creates as `student` and edits `displayName`; admins change `role` (not their own) |
+| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, admins | admins |
 | `courses/{id}` | everyone if `published`, admins | admins |
 | `courses/{id}/lessons/{id}` | users enrolled in that course or with academy access | admins |
 | `materials/{id}` | users with academy access (`enrollments/{uid}.academy == true`), admins | admins |
 | `investors/{uid}` (Eleva) | owner, admins | admins |
 
-A user gets access to the academy and the material repository when an admin creates
-`enrollments/{uid}` with `academy: true`. The route guards mirror these checks in the UI, but
+A user gets access to the academy and the material repository when an admin turns on
+"Acceso a la academia" for them in `/admin` (which writes `enrollments/{uid}` with
+`academy: true`). Admins also promote or demote other users there. The first admin has to be
+set by hand: in the Firebase console, open `users/{uid}` for that account and change `role` to
+`admin`. Admins cannot remove their own admin role, so there is always at least one. The route guards mirror these checks in the UI, but
 the rules are what actually protect the data. Anything not listed is denied.
 
 ## Routes
@@ -152,6 +155,7 @@ the rules are what actually protect the data. Anything not listed is denied.
 | `/login`, `/register` | signed-out visitors |
 | `/academy` | signed-in users (shows "pending" until enrolled) |
 | `/repository` | enrolled users |
+| `/admin` | admins (users, roles, academy access) |
 
 ## Scripts
 
@@ -173,7 +177,7 @@ src/app/
   core/firebase/   Firebase app, Auth and Firestore providers (DI tokens)
   core/auth/       AuthService (signals) and route guards
   core/models/     Firestore document types
-  features/        landing, auth, academy, repository, eleva (placeholders to build out)
+  features/        landing, auth, academy, repository, eleva, admin
   shared/layout/   header
 src/environments/  environment.ts (indab-academy) and environment.development.ts (emulators)
 firestore.rules    security rules (tested in tests/firestore.rules.test.ts)

@@ -1,22 +1,33 @@
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRouteSnapshot, Router, RouterStateSnapshot, UrlTree, provideRouter } from '@angular/router';
+import {
+  ActivatedRouteSnapshot,
+  Router,
+  RouterStateSnapshot,
+  UrlTree,
+  provideRouter,
+} from '@angular/router';
 import { signal } from '@angular/core';
 import { AuthService } from './auth.service';
-import { authGuard, enrolledGuard, guestGuard } from './auth.guards';
+import { adminGuard, authGuard, enrolledGuard, guestGuard } from './auth.guards';
 
 describe('auth guards', () => {
   const isLoggedIn = signal(false);
   const hasAcademyAccess = signal(false);
+  const isAdmin = signal(false);
   const state = { url: '/repository' } as RouterStateSnapshot;
   const route = {} as ActivatedRouteSnapshot;
 
   beforeEach(() => {
     isLoggedIn.set(false);
     hasAcademyAccess.set(false);
+    isAdmin.set(false);
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
-        { provide: AuthService, useValue: { isLoggedIn, hasAcademyAccess, whenReady: () => Promise.resolve() } },
+        {
+          provide: AuthService,
+          useValue: { isLoggedIn, hasAcademyAccess, isAdmin, whenReady: () => Promise.resolve() },
+        },
       ],
     });
   });
@@ -42,5 +53,14 @@ describe('auth guards', () => {
     expect(url(await run(enrolledGuard))).toBe('/academy');
     hasAcademyAccess.set(true);
     expect(await run(enrolledGuard)).toBe(true);
+  });
+
+  it('adminGuard requires the admin role', async () => {
+    expect(url(await run(adminGuard))).toBe('/login?returnUrl=%2Frepository');
+    isLoggedIn.set(true);
+    hasAcademyAccess.set(true);
+    expect(url(await run(adminGuard))).toBe('/academy');
+    isAdmin.set(true);
+    expect(await run(adminGuard)).toBe(true);
   });
 });

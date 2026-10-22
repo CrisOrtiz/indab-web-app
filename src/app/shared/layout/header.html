@@ -11,6 +11,9 @@
         @if (auth.hasAcademyAccess()) {
           <a routerLink="/repository" routerLinkActive="active">Material</a>
         }
+        @if (auth.isAdmin()) {
+          <a routerLink="/admin" routerLinkActive="active">Administración</a>
+        }
         <button type="button" class="btn btn-outline" (click)="signOut()">Cerrar sesión</button>
       } @else {
         <a routerLink="/login" class="btn">Ingresar</a>

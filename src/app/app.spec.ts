@@ -12,7 +12,11 @@ describe('App', () => {
         provideRouter([]),
         {
           provide: AuthService,
-          useValue: { isLoggedIn: signal(false), hasAcademyAccess: signal(false) },
+          useValue: {
+            isLoggedIn: signal(false),
+            hasAcademyAccess: signal(false),
+            isAdmin: signal(false),
+          },
         },
       ],
     }).compileComponents();

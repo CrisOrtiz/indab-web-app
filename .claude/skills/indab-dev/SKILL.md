@@ -44,8 +44,8 @@ otherwise create a feature service.
 
 | Collection | Read | Write |
 | --- | --- | --- |
-| `users/{uid}` | owner, admins | owner creates as `student`, edits `displayName`; admins all |
-| `enrollments/{uid}` `{academy, courses[], updatedAt}` | owner, admins | admins |
+| `users/{uid}` | owner, admins | owner creates as `student`, edits `displayName`; admins change `role` of others only |
+| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, admins | admins (shape validated) |
 | `courses/{id}` | everyone if `published`, admins | admins |
 | `courses/{id}/lessons/{id}` | enrolled in course or academy access | admins |
 | `materials/{id}` | academy access | admins |
@@ -55,7 +55,7 @@ Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`,
 `hasAcademyAccess()`, `isEnrolledIn(courseId)`. Everything not matched is denied.
 
 Guards in `src/app/core/auth/auth.guards.ts`: `authGuard` (signed in), `guestGuard`
-(signed out), `enrolledGuard` (academy access). Guards are UX only; the rules are the security.
+(signed out), `enrolledGuard` (academy access), `adminGuard` (admin role). Guards are UX only; the rules are the security.
 Users can never grant themselves a role, enrollment or investor data from the client.
 
 ## Layout and conventions
@@ -108,7 +108,12 @@ Module notes:
 - **Eleva (`/eleva`, investor area)**: the public page stays unguarded. Investor data lives in
   `investors/{uid}` and subcollections (e.g. `investors/{uid}/statements/{month}`), admin-written,
   owner-read. Financial figures are never computed or written by the client.
-- **Admin tools**: any admin UI must still rely on rules (`isAdmin()`); never trust a client flag.
+- **Admin (`/admin`, built)**: `features/admin/`. `AdminService` is provided by the `Admin`
+  component (live `users` + `enrollments` listeners that stop on leave); search/filter is
+  client-side in `admin-users.ts` (fine for hundreds of users; move to a paged query if it grows).
+  Admins change roles (rules block changing their own) and toggle `enrollments/{uid}.academy`.
+  New admin tools (courses, materials, investors) can be added as sections of this page.
+  Any admin UI must still rely on rules (`isAdmin()`); never trust a client flag.
 
 ## Do not
 
