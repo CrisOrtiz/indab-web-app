@@ -2,14 +2,17 @@ rules_version = '2';
 
 // Data model
 //   users/{uid}                          profile; created by the user, role changes by admins only
-//   enrollments/{uid}                    { academy: bool, courses: [courseId] }; admin-managed
+//   enrollments/{uid}                    { academy: bool, courses: [courseId], updatedAt, updatedBy };
+//                                        admin-managed from the /admin area
 //   courses/{courseId}                   course catalog; published courses are public
 //   courses/{courseId}/lessons/{id}      lesson content; enrolled users only
 //   materials/{materialId}               learning-material repository; enrolled users only
 //   investors/{uid}                      Eleva Inversiones investor account; owner reads, admins write
 //
 // Admins are users whose profile has role == 'admin'. Promote the first admin by editing
-// their users/{uid} document in the Firebase console.
+// their users/{uid} document in the Firebase console; after that, admins manage roles and
+// academy access from the /admin area. Admins cannot remove their own admin role, so the
+// last admin can never lock everyone out.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -55,8 +58,12 @@ service cloud.firestore {
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() <= 80;
 
-      // Users can edit their own profile but never their role or identity fields.
-      allow update: if isAdmin()
+      // Admins can change a user's role (never their own). Users can edit their own profile
+      // but never their role or identity fields.
+      allow update: if (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+          && request.resource.data.role in ['student', 'admin']
+          && !isOwner(uid))
         || (isOwner(uid)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName'])
           && request.resource.data.displayName is string
@@ -67,7 +74,12 @@ service cloud.firestore {
 
     match /enrollments/{uid} {
       allow read: if isOwner(uid) || isAdmin();
-      allow write: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['academy', 'courses', 'updatedAt', 'updatedBy'])
+        && request.resource.data.academy is bool
+        && request.resource.data.courses is list
+        && (!('updatedBy' in request.resource.data) || request.resource.data.updatedBy == request.auth.uid);
+      allow delete: if isAdmin();
     }
 
     match /courses/{courseId} {

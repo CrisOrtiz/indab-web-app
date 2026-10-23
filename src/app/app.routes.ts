@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, enrolledGuard, guestGuard } from './core/auth/auth.guards';
+import { adminGuard, authGuard, enrolledGuard, guestGuard } from './core/auth/auth.guards';
 
 export const routes: Routes = [
   // Public
@@ -41,6 +41,14 @@ export const routes: Routes = [
     title: 'Material de estudio | INDAB',
     canActivate: [enrolledGuard],
     loadComponent: () => import('./features/repository/repository').then((m) => m.Repository),
+  },
+
+  // Admins only
+  {
+    path: 'admin',
+    title: 'Administración | INDAB',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/admin/admin').then((m) => m.Admin),
   },
 
   {
