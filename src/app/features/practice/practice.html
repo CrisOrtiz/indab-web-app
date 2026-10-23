@@ -68,6 +68,7 @@
             [symbol]="symbol()"
             (draftSubmitted)="openTrade()"
             (orderAt)="onOrderAt($event)"
+            (lotsChanged)="setLots($event)"
           >
             <div class="quick" role="group" aria-label="Operación rápida a mercado">
               <button
@@ -80,7 +81,15 @@
                 <strong>{{ r.current().close | number: priceDigits(r.current().close) }}</strong>
                 <span>VENDER</span>
               </button>
-              <span class="quick-size">{{ formatLots(lots()) }}</span>
+              <input
+                class="quick-size"
+                type="number"
+                [min]="lotStep"
+                [step]="lotStep"
+                aria-label="Lotes"
+                [value]="formatLots(lots())"
+                (change)="setLots($any($event.target).value)"
+              />
               <button
                 type="button"
                 class="quick-buy"

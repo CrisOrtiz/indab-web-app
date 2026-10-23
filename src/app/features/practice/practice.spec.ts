@@ -22,6 +22,7 @@ class FakeChart {
   readonly tradeClosed = output<string>();
   readonly symbol = input('');
   readonly draftSubmitted = output<void>();
+  readonly lotsChanged = output<string>();
   readonly orderAt = output<OrderAt>();
 }
 
@@ -472,6 +473,24 @@ describe('Practice page', () => {
       'u1',
       expect.objectContaining({ side: 'short', orderType: 'limit', orderPrice: 103 }),
     );
+  });
+
+  it('takes the lot size from the chart too, in steps of 0.01', async () => {
+    await start();
+    const quick = el.querySelector<HTMLInputElement>('.quick input[aria-label="Lotes"]')!;
+    quick.value = '0.034';
+    quick.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(quick.value).toBe('0.03');
+    expect(chart().draft()?.quantity).toBe(3);
+    expect(submitLabel()).toBe('Comprar 0.03 PAXGUSDT MERCADO');
+
+    chart().lotsChanged.emit('0.2');
+    await fixture.whenStable();
+    expect(quick.value).toBe('0.20');
+    chart().lotsChanged.emit('0');
+    await fixture.whenStable();
+    expect(quick.value).toBe('0.01');
   });
 
   it('places a limit order that fills later, and drags its lines', async () => {
