@@ -7,6 +7,7 @@ import { EXIT_REASONS, orderLabel, priceDigits } from '../../practice/practice-f
 import { PracticeService } from '../../practice/practice.service';
 import { LOT_SIZE } from '../../practice/replay';
 import { ReplayChart } from '../../practice/replay-chart';
+import { SessionStatsPanel } from '../../practice/session-stats';
 
 /**
  * Admin view of every student's chart-replay sessions: the trades logged in each, drawn on the
@@ -14,7 +15,7 @@ import { ReplayChart } from '../../practice/replay-chart';
  */
 @Component({
   selector: 'app-practice-review',
-  imports: [DatePipe, DecimalPipe, RouterLink, ReplayChart],
+  imports: [DatePipe, DecimalPipe, RouterLink, ReplayChart, SessionStatsPanel],
   templateUrl: './practice-review.html',
   styleUrls: ['../admin.scss', './practice-review.scss'],
 })

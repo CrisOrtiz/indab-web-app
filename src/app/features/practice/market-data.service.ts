@@ -54,18 +54,36 @@ export const REPLAY_DAYS = 30;
 const ENDPOINTS = ['https://data-api.binance.vision', 'https://api.binance.com'];
 
 /**
- * Picks a random replay start (ms), on a 4-hour boundary, with room for the history before it
- * and a full replay after it.
+ * First and last replay starts (ms): room for the history before them and a full replay after.
  */
+export function replayWindow(
+  instrument: Instrument,
+  now = Date.now(),
+): { earliest: number; latest: number } {
+  const earliest = alignStart(instrument.listedAt + HISTORY_BARS * LONGEST.ms);
+  const latest = Math.max(earliest, now - (REPLAY_DAYS + 1) * 24 * HOUR);
+  return { earliest, latest: Math.floor(latest / LONGEST.ms) * LONGEST.ms };
+}
+
+/** Picks a random replay start (ms), on a 4-hour boundary, inside `replayWindow`. */
 export function randomReplayStart(
   instrument: Instrument,
   now = Date.now(),
   random = Math.random,
 ): number {
-  const earliest = instrument.listedAt + HISTORY_BARS * LONGEST.ms;
-  const latest = now - (REPLAY_DAYS + 1) * 24 * HOUR;
-  const start = earliest + random() * Math.max(0, latest - earliest);
-  return Math.ceil(start / LONGEST.ms) * LONGEST.ms;
+  const { earliest, latest } = replayWindow(instrument, now);
+  return Math.min(latest, alignStart(earliest + random() * (latest - earliest)));
+}
+
+/** The replay start (ms) for a date the student picked, kept inside `replayWindow`. */
+export function replayStartAt(instrument: Instrument, date: number, now = Date.now()): number {
+  const { earliest, latest } = replayWindow(instrument, now);
+  return Math.min(latest, Math.max(earliest, alignStart(date)));
+}
+
+/** Replays start on a bar of the longest timeframe, so every timeframe lines up. */
+function alignStart(time: number): number {
+  return Math.ceil(time / LONGEST.ms) * LONGEST.ms;
 }
 
 /** Parses Binance klines (`[openTime, open, high, low, close, ...]` with string prices). */

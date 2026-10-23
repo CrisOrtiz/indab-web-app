@@ -207,8 +207,8 @@ from Binance's public market-data API (`data-api.binance.vision`, falling back t
 are planned but need a data source licensed for showing prices to students (Dukascopy's free
 feed is for personal use only, and free APIs don't allow display to third parties).
 
-Each session starts at a random moment (on a 4-hour boundary, at least 30 days before today)
-with the dates optionally hidden. The replay runs on one-minute candles, fetched 1000 at a time
+Each session starts at a random moment or on a date the student picks (on a 4-hour boundary, at
+least 30 days before today), with the dates optionally hidden. The replay runs on one-minute candles, fetched 1000 at a time
 as it goes, and the chart builds them into bars of the timeframe the student picks: 1m, 3m, 5m,
 15m (the default), 1h or 4h, switchable at any time; each timeframe shows its 500 bars of
 history before the start. "Siguiente vela" shows the next bar of that timeframe, and orders,
@@ -223,7 +223,10 @@ that show their P/L and the reward to risk, plus an account summary and Position
 History tabs under the chart. Every order, position, stop loss and take profit is a line on the
 chart with a label showing its size and P/L and a × to close, cancel or remove it; order prices
 and stops can be dragged by the line or the label. The chart toolbar adds MA 20, MA 50, EMA 21
-and RSI 14 (in its own pane, computed only from the bars shown) and horizontal and trend lines.
+and RSI 14 (in its own pane, computed only from the bars shown) and drawings: horizontal and trend
+lines, rectangles and Fibonacci retracements. A Statistics tab, the end screen and the admin
+review show the session's win rate, profit factor, average win and loss, maximum drawdown and
+equity curve.
 
 Sessions and orders are written to Firestore as they happen; admins review them at
 `/admin/practice`, where each session's trades are drawn on its candles (fetched again from

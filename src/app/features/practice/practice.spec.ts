@@ -188,6 +188,23 @@ describe('Practice page', () => {
     expect(el.querySelector('.elapsed')!.textContent).toContain('30 min');
   });
 
+  it('starts on the date the student picks', async () => {
+    const radio = [...el.querySelectorAll('label.check')]
+      .find((l) => l.textContent?.trim() === 'Elegir fecha')!
+      .querySelector('input')!;
+    radio.click();
+    await fixture.whenStable();
+    const date = el.querySelector<HTMLInputElement>('input[aria-label="Fecha de inicio"]')!;
+    expect(date.min).toBe('2020-12-23');
+    date.value = '2023-06-15';
+    date.dispatchEvent(new Event('input'));
+    await start();
+    expect(begin * 1000).toBe(Date.UTC(2023, 5, 15));
+    expect(practice.startSession).toHaveBeenCalledWith(
+      expect.objectContaining({ replayStart: Date.UTC(2023, 5, 15) }),
+    );
+  });
+
   it('switches timeframe during the practice, loading its history once', async () => {
     await start();
     await click('Siguiente vela');
@@ -312,6 +329,10 @@ describe('Practice page', () => {
       expect.objectContaining({ side: 'short', orderType: 'market', stopLoss: null }),
     );
     await click('Siguiente vela');
+    await click('Estadísticas');
+    expect(el.querySelector('app-session-stats')?.textContent).toContain(
+      'Cierra operaciones para ver cómo evoluciona tu saldo.',
+    );
     await click('Terminar sesión');
 
     expect(practice.closeTrade).toHaveBeenCalledWith(
@@ -324,6 +345,9 @@ describe('Practice page', () => {
       tradeCount: 1,
     });
     expect(el.textContent).toContain('Sesión terminada');
+    expect(el.querySelector('app-session-stats svg')?.getAttribute('aria-label')).toBe(
+      'Saldo de 200 a 199 USD',
+    );
     expect(chart().hideDates()).toBe(false);
 
     await click('Nueva práctica');

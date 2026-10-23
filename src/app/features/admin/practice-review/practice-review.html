@@ -103,6 +103,7 @@
                   <p class="muted">Cargando gráfico…</p>
                 }
                 @if (trades(); as list) {
+                  <app-session-stats [trades]="list" [startingBalance]="s.startingBalance" />
                   <table class="trades">
                     <thead>
                       <tr>

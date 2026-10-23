@@ -141,6 +141,9 @@ Module notes:
   loaded in chunks; `BarBuilder` (`bars.ts`) builds the chart's bars. TradingView's own
   indicators/drawings are not available to us (Advanced Charts is for public sites only), so
   chart tools (`indicators.ts`, drawings in `ReplayChart`) are built on lightweight-charts.
+  Drawings listen to DOM clicks, since the chart's `subscribeClick` drops a second click within
+  500 ms. Cris chose to grow this with FX Replay's best ideas rather than clone it: session
+  stats (`stats.ts`, `SessionStatsPanel`), rectangle/Fibonacci, picking the start date.
   Cris wants exactly XAU/USD, USD/JPY and NASDAQ: only gold (PAXGUSDT) is live, the others
   wait for a data source licensed for display to students. Never bundle or serve data whose
   license is personal use only (e.g. Dukascopy). A new timeframe must also be added to the

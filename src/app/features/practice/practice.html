@@ -3,9 +3,9 @@
     <a routerLink="/academy" class="back">← Academia</a>
     <h1>Práctica de trading</h1>
     <p>
-      Opera sobre datos históricos reales sin arriesgar dinero. Te mostramos un momento al azar del
-      pasado y avanzas vela por vela: no sabes qué viene después. Todas tus operaciones quedan
-      registradas para que tu instructor las revise.
+      Opera sobre datos históricos reales sin arriesgar dinero. Eliges una fecha del pasado o te
+      mostramos una al azar, y avanzas vela por vela: no sabes qué viene después. Todas tus
+      operaciones quedan registradas para que tu instructor las revise.
     </p>
   </header>
 
@@ -278,6 +278,14 @@
           >
             Historial ({{ r.closedTrades().length }})
           </button>
+          <button
+            type="button"
+            [class.selected]="tab() === 'stats'"
+            [attr.aria-pressed]="tab() === 'stats'"
+            (click)="tab.set('stats')"
+          >
+            Estadísticas
+          </button>
         </div>
 
         @switch (tab()) {
@@ -366,6 +374,9 @@
                 }
               </tbody>
             </table>
+          }
+          @case ('stats') {
+            <app-session-stats [trades]="r.trades()" [startingBalance]="startingBalance" />
           }
           @default {
             <table class="trades">
@@ -477,6 +488,8 @@
             [trades]="r.trades()"
             [barSeconds]="barSeconds()"
           />
+          <h3>Estadísticas</h3>
+          <app-session-stats [trades]="r.trades()" [startingBalance]="startingBalance" />
           <button type="button" class="btn" (click)="reset()">Nueva práctica</button>
         </div>
       }
@@ -492,6 +505,38 @@
             }
           </select>
         </label>
+        <fieldset class="start">
+          <legend>Inicio</legend>
+          <label class="check">
+            <input
+              type="radio"
+              name="start"
+              [checked]="randomStart()"
+              (change)="randomStart.set(true)"
+            />
+            Un momento al azar
+          </label>
+          <label class="check">
+            <input
+              type="radio"
+              name="start"
+              [checked]="!randomStart()"
+              (change)="randomStart.set(false)"
+            />
+            Elegir fecha
+          </label>
+          @if (!randomStart()) {
+            <input
+              type="date"
+              aria-label="Fecha de inicio"
+              required
+              [min]="dateRange().min"
+              [max]="dateRange().max"
+              [value]="startDate()"
+              (input)="startDate.set($any($event.target).value)"
+            />
+          }
+        </fieldset>
         <label class="check">
           <input
             type="checkbox"

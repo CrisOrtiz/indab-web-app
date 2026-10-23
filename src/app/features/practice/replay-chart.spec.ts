@@ -20,10 +20,13 @@ const lw = vi.hoisted(() => {
     scrollToRealTime: vi.fn(),
     subscribeVisibleLogicalRangeChange: vi.fn(),
     subscribeSizeChange: vi.fn(),
+    // Bar i sits at x = 10 * i, in a 700 px wide pane.
+    logicalToCoordinate: vi.fn((index: number) => index * 10),
+    coordinateToLogical: vi.fn((x: number) => x / 10),
+    width: () => 700,
   };
-  const pane = { setHeight: vi.fn() };
+  const pane = { setHeight: vi.fn(), getHeight: () => 420 };
   const priceScale = { width: () => 60, applyOptions: vi.fn() };
-  const handlers: { click?: (param: unknown) => void } = {};
   const chart = {
     addSeries: vi.fn((type: string) => {
       if (type === 'Candlestick') {
@@ -39,11 +42,10 @@ const lw = vi.hoisted(() => {
     priceScale: () => priceScale,
     panes: () => [pane, pane],
     subscribeCrosshairMove: vi.fn(),
-    subscribeClick: vi.fn((handler) => (handlers.click = handler)),
     remove: vi.fn(),
   };
   const markers = { setMarkers: vi.fn() };
-  return { series, lines, chart, markers, pane, priceScale, handlers };
+  return { series, lines, chart, markers, pane, priceScale };
 });
 
 vi.mock('lightweight-charts', () => ({
@@ -282,20 +284,27 @@ describe('ReplayChart', () => {
 
   it('draws horizontal and trend lines where the student clicks, and erases them', async () => {
     const { fixture, click, labels, button, el } = await render();
-    const chartClick = async (time: number | undefined, y: number) => {
-      lw.handlers.click!({ time, point: { x: 10, y }, paneIndex: 0 });
+    const chartClick = async (time: number, y: number) => {
+      // Bar `time` (1 or 2) is at x 0 or 10.
+      el.querySelector('.canvas')!.dispatchEvent(
+        new MouseEvent('click', { clientX: (time - 1) * 10, clientY: y, bubbles: true }),
+      );
       await fixture.whenStable();
     };
 
-    await click('Línea horizontal');
+    await click('Horizontal');
     expect(el.textContent).toContain('Haz clic en el gráfico para poner la línea.');
+    // Clicks on the price scale or the RSI pane do not draw.
+    await chartClick(80, 400);
+    await chartClick(1, 450);
+    expect(lw.series.createPriceLine).not.toHaveBeenCalled();
     await chartClick(1, 400);
     expect(lw.series.createPriceLine).toHaveBeenLastCalledWith(
       expect.objectContaining({ price: 100 }),
     );
     expect(labels()).toEqual(['×']);
 
-    await click('Línea de tendencia');
+    await click('Tendencia');
     await chartClick(2, 390);
     expect(el.textContent).toContain('Haz clic en el segundo punto.');
     await chartClick(1, 380);
@@ -303,7 +312,7 @@ describe('ReplayChart', () => {
       { time: 1, value: 120 },
       { time: 2, value: 110 },
     ]);
-    expect(button('Línea de tendencia').getAttribute('aria-pressed')).toBe('false');
+    expect(button('Tendencia').getAttribute('aria-pressed')).toBe('false');
 
     el.querySelector<HTMLButtonElement>('button[aria-label="Borrar línea"]')!.click();
     await fixture.whenStable();
@@ -311,5 +320,54 @@ describe('ReplayChart', () => {
     await click('Borrar dibujos');
     expect(lw.chart.removeSeries).toHaveBeenCalledWith(lw.lines[0]);
     expect(button('Borrar dibujos').disabled).toBe(true);
+  });
+
+  it('draws rectangles and Fibonacci retracements over the chart, and erases them', async () => {
+    const { fixture, click, el } = await render();
+    const chartClick = async (time: number, y: number) => {
+      // Bar `time` (1 or 2) is at x 0 or 10.
+      el.querySelector('.canvas')!.dispatchEvent(
+        new MouseEvent('click', { clientX: (time - 1) * 10, clientY: y, bubbles: true }),
+      );
+      await fixture.whenStable();
+    };
+
+    await click('Rectángulo');
+    expect(el.textContent).toContain('Haz clic en una esquina del rectángulo.');
+    await chartClick(2, 300);
+    expect(el.textContent).toContain('Haz clic en la esquina opuesta.');
+    await chartClick(1, 380);
+    const rect = el.querySelector('svg.shapes rect')!;
+    // Bars 1 and 2 are at x 0 and 10; prices 120 and 200 at y 380 and 300.
+    expect(['x', 'y', 'width', 'height'].map((a) => rect.getAttribute(a))).toEqual([
+      '0',
+      '300',
+      '10',
+      '80',
+    ]);
+
+    // A move from 100 up to 200: the 0 level sits at its end and 1 at its start.
+    await click('Fibonacci');
+    await chartClick(1, 400);
+    await chartClick(2, 300);
+    const levels = [...el.querySelectorAll('svg.shapes .fib-text')].map((t) =>
+      t.textContent!.trim(),
+    );
+    expect(levels).toEqual([
+      '0 (200.000)',
+      '0.236 (176.400)',
+      '0.382 (161.800)',
+      '0.5 (150.000)',
+      '0.618 (138.200)',
+      '0.786 (121.400)',
+      '1 (100.000)',
+    ]);
+
+    el.querySelector<HTMLButtonElement>('button[aria-label="Borrar rectángulo"]')!.click();
+    await fixture.whenStable();
+    expect(el.querySelector('svg.shapes rect')).toBeNull();
+    expect(el.querySelectorAll('svg.shapes .fib')).toHaveLength(7);
+    await click('Borrar dibujos');
+    expect(el.querySelector('svg.shapes')).toBeNull();
   });
 });

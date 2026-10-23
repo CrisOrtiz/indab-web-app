@@ -134,6 +134,7 @@ describe('PracticeReview', () => {
     );
     expect(chart()?.candles()).toEqual([candle]);
     expect(chart()?.trades()).toHaveLength(2);
+    expect(el.querySelector('app-session-stats')?.textContent).toContain('Drawdown máximo');
     expect(chart()?.barSeconds()).toBe(3600);
     const detail = el.querySelector('.detail')!;
     expect(detail.textContent).toContain('Take profit');

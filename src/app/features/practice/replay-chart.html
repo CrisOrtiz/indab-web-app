@@ -15,17 +15,35 @@
       type="button"
       [class.on]="tool() === 'hline'"
       [attr.aria-pressed]="tool() === 'hline'"
+      title="Línea horizontal"
       (click)="pick('hline')"
     >
-      Línea horizontal
+      Horizontal
     </button>
     <button
       type="button"
       [class.on]="tool() === 'trend'"
       [attr.aria-pressed]="tool() === 'trend'"
+      title="Línea de tendencia"
       (click)="pick('trend')"
     >
-      Línea de tendencia
+      Tendencia
+    </button>
+    <button
+      type="button"
+      [class.on]="tool() === 'rect'"
+      [attr.aria-pressed]="tool() === 'rect'"
+      (click)="pick('rect')"
+    >
+      Rectángulo
+    </button>
+    <button
+      type="button"
+      [class.on]="tool() === 'fib'"
+      [attr.aria-pressed]="tool() === 'fib'"
+      (click)="pick('fib')"
+    >
+      Fibonacci
     </button>
     <button type="button" [disabled]="!drawings().length" (click)="clearDrawings()">
       Borrar dibujos
@@ -34,6 +52,46 @@
 }
 <div class="stage" #stage>
   <div class="canvas" #canvas></div>
+  @if (shapes().length) {
+    <svg class="shapes" aria-hidden="true">
+      @for (shape of shapes(); track shape.id) {
+        @if (shape.kind === 'rect') {
+          <rect
+            class="rect"
+            [attr.x]="shape.left"
+            [attr.y]="shape.top"
+            [attr.width]="shape.right - shape.left"
+            [attr.height]="shape.bottom - shape.top"
+          />
+        } @else {
+          @for (level of shape.levels; track level.ratio) {
+            <line
+              class="fib"
+              [attr.x1]="shape.left"
+              [attr.x2]="shape.right"
+              [attr.y1]="level.y"
+              [attr.y2]="level.y"
+            />
+            <text class="fib-text" [attr.x]="shape.left + 4" [attr.y]="level.y - 3">
+              {{ level.ratio }} ({{ level.price | number: priceDigits(level.price) }})
+            </text>
+          }
+        }
+      }
+    </svg>
+    @for (shape of shapes(); track shape.id) {
+      <button
+        type="button"
+        class="x shape-x"
+        [style.left.px]="shape.right"
+        [style.top.px]="shape.top"
+        [attr.aria-label]="shape.kind === 'rect' ? 'Borrar rectángulo' : 'Borrar Fibonacci'"
+        (click)="act({ kind: 'erase', drawingId: shape.id, label: '' })"
+      >
+        ×
+      </button>
+    }
+  }
   @for (label of labels(); track label.key) {
     <div
       class="line-label"
@@ -66,13 +124,7 @@
   }
   @if (tool(); as current) {
     <p class="tool-hint" role="status">
-      {{
-        current === 'hline'
-          ? 'Haz clic en el gráfico para poner la línea.'
-          : anchor()
-            ? 'Haz clic en el segundo punto.'
-            : 'Haz clic en el primer punto de la línea.'
-      }}
+      {{ toolHints[current][anchor() ? 1 : 0] }}
     </p>
   }
   <ng-content />
