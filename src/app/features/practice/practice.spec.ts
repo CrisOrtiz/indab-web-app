@@ -233,6 +233,78 @@ describe('Practice page', () => {
     expect(market.loadCandles).toHaveBeenCalledTimes(3);
   });
 
+  it('builds every timeframe from the same candles, history and replay alike', async () => {
+    // A market whose minutes all differ, served the way Binance does: a bar of any interval
+    // is the open of its first minute, the highest high, lowest low and close of its last.
+    const minute = (t: number): Candle => {
+      const m = t / 60;
+      const base = 2000 + 20 * Math.sin(m / 50) + ((m * 7) % 5);
+      const open = base + ((m * 37) % 11) / 10;
+      const close = base + ((m * 53) % 13) / 10;
+      return {
+        time: t,
+        open,
+        close,
+        high: Math.max(open, close) + ((m * 17) % 5) / 10,
+        low: Math.min(open, close) - ((m * 29) % 7) / 10,
+      };
+    };
+    const seconds: Record<string, number> = {
+      '1m': 60,
+      '3m': 180,
+      '5m': 300,
+      '15m': 900,
+      '1h': 3600,
+      '4h': 14400,
+    };
+    market.loadCandles.mockImplementation(
+      async (_symbol: string, interval: string, from: number, limit = 1000) => {
+        const s = seconds[interval];
+        return Array.from(
+          { length: limit },
+          (_, i) =>
+            aggregate(
+              Array.from({ length: s / 60 }, (_, k) => minute(from / 1000 + i * s + k * 60)),
+              s,
+            )[0],
+        );
+      },
+    );
+
+    await start();
+    for (let i = 0; i < 5; i++) {
+      await click('Siguiente vela');
+    }
+    // Seven minutes into the next 15 minutes: every timeframe has a bar in the making.
+    await click('1m');
+    for (let i = 0; i < 7; i++) {
+      await click('Siguiente vela');
+    }
+    const bars: Record<string, Candle[]> = {};
+    for (const tf of Object.keys(seconds)) {
+      await click(tf);
+      bars[tf] = chart().candles();
+    }
+
+    const pairs = [
+      ['1m', '3m'],
+      ['1m', '5m'],
+      ['5m', '15m'],
+      ['15m', '1h'],
+      ['1h', '4h'],
+    ];
+    for (const [lower, higher] of pairs) {
+      const from = bars[lower][0].time;
+      const built = aggregate(bars[lower], seconds[higher]);
+      const covered = bars[higher].filter((b) => b.time >= from);
+      expect(covered.length, `${higher} from ${lower}`).toBeGreaterThan(1);
+      expect(covered, `${higher} from ${lower}`).toEqual(built.slice(-covered.length));
+    }
+    // ...and they all end at the same moment, on the current price.
+    const last = Object.values(bars).map((list) => list.at(-1)!.close);
+    expect(new Set(last).size).toBe(1);
+  });
+
   it('fetches more minutes before they run out', async () => {
     await start();
     await click('4h');
@@ -492,3 +564,24 @@ describe('Practice page', () => {
     expect(el.textContent).toContain('Sesión terminada');
   });
 });
+
+/** Bars of `seconds` made of consecutive smaller bars, as a chart platform builds them. */
+function aggregate(candles: Candle[], seconds: number): Candle[] {
+  const bars: Candle[] = [];
+  for (const c of candles) {
+    const time = Math.floor(c.time / seconds) * seconds;
+    const last = bars.at(-1);
+    if (last?.time === time) {
+      bars[bars.length - 1] = {
+        time,
+        open: last.open,
+        high: Math.max(last.high, c.high),
+        low: Math.min(last.low, c.low),
+        close: c.close,
+      };
+    } else {
+      bars.push({ ...c, time });
+    }
+  }
+  return bars;
+}

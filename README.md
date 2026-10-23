@@ -211,8 +211,11 @@ Each session starts at a random moment or on a date the student picks (on a 4-ho
 least 30 days before today), with the dates optionally hidden. The replay runs on one-minute candles, fetched 1000 at a time
 as it goes, and the chart builds them into bars of the timeframe the student picks: 1m, 3m, 5m,
 15m (the default), 1h or 4h, switchable at any time; each timeframe shows its 500 bars of
-history before the start. "Siguiente vela" shows the next bar of that timeframe, and orders,
-stops and the stop out are checked minute by minute.
+history before the start. Every bar is the open of its first minute, the highest high, lowest
+low and close of its last, so the timeframes agree (a 3m bar is three 1m bars, a 1h bar four 15m
+bars, the bar in the making included); a test in `practice.spec.ts` checks this across all six.
+"Siguiente vela" shows the next bar of that timeframe, and orders, stops and the stop out are
+checked minute by minute.
 
 Students start with 200 virtual USD and trade in lots (1 lot = 100 oz) with 1:100 leverage: a
 position ties up 1% of its value as margin, and every position is closed (stop out) when equity
