@@ -86,6 +86,7 @@ const position: PracticeTrade = {
     (tradeClosed)="closed.push($event)"
     (draftSubmitted)="submitted()"
     (orderAt)="orders.push($event)"
+    (lotsChanged)="lots.push($event)"
     symbol="PAXGUSDT"
   />`,
 })
@@ -99,6 +100,7 @@ class Host {
   readonly removed: LevelRemove[] = [];
   readonly closed: string[] = [];
   readonly orders: OrderAt[] = [];
+  readonly lots: string[] = [];
   submitted = () => {};
 }
 
@@ -254,6 +256,19 @@ describe('ReplayChart', () => {
     pointer('pointerup', 370);
     expect(host.moves.slice(1)).toEqual([{ target: 'a', field: 'stopLoss', price: 108 }]);
 
+    // On a touch screen, a finger dragging a line neither scrolls the page nor pans the chart.
+    const touch = (type: string) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      canvas.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(touch('touchmove')).toBe(false);
+    pointer('pointerdown', 390);
+    expect(touch('touchstart')).toBe(true);
+    expect(touch('touchmove')).toBe(true);
+    pointer('pointerup', 390);
+    host.moves.pop();
+
     // A label is a handle for its line too.
     await new Promise((resolve) => setTimeout(resolve));
     await fixture.whenStable();
@@ -389,7 +404,12 @@ describe('ReplayChart', () => {
     });
     host.trades.set([position]);
     await fixture.whenStable();
-    expect(labels()).toContain('Vender 0.05 Mercado');
+    expect(labels()).toContain('Vender Mercado');
+    const lots = el.querySelector<HTMLInputElement>('.line-label input.lots')!;
+    expect(lots.value).toBe('0.05');
+    lots.value = '0.1';
+    lots.dispatchEvent(new Event('change'));
+    expect(host.lots).toEqual(['0.1']);
     const canvas = el.querySelector('.canvas')!;
     const pointer = (type: string, clientY: number) =>
       canvas.dispatchEvent(new MouseEvent(type, { clientY, bubbles: true }));

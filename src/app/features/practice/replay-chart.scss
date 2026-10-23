@@ -51,7 +51,18 @@
     border-radius: 2px;
   }
 
+  // On a phone the toolbar scrolls sideways instead of eating the chart's height.
+  @media (max-width: 600px) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+
+    button {
+      flex: none;
+    }
+  }
+
   .sep {
+    flex: none;
     width: 1px;
     height: 18px;
     margin: 0 4px;
@@ -107,6 +118,21 @@
   line-height: 1.4;
 }
 
+/* A faint INDAB logo behind the candles. */
+.watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  width: 140px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  opacity: 0.07;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* The boxes on order and position lines, as in TradingView. */
 .line-label {
   position: absolute;
@@ -125,6 +151,19 @@
 
   &.draggable {
     cursor: ns-resize;
+    // A finger on a label drags its line instead of scrolling the page.
+    touch-action: none;
+  }
+
+  .lots {
+    width: 4.5em;
+    padding: 0 4px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: right;
   }
 
   > * {

@@ -67,6 +67,8 @@ type LabelAction =
 interface LineLabel {
   /** The side, at the start of the box; on the order being set up, a button that places it. */
   badge?: { text: string; side: TradeSide; submit: boolean };
+  /** Lots of the order being set up, editable on its line. */
+  lots?: number;
   text: string;
   /** P/L if the price reaches the line (or, for a position, at the last close). */
   pnl: number | null;
@@ -139,8 +141,9 @@ interface PlacedShape {
 /** Retracement levels, as TradingView draws them by default. */
 export const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 
-/** How close (px) the pointer must be to a line to grab it. */
+/** How close (px) the pointer must be to a line to grab it; a finger needs more room. */
 const GRAB_DISTANCE = 6;
+const TOUCH_GRAB_DISTANCE = 16;
 const DRAWING_COLOR = '#2962ff';
 const RSI_PANE_HEIGHT = 110;
 
@@ -182,6 +185,8 @@ export class ReplayChart {
   readonly tradeClosed = output<string>();
   /** The side button on the line of the order being set up. */
   readonly draftSubmitted = output<void>();
+  /** Lots typed on the line of the order being set up. */
+  readonly lotsChanged = output<string>();
   readonly orderAt = output<OrderAt>();
   /** Symbol named in the "+" menu. */
   readonly symbol = input('');
@@ -547,7 +552,8 @@ export class ReplayChart {
           side: draft.side,
           submit: true,
         },
-        text: `${lots} ${ORDER_TYPES[draft.orderType]}`,
+        lots: Number(lots),
+        text: ORDER_TYPES[draft.orderType],
         pnl: null,
         action: null,
       };
@@ -914,7 +920,7 @@ export class ReplayChart {
     /** The draggable line closest to the pointer, if one is within reach. */
     const near = (event: PointerEvent) => {
       let best: (typeof this.priceLines)[number] | undefined;
-      let bestDistance = GRAB_DISTANCE;
+      let bestDistance = event.pointerType === 'touch' ? TOUCH_GRAB_DISTANCE : GRAB_DISTANCE;
       for (const entry of this.priceLines) {
         const grabbable = entry.line.drag || entry.line.bracket;
         const at = grabbable ? this.series!.priceToCoordinate(entry.line.price) : null;
@@ -990,6 +996,16 @@ export class ReplayChart {
       // If the page rejects the move its inputs stay the same, so put the line back.
       setTimeout(() => this.drawTrades(this.trades(), this.draft()));
     };
+    // On a touch screen a drag would also scroll the page and pan the chart: the pointerdown
+    // that grabbed a line comes first, so its touches are kept from both.
+    const holdTouch = (event: TouchEvent) => {
+      if (this.dragging) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    stage.addEventListener('touchstart', holdTouch, { capture: true, passive: false });
+    stage.addEventListener('touchmove', holdTouch, { capture: true, passive: false });
     stage.addEventListener('pointerleave', () => this.hoverY.set(null));
     stage.addEventListener('pointerup', drop, { capture: true });
     stage.addEventListener('pointercancel', drop, { capture: true });

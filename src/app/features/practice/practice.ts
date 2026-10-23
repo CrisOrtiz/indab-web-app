@@ -491,6 +491,13 @@ export class Practice {
     return move * this.units();
   }
 
+  /** Lots typed on the chart: whole steps of 0.01, at least one. */
+  protected setLots(value: string): void {
+    const lots = Number(value);
+    const steps = Number.isFinite(lots) ? Math.round(lots / LOT_STEP) : 1;
+    this.lots.set(Number((Math.max(1, steps) * LOT_STEP).toFixed(2)));
+  }
+
   protected useFraction(fraction: number): void {
     const available = this.replay()?.available() ?? 0;
     const perLot = marginFor(1, this.reference());
