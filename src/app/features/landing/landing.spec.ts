@@ -49,4 +49,18 @@ describe('Landing', () => {
     expect(el.querySelector('#eleva a[href="/eleva"]')).not.toBeNull();
     expect(el.querySelector('#eleva .disclaimer')?.textContent).toContain('Aviso de riesgo');
   });
+
+  it('credits INDAB and crisortizdev in the footer', async () => {
+    const el = await render();
+    const footer = el.querySelector('footer')!;
+    expect(footer.textContent).toContain('INDAB y crisortizdev. Todos los derechos reservados.');
+    const credit = footer.querySelector<HTMLAnchorElement>('a[href="https://crisortiz.github.io"]');
+    expect(credit?.textContent).toContain('crisortizdev');
+    expect(credit?.target).toBe('_blank');
+  });
+
+  it('animates the sections in on scroll', async () => {
+    const el = await render();
+    expect(el.querySelectorAll('.reveal').length).toBeGreaterThan(10);
+  });
 });

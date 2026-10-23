@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { Reveal } from '../../shared/reveal/reveal';
 
 interface Item {
   title: string;
@@ -15,7 +16,7 @@ interface Faq {
 // Public landing page. Draft: the copy below is placeholder content for Cris to review.
 @Component({
   selector: 'app-landing',
-  imports: [RouterLink],
+  imports: [RouterLink, Reveal],
   templateUrl: './landing.html',
   styleUrl: './landing.scss',
 })
