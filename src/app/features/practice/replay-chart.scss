@@ -144,6 +144,83 @@
   }
 }
 
+/* The side of an order or position; on the order being set up it places it. */
+.line-label .badge {
+  border: 0;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+
+  &.buy {
+    background: #2962ff;
+  }
+
+  &.sell {
+    background: #f23645;
+  }
+}
+
+button.badge {
+  cursor: pointer;
+
+  &:hover {
+    filter: brightness(1.1);
+  }
+}
+
+/* The "+" next to the price scale and its menu, as in TradingView. */
+.plus {
+  position: absolute;
+  z-index: 3;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 1px solid var(--color-muted);
+  border-radius: 50%;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.plus-menu {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  min-width: 260px;
+  padding: 4px 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
+
+  button {
+    padding: 8px 14px;
+    border: 0;
+    background: none;
+    color: var(--color-text);
+    font: inherit;
+    font-size: 0.85rem;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--color-surface);
+    }
+  }
+
+  hr {
+    margin: 4px 0;
+    border: 0;
+    border-top: 1px solid var(--color-border);
+  }
+}
+
 .x {
   border: 0;
   background: none;

@@ -65,6 +65,9 @@
             (levelMoved)="onLevelMoved($event)"
             (levelRemoved)="onLevelRemoved($event)"
             (tradeClosed)="onTradeClosed($event)"
+            [symbol]="symbol()"
+            (draftSubmitted)="openTrade()"
+            (orderAt)="onOrderAt($event)"
           >
             <div class="quick" role="group" aria-label="Operación rápida a mercado">
               <button

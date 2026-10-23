@@ -222,7 +222,10 @@ panel with Market/Limit/Stop tabs, lots with their margin, and take profit / sto
 that show their P/L and the reward to risk, plus an account summary and Positions / Orders /
 History tabs under the chart. Every order, position, stop loss and take profit is a line on the
 chart with a label showing its size and P/L and a × to close, cancel or remove it; order prices
-and stops can be dragged by the line or the label. The chart toolbar adds MA 20, MA 50, EMA 21
+and stops can be dragged by the line or the label. As in TradingView, the order being set up is a
+line with a Buy/Sell button that places it, dragging up or down from it (or from an open
+position) pulls out a take profit or stop loss, and a "+" next to the price scale offers a buy or
+sell limit/stop at the price under the pointer, filling in the order panel, or a horizontal line. The chart toolbar adds MA 20, MA 50, EMA 21
 and RSI 14 (in its own pane, computed only from the bars shown) and drawings: horizontal and trend
 lines, rectangles and Fibonacci retracements. A Statistics tab, the end screen and the admin
 review show the session's win rate, profit factor, average win and loss, maximum drawdown and

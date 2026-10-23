@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { Candle, PracticeTrade } from '../../core/models/practice';
-import { LevelMove, LevelRemove, OrderDraft, ReplayChart } from './replay-chart';
+import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
 
 const lw = vi.hoisted(() => {
   const makeSeries = () => ({
@@ -84,6 +84,9 @@ const position: PracticeTrade = {
     (levelMoved)="moves.push($event)"
     (levelRemoved)="removed.push($event)"
     (tradeClosed)="closed.push($event)"
+    (draftSubmitted)="submitted()"
+    (orderAt)="orders.push($event)"
+    symbol="PAXGUSDT"
   />`,
 })
 class Host {
@@ -95,6 +98,8 @@ class Host {
   readonly moves: LevelMove[] = [];
   readonly removed: LevelRemove[] = [];
   readonly closed: string[] = [];
+  readonly orders: OrderAt[] = [];
+  submitted = () => {};
 }
 
 describe('ReplayChart', () => {
@@ -183,7 +188,7 @@ describe('ReplayChart', () => {
     ]);
     expect(lw.series.createPriceLine).toHaveBeenCalledTimes(2);
     // 0.05 lots bought at 120, last close 1.5; stop loss at 110.
-    expect(labels()).toEqual(['Compra 0.05 -592.50 USD ×', 'SL -50.00 USD ×']);
+    expect(labels()).toEqual(['Compra 0.05 -592.50 USD ×', 'SL 0.05 -50.00 USD ×']);
 
     // A new candle refreshes the position's P/L.
     host.candles.update((list) => [...list, c(3, 130)]);
@@ -218,7 +223,7 @@ describe('ReplayChart', () => {
     ]);
   });
 
-  it('lets the student drag the draft and trade levels, not the entry of an open trade', async () => {
+  it('lets the student drag the draft and trade levels', async () => {
     const { fixture, host, el } = await render();
     host.draft.set({ side: 'long', orderType: 'limit', price: 98, stopLoss: 95, takeProfit: null });
     host.trades.set([position]);
@@ -241,7 +246,7 @@ describe('ReplayChart', () => {
       handleScale: true,
     });
 
-    // The open trade's stop loss (y = 390) moves; its entry line (y = 380) does not.
+    // The open trade's stop loss (y = 390) moves; a click on its entry (y = 380) adds nothing.
     pointer('pointerdown', 390);
     pointer('pointermove', 392);
     pointer('pointerup', 392);
@@ -253,7 +258,7 @@ describe('ReplayChart', () => {
     await new Promise((resolve) => setTimeout(resolve));
     await fixture.whenStable();
     const label = [...el.querySelectorAll('.line-label')].find((l) =>
-      l.textContent?.includes('Nueva compra límite'),
+      l.textContent?.includes('Límite'),
     )!;
     label.dispatchEvent(new MouseEvent('pointerdown', { clientY: 402, bubbles: true }));
     canvas.dispatchEvent(new MouseEvent('pointermove', { clientY: 403, bubbles: true }));
@@ -369,5 +374,110 @@ describe('ReplayChart', () => {
     expect(el.querySelectorAll('svg.shapes .fib')).toHaveLength(7);
     await click('Borrar dibujos');
     expect(el.querySelector('svg.shapes')).toBeNull();
+  });
+
+  it('pulls a take profit or stop loss out of an entry line, as in TradingView', async () => {
+    const { fixture, host, el, labels } = await render();
+    // A market order being set up sits on the last close (1.5, y = 498.5).
+    host.draft.set({
+      side: 'short',
+      orderType: 'market',
+      price: null,
+      stopLoss: null,
+      takeProfit: null,
+      quantity: 5,
+    });
+    host.trades.set([position]);
+    await fixture.whenStable();
+    expect(labels()).toContain('Vender 0.05 Mercado');
+    const canvas = el.querySelector('.canvas')!;
+    const pointer = (type: string, clientY: number) =>
+      canvas.dispatchEvent(new MouseEvent(type, { clientY, bubbles: true }));
+
+    // From the long position's entry (120, y = 380): up is a take profit, with its P/L live.
+    pointer('pointerdown', 380);
+    pointer('pointermove', 360);
+    await fixture.whenStable();
+    expect(labels()).toContain('TP 0.05 +100.00 USD ×');
+    pointer('pointerup', 360);
+    // ...and down a stop loss.
+    pointer('pointerdown', 380);
+    pointer('pointermove', 400);
+    pointer('pointerup', 400);
+    // For the short order being set up, down is its take profit.
+    pointer('pointerdown', 498);
+    pointer('pointermove', 499);
+    pointer('pointerup', 499);
+    expect(host.moves).toEqual([
+      { target: 'a', field: 'takeProfit', price: 140 },
+      { target: 'a', field: 'stopLoss', price: 100 },
+      { target: 'draft', field: 'takeProfit', price: 1 },
+    ]);
+
+    // The side button on the order line places it.
+    let submitted = 0;
+    fixture.componentInstance.submitted = () => submitted++;
+    el.querySelector<HTMLButtonElement>('.line-label button.badge')!.click();
+    expect(submitted).toBe(1);
+  });
+
+  it('offers orders and a horizontal line at the price under the pointer', async () => {
+    const { fixture, host, el, labels } = await render();
+    host.candles.set([c(1), c(2, 100)]);
+    host.draft.set({
+      side: 'long',
+      orderType: 'market',
+      price: null,
+      stopLoss: null,
+      takeProfit: null,
+      quantity: 5,
+    });
+    await fixture.whenStable();
+    const stage = el.querySelector('.stage')!;
+    // y = 410 is price 90, below the market (100).
+    stage.dispatchEvent(
+      new MouseEvent('pointermove', { clientX: 50, clientY: 410, bubbles: true }),
+    );
+    await fixture.whenStable();
+    el.querySelector<HTMLButtonElement>('button.plus')!.click();
+    await fixture.whenStable();
+    const items = () =>
+      [...el.querySelectorAll<HTMLButtonElement>('.plus-menu button')].map((b) =>
+        b.textContent!.replace(/\s+/g, ' ').trim(),
+      );
+    expect(items()).toEqual([
+      'Comprar 0.05 PAXGUSDT @ 90.000 límite',
+      'Vender 0.05 PAXGUSDT @ 90.000 stop',
+      'Añadir orden en 90.000…',
+      'Dibujar línea horizontal en 90.000',
+    ]);
+    el.querySelectorAll<HTMLButtonElement>('.plus-menu button')[1].click();
+    await fixture.whenStable();
+    expect(el.querySelector('.plus-menu')).toBeNull();
+
+    el.querySelector<HTMLButtonElement>('button.plus')!.click();
+    await fixture.whenStable();
+    el.querySelectorAll<HTMLButtonElement>('.plus-menu button')[2].click();
+    el.querySelector<HTMLButtonElement>('button.plus')!.click();
+    await fixture.whenStable();
+    el.querySelectorAll<HTMLButtonElement>('.plus-menu button')[3].click();
+    await fixture.whenStable();
+    expect(host.orders).toEqual([
+      { side: 'short', orderType: 'stop', price: 90, place: true },
+      { side: 'long', orderType: 'limit', price: 90, place: false },
+    ]);
+    expect(labels()).toContain('×');
+
+    // Clicking elsewhere closes the menu; outside the candles there is no "+".
+    el.querySelector<HTMLButtonElement>('button.plus')!.click();
+    await fixture.whenStable();
+    document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    await fixture.whenStable();
+    expect(el.querySelector('.plus-menu')).toBeNull();
+    stage.dispatchEvent(
+      new MouseEvent('pointermove', { clientX: 750, clientY: 410, bubbles: true }),
+    );
+    await fixture.whenStable();
+    expect(el.querySelector('button.plus')).toBeNull();
   });
 });
