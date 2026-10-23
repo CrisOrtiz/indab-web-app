@@ -94,6 +94,8 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
 6. **Indexes**: composite queries need an entry in `firestore.indexes.json`.
 7. **Docs**: update the access-model and routes tables in `README.md` and this skill.
 8. **Verify**: `npm test`, `npm run test:rules`, `npm run build`.
+   CI (`.github/workflows/ci.yml`) runs the same three on every PR and push and gates every
+   deploy on them; a new test script must also be added to its `test` job.
 
 Module notes:
 

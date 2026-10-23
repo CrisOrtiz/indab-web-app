@@ -1,0 +1,141 @@
+# Tests every push and pull request, then deploys (project indab-academy) only if tests pass.
+#   - pull request / any push -> build, unit tests (ng test) and Firestore rules tests (emulator)
+#   - pull request            -> temporary preview URL, posted as a PR comment
+#   - push to main            -> live site (https://indab-academy.web.app)
+#   - push to main            -> Firestore rules + indexes, only when the repository variable
+#                                DEPLOY_FIRESTORE_RULES is "true"
+# Deploys need the repository secret FIREBASE_SERVICE_ACCOUNT_INDAB_ACADEMY (see README,
+# "Automatic deploys"). Without it the tests still run and the deploy steps are skipped.
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Never cancel a run on main halfway through a deploy; superseded PR runs can go.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Cache Firebase emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+      - name: Unit tests
+        run: npm test -- --watch=false
+      - name: Firestore rules tests
+        run: npm run test:rules
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/indab-web-app/browser
+          retention-days: 3
+
+  deploy_preview:
+    name: Deploy preview
+    needs: test
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    env:
+      HAS_FIREBASE_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_INDAB_ACADEMY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/indab-web-app/browser
+      - name: Deploy preview channel
+        if: env.HAS_FIREBASE_KEY == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_INDAB_ACADEMY }}
+          projectId: indab-academy
+          expires: 7d
+
+  deploy_live:
+    name: Deploy live site
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-live
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://indab-academy.web.app
+    env:
+      HAS_FIREBASE_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_INDAB_ACADEMY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/indab-web-app/browser
+      - name: Deploy live site
+        if: env.HAS_FIREBASE_KEY == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_INDAB_ACADEMY }}
+          projectId: indab-academy
+          channelId: live
+
+  deploy_rules:
+    name: Deploy Firestore rules
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.DEPLOY_FIRESTORE_RULES == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-rules
+      cancel-in-progress: false
+    environment: production
+    env:
+      FIREBASE_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_INDAB_ACADEMY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Deploy rules and indexes
+        if: env.FIREBASE_KEY != ''
+        run: |
+          key_file="$RUNNER_TEMP/firebase-key.json"
+          printf '%s' "$FIREBASE_KEY" > "$key_file"
+          export GOOGLE_APPLICATION_CREDENTIALS="$key_file"
+          npx firebase deploy --only firestore:rules,firestore:indexes --project indab-academy --non-interactive
+          rm -f "$key_file"

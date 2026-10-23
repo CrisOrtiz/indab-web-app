@@ -102,12 +102,20 @@ If the CLI reports that no Hosting site exists, open **Hosting** in the Firebase
 **Comenzar** once, and run `npm run deploy` again. Both hosting domains are in **Authentication >
 Settings > Authorized domains** by default; add any custom domain there too, or Google sign-in fails on it.
 
-### Automatic deploys (GitHub Actions)
+### CI/CD (GitHub Actions)
 
-`.github/workflows/firebase-hosting.yml` builds every push and pull request. When the repository
-secret `FIREBASE_SERVICE_ACCOUNT_INDAB_ACADEMY` exists, a merge to `main` deploys the live site and
-each pull request gets a 7-day preview URL posted as a PR comment. To create the secret (and a
-service account with exactly the Hosting roles it needs) run, from the repo folder:
+`.github/workflows/ci.yml` runs on every push and pull request:
+
+1. **Build and test**: `npm run build`, `npm test` and `npm run test:rules` (Node 24, Java 21 for
+   the Firestore emulator). Nothing deploys unless this job passes.
+2. **Deploy preview** (pull requests): a 7-day preview URL posted as a PR comment.
+3. **Deploy live site** (push to `main`): https://indab-academy.web.app, using the build that was tested.
+4. **Deploy Firestore rules** (push to `main`, opt-in): `firestore.rules` and
+   `firestore.indexes.json`, only when the repository variable `DEPLOY_FIRESTORE_RULES` is `true`.
+
+The deploy jobs need the repository secret `FIREBASE_SERVICE_ACCOUNT_INDAB_ACADEMY`; without it
+they are skipped and only the tests run. To create the secret (and a service account with the
+Hosting roles) run, from the repo folder:
 
 ```bash
 npx firebase init hosting:github
@@ -115,8 +123,20 @@ npx firebase init hosting:github
 
 Pick repository `CrisOrtiz/indab-web-app`; it uploads the secret to GitHub for you. Answer **No**
 to the build-script and automatic-deploy questions, and don't commit the
-`firebase-hosting-pull-request.yml` / `firebase-hosting-merge.yml` files it writes: delete them, this
-workflow already covers both.
+`firebase-hosting-pull-request.yml` / `firebase-hosting-merge.yml` files it writes: delete them,
+`ci.yml` already covers both.
+
+To also deploy rules from CI:
+
+1. In [Google Cloud IAM](https://console.cloud.google.com/iam-admin/iam?project=indab-academy), edit
+   the `github-action-...@indab-academy.iam.gserviceaccount.com` account the command created and add
+   the roles **Firebase Rules Admin**, **Cloud Datastore Index Admin** and **Service Usage Consumer**.
+2. In GitHub, **Settings > Secrets and variables > Actions > Variables**, add
+   `DEPLOY_FIRESTORE_RULES` = `true`.
+
+Recommended: in **Settings > Branches**, protect `main` and require the **Build and test** check, so
+a pull request with failing tests cannot be merged. Deploy jobs run in the `production`
+environment, where you can add required reviewers if you want to approve each live deploy.
 
 To run `ng serve` against the real project instead of the emulators, copy the config from
 `environment.ts` into `environment.development.ts` and set `useEmulators: false` (do not commit that change).
