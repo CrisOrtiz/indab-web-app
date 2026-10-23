@@ -44,7 +44,7 @@ test('visitors see Eleva and the login link, not private sections', async ({ pag
   await expect(nav(page).getByRole('link', { name: 'Administración' })).toHaveCount(0);
 });
 
-for (const path of ['/academy', '/repository', '/admin']) {
+for (const path of ['/academy', '/academy/material', '/admin']) {
   test(`${path} sends visitors to the login page`, async ({ page }) => {
     await page.goto(path);
     await expect(page).toHaveURL(`/login?returnUrl=${encodeURIComponent(path)}`);

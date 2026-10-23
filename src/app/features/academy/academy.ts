@@ -12,7 +12,7 @@ import { AuthService } from '../../core/auth/auth.service';
       @if (auth.hasAcademyAccess()) {
         <p>Bienvenido a la academia.</p>
         <div class="actions">
-          <a routerLink="/repository" class="btn">Ver material de estudio</a>
+          <a routerLink="/academy/material" class="btn">Ver material de estudio</a>
           <a routerLink="/academy/practice" class="btn btn-outline">Práctica de trading</a>
         </div>
       } @else {

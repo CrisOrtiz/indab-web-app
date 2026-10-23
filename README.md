@@ -61,7 +61,7 @@ npx firebase emulators:start --project demo-indab --only auth,firestore --import
 1. Register at http://localhost:4200/register.
 2. In the Emulator UI (http://127.0.0.1:4000/firestore), open `users/{your uid}` and set `role` to
    `admin`, or create `enrollments/{your uid}` with `academy: true` (boolean) and `courses: []`.
-3. The app reacts immediately; `/repository` opens.
+3. The app reacts immediately; `/academy/material` opens.
 
 ## Tests
 
@@ -193,7 +193,7 @@ the rules are what actually protect the data. Anything not listed is denied.
 | `/` landing, `/eleva` | public |
 | `/login`, `/register` | signed-out visitors |
 | `/academy` | signed-in users (shows "pending" until enrolled) |
-| `/repository` | enrolled users |
+| `/academy/material` | enrolled users (learning material, opened from the academy; `/repository` redirects here) |
 | `/academy/practice` | enrolled users (chart-replay trading practice) |
 | `/admin` | admins (users, roles, academy access) |
 | `/admin/practice` | admins (review students' practice sessions on the chart, delete them) |
@@ -271,6 +271,6 @@ CLAUDE.md          conventions for Claude Code; the project skill lives in .clau
 - **Emulators fail with "Could not spawn `java -version`"**: install Java 21+ and reopen the terminal.
 - **Port 8080 / 9099 / 4000 already in use**: stop the other process or change the ports in `firebase.json`
   (and the emulator hosts in `src/app/core/firebase/firebase.providers.ts`).
-- **Sign-in works but `/repository` redirects to `/academy`**: the user has no `enrollments/{uid}` with
+- **Sign-in works but `/academy/material` redirects to `/academy`**: the user has no `enrollments/{uid}` with
   `academy: true` (or is not an admin).
 - **PowerShell blocks `npm`/`npx` scripts**: run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.

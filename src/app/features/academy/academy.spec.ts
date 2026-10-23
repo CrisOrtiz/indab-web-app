@@ -26,7 +26,7 @@ describe('Academy', () => {
     const el = await render();
     expect(el.querySelector('h1')?.textContent).toContain('Hola, Ana');
     expect(el.textContent).toContain('Tu inscripción está pendiente.');
-    expect(el.querySelector('a[href="/repository"]')).toBeNull();
+    expect(el.querySelector('a[href="/academy/material"]')).toBeNull();
     expect(el.querySelector('a[href="/academy/practice"]')).toBeNull();
   });
 
@@ -35,7 +35,7 @@ describe('Academy', () => {
     auth.profile.set(null);
     const el = await render();
     expect(el.querySelector('h1')?.textContent).toContain('Hola, ana@indab.co');
-    expect(el.querySelector('a[href="/repository"]')).not.toBeNull();
+    expect(el.querySelector('a[href="/academy/material"]')).not.toBeNull();
     expect(el.querySelector('a[href="/academy/practice"]')?.textContent).toContain(
       'Práctica de trading',
     );

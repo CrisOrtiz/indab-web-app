@@ -121,7 +121,8 @@ Module notes:
 
 - **Landing (`/`)**: public, no Firestore reads needed except published `courses`. Sections for
   the academy, courses and a link to Eleva. Call to action goes to `/register`.
-- **Material repository (`/repository`)**: `materials/{id}` (title, description, category, type
+- **Material repository (`/academy/material`)**: part of the academy, opened from `/academy`;
+  Cris does not want it as its own header tab (`/repository` only redirects). `materials/{id}` (title, description, category, type
   such as pdf/video/link, url, createdAt). Gated by `enrolledGuard` + `hasAcademyAccess()` rule.
   If files are uploaded, use Firebase Storage with `storage.rules` mirroring the same check
   (add a `FIREBASE_STORAGE` token and emulator wiring in `firebase.providers.ts`).

@@ -8,9 +8,6 @@
       <a routerLink="/eleva" routerLinkActive="active">Eleva Inversiones</a>
       @if (auth.isLoggedIn()) {
         <a routerLink="/academy" routerLinkActive="active">Academia</a>
-        @if (auth.hasAcademyAccess()) {
-          <a routerLink="/repository" routerLinkActive="active">Material</a>
-        }
         @if (auth.isAdmin()) {
           <a routerLink="/admin" routerLinkActive="active">Administración</a>
         }

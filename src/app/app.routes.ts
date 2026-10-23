@@ -43,11 +43,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/practice/practice').then((m) => m.Practice),
   },
   {
-    path: 'repository',
+    path: 'academy/material',
     title: 'Material de estudio | INDAB',
     canActivate: [enrolledGuard],
     loadComponent: () => import('./features/repository/repository').then((m) => m.Repository),
   },
+  // The material used to be its own section; keep old links working.
+  { path: 'repository', redirectTo: 'academy/material' },
 
   // Admins only
   {
