@@ -1,5 +1,5 @@
-import { DatePipe, DecimalPipe, PercentPipe } from '@angular/common';
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { DatePipe, DecimalPipe, PercentPipe, formatNumber } from '@angular/common';
+import { Component, DestroyRef, LOCALE_ID, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { OrderType, PracticeSession, PracticeTrade, TradeSide } from '../../core/models/practice';
@@ -10,12 +10,28 @@ import {
   TIMEFRAMES,
   randomWindowStart,
 } from './market-data.service';
-import { EXIT_REASONS, ORDER_TYPES, orderLabel, priceDigits, roundPrice } from './practice-format';
+import {
+  EXIT_REASONS,
+  ORDER_TYPES,
+  orderLabel,
+  priceDigits,
+  roundPrice,
+  signedMoney,
+} from './practice-format';
 import { PracticeService } from './practice.service';
-import { Replay, STARTING_BALANCE, fillsBelow, tradePnl } from './replay';
+import {
+  OpenTradeInput,
+  Replay,
+  STARTING_BALANCE,
+  TradeLevels,
+  fillsBelow,
+  tradePnl,
+} from './replay';
 import { LevelMove, OrderDraft, ReplayChart } from './replay-chart';
 
 type Phase = 'setup' | 'loading' | 'playing' | 'finished';
+type Tab = 'positions' | 'orders' | 'history';
+type LevelField = 'stopLoss' | 'takeProfit';
 
 export const SPEEDS = [1, 2, 5, 10];
 
@@ -31,6 +47,10 @@ const MIN_REPLAY_BARS = 50;
  * Chart-replay trading practice: the student picks a market, gets a random stretch of real
  * history with the future hidden, steps through it bar by bar and opens simulated trades.
  * Every session and trade is logged to Firestore for instructors to review.
+ *
+ * The trading screen follows TradingView: Buy/Sell prices on the chart for one-click market
+ * orders, an order panel with Market/Limit/Stop tabs and take profit / stop loss checkboxes
+ * that show their P/L, and Positions / Orders / History tabs under the chart.
  */
 @Component({
   selector: 'app-practice',
@@ -43,6 +63,7 @@ export class Practice {
   private readonly auth = inject(AuthService);
   private readonly market = inject(MarketDataService);
   private readonly practice = inject(PracticeService);
+  private readonly locale = inject(LOCALE_ID);
 
   protected readonly instruments = INSTRUMENTS;
   protected readonly timeframes = TIMEFRAMES;
@@ -52,6 +73,16 @@ export class Practice {
   protected readonly priceDigits = priceDigits;
   protected readonly orderLabel = orderLabel;
   protected readonly orderTypes = Object.entries(ORDER_TYPES) as [OrderType, string][];
+  protected readonly signed = signedMoney;
+  /** Shortcuts for the amount, as parts of the available balance. */
+  protected readonly fractions = [0.25, 0.5, 1];
+  /** Stop loss and take profit, in the order of the position columns. */
+  protected readonly levels: { field: LevelField; label: string; short: string }[] = [
+    { field: 'stopLoss', label: 'Stop loss', short: 'SL' },
+    { field: 'takeProfit', label: 'Take profit', short: 'TP' },
+  ];
+  /** The order panel lists the take profit above the stop loss, as TradingView does. */
+  protected readonly ticketLevels = [...this.levels].reverse();
 
   // Setup
   protected readonly symbol = signal(INSTRUMENTS[0].symbol);
@@ -66,13 +97,14 @@ export class Practice {
   protected readonly playing = signal(false);
   protected readonly speed = signal(SPEEDS[1]);
   protected readonly history = signal<PracticeSession[]>([]);
+  protected readonly tab = signal<Tab>('positions');
 
   // Order ticket
   protected readonly side = signal<TradeSide>('long');
   protected readonly orderType = signal<OrderType>('market');
   /** Limit or stop price. */
   protected readonly orderPrice = signal<number | null>(null);
-  protected readonly amount = signal(1000);
+  protected readonly amount = signal(100);
   protected readonly stopLoss = signal<number | null>(null);
   protected readonly takeProfit = signal<number | null>(null);
   protected readonly orderError = signal<string | null>(null);
@@ -91,6 +123,37 @@ export class Practice {
     [...(this.replay()?.closedTrades() ?? [])].reverse(),
   );
 
+  /** Where the ticket's order would enter: the market, or its limit/stop price. */
+  protected readonly reference = computed(() => {
+    const current = this.replay()?.current().close ?? 0;
+    return this.orderType() === 'market' ? current : (this.orderPrice() ?? current);
+  });
+  protected readonly units = computed(() =>
+    this.reference() > 0 ? this.amount() / this.reference() : 0,
+  );
+  /** Reward per unit of risk, once the ticket has both a stop loss and a take profit. */
+  protected readonly riskReward = computed(() => {
+    const stopLoss = this.stopLoss();
+    const takeProfit = this.takeProfit();
+    if (stopLoss === null || takeProfit === null) {
+      return null;
+    }
+    const risk = Math.abs(this.reference() - stopLoss);
+    return risk > 0 ? Math.abs(takeProfit - this.reference()) / risk : null;
+  });
+  /** "Comprar 0.0435 PAXGUSDT a mercado", "Vender 0.0435 PAXGUSDT límite a 2,310.00". */
+  protected readonly submitLabel = computed(() => {
+    const side = this.side() === 'long' ? 'Comprar' : 'Vender';
+    const units = formatNumber(this.units(), this.locale, '1.4-4');
+    const type = this.orderType();
+    const price = this.orderPrice();
+    const where =
+      type === 'market' || price === null
+        ? 'a mercado'
+        : `${ORDER_TYPES[type].toLowerCase()} a ${formatNumber(price, this.locale, priceDigits(price))}`;
+    return `${side} ${units} ${this.symbol()} ${where}`;
+  });
+
   /** The ticket's order, drawn on the chart as lines the student can drag. */
   protected readonly draft = computed<OrderDraft | null>(() =>
     this.phase() === 'playing'
@@ -100,6 +163,7 @@ export class Practice {
           price: this.orderType() === 'market' ? null : this.orderPrice(),
           stopLoss: this.stopLoss(),
           takeProfit: this.takeProfit(),
+          quantity: this.units(),
         }
       : null,
   );
@@ -151,6 +215,7 @@ export class Practice {
       this.orderError.set(null);
       this.stopLoss.set(null);
       this.takeProfit.set(null);
+      this.tab.set('positions');
       this.phase.set('playing');
     } catch {
       this.error.set(
@@ -193,37 +258,62 @@ export class Practice {
     }
   }
 
+  /** Places the order set up in the ticket. */
   protected async openTrade(): Promise<void> {
+    const placed = await this.place({
+      side: this.side(),
+      orderType: this.orderType(),
+      price: this.orderPrice(),
+      amount: this.amount(),
+      stopLoss: this.stopLoss(),
+      takeProfit: this.takeProfit(),
+    });
+    if (placed) {
+      this.stopLoss.set(null);
+      this.takeProfit.set(null);
+      this.setOrderType(this.orderType());
+      this.tab.set(placed.status === 'pending' ? 'orders' : 'positions');
+    }
+  }
+
+  /** One-click market order from the chart, with the ticket's amount and no SL/TP. */
+  protected async quickTrade(side: TradeSide): Promise<void> {
+    const placed = await this.place({
+      side,
+      orderType: 'market',
+      price: null,
+      amount: this.amount(),
+      stopLoss: null,
+      takeProfit: null,
+    });
+    if (placed) {
+      this.tab.set('positions');
+    }
+  }
+
+  private async place(input: OpenTradeInput): Promise<PracticeTrade | null> {
     const replay = this.replay();
     const sessionId = this.sessionId();
     const uid = this.auth.user()?.uid;
     if (!replay || !sessionId || !uid) {
-      return;
+      return null;
     }
     let trade: PracticeTrade;
     try {
-      trade = replay.open(this.practice.newTradeId(sessionId), {
-        side: this.side(),
-        orderType: this.orderType(),
-        price: this.orderPrice(),
-        amount: this.amount(),
-        stopLoss: this.stopLoss(),
-        takeProfit: this.takeProfit(),
-      });
+      trade = replay.open(this.practice.newTradeId(sessionId), input);
     } catch (e) {
       this.orderError.set((e as Error).message);
-      return;
+      return null;
     }
     this.orderError.set(null);
     this.placing.set(true);
     try {
       await this.practice.openTrade(sessionId, uid, trade);
-      this.stopLoss.set(null);
-      this.takeProfit.set(null);
-      this.setOrderType(this.orderType());
+      return trade;
     } catch {
       replay.discard(trade.id);
       this.orderError.set('No se pudo registrar la operación. Intenta de nuevo.');
+      return null;
     } finally {
       this.placing.set(false);
     }
@@ -263,16 +353,51 @@ export class Practice {
     this.orderPrice.set(roundPrice(current * (1 + (below ? -1 : 1) * DEFAULT_ORDER_OFFSET)));
   }
 
-  /** Adds a stop loss or take profit at a default distance, ready to drag. */
-  protected addLevel(field: 'stopLoss' | 'takeProfit'): void {
+  protected levelPrice(field: LevelField): number | null {
+    return this[field]();
+  }
+
+  protected setLevel(field: LevelField, price: number | null): void {
+    this[field].set(price);
+  }
+
+  /** The take profit / stop loss checkboxes: on adds the level at a default distance. */
+  protected toggleLevel(field: LevelField, on: boolean): void {
     const current = this.replay()?.current().close;
-    if (current === undefined) {
+    if (!on || current === undefined) {
+      this[field].set(null);
       return;
     }
-    const reference = this.orderType() === 'market' ? current : (this.orderPrice() ?? current);
-    const direction = (this.side() === 'long' ? 1 : -1) * (field === 'stopLoss' ? -1 : 1);
-    const offset = field === 'stopLoss' ? DEFAULT_STOP_OFFSET : DEFAULT_TARGET_OFFSET;
-    this[field].set(roundPrice(reference * (1 + direction * offset)));
+    this[field].set(defaultLevel(this.side(), field, this.reference()));
+  }
+
+  /** P/L of the ticket's order if it exits at `price`. */
+  protected levelPnl(price: number): number {
+    const move = this.side() === 'long' ? price - this.reference() : this.reference() - price;
+    return move * this.units();
+  }
+
+  protected useFraction(fraction: number): void {
+    const available = this.replay()?.available() ?? 0;
+    this.amount.set(Math.floor(available * fraction * 100) / 100);
+  }
+
+  /** Adds a stop loss or take profit to a position or pending order, ready to drag. */
+  protected addTradeLevel(trade: PracticeTrade, field: LevelField): void {
+    const replay = this.replay();
+    if (replay) {
+      const reference = trade.status === 'pending' ? trade.orderPrice! : replay.current().close;
+      this.setTradeLevel(trade, field, defaultLevel(trade.side, field, reference));
+    }
+  }
+
+  protected setTradeLevel(trade: PracticeTrade, field: LevelField, price: number | null): void {
+    this.changeTrade(trade, {
+      stopLoss: trade.stopLoss,
+      takeProfit: trade.takeProfit,
+      orderPrice: trade.orderPrice,
+      [field]: price,
+    });
   }
 
   /** A line dragged on the chart: updates the ticket, or moves a pending order or open trade. */
@@ -286,17 +411,24 @@ export class Practice {
       field[move.field].set(move.price);
       return;
     }
+    const trade = this.replay()
+      ?.trades()
+      .find((t) => t.id === move.target);
+    if (trade) {
+      this.changeTrade(trade, {
+        stopLoss: trade.stopLoss,
+        takeProfit: trade.takeProfit,
+        orderPrice: trade.orderPrice,
+        [move.field === 'price' ? 'orderPrice' : move.field]: move.price,
+      });
+    }
+  }
+
+  private changeTrade(trade: PracticeTrade, levels: TradeLevels): void {
     const replay = this.replay();
-    const trade = replay?.trades().find((t) => t.id === move.target);
-    if (!replay || !trade) {
+    if (!replay) {
       return;
     }
-    const levels = {
-      stopLoss: trade.stopLoss,
-      takeProfit: trade.takeProfit,
-      orderPrice: trade.orderPrice,
-      [move.field === 'price' ? 'orderPrice' : move.field]: move.price,
-    };
     try {
       const updated = replay.modify(trade.id, levels);
       this.persist((id) => this.practice.updateLevels(id, updated), trade);
@@ -412,4 +544,11 @@ export class Practice {
         .catch(() => this.history.set([]));
     }
   }
+}
+
+/** A stop loss or take profit at the default distance from `reference`, on the right side. */
+function defaultLevel(side: TradeSide, field: LevelField, reference: number): number {
+  const direction = (side === 'long' ? 1 : -1) * (field === 'stopLoss' ? -1 : 1);
+  const offset = field === 'stopLoss' ? DEFAULT_STOP_OFFSET : DEFAULT_TARGET_OFFSET;
+  return roundPrice(reference * (1 + direction * offset));
 }

@@ -7,7 +7,7 @@ import {
   TradeSide,
 } from '../../core/models/practice';
 
-export const STARTING_BALANCE = 10_000;
+export const STARTING_BALANCE = 200;
 
 export interface OpenTradeInput {
   side: TradeSide;

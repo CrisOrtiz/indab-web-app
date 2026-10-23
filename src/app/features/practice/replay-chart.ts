@@ -22,7 +22,7 @@ import {
   createSeriesMarkers,
 } from 'lightweight-charts';
 import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/practice';
-import { orderLabel, roundPrice } from './practice-format';
+import { orderLabel, roundPrice, signedMoney } from './practice-format';
 
 /** The order being set up in the ticket, drawn as draggable lines before it is placed. */
 export interface OrderDraft {
@@ -31,6 +31,8 @@ export interface OrderDraft {
   price: number | null;
   stopLoss: number | null;
   takeProfit: number | null;
+  /** Units the order would buy or sell, to label the SL/TP lines with their P/L. */
+  quantity?: number;
 }
 
 export type LevelField = 'price' | 'stopLoss' | 'takeProfit';
@@ -49,6 +51,8 @@ interface Line {
   style: LineStyle;
   /** Set when the line can be dragged. */
   drag?: { target: string; field: LevelField };
+  /** An open trade's entry line, titled with the P/L at the last close. */
+  position?: PracticeTrade;
 }
 
 /** How close (px) the pointer must be to a line to grab it. */
@@ -57,8 +61,9 @@ const GRAB_DISTANCE = 6;
 /**
  * Candlestick chart for the replay (TradingView lightweight-charts, Apache-2.0). It draws the
  * visible candles, a marker per entry and exit, and price lines for the order being set up,
- * pending orders and open trades. Order prices, stop losses and take profits can be dragged;
- * each drop emits `levelMoved` and the page decides whether to accept it.
+ * pending orders and open trades, labelled like TradingView with their P/L. Order prices, stop
+ * losses and take profits can be dragged; each drop emits `levelMoved` and the page decides
+ * whether to accept it.
  */
 @Component({
   selector: 'app-replay-chart',
@@ -154,6 +159,28 @@ export class ReplayChart {
       this.chart?.timeScale().scrollToRealTime();
     }
     this.drawn = candles;
+    this.priceLines.forEach(({ line, api }) => {
+      if (line.position) {
+        api.applyOptions({ title: this.positionTitle(line.position) });
+      }
+    });
+  }
+
+  private get lastClose(): number | undefined {
+    return this.drawn.at(-1)?.close;
+  }
+
+  /** "Compra +12.50": the side and the open P/L at the last close. */
+  private positionTitle(trade: PracticeTrade): string {
+    const side = orderLabel({ ...trade, orderType: 'market' });
+    const close = this.lastClose;
+    if (close === undefined) {
+      return side;
+    }
+    const pnl =
+      (trade.side === 'long' ? close - trade.entryPrice : trade.entryPrice - close) *
+      trade.quantity;
+    return `${side} ${signedMoney(pnl)}`;
   }
 
   private applyDates(hide: boolean): void {
@@ -164,7 +191,8 @@ export class ReplayChart {
   }
 
   private drawTrades(trades: PracticeTrade[], draft: OrderDraft | null): void {
-    if (!this.series || !this.markers) {
+    // Mid-drag the lines stay put; the drop redraws them.
+    if (!this.series || !this.markers || this.dragging) {
       return;
     }
     const { up, down, muted } = this.colors;
@@ -187,7 +215,7 @@ export class ReplayChart {
           position: long ? 'aboveBar' : 'belowBar',
           shape: 'circle',
           color: muted,
-          text: `${(t.pnl ?? 0) >= 0 ? '+' : ''}${(t.pnl ?? 0).toFixed(2)}`,
+          text: signedMoney(t.pnl ?? 0),
         });
       }
     }
@@ -209,44 +237,53 @@ export class ReplayChart {
 
   private lines(trades: PracticeTrade[], draft: OrderDraft | null): Line[] {
     const { up, down, text, muted } = this.colors;
+    /** SL and TP lines, titled with the P/L at that price when the size is known. */
     const stops = (
       target: string,
-      t: Pick<OrderDraft, 'stopLoss' | 'takeProfit'>,
+      t: Pick<OrderDraft, 'side' | 'stopLoss' | 'takeProfit'>,
+      entry: number | null,
+      quantity: number | undefined,
       style: LineStyle,
-    ) => [
-      ...(t.stopLoss !== null
-        ? [
-            {
-              price: t.stopLoss,
-              color: down,
-              title: 'SL',
-              style,
-              drag: { target, field: 'stopLoss' as const },
-            },
-          ]
-        : []),
-      ...(t.takeProfit !== null
-        ? [
-            {
-              price: t.takeProfit,
-              color: up,
-              title: 'TP',
-              style,
-              drag: { target, field: 'takeProfit' as const },
-            },
-          ]
-        : []),
-    ];
+    ) => {
+      const title = (name: string, price: number) => {
+        if (entry === null || !quantity) {
+          return name;
+        }
+        const pnl = (t.side === 'long' ? price - entry : entry - price) * quantity;
+        return `${name} ${signedMoney(pnl)}`;
+      };
+      const result: Line[] = [];
+      if (t.stopLoss !== null) {
+        result.push({
+          price: t.stopLoss,
+          color: down,
+          title: title('SL', t.stopLoss),
+          style,
+          drag: { target, field: 'stopLoss' },
+        });
+      }
+      if (t.takeProfit !== null) {
+        result.push({
+          price: t.takeProfit,
+          color: up,
+          title: title('TP', t.takeProfit),
+          style,
+          drag: { target, field: 'takeProfit' },
+        });
+      }
+      return result;
+    };
     const lines: Line[] = [];
     for (const t of trades) {
       if (t.status === 'open') {
         lines.push({
           price: t.entryPrice,
           color: text,
-          title: orderLabel({ ...t, orderType: 'market' }),
+          title: this.positionTitle(t),
           style: LineStyle.Solid,
+          position: t,
         });
-        lines.push(...stops(t.id, t, LineStyle.Dashed));
+        lines.push(...stops(t.id, t, t.entryPrice, t.quantity, LineStyle.Dashed));
       } else if (t.status === 'pending') {
         lines.push({
           price: t.orderPrice!,
@@ -255,7 +292,7 @@ export class ReplayChart {
           style: LineStyle.Dashed,
           drag: { target: t.id, field: 'price' },
         });
-        lines.push(...stops(t.id, t, LineStyle.Dashed));
+        lines.push(...stops(t.id, t, t.orderPrice, t.quantity, LineStyle.Dashed));
       }
     }
     if (draft) {
@@ -268,7 +305,8 @@ export class ReplayChart {
           drag: { target: 'draft', field: 'price' },
         });
       }
-      lines.push(...stops('draft', draft, LineStyle.Dotted));
+      const entry = draft.orderType === 'market' ? (this.lastClose ?? null) : draft.price;
+      lines.push(...stops('draft', draft, entry, draft.quantity, LineStyle.Dotted));
     }
     return lines;
   }

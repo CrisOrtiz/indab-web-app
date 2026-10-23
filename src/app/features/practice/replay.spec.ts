@@ -200,7 +200,11 @@ describe('Replay', () => {
   });
 
   it('closes trades whose stop loss or take profit the new candle hits', () => {
-    const replay = new Replay(series(candle(3, 100, 103, 94, 96), candle(4, 96, 97, 95, 96)), 2);
+    const replay = new Replay(
+      series(candle(3, 100, 103, 94, 96), candle(4, 96, 97, 95, 96)),
+      2,
+      10_000,
+    );
     replay.open('sl', order({ stopLoss: 95 }));
     replay.open('tp', order({ side: 'short', takeProfit: 97 }));
     replay.open('keep', order({ stopLoss: 90 }));
@@ -242,7 +246,7 @@ describe('Replay', () => {
   });
 
   it('moves the levels of pending orders and open trades, validating them', () => {
-    const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 2);
+    const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 2, 10_000);
     replay.open('l', order({ orderType: 'limit', price: 95 }));
     expect(replay.modify('l', { stopLoss: 90, takeProfit: 105, orderPrice: 97 })).toMatchObject({
       orderPrice: 97,
@@ -263,7 +267,7 @@ describe('Replay', () => {
   });
 
   it('cancels pending orders, by hand or when the replay ends', () => {
-    const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 2);
+    const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 2, 10_000);
     replay.open('a', order({ orderType: 'stop', price: 105 }));
     replay.open('b', order({ orderType: 'limit', price: 95 }));
     replay.open('c', order());
@@ -278,7 +282,7 @@ describe('Replay', () => {
   });
 
   it('can forget an order that was never logged and restore an edit that failed', () => {
-    const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 2);
+    const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 2, 10_000);
     const before = replay.open('a', order({ stopLoss: 90 }));
     replay.modify('a', { stopLoss: 95, takeProfit: null });
     replay.restore(before);

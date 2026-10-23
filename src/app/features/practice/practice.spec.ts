@@ -87,14 +87,27 @@ describe('Practice page', () => {
     button(name).click();
     await fixture.whenStable();
   };
-  const fill = async (label: string, value: string) => {
-    const input = [...el.querySelectorAll('label')]
-      .find((l) => l.textContent?.includes(label))!
-      .querySelector('input')!;
+  const pressed = async (selector: string) => {
+    el.querySelector<HTMLButtonElement>(selector)!.click();
+    await fixture.whenStable();
+  };
+  const submit = () => pressed('button.submit');
+  const submitLabel = () => el.querySelector('button.submit')!.textContent!.trim();
+  /** Ticks or unticks the take profit / stop loss checkbox. */
+  const toggle = async (label: string) => {
+    [...el.querySelectorAll<HTMLLabelElement>('label.check')]
+      .find((l) => l.textContent?.trim() === label)!
+      .querySelector('input')!
+      .click();
+    await fixture.whenStable();
+  };
+  const setLevel = async (label: string, value: string) => {
+    const input = el.querySelector<HTMLInputElement>(`input[aria-label="Precio del ${label}"]`)!;
     input.value = value;
     input.dispatchEvent(new Event('input'));
     await fixture.whenStable();
   };
+  const alert = () => el.querySelector('[role="alert"]')?.textContent ?? '';
   const chart = () =>
     fixture.debugElement.query((d) => d.componentInstance instanceof FakeChart)
       ?.componentInstance as FakeChart;
@@ -106,6 +119,7 @@ describe('Practice page', () => {
   it("shows the setup form and the student's past sessions", () => {
     expect(el.querySelector('h1')?.textContent).toContain('Práctica de trading');
     expect(el.querySelectorAll('select')).toHaveLength(2);
+    expect(el.textContent).toContain('Empiezas con 200 USD virtuales');
     expect(practice.mySessions).toHaveBeenCalledWith('u1');
     expect(el.textContent).toContain('PAXGUSDT · 4h');
     expect(el.textContent).toContain('Terminada');
@@ -120,7 +134,7 @@ describe('Practice page', () => {
       symbol: 'PAXGUSDT',
       interval: '1h',
       replayStart: (1000 + HISTORY_BARS * 3600) * 1000,
-      startingBalance: 10000,
+      startingBalance: 200,
     });
     expect(chart().candles()).toHaveLength(HISTORY_BARS);
     expect(chart().hideDates()).toBe(true);
@@ -135,67 +149,92 @@ describe('Practice page', () => {
   it('shows an error and stays on the setup when the data cannot load', async () => {
     market.loadCandles.mockRejectedValueOnce(new Error('offline'));
     await start();
-    expect(el.querySelector('[role="alert"]')?.textContent).toContain(
-      'No se pudieron cargar los datos del mercado',
-    );
+    expect(alert()).toContain('No se pudieron cargar los datos del mercado');
     expect(el.querySelector('form')).not.toBeNull();
     expect(practice.startSession).not.toHaveBeenCalled();
   });
 
-  it('opens, logs and closes trades', async () => {
+  it('opens a trade from the order panel with a stop loss, then closes it', async () => {
     await start();
-    await fill('Monto', '1000');
-    await fill('Stop loss', '101');
-    await click('Abrir operación');
-    expect(el.querySelector('[role="alert"]')?.textContent).toContain('por debajo');
+    // 100 USD at 100 is 1 unit.
+    expect(submitLabel()).toBe('Comprar 1.0000 PAXGUSDT a mercado');
+    await toggle('Stop loss');
+    expect(chart().draft()).toMatchObject({ stopLoss: 99, quantity: 1 });
+    expect(el.querySelector('.bracket-fields')!.textContent).toContain('-1.00 USD');
+
+    await setLevel('stop loss', '101');
+    await submit();
+    expect(alert()).toContain('por debajo');
     expect(practice.openTrade).not.toHaveBeenCalled();
 
-    await fill('Stop loss', '90');
-    await click('Abrir operación');
+    await setLevel('stop loss', '90');
+    await submit();
     expect(practice.openTrade).toHaveBeenCalledWith(
       'session-1',
       'u1',
-      expect.objectContaining({ side: 'long', entryPrice: 100, stopLoss: 90, quantity: 10 }),
+      expect.objectContaining({ side: 'long', entryPrice: 100, stopLoss: 90, quantity: 1 }),
     );
+    // The ticket is ready for the next order.
+    expect(chart().draft()?.stopLoss).toBeNull();
+    expect(el.textContent).toContain('Posiciones (1)');
 
     await click('Siguiente vela');
+    expect(el.querySelector('.account')!.textContent).toContain('+1.00');
     await click('Cerrar');
     expect(practice.closeTrade).toHaveBeenCalledWith(
       'session-1',
-      expect.objectContaining({ exitPrice: 101, exitReason: 'manual', pnl: 10 }),
+      expect.objectContaining({ exitPrice: 101, exitReason: 'manual', pnl: 1 }),
     );
     expect(practice.updateSummary).toHaveBeenCalledWith('session-1', {
-      balance: 10010,
-      pnl: 10,
+      balance: 201,
+      pnl: 1,
       tradeCount: 1,
     });
+    await click('Historial (1)');
     expect(el.textContent).toContain('Manual');
+  });
+
+  it('shows the reward to risk of the ticket and sizes from the available balance', async () => {
+    await start();
+    await toggle('Take profit');
+    await toggle('Stop loss');
+    // SL 1% and TP 2% away from 100.
+    expect(el.querySelector('.ratio')!.textContent).toContain('1 : 2.00');
+    await toggle('Take profit');
+    expect(el.querySelector('.ratio')).toBeNull();
+
+    await click('50%');
+    expect(submitLabel()).toBe('Comprar 1.0000 PAXGUSDT a mercado');
+    await click('100%');
+    expect(submitLabel()).toBe('Comprar 2.0000 PAXGUSDT a mercado');
   });
 
   it('drops a trade that could not be logged', async () => {
     await start();
     practice.openTrade.mockRejectedValueOnce(new Error('denied'));
-    await click('Abrir operación');
-    expect(el.querySelector('[role="alert"]')?.textContent).toContain(
-      'No se pudo registrar la operación',
-    );
-    expect(el.textContent).toContain('No tienes operaciones abiertas.');
+    await submit();
+    expect(alert()).toContain('No se pudo registrar la operación');
+    expect(el.textContent).toContain('No tienes posiciones abiertas.');
   });
 
-  it('closes open trades and saves the result when the session ends', async () => {
+  it('sells in one click from the chart and closes it when the session ends', async () => {
     await start();
-    await button('Vender').click();
-    await click('Abrir operación');
+    await pressed('.quick-sell');
+    expect(practice.openTrade).toHaveBeenCalledWith(
+      'session-1',
+      'u1',
+      expect.objectContaining({ side: 'short', orderType: 'market', stopLoss: null }),
+    );
     await click('Siguiente vela');
     await click('Terminar sesión');
 
     expect(practice.closeTrade).toHaveBeenCalledWith(
       'session-1',
-      expect.objectContaining({ side: 'short', exitReason: 'sessionEnd', pnl: -10 }),
+      expect.objectContaining({ side: 'short', exitReason: 'sessionEnd', pnl: -1 }),
     );
     expect(practice.finishSession).toHaveBeenCalledWith('session-1', {
-      balance: 9990,
-      pnl: -10,
+      balance: 199,
+      pnl: -1,
       tradeCount: 1,
     });
     expect(el.textContent).toContain('Sesión terminada');
@@ -205,14 +244,21 @@ describe('Practice page', () => {
     expect(el.querySelector('form')).not.toBeNull();
   });
 
-  const select = async (label: string, value: string) => {
-    const el2 = [...el.querySelectorAll('label')]
-      .find((l) => l.textContent?.includes(label))!
-      .querySelector('select')!;
-    el2.value = value;
-    el2.dispatchEvent(new Event('change'));
-    await fixture.whenStable();
-  };
+  it('adds and removes the stop loss of an open position', async () => {
+    await start();
+    await submit();
+    await click('+ SL');
+    expect(practice.updateLevels).toHaveBeenLastCalledWith(
+      'session-1',
+      expect.objectContaining({ id: 't1', stopLoss: 99, takeProfit: null }),
+    );
+    await pressed('button[aria-label="Quitar stop loss"]');
+    expect(practice.updateLevels).toHaveBeenLastCalledWith(
+      'session-1',
+      expect.objectContaining({ id: 't1', stopLoss: null }),
+    );
+  });
+
   const drag = async (move: LevelMove) => {
     chart().levelMoved.emit(move);
     await fixture.whenStable();
@@ -220,27 +266,28 @@ describe('Practice page', () => {
 
   it('places a limit order that fills later, and drags its lines', async () => {
     await start();
-    await select('Tipo de orden', 'limit');
+    await click('Límite');
     // A buy limit starts just below the market (100), shown as a line to drag.
-    expect(chart().draft()).toEqual({
+    expect(chart().draft()).toMatchObject({
       side: 'long',
       orderType: 'limit',
       price: 99.5,
       stopLoss: null,
       takeProfit: null,
     });
-    await click('Añadir SL');
-    await click('Añadir TP');
+    await toggle('Stop loss');
+    await toggle('Take profit');
     expect(chart().draft()).toMatchObject({ stopLoss: 98.505, takeProfit: 101.49 });
 
     await drag({ target: 'draft', field: 'price', price: 102 });
-    await click('Colocar orden');
-    expect(el.querySelector('[role="alert"]')?.textContent).toContain(
+    await submit();
+    expect(alert()).toContain(
       'Una compra límite debe tener su precio por debajo del precio actual.',
     );
     await drag({ target: 'draft', field: 'price', price: 99 });
     await drag({ target: 'draft', field: 'stopLoss', price: 98 });
-    await click('Colocar orden');
+    expect(submitLabel()).toBe('Comprar 1.0101 PAXGUSDT límite a 99.000');
+    await submit();
     expect(practice.openTrade).toHaveBeenCalledWith(
       'session-1',
       'u1',
@@ -251,18 +298,18 @@ describe('Practice page', () => {
         status: 'pending',
       }),
     );
-    expect(el.textContent).toContain('Órdenes pendientes');
+    expect(el.textContent).toContain('Órdenes (1)');
     expect(el.textContent).toContain('Compra límite');
 
-    // Dragging the pending order's take profit saves it; an invalid drag is refused.
     const id: string = practice.newTradeId.mock.results.at(-1)!.value;
+    // Dragging the pending order's take profit saves it; an invalid drag is refused.
     await drag({ target: id, field: 'takeProfit', price: 103 });
     expect(practice.updateLevels).toHaveBeenCalledWith(
       'session-1',
       expect.objectContaining({ id, takeProfit: 103, orderPrice: 99 }),
     );
     await drag({ target: id, field: 'stopLoss', price: 99.5 });
-    expect(el.querySelector('[role="alert"]')?.textContent).toContain('stop loss');
+    expect(alert()).toContain('stop loss');
     expect(practice.updateLevels).toHaveBeenCalledTimes(1);
 
     await click('Cancelar');
@@ -270,14 +317,14 @@ describe('Practice page', () => {
       'session-1',
       expect.objectContaining({ id, status: 'cancelled' }),
     );
-    expect(el.textContent).not.toContain('Órdenes pendientes');
+    expect(el.textContent).toContain('No tienes órdenes pendientes.');
   });
 
   it('fills a stop order when the price reaches it', async () => {
     await start();
-    await select('Tipo de orden', 'stop');
+    await click('Stop');
     expect(chart().draft()?.price).toBe(100.5);
-    await click('Colocar orden');
+    await submit();
     expect(practice.fillOrder).not.toHaveBeenCalled();
     // The next candle opens at 101, above the stop: it fills at the open.
     await click('Siguiente vela');
@@ -286,7 +333,7 @@ describe('Practice page', () => {
       expect.objectContaining({ status: 'open', entryPrice: 101, orderType: 'stop' }),
     );
     expect(practice.updateSummary).toHaveBeenCalledWith('session-1', {
-      balance: 10000,
+      balance: 200,
       pnl: 0,
       tradeCount: 1,
     });

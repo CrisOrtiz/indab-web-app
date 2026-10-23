@@ -37,3 +37,14 @@ export function priceDigits(price: number): string {
   const decimals = priceDecimals(price);
   return `1.${decimals}-${decimals}`;
 }
+
+const SIGNED = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  signDisplay: 'exceptZero',
+});
+
+/** Money with its sign, as trading platforms show P/L: "+1,250.00", "-3.10", "0.00". */
+export function signedMoney(value: number): string {
+  return SIGNED.format(value);
+}

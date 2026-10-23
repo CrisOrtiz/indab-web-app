@@ -134,6 +134,10 @@ Module notes:
   (no key; mock them with `page.route` in e2e); `PracticeService` logs `practiceSessions` and
   their `trades`. Admin review at `/admin/practice` (`features/admin/practice-review/`): reloads the session's
   candles to draw its trades, and deletes a session with its trades (`PracticeService.deleteSession`).
+  Cris wants the trading screen to work like TradingView (one-click Buy/Sell, order panel with
+  TP/SL checkboxes, Positions/Orders/History tabs) and students to start with 200 USD
+  (`STARTING_BALANCE`). TradingView's own indicators/drawings are not available to us (Advanced
+  Charts is for public sites only), so chart tools are built on lightweight-charts.
   Cris wants exactly XAU/USD, USD/JPY and NASDAQ: only gold (PAXGUSDT) is live, the others
   wait for a data source licensed for display to students. Never bundle or serve data whose
   license is personal use only (e.g. Dukascopy). A new timeframe must also be added to the

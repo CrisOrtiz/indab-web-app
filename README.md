@@ -208,9 +208,12 @@ are planned but need a data source licensed for showing prices to students (Duka
 feed is for personal use only, and free APIs don't allow display to third parties).
 
 Each session picks a random window (150 candles of context plus up to 850 to replay), dates
-can be hidden, and students trade 10,000 virtual USD without leverage with market, limit and
-stop orders, optional stop loss and take profit. The order price, stop loss and take profit
-are lines on the chart that can be dragged, for the order being set up, pending orders and
+can be hidden, and students trade 200 virtual USD without leverage with market, limit and
+stop orders, optional stop loss and take profit. The screen follows TradingView: one-click
+Buy/Sell over the chart, an order panel with Market/Limit/Stop tabs and take profit / stop
+loss checkboxes that show their P/L and the reward to risk, and Positions / Orders / History
+tabs under the chart. The order price, stop loss and take profit are lines on the chart,
+labelled with their P/L, that can be dragged for the order being set up, pending orders and
 open trades. Pending orders fill when a later candle reaches their price, can be cancelled,
 and expire when the session ends. Sessions and orders are written to Firestore as they
 happen; admins review them at `/admin/practice`, where each session's trades are drawn on the

@@ -118,7 +118,17 @@ describe('ReplayChart', () => {
     const markers = lw.markers.setMarkers.mock.calls.at(-1)![0];
     expect(markers.map((m: { text: string }) => m.text)).toEqual(['Compra', 'Venta', '+10.00']);
     const lines = lw.series.createPriceLine.mock.calls.map(([line]) => line.title);
-    expect(lines).toEqual(['Compra', 'SL']);
+    // Labelled with the P/L at the last close (1.5) and at the stop loss.
+    expect(lines).toEqual(['Compra -98.50', 'SL -5.00']);
+
+    // A new candle refreshes the position's P/L in place.
+    const entry = lw.series.createPriceLine.mock.results[0].value;
+    fixture.componentInstance.candles.update((list) => [
+      ...list,
+      { time: 3, open: 1, high: 120, low: 1, close: 110 },
+    ]);
+    await fixture.whenStable();
+    expect(entry.applyOptions).toHaveBeenCalledWith({ title: 'Compra +10.00' });
 
     fixture.componentInstance.trades.set([]);
     await fixture.whenStable();
