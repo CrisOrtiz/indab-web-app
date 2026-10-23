@@ -97,10 +97,32 @@
       class="line-label"
       [class.draggable]="!!label.line.drag"
       [style.top.px]="label.y"
-      [style.right.px]="scaleWidth() + 12"
+      [style.right.px]="scaleWidth() + 28"
       [style.border-color]="label.color"
       (pointerdown)="grab(label, $event)"
     >
+      @if (label.badge; as badge) {
+        @if (badge.submit) {
+          <button
+            type="button"
+            class="badge"
+            [class.buy]="badge.side === 'long'"
+            [class.sell]="badge.side === 'short'"
+            (pointerdown)="$event.stopPropagation()"
+            (click)="draftSubmitted.emit()"
+          >
+            {{ badge.text }}
+          </button>
+        } @else {
+          <span
+            class="badge"
+            [class.buy]="badge.side === 'long'"
+            [class.sell]="badge.side === 'short'"
+          >
+            {{ badge.text }}
+          </span>
+        }
+      }
       @if (label.text) {
         <span class="text" [style.color]="label.color">{{ label.text }}</span>
       }
@@ -120,6 +142,40 @@
           ×
         </button>
       }
+    </div>
+  }
+  @if (hoverY(); as y) {
+    <button
+      type="button"
+      class="plus"
+      [style.top.px]="y"
+      [style.right.px]="scaleWidth() + 2"
+      aria-label="Opciones en este precio"
+      aria-haspopup="menu"
+      (click)="openMenu()"
+    >
+      +
+    </button>
+  }
+  @if (menu(); as m) {
+    <div
+      class="plus-menu"
+      role="menu"
+      [style.top.px]="m.y + 12"
+      [style.right.px]="scaleWidth() + 2"
+    >
+      @for (order of menuOrders(); track order.side) {
+        <button type="button" role="menuitem" (click)="placeAt(order.side, order.orderType)">
+          {{ order.text }} {{ m.price | number: priceDigits(m.price) }} {{ order.type }}
+        </button>
+      }
+      <hr />
+      <button type="button" role="menuitem" (click)="addOrderAt()">
+        Añadir orden en {{ m.price | number: priceDigits(m.price) }}…
+      </button>
+      <button type="button" role="menuitem" (click)="drawLineAt()">
+        Dibujar línea horizontal en {{ m.price | number: priceDigits(m.price) }}
+      </button>
     </div>
   }
   @if (tool(); as current) {

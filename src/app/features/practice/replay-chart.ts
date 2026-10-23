@@ -4,6 +4,7 @@ import {
   DestroyRef,
   ElementRef,
   afterNextRender,
+  computed,
   effect,
   inject,
   input,
@@ -28,8 +29,8 @@ import {
 } from 'lightweight-charts';
 import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/practice';
 import { INDICATORS, RSI_LEVELS, computeIndicator } from './indicators';
-import { formatLots, orderLabel, priceDigits, roundPrice, signedMoney } from './practice-format';
-import { tradeLots } from './replay';
+import { ORDER_TYPES, formatLots, priceDigits, roundPrice, signedMoney } from './practice-format';
+import { LOT_SIZE, tradeLots } from './replay';
 
 /** The order being set up in the ticket, drawn as draggable lines before it is placed. */
 export interface OrderDraft {
@@ -64,10 +65,28 @@ type LabelAction =
 
 /** The box on a line, as TradingView draws it: text, P/L and a × button. */
 interface LineLabel {
+  /** The side, at the start of the box; on the order being set up, a button that places it. */
+  badge?: { text: string; side: TradeSide; submit: boolean };
   text: string;
   /** P/L if the price reaches the line (or, for a position, at the last close). */
   pnl: number | null;
   action: LabelAction | null;
+}
+
+/** The entry of a position or of the order being set up: dragging away from it adds a TP/SL. */
+interface Bracket {
+  target: string;
+  side: TradeSide;
+  quantity?: number;
+}
+
+/** An order picked from the "+" menu, at the price where it was opened. */
+export interface OrderAt {
+  side: TradeSide;
+  orderType: Exclude<OrderType, 'market'>;
+  price: number;
+  /** Places it at once; otherwise it only fills in the order panel. */
+  place: boolean;
 }
 
 interface Line {
@@ -80,6 +99,11 @@ interface Line {
   label?: LineLabel;
   /** An open position, whose label P/L follows the last close. */
   position?: PracticeTrade;
+  /** P/L at a price, so the label follows the line while it is dragged. */
+  pnlAt?: (price: number) => number;
+  bracket?: Bracket;
+  /** The market order being set up, which sits on the last close. */
+  atClose?: boolean;
 }
 
 interface PlacedLabel extends LineLabel {
@@ -135,6 +159,10 @@ const RSI_PANE_HEIGHT = 110;
 @Component({
   selector: 'app-replay-chart',
   imports: [DecimalPipe],
+  host: {
+    '(document:pointerdown)': 'closeMenu($event)',
+    '(document:keydown.escape)': 'menu.set(null)',
+  },
   templateUrl: './replay-chart.html',
   styleUrl: './replay-chart.scss',
 })
@@ -152,6 +180,11 @@ export class ReplayChart {
   readonly levelRemoved = output<LevelRemove>();
   /** The × of a position (close it) or pending order (cancel it). */
   readonly tradeClosed = output<string>();
+  /** The side button on the line of the order being set up. */
+  readonly draftSubmitted = output<void>();
+  readonly orderAt = output<OrderAt>();
+  /** Symbol named in the "+" menu. */
+  readonly symbol = input('');
 
   protected readonly indicators = INDICATORS;
   protected readonly signed = signedMoney;
@@ -163,6 +196,30 @@ export class ReplayChart {
   protected readonly drawings = signal<Drawing[]>([]);
   protected readonly labels = signal<PlacedLabel[]>([]);
   protected readonly shapes = signal<PlacedShape[]>([]);
+  /** Height of the pointer over the candles, where the "+" button sits. */
+  protected readonly hoverY = signal<number | null>(null);
+  /** The "+" menu, open at a price. */
+  protected readonly menu = signal<{ y: number; price: number } | null>(null);
+  protected readonly menuOrders = computed(() => {
+    const menu = this.menu();
+    const close = this.drawnClose();
+    if (!menu || close === null) {
+      return [];
+    }
+    const lots = formatLots((this.draft()?.quantity ?? 0) / LOT_SIZE);
+    const below = menu.price < close;
+    return (['long', 'short'] as const).map((side) => {
+      const orderType: OrderAt['orderType'] = (side === 'long') === below ? 'limit' : 'stop';
+      return {
+        side,
+        orderType,
+        text: `${side === 'long' ? 'Comprar' : 'Vender'} ${lots} ${this.symbol()} @`,
+        type: orderType === 'limit' ? 'límite' : 'stop',
+      };
+    });
+  });
+  /** The last close, as a signal for the menu. */
+  private readonly drawnClose = signal<number | null>(null);
   protected readonly toolHints: Record<Tool, [string, string]> = {
     hline: ['Haz clic en el gráfico para poner la línea.', ''],
     trend: ['Haz clic en el primer punto de la línea.', 'Haz clic en el segundo punto.'],
@@ -178,7 +235,14 @@ export class ReplayChart {
   private series?: ISeriesApi<'Candlestick'>;
   private markers?: ISeriesMarkersPluginApi<Time>;
   private priceLines: { line: Line; api: IPriceLine }[] = [];
-  private dragging?: { line: Line; api: IPriceLine; price: number };
+  private dragging?: {
+    line: Line;
+    api: IPriceLine;
+    price: number;
+    /** Set when a new TP/SL is being pulled out of the entry at `origin`. */
+    bracket?: Bracket;
+    origin: number;
+  };
   private drawn: Candle[] = [];
   private indicatorSeries = new Map<string, ISeriesApi<'Line'>>();
   private trendSeries = new Map<number, ISeriesApi<'Line'>>();
@@ -280,10 +344,59 @@ export class ReplayChart {
     }
   }
 
+  /** Opens the "+" menu at the price under the pointer. */
+  protected openMenu(): void {
+    const y = this.hoverY();
+    const price = y === null ? null : this.series?.coordinateToPrice(y);
+    if (y !== null && price !== null && price !== undefined && price > 0) {
+      this.menu.set({ y, price: roundPrice(price) });
+    }
+  }
+
+  protected closeMenu(event: Event): void {
+    const target = event.target;
+    if (!(target instanceof Element && target.closest('.plus, .plus-menu'))) {
+      this.menu.set(null);
+    }
+  }
+
+  /** A buy or sell from the "+" menu, placed at once. */
+  protected placeAt(side: TradeSide, orderType: OrderAt['orderType']): void {
+    const menu = this.menu();
+    this.menu.set(null);
+    if (menu) {
+      this.orderAt.emit({ side, orderType, price: menu.price, place: true });
+    }
+  }
+
+  /** "Add order": the order panel's side, as a limit or stop at the menu's price. */
+  protected addOrderAt(): void {
+    const menu = this.menu();
+    const order = this.menuOrders().find((o) => o.side === (this.draft()?.side ?? 'long'));
+    this.menu.set(null);
+    if (menu && order) {
+      this.orderAt.emit({
+        side: order.side,
+        orderType: order.orderType,
+        price: menu.price,
+        place: false,
+      });
+    }
+  }
+
+  protected drawLineAt(): void {
+    const menu = this.menu();
+    this.menu.set(null);
+    if (menu) {
+      const id = this.nextDrawingId++;
+      this.drawings.update((list) => [...list, { id, kind: 'hline', price: menu.price }]);
+    }
+  }
+
   /** Dragging a line by its label. */
   protected grab(label: PlacedLabel, event: PointerEvent): void {
     const entry = this.priceLines.find((p) => p.line === label.line);
-    if (entry?.line.drag) {
+    if (entry && (entry.line.drag || entry.line.bracket)) {
       this.startDrag(entry, event);
     }
   }
@@ -388,49 +501,11 @@ export class ReplayChart {
   }
 
   private lines(trades: PracticeTrade[], draft: OrderDraft | null, drawings: Drawing[]): Line[] {
-    const { up, down, text, muted } = this.colors;
-    /** SL and TP lines, labelled with the P/L at that price when the size is known. */
-    const stops = (
-      target: string,
-      t: Pick<OrderDraft, 'side' | 'stopLoss' | 'takeProfit'>,
-      entry: number | null,
-      quantity: number | undefined,
-      style: LineStyle,
-    ) => {
-      const result: Line[] = [];
-      const levels = [
-        { field: 'stopLoss', name: 'SL', price: t.stopLoss, color: down },
-        { field: 'takeProfit', name: 'TP', price: t.takeProfit, color: up },
-      ] as const;
-      for (const { field, name, price, color } of levels) {
-        if (price === null) {
-          continue;
-        }
-        const pnl =
-          entry !== null && quantity
-            ? (t.side === 'long' ? price - entry : entry - price) * quantity
-            : null;
-        result.push({
-          key: `${target}:${field}`,
-          price,
-          color,
-          style,
-          drag: { target, field },
-          label: {
-            text: name,
-            pnl,
-            action: {
-              kind: 'remove',
-              level: { target, field },
-              label: `Quitar ${field === 'stopLoss' ? 'stop loss' : 'take profit'}`,
-            },
-          },
-        });
-      }
-      return result;
-    };
+    const { text, muted } = this.colors;
     const lines: Line[] = [];
     for (const t of trades) {
+      const lots = formatLots(tradeLots(t));
+      const badge = { text: t.side === 'long' ? 'Compra' : 'Venta', side: t.side, submit: false };
       if (t.status === 'open') {
         lines.push({
           key: t.id,
@@ -438,13 +513,15 @@ export class ReplayChart {
           color: text,
           style: LineStyle.Solid,
           position: t,
+          bracket: { target: t.id, side: t.side, quantity: t.quantity },
           label: {
-            text: `${orderLabel({ ...t, orderType: 'market' })} ${formatLots(tradeLots(t))}`,
+            badge,
+            text: lots,
             pnl: null,
             action: { kind: 'close', tradeId: t.id, label: 'Cerrar posición' },
           },
         });
-        lines.push(...stops(t.id, t, t.entryPrice, t.quantity, LineStyle.Dashed));
+        lines.push(...this.stops(t.id, t, () => t.entryPrice, t.quantity, LineStyle.Dashed));
       } else if (t.status === 'pending') {
         lines.push({
           key: t.id,
@@ -453,27 +530,51 @@ export class ReplayChart {
           style: LineStyle.Dashed,
           drag: { target: t.id, field: 'price' },
           label: {
-            text: `${orderLabel(t)} ${formatLots(tradeLots(t))}`,
+            badge,
+            text: `${lots} ${ORDER_TYPES[t.orderType]}`,
             pnl: null,
             action: { kind: 'close', tradeId: t.id, label: 'Cancelar orden' },
           },
         });
-        lines.push(...stops(t.id, t, t.orderPrice, t.quantity, LineStyle.Dashed));
+        lines.push(...this.stops(t.id, t, () => t.orderPrice, t.quantity, LineStyle.Dashed));
       }
     }
     if (draft) {
-      if (draft.orderType !== 'market' && draft.price !== null) {
+      const lots = formatLots((draft.quantity ?? 0) / LOT_SIZE);
+      const label = {
+        badge: {
+          text: draft.side === 'long' ? 'Comprar' : 'Vender',
+          side: draft.side,
+          submit: true,
+        },
+        text: `${lots} ${ORDER_TYPES[draft.orderType]}`,
+        pnl: null,
+        action: null,
+      };
+      const market = draft.orderType === 'market';
+      const close = this.lastClose;
+      if (market && close !== undefined) {
+        lines.push({
+          key: 'draft:market',
+          price: close,
+          color: muted,
+          style: LineStyle.Dotted,
+          atClose: true,
+          bracket: { target: 'draft', side: draft.side, quantity: draft.quantity },
+          label,
+        });
+      } else if (!market && draft.price !== null) {
         lines.push({
           key: 'draft:price',
           price: draft.price,
           color: muted,
           style: LineStyle.Dotted,
           drag: { target: 'draft', field: 'price' },
-          label: { text: `Nueva ${orderLabel(draft).toLowerCase()}`, pnl: null, action: null },
+          label,
         });
       }
-      const entry = draft.orderType === 'market' ? (this.lastClose ?? null) : draft.price;
-      lines.push(...stops('draft', draft, entry, draft.quantity, LineStyle.Dotted));
+      const entry = () => (market ? (this.lastClose ?? null) : draft.price);
+      lines.push(...this.stops('draft', draft, entry, draft.quantity, LineStyle.Dotted));
     }
     for (const d of drawings) {
       if (d.kind === 'hline') {
@@ -494,14 +595,72 @@ export class ReplayChart {
     return lines;
   }
 
+  /** SL and TP lines, labelled with their size and the P/L at that price. */
+  private stops(
+    target: string,
+    t: Pick<OrderDraft, 'side' | 'stopLoss' | 'takeProfit'>,
+    entry: () => number | null,
+    quantity: number | undefined,
+    style: LineStyle,
+  ): Line[] {
+    const result: Line[] = [];
+    for (const field of ['stopLoss', 'takeProfit'] as const) {
+      const price = t[field];
+      if (price !== null) {
+        result.push(this.levelLine(target, t.side, field, price, entry, quantity, style));
+      }
+    }
+    return result;
+  }
+
+  private levelLine(
+    target: string,
+    side: TradeSide,
+    field: 'stopLoss' | 'takeProfit',
+    price: number,
+    entry: () => number | null,
+    quantity: number | undefined,
+    style: LineStyle,
+  ): Line {
+    const stop = field === 'stopLoss';
+    const pnlAt = (at: number) => {
+      const from = entry();
+      return from === null || !quantity ? 0 : (side === 'long' ? at - from : from - at) * quantity;
+    };
+    const known = entry() !== null && !!quantity;
+    return {
+      key: `${target}:${field}`,
+      price,
+      color: stop ? this.colors.down : this.colors.up,
+      style,
+      drag: { target, field },
+      pnlAt: known ? pnlAt : undefined,
+      label: {
+        text: `${stop ? 'SL' : 'TP'}${quantity ? ` ${formatLots(quantity / LOT_SIZE)}` : ''}`,
+        pnl: known ? pnlAt(price) : null,
+        action: {
+          kind: 'remove',
+          level: { target, field },
+          label: `Quitar ${stop ? 'stop loss' : 'take profit'}`,
+        },
+      },
+    };
+  }
+
   /** Puts each label on its line, and refreshes the P/L of open positions. */
   private layoutLabels(): void {
     if (!this.series || !this.chart) {
       return;
     }
     const close = this.lastClose;
+    this.drawnClose.set(close ?? null);
     const placed: PlacedLabel[] = [];
-    for (const { line } of this.priceLines) {
+    for (const { line, api } of this.priceLines) {
+      // The market order being set up follows the price.
+      if (line.atClose && close !== undefined && line.price !== close) {
+        line.price = close;
+        api.applyOptions({ price: close });
+      }
       if (!line.label) {
         continue;
       }
@@ -514,8 +673,8 @@ export class ReplayChart {
       if (line.position && close !== undefined) {
         const t = line.position;
         pnl = (t.side === 'long' ? close - t.entryPrice : t.entryPrice - close) * t.quantity;
-      } else if (this.dragging?.line === line && line.label.pnl !== null) {
-        pnl = null;
+      } else if (line.pnlAt) {
+        pnl = line.pnlAt(price);
       }
       placed.push({ ...line.label, pnl, key: line.key, color: line.color, y, line });
     }
@@ -719,7 +878,31 @@ export class ReplayChart {
   private startDrag(entry: { line: Line; api: IPriceLine }, event: PointerEvent): void {
     event.preventDefault();
     event.stopPropagation();
-    this.dragging = { ...entry, price: entry.line.price };
+    const bracket = entry.line.drag ? undefined : entry.line.bracket;
+    if (bracket) {
+      // Dragging away from an entry pulls out a new take profit or stop loss.
+      const price = entry.line.price;
+      const line = this.levelLine(
+        bracket.target,
+        bracket.side,
+        'takeProfit',
+        price,
+        () => price,
+        bracket.quantity,
+        LineStyle.Dashed,
+      );
+      const api = this.series!.createPriceLine({
+        price,
+        color: line.color,
+        title: '',
+        lineWidth: 2,
+        lineStyle: line.style,
+      });
+      this.priceLines.push({ line, api });
+      this.dragging = { line, api, price, bracket, origin: price };
+    } else {
+      this.dragging = { ...entry, price: entry.line.price, origin: entry.line.price };
+    }
     this.chart!.applyOptions({ handleScroll: false, handleScale: false });
     this.stage().nativeElement.setPointerCapture?.(event.pointerId);
   }
@@ -733,7 +916,8 @@ export class ReplayChart {
       let best: (typeof this.priceLines)[number] | undefined;
       let bestDistance = GRAB_DISTANCE;
       for (const entry of this.priceLines) {
-        const at = entry.line.drag ? this.series!.priceToCoordinate(entry.line.price) : null;
+        const grabbable = entry.line.drag || entry.line.bracket;
+        const at = grabbable ? this.series!.priceToCoordinate(entry.line.price) : null;
         const distance = at === null ? Infinity : Math.abs(at - y(event));
         if (distance <= bestDistance) {
           best = entry;
@@ -759,6 +943,10 @@ export class ReplayChart {
       (event) => {
         if (!this.dragging) {
           stage.style.cursor = untracked(this.tool) ? 'crosshair' : near(event) ? 'ns-resize' : '';
+          const onPlus = event.target instanceof Element && event.target.closest('.plus');
+          if (!onPlus) {
+            this.hoverY.set(this.overCandles(event) ? y(event) : null);
+          }
           return;
         }
         event.stopPropagation();
@@ -766,6 +954,11 @@ export class ReplayChart {
         if (price !== null && price > 0) {
           this.dragging.price = roundPrice(price);
           this.dragging.api.applyOptions({ price: this.dragging.price });
+          if (this.dragging.bracket) {
+            const { line, bracket, origin } = this.dragging;
+            this.pullLevel(line, bracket, origin, this.dragging.price);
+            this.dragging.api.applyOptions({ color: this.dragging.line.color });
+          }
           this.layoutLabels();
         }
       },
@@ -780,6 +973,10 @@ export class ReplayChart {
       this.dragging = undefined;
       this.chart!.applyOptions({ handleScroll: true, handleScale: true });
       const { target, field } = dragging.line.drag!;
+      if (dragging.bracket && dragging.price === dragging.origin) {
+        this.drawTrades(this.trades(), this.draft());
+        return;
+      }
       if (target.startsWith('drawing:')) {
         const id = Number(target.slice('drawing:'.length));
         this.drawings.update((list) =>
@@ -793,8 +990,38 @@ export class ReplayChart {
       // If the page rejects the move its inputs stay the same, so put the line back.
       setTimeout(() => this.drawTrades(this.trades(), this.draft()));
     };
+    stage.addEventListener('pointerleave', () => this.hoverY.set(null));
     stage.addEventListener('pointerup', drop, { capture: true });
     stage.addEventListener('pointercancel', drop, { capture: true });
+  }
+
+  /** Whether the pointer is over the candles of a live practice, where "+" is offered. */
+  private overCandles(event: PointerEvent): boolean {
+    const chart = this.chart;
+    if (!chart || !untracked(this.draft) || untracked(this.tool)) {
+      return false;
+    }
+    const box = this.canvas().nativeElement.getBoundingClientRect();
+    const x = event.clientX - box.left;
+    const y = event.clientY - box.top;
+    return x >= 0 && x <= chart.timeScale().width() && y >= 0 && y <= chart.panes()[0].getHeight();
+  }
+
+  /** Turns the line pulled out of an entry into a take profit or a stop loss, by its side. */
+  private pullLevel(line: Line, bracket: Bracket, origin: number, price: number): void {
+    const profit = price > origin === (bracket.side === 'long');
+    Object.assign(
+      line,
+      this.levelLine(
+        bracket.target,
+        bracket.side,
+        profit ? 'takeProfit' : 'stopLoss',
+        price,
+        () => origin,
+        bracket.quantity,
+        LineStyle.Dashed,
+      ),
+    );
   }
 
   private point(candle: Candle) {

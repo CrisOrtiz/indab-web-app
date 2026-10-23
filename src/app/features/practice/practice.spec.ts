@@ -7,7 +7,7 @@ import { Candle } from '../../core/models/practice';
 import { HISTORY_BARS, MarketDataService } from './market-data.service';
 import { Practice } from './practice';
 import { PracticeService } from './practice.service';
-import { LevelMove, LevelRemove, OrderDraft, ReplayChart } from './replay-chart';
+import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
 
 // The real chart needs a canvas; the page only passes it data.
 @Component({ selector: 'app-replay-chart', template: '<ng-content />' })
@@ -20,6 +20,9 @@ class FakeChart {
   readonly levelMoved = output<LevelMove>();
   readonly levelRemoved = output<LevelRemove>();
   readonly tradeClosed = output<string>();
+  readonly symbol = input('');
+  readonly draftSubmitted = output<void>();
+  readonly orderAt = output<OrderAt>();
 }
 
 /**
@@ -373,6 +376,31 @@ describe('Practice page', () => {
     chart().levelMoved.emit(move);
     await fixture.whenStable();
   };
+
+  it('trades from the chart: its order line button and its "+" menu', async () => {
+    await start();
+    // "+" → "Buy 0.01 @ 99 limit" places it at once.
+    chart().orderAt.emit({ side: 'long', orderType: 'limit', price: 99, place: true });
+    await fixture.whenStable();
+    expect(practice.openTrade).toHaveBeenLastCalledWith(
+      'session-1',
+      'u1',
+      expect.objectContaining({ side: 'long', orderType: 'limit', orderPrice: 99 }),
+    );
+    expect(el.textContent).toContain('Compra límite');
+
+    // "+" → "Add order at 103" fills in the panel; the line's button places it.
+    chart().orderAt.emit({ side: 'short', orderType: 'limit', price: 103, place: false });
+    await fixture.whenStable();
+    expect(submitLabel()).toBe('Vender 0.01 PAXGUSDT LÍMITE 103.000');
+    chart().draftSubmitted.emit();
+    await fixture.whenStable();
+    expect(practice.openTrade).toHaveBeenLastCalledWith(
+      'session-1',
+      'u1',
+      expect.objectContaining({ side: 'short', orderType: 'limit', orderPrice: 103 }),
+    );
+  });
 
   it('places a limit order that fills later, and drags its lines', async () => {
     await start();

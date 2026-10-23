@@ -47,7 +47,7 @@ import {
   tradeLots,
   tradePnl,
 } from './replay';
-import { LevelMove, LevelRemove, OrderDraft, ReplayChart } from './replay-chart';
+import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
 import { SessionStatsPanel } from './session-stats';
 
 type Phase = 'setup' | 'loading' | 'playing' | 'finished';
@@ -604,6 +604,27 @@ export class Practice {
   }
 
   /** The × on a stop loss or take profit label. */
+  /** An order from the chart's "+" menu: placed at once, or filled into the order panel. */
+  protected async onOrderAt(order: OrderAt): Promise<void> {
+    if (!order.place) {
+      this.side.set(order.side);
+      this.orderType.set(order.orderType);
+      this.orderPrice.set(order.price);
+      return;
+    }
+    const placed = await this.place({
+      side: order.side,
+      orderType: order.orderType,
+      price: order.price,
+      lots: this.lots(),
+      stopLoss: null,
+      takeProfit: null,
+    });
+    if (placed) {
+      this.tab.set('orders');
+    }
+  }
+
   protected onLevelRemoved({ target, field }: LevelRemove): void {
     if (target === 'draft') {
       this.setLevel(field, null);
