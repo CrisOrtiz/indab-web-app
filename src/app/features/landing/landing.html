@@ -1,0 +1,232 @@
+<section class="hero inverted">
+  <div class="container hero-inner">
+    <div class="hero-copy">
+      <p class="eyebrow">Academia de trading</p>
+      <h1>INDAB Academy</h1>
+      <p class="tagline">Conocimiento. Disciplina. Estrategia. Resultados.</p>
+      <p class="lead">
+        Aprende a leer el mercado, construir tu plan de trading y operar con gestión de riesgo,
+        acompañado de mentores y una comunidad que opera todos los días.
+      </p>
+      <div class="actions">
+        @if (auth.isLoggedIn()) {
+          <a routerLink="/academy" class="btn btn-light">Ir a la academia</a>
+        } @else {
+          <a routerLink="/register" class="btn btn-light">Únete a la academia</a>
+          <a routerLink="/login" class="btn btn-ghost">Ya tengo cuenta</a>
+        }
+      </div>
+    </div>
+    <div class="hero-visual" aria-hidden="true">
+      <svg viewBox="0 0 240 160" role="presentation">
+        <g stroke="currentColor" stroke-width="2">
+          <line x1="20" y1="100" x2="20" y2="140" />
+          <line x1="50" y1="80" x2="50" y2="130" />
+          <line x1="80" y1="90" x2="80" y2="135" />
+          <line x1="110" y1="60" x2="110" y2="110" />
+          <line x1="140" y1="50" x2="140" y2="100" />
+          <line x1="170" y1="55" x2="170" y2="95" />
+          <line x1="200" y1="25" x2="200" y2="75" />
+        </g>
+        <g fill="currentColor">
+          <rect x="13" y="108" width="14" height="24" />
+          <rect x="43" y="88" width="14" height="30" />
+          <rect x="133" y="58" width="14" height="32" />
+          <rect x="193" y="32" width="14" height="34" />
+        </g>
+        <g fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="73" y="98" width="14" height="26" />
+          <rect x="103" y="68" width="14" height="30" />
+          <rect x="163" y="62" width="14" height="22" />
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<div class="section-nav">
+  <div class="container">
+    @for (s of sections; track s.id) {
+      <a [href]="'#' + s.id">{{ s.label }}</a>
+    }
+  </div>
+</div>
+
+<section id="nosotros" class="section">
+  <div class="container two-col">
+    <div>
+      <p class="eyebrow">Nosotros</p>
+      <h2>Formamos traders con método</h2>
+      <p>
+        INDAB es una academia de trading enfocada en la formación práctica. Enseñamos un proceso
+        claro y medible para que tomes decisiones con criterio, no por impulso.
+      </p>
+      <ul class="stats">
+        @for (s of stats; track s.label) {
+          <li>
+            <strong>{{ s.value }}</strong>
+            <span>{{ s.label }}</span>
+          </li>
+        }
+      </ul>
+    </div>
+    <ul class="cards cards-2">
+      @for (p of pillars; track p.title) {
+        <li class="card">
+          <h3>{{ p.title }}</h3>
+          <p>{{ p.text }}</p>
+        </li>
+      }
+    </ul>
+  </div>
+</section>
+
+<section id="programas" class="section surface">
+  <div class="container">
+    <p class="eyebrow">Qué vas a aprender</p>
+    <h2>Programas por niveles</h2>
+    <ul class="cards cards-4">
+      @for (p of programs; track p.title) {
+        <li class="card">
+          <span class="badge">{{ p.level }}</span>
+          <h3>{{ p.title }}</h3>
+          <p>{{ p.text }}</p>
+        </li>
+      }
+    </ul>
+  </div>
+</section>
+
+<section id="metodologia" class="section">
+  <div class="container">
+    <p class="eyebrow">Metodología</p>
+    <h2>Un proceso en cuatro pasos</h2>
+    <ol class="steps">
+      @for (s of steps; track s.title; let i = $index) {
+        <li>
+          <span class="step-number">{{ i + 1 }}</span>
+          <h3>{{ s.title }}</h3>
+          <p>{{ s.text }}</p>
+        </li>
+      }
+    </ol>
+  </div>
+</section>
+
+<section id="plataforma" class="section surface">
+  <div class="container">
+    <p class="eyebrow">La plataforma</p>
+    <h2>Todo tu aprendizaje en un solo lugar</h2>
+    <ul class="cards cards-4">
+      @for (f of features; track f.title) {
+        <li class="card">
+          @if (f.soon) {
+            <span class="badge badge-solid">Próximamente</span>
+          }
+          <h3>{{ f.title }}</h3>
+          <p>{{ f.text }}</p>
+        </li>
+      }
+    </ul>
+  </div>
+</section>
+
+<section id="eleva" class="section inverted">
+  <div class="container two-col">
+    <div>
+      <p class="eyebrow">Eleva Inversiones</p>
+      <h2>El brazo de inversión de INDAB</h2>
+      <p>
+        Eleva Inversiones gestiona capital de inversionistas aplicando en los mercados la misma
+        disciplina y gestión de riesgo que enseñamos. Los inversionistas reciben reportes mensuales
+        de su cuenta y de los resultados.
+      </p>
+      <a routerLink="/eleva" class="btn btn-light">Conoce Eleva Inversiones</a>
+    </div>
+    <p class="disclaimer">
+      <strong>Aviso de riesgo:</strong> el trading y la inversión en mercados financieros implican
+      riesgo de pérdida, incluso del capital invertido. Los rendimientos pasados no garantizan
+      resultados futuros y ningún rendimiento mensual está asegurado. Invierte solo dinero que
+      puedas permitirte perder.
+    </p>
+  </div>
+</section>
+
+<section id="testimonios" class="section">
+  <div class="container">
+    <p class="eyebrow">Testimonios</p>
+    <h2>Lo que dicen nuestros estudiantes</h2>
+    <ul class="cards cards-3">
+      @for (t of testimonials; track $index) {
+        <li class="card">
+          <blockquote>“{{ t.quote }}”</blockquote>
+          <p class="author">
+            <strong>{{ t.name }}</strong
+            ><br />
+            {{ t.role }}
+          </p>
+        </li>
+      }
+    </ul>
+  </div>
+</section>
+
+<section id="preguntas" class="section surface">
+  <div class="container narrow">
+    <p class="eyebrow">Preguntas frecuentes</p>
+    <h2>Resolvemos tus dudas</h2>
+    @for (f of faqs; track f.question) {
+      <details class="faq">
+        <summary>{{ f.question }}</summary>
+        <p>{{ f.answer }}</p>
+      </details>
+    }
+  </div>
+</section>
+
+<section id="contacto" class="section">
+  <div class="container two-col">
+    <div>
+      <p class="eyebrow">Contacto</p>
+      <h2>Hablemos</h2>
+      <p>
+        ¿Tienes preguntas sobre los programas o las inscripciones? Escríbenos y te respondemos a la
+        brevedad.
+      </p>
+    </div>
+    <ul class="contact">
+      <li>
+        <span>Correo</span> <a href="mailto:contacto@indab.academy">contacto&#64;indab.academy</a>
+      </li>
+      <li><span>WhatsApp</span> <a href="https://wa.me/00000000000">+00 000 000 000</a></li>
+      <li><span>Instagram</span> <a href="https://instagram.com/">&#64;indab.academy</a></li>
+    </ul>
+  </div>
+</section>
+
+<section class="section inverted cta">
+  <div class="container">
+    <h2>Empieza hoy tu camino como trader</h2>
+    @if (!auth.isLoggedIn()) {
+      <a routerLink="/register" class="btn btn-light">Crear mi cuenta</a>
+    }
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <img src="logo.jpg" alt="" width="40" height="40" />
+      <div>
+        <strong>INDAB Academy</strong>
+        <p>Conocimiento. Disciplina. Estrategia. Resultados.</p>
+      </div>
+    </div>
+    <div class="footer-links">
+      <a routerLink="/eleva">Eleva Inversiones</a>
+      <a routerLink="/login">Ingresar</a>
+      <a routerLink="/register">Crear cuenta</a>
+    </div>
+    <p class="legal">© {{ year }} INDAB. Contenido educativo; no constituye asesoría financiera.</p>
+  </div>
+</footer>
