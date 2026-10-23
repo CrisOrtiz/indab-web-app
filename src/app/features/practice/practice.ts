@@ -56,7 +56,7 @@ const MIN_REPLAY_BARS = 50;
   selector: 'app-practice',
   imports: [RouterLink, DatePipe, DecimalPipe, PercentPipe, ReplayChart],
   templateUrl: './practice.html',
-  styleUrl: './practice.scss',
+  styleUrls: ['./practice.scss', './trading-panel.scss'],
   host: { '(window:keydown)': 'onKey($event)' },
 })
 export class Practice {
