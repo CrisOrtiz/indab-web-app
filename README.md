@@ -210,7 +210,7 @@ feed is for personal use only, and free APIs don't allow display to third partie
 Each session starts at a random moment (on a 4-hour boundary, at least 30 days before today)
 with the dates optionally hidden. The replay runs on one-minute candles, fetched 1000 at a time
 as it goes, and the chart builds them into bars of the timeframe the student picks: 1m, 3m, 5m,
-15m (the default), 1h or 4h, switchable at any time; each timeframe shows its 150 bars of
+15m (the default), 1h or 4h, switchable at any time; each timeframe shows its 500 bars of
 history before the start. "Siguiente vela" shows the next bar of that timeframe, and orders,
 stops and the stop out are checked minute by minute.
 

@@ -44,8 +44,8 @@ export function intervalMs(interval: string): number | null {
 
 /** Most klines Binance returns per request. */
 export const REPLAY_BARS = 1000;
-/** Bars of context shown before the replay starts, in every timeframe. */
-export const HISTORY_BARS = 150;
+/** Bars of context shown before the replay starts, in every timeframe: enough to zoom out. */
+export const HISTORY_BARS = 500;
 /** How far a replay can run: it is fed one-minute candles, a chunk at a time. */
 export const REPLAY_DAYS = 30;
 

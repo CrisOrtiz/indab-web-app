@@ -21,7 +21,7 @@ const mockMarket = (page: Page) =>
     const seconds = SECONDS[params.get('interval')!];
     const from = Number(params.get('startTime')) / 1000;
     const limit = Number(params.get('limit'));
-    replayStart ||= seconds === 60 ? from + 60 : from + 150 * seconds;
+    replayStart ||= seconds === 60 ? from + 60 : from + 500 * seconds;
     const json = Array.from({ length: limit }, (_, i) => {
       const time = from + i * seconds;
       const close = time < replayStart ? 100 : 101 + Math.floor((time - replayStart) / 900);
