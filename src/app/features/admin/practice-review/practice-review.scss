@@ -20,6 +20,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn.delete {
+  color: var(--color-down);
+  border-color: currentColor;
+}
+
+app-replay-chart {
+  margin: 12px 0;
+}
+
 .detail > td {
   padding: 0 0 16px;
   background: var(--color-surface);

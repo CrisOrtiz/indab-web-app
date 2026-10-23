@@ -1,15 +1,17 @@
 import { vi } from 'vitest';
 import {
+  HISTORY_BARS,
   INSTRUMENTS,
   MarketDataService,
   REPLAY_BARS,
-  TIMEFRAMES,
+  REPLAY_DAYS,
+  intervalMs,
   parseKlines,
-  randomWindowStart,
+  randomReplayStart,
 } from './market-data.service';
 
-const hour = TIMEFRAMES.find((t) => t.interval === '1h')!;
-const btc = INSTRUMENTS[0];
+const HOUR = 3_600_000;
+const gold = INSTRUMENTS[0];
 
 describe('parseKlines', () => {
   it('turns Binance rows into candles with times in seconds', () => {
@@ -19,16 +21,24 @@ describe('parseKlines', () => {
   });
 });
 
-describe('randomWindowStart', () => {
+describe('randomReplayStart', () => {
   const now = Date.UTC(2026, 9, 1);
 
-  it('stays between the listing date and the last full window, aligned to the timeframe', () => {
-    const first = randomWindowStart(btc, hour, now, () => 0);
-    const last = randomWindowStart(btc, hour, now, () => 0.999999);
-    expect(first).toBeGreaterThanOrEqual(btc.listedAt);
-    expect(last + REPLAY_BARS * hour.ms).toBeLessThanOrEqual(now);
-    expect(last % hour.ms).toBe(0);
-    expect(randomWindowStart(btc, hour, now, () => 0.5) % hour.ms).toBe(0);
+  it('leaves room for the history and a full replay, on a 4-hour boundary', () => {
+    const first = randomReplayStart(gold, now, () => 0);
+    const last = randomReplayStart(gold, now, () => 0.999999);
+    expect(first - HISTORY_BARS * 4 * HOUR).toBeGreaterThanOrEqual(gold.listedAt);
+    expect(last + REPLAY_DAYS * 24 * HOUR).toBeLessThanOrEqual(now);
+    expect(last % (4 * HOUR)).toBe(0);
+    expect(randomReplayStart(gold, now, () => 0.5) % (4 * HOUR)).toBe(0);
+  });
+});
+
+describe('intervalMs', () => {
+  it('knows the practice timeframes and the daily bars of older sessions', () => {
+    expect(intervalMs('3m')).toBe(180_000);
+    expect(intervalMs('1d')).toBe(24 * HOUR);
+    expect(intervalMs('2w')).toBeNull();
   });
 });
 
@@ -41,12 +51,14 @@ describe('MarketDataService', () => {
   it('loads klines from the public market-data endpoint', async () => {
     const fetch = vi.fn(async (_url: string) => new Response(JSON.stringify(rows)));
     vi.stubGlobal('fetch', fetch);
-    const candles = await service.loadCandles('ETHUSDT', '4h', 123);
+    const candles = await service.loadCandles('PAXGUSDT', '4h', 123);
+    await service.loadCandles('PAXGUSDT', '15m', 456, 150);
+    expect(new URL(fetch.mock.calls[1][0]).searchParams.get('limit')).toBe('150');
     expect(candles).toHaveLength(1);
     const url = new URL(fetch.mock.calls[0][0]);
     expect(url.origin).toBe('https://data-api.binance.vision');
     expect(Object.fromEntries(url.searchParams)).toEqual({
-      symbol: 'ETHUSDT',
+      symbol: 'PAXGUSDT',
       interval: '4h',
       startTime: '123',
       limit: String(REPLAY_BARS),
@@ -59,13 +71,13 @@ describe('MarketDataService', () => {
       .mockRejectedValueOnce(new TypeError('network'))
       .mockResolvedValueOnce(new Response(JSON.stringify(rows)));
     vi.stubGlobal('fetch', fetch);
-    expect(await service.loadCandles('BTCUSDT', '1h', 0)).toHaveLength(1);
+    expect(await service.loadCandles('PAXGUSDT', '1h', 0)).toHaveLength(1);
     expect(fetch.mock.calls[1][0]).toContain('https://api.binance.com/');
 
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response('', { status: 451 })),
     );
-    await expect(service.loadCandles('BTCUSDT', '1h', 0)).rejects.toThrow('HTTP 451');
+    await expect(service.loadCandles('PAXGUSDT', '1h', 0)).rejects.toThrow('HTTP 451');
   });
 });

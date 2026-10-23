@@ -4,6 +4,8 @@ import { FIRESTORE } from '../../core/firebase/firebase.providers';
 import { PracticeTrade } from '../../core/models/practice';
 import { PracticeService } from './practice.service';
 
+const batch = vi.hoisted(() => ({ delete: vi.fn(), commit: vi.fn(async () => undefined) }));
+
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((_db, ...segments: string[]) => ({ path: segments.join('/') })),
   doc: vi.fn((parent: { path: string }, id?: string) => {
@@ -15,11 +17,12 @@ vi.mock('firebase/firestore', () => ({
   orderBy: vi.fn((...args) => ['orderBy', ...args]),
   limit: vi.fn((n) => ['limit', n]),
   getDocs: vi.fn(async () => ({
-    docs: [{ id: 's1', data: () => ({ symbol: 'BTCUSDT', id: 'ignored' }) }],
+    docs: [{ id: 's1', data: () => ({ symbol: 'PAXGUSDT', id: 'ignored' }) }],
   })),
   setDoc: vi.fn(async () => undefined),
   updateDoc: vi.fn(async () => undefined),
   serverTimestamp: vi.fn(() => 'SERVER_TIMESTAMP'),
+  writeBatch: vi.fn(() => batch),
 }));
 
 import { getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
@@ -31,6 +34,9 @@ describe('PracticeService', () => {
     id: 't1',
     uid: '',
     side: 'short',
+    orderType: 'market',
+    orderPrice: null,
+    placedTime: 10,
     quantity: 0.5,
     entryPrice: 100,
     entryTime: 10,
@@ -53,7 +59,7 @@ describe('PracticeService', () => {
     const id = await service.startSession({
       uid: 'u1',
       userName: 'Ana',
-      symbol: 'BTCUSDT',
+      symbol: 'PAXGUSDT',
       interval: '1h',
       replayStart: 1000,
       startingBalance: 10000,
@@ -64,7 +70,7 @@ describe('PracticeService', () => {
       {
         uid: 'u1',
         userName: 'Ana',
-        symbol: 'BTCUSDT',
+        symbol: 'PAXGUSDT',
         interval: '1h',
         replayStart: 1000,
         startingBalance: 10000,
@@ -80,12 +86,15 @@ describe('PracticeService', () => {
   it('logs a trade as open with only its entry fields, then closes it', async () => {
     expect(service.newTradeId('s1')).toBe('generated-id');
 
-    await service.openTrade('s1', 'u1', trade);
+    await service.openTrade('s1', 'u1', { ...trade, status: 'open' });
     expect(setDoc).toHaveBeenCalledWith(
       expect.objectContaining({ path: 'practiceSessions/s1/trades/t1' }),
       {
         uid: 'u1',
         side: 'short',
+        orderType: 'market',
+        orderPrice: null,
+        placedTime: 10,
         quantity: 0.5,
         entryPrice: 100,
         entryTime: 10,
@@ -110,6 +119,34 @@ describe('PracticeService', () => {
     );
   });
 
+  it('fills, cancels and moves pending orders and moves stops of open trades', async () => {
+    const ref = expect.objectContaining({ path: 'practiceSessions/s1/trades/t1' });
+    const pending = { ...trade, orderType: 'limit', orderPrice: 99, status: 'pending' } as const;
+
+    await service.updateLevels('s1', { ...pending, orderPrice: 98, entryPrice: 98, stopLoss: 105 });
+    expect(updateDoc).toHaveBeenLastCalledWith(ref, {
+      stopLoss: 105,
+      takeProfit: null,
+      orderPrice: 98,
+      entryPrice: 98,
+    });
+    await service.updateLevels('s1', { ...trade, status: 'open', stopLoss: 104, takeProfit: 90 });
+    expect(updateDoc).toHaveBeenLastCalledWith(ref, { stopLoss: 104, takeProfit: 90 });
+
+    await service.fillOrder('s1', { ...pending, status: 'open', entryPrice: 98.5, entryTime: 11 });
+    expect(updateDoc).toHaveBeenLastCalledWith(ref, {
+      status: 'open',
+      entryPrice: 98.5,
+      entryTime: 11,
+      filledAt: 'SERVER_TIMESTAMP',
+    });
+    await service.cancelOrder('s1', pending);
+    expect(updateDoc).toHaveBeenLastCalledWith(ref, {
+      status: 'cancelled',
+      closedAt: 'SERVER_TIMESTAMP',
+    });
+  });
+
   it('updates the summary and finishes the session', async () => {
     const summary = { balance: 10005, pnl: 5, tradeCount: 1 };
     await service.updateSummary('s1', summary);
@@ -129,11 +166,26 @@ describe('PracticeService', () => {
   });
 
   it("reads the student's own sessions, every session and a session's trades", async () => {
-    expect(await service.mySessions('u1')).toEqual([{ symbol: 'BTCUSDT', id: 's1' }]);
+    expect(await service.mySessions('u1')).toEqual([{ symbol: 'PAXGUSDT', id: 's1' }]);
     expect(where).toHaveBeenCalledWith('uid', '==', 'u1');
     expect(await service.allSessions()).toHaveLength(1);
-    expect(await service.sessionTrades('s1')).toHaveLength(1);
+    // Trades logged before order types existed read as market orders.
+    expect(await service.sessionTrades('s1')).toEqual([
+      { orderType: 'market', orderPrice: null, symbol: 'PAXGUSDT', id: 's1' },
+    ]);
     expect(vi.mocked(query).mock.calls[2][0]).toEqual({ path: 'practiceSessions/s1/trades' });
     expect(getDocs).toHaveBeenCalledTimes(3);
+  });
+
+  it('deletes a session with its trades', async () => {
+    vi.mocked(getDocs).mockResolvedValueOnce({
+      docs: [{ ref: { path: 'practiceSessions/s1/trades/t1' } }],
+    } as never);
+    await service.deleteSession('s1');
+    expect(batch.delete.mock.calls.map(([ref]) => ref.path)).toEqual([
+      'practiceSessions/s1/trades/t1',
+      'practiceSessions/s1',
+    ]);
+    expect(batch.commit).toHaveBeenCalledTimes(1);
   });
 });

@@ -10,6 +10,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
 import { PracticeSession, PracticeTrade } from '../../core/models/practice';
@@ -65,19 +66,52 @@ export class PracticeService {
     });
   }
 
+  /** Logs a new order: `open` for market orders, `pending` for limit and stop orders. */
   openTrade(sessionId: string, uid: string, trade: PracticeTrade): Promise<void> {
-    const { id, side, quantity, entryPrice, entryTime, stopLoss, takeProfit } = trade;
+    const { id, side, orderType, orderPrice, placedTime, quantity, entryPrice, entryTime } = trade;
     return setDoc(doc(this.trades(sessionId), id), {
       uid,
       side,
+      orderType,
+      orderPrice,
+      placedTime,
       quantity,
       entryPrice,
       entryTime,
-      stopLoss,
-      takeProfit,
-      status: 'open',
+      stopLoss: trade.stopLoss,
+      takeProfit: trade.takeProfit,
+      status: trade.status,
       openedAt: serverTimestamp(),
     });
+  }
+
+  fillOrder(sessionId: string, trade: PracticeTrade): Promise<void> {
+    return updateDoc(doc(this.trades(sessionId), trade.id), {
+      status: 'open',
+      entryPrice: trade.entryPrice,
+      entryTime: trade.entryTime,
+      filledAt: serverTimestamp(),
+    });
+  }
+
+  cancelOrder(sessionId: string, trade: PracticeTrade): Promise<void> {
+    return updateDoc(doc(this.trades(sessionId), trade.id), {
+      status: 'cancelled',
+      closedAt: serverTimestamp(),
+    });
+  }
+
+  /** Saves moved stop loss / take profit, and a pending order's price. */
+  updateLevels(sessionId: string, trade: PracticeTrade): Promise<void> {
+    const levels: Record<string, number | null> = {
+      stopLoss: trade.stopLoss,
+      takeProfit: trade.takeProfit,
+    };
+    if (trade.status === 'pending') {
+      levels['orderPrice'] = trade.orderPrice;
+      levels['entryPrice'] = trade.entryPrice;
+    }
+    return updateDoc(doc(this.trades(sessionId), trade.id), levels);
   }
 
   closeTrade(sessionId: string, trade: PracticeTrade): Promise<void> {
@@ -105,8 +139,23 @@ export class PracticeService {
     return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
   }
 
+  /** Deletes a session and its trades (admins only). */
+  async deleteSession(sessionId: string): Promise<void> {
+    const trades = await getDocs(this.trades(sessionId));
+    const refs = [...trades.docs.map((d) => d.ref), doc(this.sessions, sessionId)];
+    // A batch holds at most 500 writes; the session goes last so a failure leaves it listed.
+    for (let i = 0; i < refs.length; i += 500) {
+      const batch = writeBatch(this.firestore);
+      refs.slice(i, i + 500).forEach((ref) => batch.delete(ref));
+      await batch.commit();
+    }
+  }
+
   async sessionTrades(sessionId: string): Promise<PracticeTrade[]> {
     const snapshot = await getDocs(query(this.trades(sessionId), orderBy('entryTime')));
-    return snapshot.docs.map((d) => ({ ...(d.data() as PracticeTrade), id: d.id }));
+    // Trades logged before order types existed were market orders.
+    return snapshot.docs.map(
+      (d) => ({ orderType: 'market', orderPrice: null, ...d.data(), id: d.id }) as PracticeTrade,
+    );
   }
 }

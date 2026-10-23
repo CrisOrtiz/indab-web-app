@@ -10,7 +10,10 @@ export interface Candle {
 }
 
 export type TradeSide = 'long' | 'short';
-export type TradeExitReason = 'manual' | 'stopLoss' | 'takeProfit' | 'sessionEnd';
+/** `market` fills at once; `limit` and `stop` wait in the book until a candle reaches `orderPrice`. */
+export type OrderType = 'market' | 'limit' | 'stop';
+export type TradeStatus = 'pending' | 'open' | 'closed' | 'cancelled';
+export type TradeExitReason = 'manual' | 'stopLoss' | 'takeProfit' | 'stopOut' | 'sessionEnd';
 
 /**
  * Stored at `practiceSessions/{id}`: one chart replay by one student. Created by the student
@@ -36,21 +39,31 @@ export interface PracticeSession {
 }
 
 /**
- * Stored at `practiceSessions/{sessionId}/trades/{id}`. Opened as `open`, then closed once
- * (by hand, stop loss, take profit or the end of the replay) and never edited again.
+ * Stored at `practiceSessions/{sessionId}/trades/{id}`. A market order starts `open`; a limit
+ * or stop order starts `pending` and becomes `open` when a candle reaches its price, or
+ * `cancelled`. While pending or open only the stop loss, take profit (and a pending order's
+ * price) can move. An open trade is closed once (by hand, stop loss, take profit or the end
+ * of the replay) and never edited again.
  */
 export interface PracticeTrade {
   id: string;
   uid: string;
   side: TradeSide;
+  orderType: OrderType;
+  /** Limit or stop price; null for market orders. */
+  orderPrice: number | null;
+  /** Candle time (seconds) the order was placed at. */
+  placedTime: number;
   quantity: number;
+  /** Fill price; for a pending order, its order price. */
   entryPrice: number;
-  /** Candle time (seconds) the trade was opened at. */
+  /** Candle time (seconds) the trade was filled at; for a pending order, `placedTime`. */
   entryTime: number;
   stopLoss: number | null;
   takeProfit: number | null;
-  status: 'open' | 'closed';
+  status: TradeStatus;
   openedAt?: Timestamp;
+  filledAt?: Timestamp;
   exitPrice?: number;
   exitTime?: number;
   exitReason?: TradeExitReason;

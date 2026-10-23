@@ -77,7 +77,7 @@ npm run test:all     # all three, as CI runs them
 | --- | --- | --- |
 | Unit | `src/**/*.spec.ts` | `AuthService`, guards, routes, login/register forms, admin page and service, header. Firebase is faked with `vi.mock`, no emulator needed. |
 | Rules | `tests/firestore.rules.test.ts` | every collection in `firestore.rules`, allowed and denied, for visitor, student, enrolled, owner and admin |
-| End-to-end | `e2e/*.spec.ts` | the real app in Chromium against the Auth + Firestore emulators: register, login, guards, sign-out, admin grants access and promotes users, a practice replay is logged and reviewed (market data mocked) |
+| End-to-end | `e2e/*.spec.ts` | the real app in Chromium against the Auth + Firestore emulators: register, login, guards, sign-out, admin grants access and promotes users, a practice replay is logged, reviewed and deleted (market data mocked) |
 
 Before the first `npm run test:e2e`, install the browser once with `npx playwright install chromium`.
 The e2e tests wipe the emulator data on every test, so stop `npm run emulators` before running them.
@@ -196,17 +196,38 @@ the rules are what actually protect the data. Anything not listed is denied.
 | `/repository` | enrolled users |
 | `/academy/practice` | enrolled users (chart-replay trading practice) |
 | `/admin` | admins (users, roles, academy access) |
-| `/admin/practice` | admins (review students' practice sessions and trades) |
+| `/admin/practice` | admins (review students' practice sessions on the chart, delete them) |
 
 ## Trading practice (chart replay)
 
-`/academy/practice` replays real historical candles bar by bar. Candles come from Binance's
-public market-data API (`data-api.binance.vision`, falling back to `api.binance.com`): free,
-no API key, fetched by the student's browser. Markets: BTC, ETH, SOL, gold (PAXG) and EUR
-(EURUSDT), on 15m/1h/4h/1d. Each session picks a random window (150 candles of context plus
-up to 850 to replay), dates can be hidden, and students open long/short trades with optional
-stop loss and take profit on 10,000 virtual USD without leverage. Sessions and trades are
-written to Firestore as they happen; admins review them at `/admin/practice`.
+`/academy/practice` replays real historical candles bar by bar. For now the only market is
+gold, through Binance's PAXG/USDT (a token that tracks XAU/USD), on 15m/1h/4h/1d. Candles come
+from Binance's public market-data API (`data-api.binance.vision`, falling back to
+`api.binance.com`): free, no API key, fetched by each student's browser. USD/JPY and NASDAQ
+are planned but need a data source licensed for showing prices to students (Dukascopy's free
+feed is for personal use only, and free APIs don't allow display to third parties).
+
+Each session starts at a random moment (on a 4-hour boundary, at least 30 days before today)
+with the dates optionally hidden. The replay runs on one-minute candles, fetched 1000 at a time
+as it goes, and the chart builds them into bars of the timeframe the student picks: 1m, 3m, 5m,
+15m (the default), 1h or 4h, switchable at any time; each timeframe shows its 150 bars of
+history before the start. "Siguiente vela" shows the next bar of that timeframe, and orders,
+stops and the stop out are checked minute by minute.
+
+Students start with 200 virtual USD and trade in lots (1 lot = 100 oz) with 1:100 leverage: a
+position ties up 1% of its value as margin, and every position is closed (stop out) when equity
+falls below 50% of the margin in use. Orders are market, limit or stop, with optional stop loss
+and take profit. The screen follows TradingView: one-click Buy/Sell over the chart, an order
+panel with Market/Limit/Stop tabs, lots with their margin, and take profit / stop loss switches
+that show their P/L and the reward to risk, plus an account summary and Positions / Orders /
+History tabs under the chart. Every order, position, stop loss and take profit is a line on the
+chart with a label showing its size and P/L and a × to close, cancel or remove it; order prices
+and stops can be dragged by the line or the label. The chart toolbar adds MA 20, MA 50, EMA 21
+and RSI 14 (in its own pane, computed only from the bars shown) and horizontal and trend lines.
+
+Sessions and orders are written to Firestore as they happen; admins review them at
+`/admin/practice`, where each session's trades are drawn on its candles (fetched again from
+Binance) and a session can be deleted with its trades.
 
 The chart is TradingView's [lightweight-charts](https://github.com/tradingview/lightweight-charts)
 (Apache-2.0; its logo on the chart is the required attribution). P/L figures are computed in the

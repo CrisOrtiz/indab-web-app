@@ -1,0 +1,310 @@
+// The TradingView-style trading screen: chart buttons, order panel, account and tabs.
+// TradingView colours: blue to buy, red to sell.
+
+:host {
+  --color-buy: #2962ff;
+  --color-sell: #f23645;
+}
+
+.workspace app-replay-chart {
+  height: 100%;
+  min-height: 460px;
+}
+
+/* One-click market orders over the chart. */
+.quick {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 84px;
+    padding: 3px 10px;
+    border: 0;
+    border-radius: 4px;
+    color: #fff;
+    font: inherit;
+    font-size: 0.7rem;
+    line-height: 1.25;
+    cursor: pointer;
+
+    &:disabled {
+      cursor: wait;
+    }
+
+    strong {
+      font-size: 0.9rem;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  .quick-sell {
+    background: var(--color-sell);
+  }
+
+  .quick-buy {
+    background: var(--color-buy);
+  }
+
+  .quick-size {
+    padding: 0 4px;
+    border-radius: 4px;
+    background: var(--color-bg);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+  }
+}
+
+.ticket {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+
+  h3 {
+    margin: 4px 0 -4px;
+    font-size: 0.95rem;
+  }
+
+  label {
+    gap: 6px;
+    font-weight: 400;
+  }
+}
+
+.ticket-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.field-name {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+/* An input with a note at its right end, as in TradingView's order panel. */
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+
+  input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+  }
+}
+
+.sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border-radius: var(--radius);
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 0;
+  background: var(--color-surface);
+  font: inherit;
+  cursor: pointer;
+
+  span {
+    font-size: 0.8rem;
+  }
+
+  strong {
+    font-size: 1.05rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &.sell {
+    color: var(--color-sell);
+  }
+
+  &.buy {
+    align-items: flex-end;
+    color: var(--color-buy);
+  }
+
+  &.selected {
+    color: #fff;
+  }
+
+  &.sell.selected {
+    background: var(--color-sell);
+  }
+
+  &.buy.selected {
+    background: var(--color-buy);
+  }
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+
+  button {
+    flex: 1;
+    padding: 8px 6px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--color-muted);
+    font: inherit;
+    cursor: pointer;
+
+    &.selected {
+      border-bottom-color: var(--color-text);
+      color: var(--color-text);
+      font-weight: 600;
+    }
+  }
+}
+
+.panel-tabs {
+  margin: 8px 0 0;
+  overflow-x: auto;
+
+  button {
+    flex: 0 0 auto;
+    padding: 10px 14px;
+  }
+}
+
+.fractions {
+  display: flex;
+  gap: 6px;
+  margin-top: -6px;
+
+  button {
+    flex: 1;
+    padding: 3px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+
+  dt {
+    color: var(--color-muted);
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.bracket {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* TradingView's toggle switches for take profit and stop loss. */
+.switch {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+
+  input {
+    appearance: none;
+    position: relative;
+    width: 36px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: var(--color-border);
+    cursor: pointer;
+    transition: background 0.15s;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.15s;
+    }
+
+    &:checked {
+      background: var(--color-text);
+
+      &::after {
+        transform: translateX(16px);
+      }
+    }
+  }
+}
+
+.submit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px;
+  border: 0;
+  border-radius: var(--radius);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+
+  strong {
+    font-size: 1.05rem;
+  }
+
+  span {
+    font-size: 0.8rem;
+  }
+
+  &.buy {
+    background: var(--color-buy);
+  }
+
+  &.sell {
+    background: var(--color-sell);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+}

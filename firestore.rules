@@ -10,7 +10,9 @@ rules_version = '2';
 //   investors/{uid}                      Eleva Inversiones investor account; owner reads, admins write
 //   practiceSessions/{id}                chart-replay practice by a student with academy access;
 //                                        owner writes while active, admins read all
-//   practiceSessions/{id}/trades/{id}    simulated trades of that session; opened once, closed once
+//   practiceSessions/{id}/trades/{id}    simulated orders of that session: market orders open at
+//                                        once, limit/stop orders fill or are cancelled once; open
+//                                        trades close once; only SL/TP (and a pending price) move
 //
 // Admins are users whose profile has role == 'admin'. Promote the first admin by editing
 // their users/{uid} document in the Firebase console; after that, admins manage roles and
@@ -123,7 +125,7 @@ service cloud.firestore {
         && request.resource.data.userName.size() <= 120
         && request.resource.data.symbol is string
         && request.resource.data.symbol.size() <= 20
-        && request.resource.data.interval in ['15m', '1h', '4h', '1d']
+        && request.resource.data.interval in ['1m', '3m', '5m', '15m', '1h', '4h', '1d']
         && request.resource.data.replayStart is int
         && request.resource.data.startingBalance is number
         && request.resource.data.balance == request.resource.data.startingBalance
@@ -152,36 +154,76 @@ service cloud.firestore {
           return value is number && value > 0;
         }
 
+        function optionalPrice(value) {
+          return value == null || isPrice(value);
+        }
+
+        function changes(keys) {
+          return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+        }
+
         allow read: if isAdmin() || (signedIn() && session().uid == request.auth.uid);
 
-        // Opened by the session's owner while the session is active.
+        // Placed by the session's owner while the session is active: a market order opens at
+        // once, a limit or stop order waits as `pending` at its order price.
         allow create: if signedIn()
           && session().uid == request.auth.uid
           && session().status == 'active'
-          && request.resource.data.keys().hasOnly(['uid', 'side', 'quantity', 'entryPrice',
-            'entryTime', 'stopLoss', 'takeProfit', 'status', 'openedAt'])
+          && request.resource.data.keys().hasOnly(['uid', 'side', 'orderType', 'orderPrice',
+            'placedTime', 'quantity', 'entryPrice', 'entryTime', 'stopLoss', 'takeProfit',
+            'status', 'openedAt'])
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.side in ['long', 'short']
           && isPrice(request.resource.data.quantity)
           && isPrice(request.resource.data.entryPrice)
-          && request.resource.data.entryTime is int
-          && (request.resource.data.stopLoss == null || isPrice(request.resource.data.stopLoss))
-          && (request.resource.data.takeProfit == null || isPrice(request.resource.data.takeProfit))
-          && request.resource.data.status == 'open'
+          && request.resource.data.placedTime is int
+          && request.resource.data.entryTime == request.resource.data.placedTime
+          && optionalPrice(request.resource.data.stopLoss)
+          && optionalPrice(request.resource.data.takeProfit)
+          && ((request.resource.data.orderType == 'market'
+              && request.resource.data.orderPrice == null
+              && request.resource.data.status == 'open')
+            || (request.resource.data.orderType in ['limit', 'stop']
+              && request.resource.data.orderPrice == request.resource.data.entryPrice
+              && request.resource.data.status == 'pending'))
           && request.resource.data.openedAt == request.time;
 
-        // Closed exactly once; the entry can never be edited.
-        allow update: if isOwner(resource.data.uid)
-          && resource.data.status == 'open'
-          && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'exitPrice', 'exitTime', 'exitReason', 'pnl', 'closedAt'])
-          && request.resource.data.status == 'closed'
-          && isPrice(request.resource.data.exitPrice)
-          && request.resource.data.exitTime is int
-          && request.resource.data.exitTime >= resource.data.entryTime
-          && request.resource.data.exitReason in ['manual', 'stopLoss', 'takeProfit', 'sessionEnd']
-          && request.resource.data.pnl is number
-          && request.resource.data.closedAt == request.time;
+        allow update: if isOwner(resource.data.uid) && (
+          // A pending order moves its price, stop loss or take profit...
+          (resource.data.status == 'pending'
+            && changes(['orderPrice', 'entryPrice', 'stopLoss', 'takeProfit'])
+            && isPrice(request.resource.data.orderPrice)
+            && request.resource.data.entryPrice == request.resource.data.orderPrice
+            && optionalPrice(request.resource.data.stopLoss)
+            && optionalPrice(request.resource.data.takeProfit))
+          // ...fills once...
+          || (resource.data.status == 'pending'
+            && changes(['status', 'entryPrice', 'entryTime', 'filledAt'])
+            && request.resource.data.status == 'open'
+            && isPrice(request.resource.data.entryPrice)
+            && request.resource.data.entryTime is int
+            && request.resource.data.entryTime > resource.data.placedTime
+            && request.resource.data.filledAt == request.time)
+          // ...or is cancelled.
+          || (resource.data.status == 'pending'
+            && changes(['status', 'closedAt'])
+            && request.resource.data.status == 'cancelled'
+            && request.resource.data.closedAt == request.time)
+          // An open trade moves its stop loss or take profit; its entry never changes...
+          || (resource.data.status == 'open'
+            && changes(['stopLoss', 'takeProfit'])
+            && optionalPrice(request.resource.data.stopLoss)
+            && optionalPrice(request.resource.data.takeProfit))
+          // ...and is closed exactly once.
+          || (resource.data.status == 'open'
+            && changes(['status', 'exitPrice', 'exitTime', 'exitReason', 'pnl', 'closedAt'])
+            && request.resource.data.status == 'closed'
+            && isPrice(request.resource.data.exitPrice)
+            && request.resource.data.exitTime is int
+            && request.resource.data.exitTime >= resource.data.entryTime
+            && request.resource.data.exitReason in ['manual', 'stopLoss', 'takeProfit', 'stopOut', 'sessionEnd']
+            && request.resource.data.pnl is number
+            && request.resource.data.closedAt == request.time));
 
         allow delete: if isAdmin();
       }

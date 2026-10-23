@@ -1,0 +1,135 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 460px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border);
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: none;
+    color: var(--color-text);
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--color-surface);
+    }
+
+    &.on {
+      border-color: var(--color-border);
+      background: var(--color-surface);
+      font-weight: 600;
+    }
+
+    &:disabled {
+      color: var(--color-muted);
+      cursor: default;
+    }
+  }
+
+  .swatch {
+    width: 10px;
+    height: 3px;
+    border-radius: 2px;
+  }
+
+  .sep {
+    width: 1px;
+    height: 18px;
+    margin: 0 4px;
+    background: var(--color-border);
+  }
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* The boxes on order and position lines, as in TradingView. */
+.line-label {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: stretch;
+  transform: translateY(-50%);
+  border: 1px solid;
+  border-radius: 2px;
+  background: var(--color-bg);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+
+  &.draggable {
+    cursor: ns-resize;
+  }
+
+  > * {
+    padding: 0 6px;
+  }
+
+  > * + * {
+    border-left: 1px solid var(--color-border);
+  }
+
+  .up {
+    color: var(--color-up);
+  }
+
+  .down {
+    color: var(--color-down);
+  }
+}
+
+.x {
+  border: 0;
+  background: none;
+  color: var(--color-muted);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-down);
+  }
+}
+
+.tool-hint {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  z-index: 2;
+  margin: 0;
+  padding: 4px 10px;
+  transform: translateX(-50%);
+  border-radius: var(--radius);
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: 0.8rem;
+  pointer-events: none;
+}
