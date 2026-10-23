@@ -66,11 +66,25 @@ npx firebase emulators:start --project demo-indab --only auth,firestore --import
 ## Tests
 
 ```bash
-npm test             # unit tests (Vitest through the Angular CLI)
+npm test             # unit tests (Vitest through the Angular CLI), watch mode
+npm run test:ci      # unit tests once, with a coverage report in coverage/
 npm run test:rules   # Firestore security rules tests; starts the Firestore emulator itself (needs Java)
+npm run test:e2e     # browser tests (Playwright); starts the emulators and ng serve itself (needs Java)
+npm run test:all     # all three, as CI runs them
 ```
 
-Every change to `firestore.rules` should come with a test in `tests/firestore.rules.test.ts`.
+| Suite | Where | What it covers |
+| --- | --- | --- |
+| Unit | `src/**/*.spec.ts` | `AuthService`, guards, routes, login/register forms, admin page and service, header. Firebase is faked with `vi.mock`, no emulator needed. |
+| Rules | `tests/firestore.rules.test.ts` | every collection in `firestore.rules`, allowed and denied, for visitor, student, enrolled, owner and admin |
+| End-to-end | `e2e/*.spec.ts` | the real app in Chromium against the Auth + Firestore emulators: register, login, guards, sign-out, admin grants access and promotes users |
+
+Before the first `npm run test:e2e`, install the browser once with `npx playwright install chromium`.
+The e2e tests wipe the emulator data on every test, so stop `npm run emulators` before running them.
+If a test fails, `npx playwright show-report` opens the report with screenshots and traces.
+
+Every change to `firestore.rules` should come with a test in `tests/firestore.rules.test.ts`, and
+every new page or user flow with a unit test and, for a main flow, an e2e test in `e2e/`.
 
 ## Firebase project and deploys
 
@@ -106,8 +120,9 @@ Settings > Authorized domains** by default; add any custom domain there too, or 
 
 `.github/workflows/ci.yml` runs on every push and pull request:
 
-1. **Build and test**: `npm run build`, `npm test` and `npm run test:rules` (Node 24, Java 21 for
-   the Firestore emulator). Nothing deploys unless this job passes.
+1. **Build and test**: `npm run build`, `npm run test:ci`, `npm run test:rules` and
+   `npm run test:e2e` (Node 24, Java 21 for the emulators). Nothing deploys unless this job passes.
+   The coverage report and, on failure, the Playwright report are attached to the run.
 2. **Deploy preview** (pull requests): a 7-day preview URL posted as a PR comment.
 3. **Deploy live site** (push to `main`): https://indab-academy.web.app, using the build that was tested.
 4. **Deploy Firestore rules** (push to `main`, opt-in): `firestore.rules` and
@@ -185,8 +200,11 @@ the rules are what actually protect the data. Anything not listed is denied.
 | `npm run emulators` | Auth + Firestore emulators with the Emulator UI |
 | `npm run build` | production build to `dist/indab-web-app/browser` |
 | `npm run watch` | development build in watch mode |
-| `npm test` | unit tests (Vitest) |
+| `npm test` | unit tests (Vitest), watch mode |
+| `npm run test:ci` | unit tests once, with coverage |
 | `npm run test:rules` | Firestore security rules tests against the emulator |
+| `npm run test:e2e` | end-to-end browser tests (Playwright) against the emulators |
+| `npm run test:all` | all test suites |
 | `npm run deploy:rules` | deploy Firestore rules and indexes |
 | `npm run deploy` | build and deploy to Firebase Hosting |
 
@@ -201,6 +219,7 @@ src/app/
   shared/layout/   header
 src/environments/  environment.ts (indab-academy) and environment.development.ts (emulators)
 firestore.rules    security rules (tested in tests/firestore.rules.test.ts)
+e2e/               Playwright end-to-end tests and emulator seeding helpers
 CLAUDE.md          conventions for Claude Code; the project skill lives in .claude/skills/indab-dev
 ```
 

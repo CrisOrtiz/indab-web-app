@@ -2,6 +2,9 @@ import { FirebaseError } from 'firebase/app';
 
 const messages: Record<string, string> = {
   'auth/invalid-credential': 'Correo o contraseña incorrectos.',
+  // Projects without email enumeration protection (and the Auth emulator) use these instead.
+  'auth/wrong-password': 'Correo o contraseña incorrectos.',
+  'auth/user-not-found': 'Correo o contraseña incorrectos.',
   'auth/invalid-email': 'El correo no es válido.',
   'auth/user-disabled': 'Esta cuenta está deshabilitada.',
   'auth/email-already-in-use': 'Ya existe una cuenta con este correo.',
