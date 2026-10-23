@@ -116,7 +116,7 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_INDAB_ACADEMY }}
           projectId: indab-academy
-          expires: 7d
+          expires: 1d
 
   deploy_live:
     name: Deploy live site

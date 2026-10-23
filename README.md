@@ -123,7 +123,9 @@ Settings > Authorized domains** by default; add any custom domain there too, or 
 1. **Build and test**: `npm run build`, `npm run test:ci`, `npm run test:rules` and
    `npm run test:e2e` (Node 24, Java 21 for the emulators). Nothing deploys unless this job passes.
    The coverage report and, on failure, the Playwright report are attached to the run.
-2. **Deploy preview** (pull requests): a 7-day preview URL posted as a PR comment.
+2. **Deploy preview** (pull requests): a temporary preview URL posted as a PR comment. It is
+   deleted when the PR is merged or closed (`.github/workflows/preview-cleanup.yml`) and expires
+   after 1 day anyway. To delete every preview now: **Actions > Delete previews > Run workflow**.
 3. **Deploy live site** (push to `main`): https://indab-academy.web.app, using the build that was tested.
 4. **Deploy Firestore rules** (push to `main`, opt-in): `firestore.rules` and
    `firestore.indexes.json`, only when the repository variable `DEPLOY_FIRESTORE_RULES` is `true`.
