@@ -1,5 +1,6 @@
 # Tests every push and pull request, then deploys (project indab-academy) only if tests pass.
-#   - pull request / any push -> build, unit tests (ng test) and Firestore rules tests (emulator)
+#   - pull request / any push -> build, unit tests with coverage, Firestore rules tests and
+#                                Playwright end-to-end tests (both against the emulators)
 #   - pull request            -> temporary preview URL, posted as a PR comment
 #   - push to main            -> live site (https://indab-academy.web.app)
 #   - push to main            -> Firestore rules + indexes, only when the repository variable
@@ -48,9 +49,28 @@ jobs:
       - name: Build
         run: npm run build
       - name: Unit tests
-        run: npm test -- --watch=false
+        run: npm run test:ci
       - name: Firestore rules tests
         run: npm run test:rules
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end tests
+        run: npm run test:e2e
+
+      - name: Upload coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+          retention-days: 7
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
 
       - name: Upload build
         uses: actions/upload-artifact@v4

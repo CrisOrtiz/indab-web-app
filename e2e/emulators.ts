@@ -1,0 +1,105 @@
+// Helpers that seed and inspect the Auth and Firestore emulators through their REST APIs.
+// `Bearer owner` is the emulators' admin token: it bypasses the security rules.
+const projectId = 'demo-indab';
+const authUrl = 'http://127.0.0.1:9099';
+const firestoreUrl = `http://127.0.0.1:8080/v1/projects/${projectId}/databases/(default)/documents`;
+const owner = { Authorization: 'Bearer owner' };
+
+export const PASSWORD = 'secreto123';
+
+async function request(url: string, init: RequestInit = {}): Promise<any> {
+  const response = await fetch(url, init);
+  if (!response.ok) {
+    const detail = `${response.status} ${await response.text()}`;
+    throw new Error(`${init.method ?? 'GET'} ${url} failed: ${detail}`);
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+/** Deletes every account and document, so each test starts from an empty project. */
+export async function resetEmulators(): Promise<void> {
+  await request(`${authUrl}/emulator/v1/projects/${projectId}/accounts`, { method: 'DELETE' });
+  await request(
+    `http://127.0.0.1:8080/emulator/v1/projects/${projectId}/databases/(default)/documents`,
+    { method: 'DELETE' },
+  );
+}
+
+type Value = string | boolean | number | Date | Value[];
+
+const toField = (value: Value): object => {
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(toField) } };
+  if (value instanceof Date) return { timestampValue: value.toISOString() };
+  if (typeof value === 'boolean') return { booleanValue: value };
+  if (typeof value === 'number') return { integerValue: String(value) };
+  return { stringValue: value };
+};
+
+const fromField = (field: any): unknown => {
+  if ('arrayValue' in field) return (field.arrayValue.values ?? []).map(fromField);
+  if ('booleanValue' in field) return field.booleanValue;
+  if ('integerValue' in field) return Number(field.integerValue);
+  if ('nullValue' in field) return null;
+  return field.stringValue ?? field.timestampValue;
+};
+
+export async function setDocument(path: string, data: Record<string, Value>): Promise<void> {
+  const fields = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, toField(v)]));
+  await request(`${firestoreUrl}/${path}`, {
+    method: 'PATCH',
+    headers: { ...owner, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  });
+}
+
+export async function getDocument(path: string): Promise<Record<string, unknown> | null> {
+  const response = await fetch(`${firestoreUrl}/${path}`, { headers: owner });
+  if (response.status === 404) return null;
+  const { fields = {} } = await response.json();
+  return Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, fromField(v)]));
+}
+
+/** Finds the uid of the account registered with this email. */
+export async function uidOf(email: string): Promise<string> {
+  const { users = [] } = await request(
+    `${authUrl}/identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:lookup`,
+    {
+      method: 'POST',
+      headers: { ...owner, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: [email] }),
+    },
+  );
+  if (!users[0]) throw new Error(`No account for ${email}`);
+  return users[0].localId;
+}
+
+/** Creates an account with its profile, as the app would after registration. */
+export async function createUser(
+  displayName: string,
+  email: string,
+  options: { role?: 'student' | 'admin'; academy?: boolean } = {},
+): Promise<string> {
+  const { localId: uid } = await request(
+    `${authUrl}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-api-key`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: PASSWORD, displayName }),
+    },
+  );
+  await setDocument(`users/${uid}`, {
+    uid,
+    email,
+    displayName,
+    role: options.role ?? 'student',
+    createdAt: new Date(),
+  });
+  if (options.academy !== undefined) {
+    await setDocument(`enrollments/${uid}`, {
+      academy: options.academy,
+      courses: [],
+      updatedAt: new Date(),
+    });
+  }
+  return uid;
+}

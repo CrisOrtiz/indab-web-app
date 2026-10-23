@@ -15,7 +15,8 @@ The app serves two businesses:
 ## Stack (do not change without asking)
 
 - Angular 22.2: standalone components, signals, `inject()`, `@if`/`@for` control flow,
-  lazy `loadComponent` routes, SCSS. Unit tests run on Vitest through `ng test`.
+  lazy `loadComponent` routes, SCSS. Unit tests run on Vitest through `ng test`; end-to-end
+  tests on Playwright against the emulators.
 - Firebase JS SDK 13, modular API, **no AngularFire** (it lags behind Angular releases).
 - Firebase project `indab-academy` (Firestore in `southamerica-west1`). Local dev uses the
   emulators with project `demo-indab` (`environment.development.ts`, `useEmulators: true`).
@@ -93,9 +94,27 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
    Add a header link in `src/app/shared/layout/header.html` if it is a main section.
 6. **Indexes**: composite queries need an entry in `firestore.indexes.json`.
 7. **Docs**: update the access-model and routes tables in `README.md` and this skill.
-8. **Verify**: `npm test`, `npm run test:rules`, `npm run build`.
-   CI (`.github/workflows/ci.yml`) runs the same three on every PR and push and gates every
+8. **Tests**: a `<name>.spec.ts` next to each component and service, and an e2e test in `e2e/` for
+   the main user flow (see Testing below).
+9. **Verify**: `npm run test:ci`, `npm run test:rules`, `npm run test:e2e`, `npm run build`.
+   CI (`.github/workflows/ci.yml`) runs the same on every PR and push and gates every
    deploy on them; a new test script must also be added to its `test` job.
+
+## Testing
+
+- **Unit** (`src/**/*.spec.ts`, `npm test` / `npm run test:ci`): Vitest + TestBed, jsdom.
+  Components: replace `AuthService` (or the feature service) with a `useValue` fake built from
+  `signal()`s and drive the DOM. Services: fake the Firebase SDK with
+  `vi.mock('firebase/firestore', ...)` and capture `onSnapshot` callbacks
+  (see `auth.service.spec.ts`, `admin.service.spec.ts`). `isolate: true` in `angular.json` keeps
+  `vi.mock` per file; do not turn it off.
+- **Rules** (`tests/firestore.rules.test.ts`, `npm run test:rules`): allowed and denied cases.
+- **E2E** (`e2e/*.spec.ts`, `npm run test:e2e`): Playwright drives `ng serve` against the Auth and
+  Firestore emulators with the real rules. Each test calls `resetEmulators()` and seeds what it
+  needs with `createUser()` / `setDocument()` from `e2e/emulators.ts` (REST, bypasses rules).
+  Select by role and Spanish label (`getByRole`, `getByLabel`), not CSS, where possible.
+  `PLAYWRIGHT_CHROMIUM_PATH` lets you use an already installed Chromium (e.g. in cloud sessions,
+  `/opt/pw-browsers/chromium`) instead of `npx playwright install`.
 
 Module notes:
 
