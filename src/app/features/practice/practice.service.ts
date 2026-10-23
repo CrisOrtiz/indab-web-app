@@ -10,6 +10,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
 import { PracticeSession, PracticeTrade } from '../../core/models/practice';
@@ -136,6 +137,18 @@ export class PracticeService {
   async allSessions(max = 200): Promise<PracticeSession[]> {
     const snapshot = await getDocs(query(this.sessions, orderBy('startedAt', 'desc'), limit(max)));
     return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
+  }
+
+  /** Deletes a session and its trades (admins only). */
+  async deleteSession(sessionId: string): Promise<void> {
+    const trades = await getDocs(this.trades(sessionId));
+    const refs = [...trades.docs.map((d) => d.ref), doc(this.sessions, sessionId)];
+    // A batch holds at most 500 writes; the session goes last so a failure leaves it listed.
+    for (let i = 0; i < refs.length; i += 500) {
+      const batch = writeBatch(this.firestore);
+      refs.slice(i, i + 500).forEach((ref) => batch.delete(ref));
+      await batch.commit();
+    }
   }
 
   async sessionTrades(sessionId: string): Promise<PracticeTrade[]> {

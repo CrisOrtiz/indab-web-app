@@ -102,8 +102,16 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   await nav(page).getByRole('link', { name: 'Administración' }).click();
   await page.getByRole('link', { name: 'Revisar prácticas de trading' }).click();
   await expect(page).toHaveURL('/admin/practice');
-  await expect(page.getByRole('cell', { name: 'José Pérez' })).toBeVisible();
-  await page.getByRole('button', { name: 'Ver operaciones' }).click();
+  await expect(page.getByRole('cell', { name: 'José Pérez', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Ver práctica' }).click();
+  await expect(page.locator('.detail app-replay-chart canvas').first()).toBeVisible();
   await expect(page.getByRole('cell', { name: 'Fin de sesión', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: 'Manual', exact: true })).toBeVisible();
+
+  // ...and can delete it with its trades.
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Eliminar práctica de José Pérez' }).click();
+  await expect(page.getByText('No hay prácticas registradas.')).toBeVisible();
+  expect(await listDocuments('practiceSessions')).toEqual([]);
+  expect(await listDocuments(`practiceSessions/${session['id']}/trades`)).toEqual([]);
 });

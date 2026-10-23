@@ -4,6 +4,8 @@ import { FIRESTORE } from '../../core/firebase/firebase.providers';
 import { PracticeTrade } from '../../core/models/practice';
 import { PracticeService } from './practice.service';
 
+const batch = vi.hoisted(() => ({ delete: vi.fn(), commit: vi.fn(async () => undefined) }));
+
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((_db, ...segments: string[]) => ({ path: segments.join('/') })),
   doc: vi.fn((parent: { path: string }, id?: string) => {
@@ -20,6 +22,7 @@ vi.mock('firebase/firestore', () => ({
   setDoc: vi.fn(async () => undefined),
   updateDoc: vi.fn(async () => undefined),
   serverTimestamp: vi.fn(() => 'SERVER_TIMESTAMP'),
+  writeBatch: vi.fn(() => batch),
 }));
 
 import { getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
@@ -172,5 +175,17 @@ describe('PracticeService', () => {
     ]);
     expect(vi.mocked(query).mock.calls[2][0]).toEqual({ path: 'practiceSessions/s1/trades' });
     expect(getDocs).toHaveBeenCalledTimes(3);
+  });
+
+  it('deletes a session with its trades', async () => {
+    vi.mocked(getDocs).mockResolvedValueOnce({
+      docs: [{ ref: { path: 'practiceSessions/s1/trades/t1' } }],
+    } as never);
+    await service.deleteSession('s1');
+    expect(batch.delete.mock.calls.map(([ref]) => ref.path)).toEqual([
+      'practiceSessions/s1/trades/t1',
+      'practiceSessions/s1',
+    ]);
+    expect(batch.commit).toHaveBeenCalledTimes(1);
   });
 });

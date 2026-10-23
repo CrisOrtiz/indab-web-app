@@ -3,8 +3,9 @@
     <a routerLink="/admin" class="back">← Administración</a>
     <h1>Prácticas de trading</h1>
     <p>
-      Sesiones de práctica con replay de los estudiantes y cada operación que abrieron. Las fechas
-      del periodo se muestran aquí aunque el estudiante las haya practicado ocultas.
+      Sesiones de práctica con replay de los estudiantes y cada operación que abrieron, sobre el
+      gráfico que practicaron. Las fechas del periodo se muestran aquí aunque el estudiante las haya
+      practicado ocultas.
     </p>
   </header>
 
@@ -65,20 +66,38 @@
               {{ s.pnl | number: '1.2-2' }}
             </td>
             <td data-label="Estado">{{ s.status === 'active' ? 'En curso' : 'Terminada' }}</td>
-            <td>
+            <td class="actions">
               <button
                 type="button"
                 class="btn btn-outline small"
                 [attr.aria-expanded]="selected() === s.id"
                 (click)="toggle(s)"
               >
-                {{ selected() === s.id ? 'Ocultar' : 'Ver operaciones' }}
+                {{ selected() === s.id ? 'Ocultar' : 'Ver práctica' }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline small delete"
+                [disabled]="deleting() === s.id"
+                [attr.aria-label]="'Eliminar práctica de ' + s.userName"
+                (click)="remove(s)"
+              >
+                {{ deleting() === s.id ? 'Eliminando…' : 'Eliminar' }}
               </button>
             </td>
           </tr>
           @if (selected() === s.id) {
             <tr class="detail">
               <td colspan="8">
+                @if (candles(); as candles) {
+                  @if (candles.length) {
+                    <app-replay-chart [candles]="candles" [trades]="trades() ?? []" />
+                  } @else {
+                    <p class="muted">No se pudo cargar el gráfico del mercado.</p>
+                  }
+                } @else {
+                  <p class="muted">Cargando gráfico…</p>
+                }
                 @if (trades(); as list) {
                   <table class="trades">
                     <thead>

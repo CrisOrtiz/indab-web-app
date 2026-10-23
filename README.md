@@ -77,7 +77,7 @@ npm run test:all     # all three, as CI runs them
 | --- | --- | --- |
 | Unit | `src/**/*.spec.ts` | `AuthService`, guards, routes, login/register forms, admin page and service, header. Firebase is faked with `vi.mock`, no emulator needed. |
 | Rules | `tests/firestore.rules.test.ts` | every collection in `firestore.rules`, allowed and denied, for visitor, student, enrolled, owner and admin |
-| End-to-end | `e2e/*.spec.ts` | the real app in Chromium against the Auth + Firestore emulators: register, login, guards, sign-out, admin grants access and promotes users, a practice replay is logged and reviewed (market data mocked) |
+| End-to-end | `e2e/*.spec.ts` | the real app in Chromium against the Auth + Firestore emulators: register, login, guards, sign-out, admin grants access and promotes users, a practice replay is logged, reviewed and deleted (market data mocked) |
 
 Before the first `npm run test:e2e`, install the browser once with `npx playwright install chromium`.
 The e2e tests wipe the emulator data on every test, so stop `npm run emulators` before running them.
@@ -196,7 +196,7 @@ the rules are what actually protect the data. Anything not listed is denied.
 | `/repository` | enrolled users |
 | `/academy/practice` | enrolled users (chart-replay trading practice) |
 | `/admin` | admins (users, roles, academy access) |
-| `/admin/practice` | admins (review students' practice sessions and trades) |
+| `/admin/practice` | admins (review students' practice sessions on the chart, delete them) |
 
 ## Trading practice (chart replay)
 
@@ -213,7 +213,8 @@ stop orders, optional stop loss and take profit. The order price, stop loss and 
 are lines on the chart that can be dragged, for the order being set up, pending orders and
 open trades. Pending orders fill when a later candle reaches their price, can be cancelled,
 and expire when the session ends. Sessions and orders are written to Firestore as they
-happen; admins review them at `/admin/practice`.
+happen; admins review them at `/admin/practice`, where each session's trades are drawn on the
+same candles (fetched again from Binance) and a session can be deleted with its trades.
 
 The chart is TradingView's [lightweight-charts](https://github.com/tradingview/lightweight-charts)
 (Apache-2.0; its logo on the chart is the required attribution). P/L figures are computed in the
