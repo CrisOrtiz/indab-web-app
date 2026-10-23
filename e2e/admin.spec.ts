@@ -65,7 +65,7 @@ test('granting academy access opens the material to the student', async ({ page 
   await signIn(page, 'luis@indab.test');
   await expect(page.getByText('Bienvenido a la academia.')).toBeVisible();
   await page.getByRole('link', { name: 'Ver material de estudio' }).click();
-  await expect(page).toHaveURL('/repository');
+  await expect(page).toHaveURL('/academy/material');
 });
 
 test('revoking academy access closes the material again', async ({ page }) => {
@@ -78,7 +78,7 @@ test('revoking academy access closes the material again', async ({ page }) => {
   await signOut(page);
   await signIn(page, 'jose@indab.test');
   await expect(page.getByText('Tu inscripción está pendiente.')).toBeVisible();
-  await page.goto('/repository');
+  await page.goto('/academy/material');
   await expect(page).toHaveURL('/academy');
 });
 
@@ -99,10 +99,9 @@ test('promoting a student asks for confirmation', async ({ page }) => {
   await expect(page.locator('.stat strong').nth(2)).toHaveText('2');
   expect(await getDocument(`users/${studentUid}`)).toMatchObject({ role: 'admin' });
 
-  // The new admin can open the admin area and the material.
+  // The new admin can open the admin area.
   await signOut(page);
   await signIn(page, 'luis@indab.test');
-  await expect(nav(page).getByRole('link', { name: 'Material' })).toBeVisible();
   await nav(page).getByRole('link', { name: 'Administración' }).click();
   await expect(page).toHaveURL('/admin');
 });

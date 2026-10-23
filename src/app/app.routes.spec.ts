@@ -57,15 +57,17 @@ describe('app routes', () => {
     auth.isAdmin.set(!!state.admin);
   };
 
+  const pages = routes.filter((route) => !route.redirectTo);
+
   it('gives every route a Spanish title for the browser tab', () => {
-    for (const route of routes) {
+    for (const route of pages) {
       expect(route.title, route.path).toMatch(/INDAB|Eleva/);
     }
     expect(routes.at(-1)?.path).toBe('**');
   });
 
   it('lazy-loads a component for every route', async () => {
-    for (const route of routes) {
+    for (const route of pages) {
       expect(await route.loadComponent!(), route.path).toBeTruthy();
     }
   });
@@ -80,7 +82,7 @@ describe('app routes', () => {
 
   it('sends visitors to login from private pages', async () => {
     expect(await visit('/academy')).toBe('/login?returnUrl=%2Facademy');
-    expect(await visit('/repository')).toBe('/login?returnUrl=%2Frepository');
+    expect(await visit('/academy/material')).toBe('/login?returnUrl=%2Facademy%2Fmaterial');
     expect(await visit('/admin')).toBe('/login?returnUrl=%2Fadmin');
     expect(await visit('/academy/practice')).toBe('/login?returnUrl=%2Facademy%2Fpractice');
     expect(await visit('/admin/practice')).toBe('/login?returnUrl=%2Fadmin%2Fpractice');
@@ -89,7 +91,7 @@ describe('app routes', () => {
   it('keeps students without access in the academy', async () => {
     signIn();
     expect(await visit('/academy')).toBe('/academy');
-    expect(await visit('/repository')).toBe('/academy');
+    expect(await visit('/academy/material')).toBe('/academy');
     expect(await visit('/academy/practice')).toBe('/academy');
     expect(await visit('/admin')).toBe('/academy');
     expect(await visit('/login')).toBe('/academy');
@@ -98,7 +100,8 @@ describe('app routes', () => {
 
   it('opens the material to enrolled students', async () => {
     signIn({ academy: true });
-    expect(await visit('/repository')).toBe('/repository');
+    expect(await visit('/academy/material')).toBe('/academy/material');
+    expect(await visit('/repository')).toBe('/academy/material');
     expect(await visit('/academy/practice')).toBe('/academy/practice');
     expect(await visit('/admin')).toBe('/academy');
     expect(await visit('/admin/practice')).toBe('/academy');

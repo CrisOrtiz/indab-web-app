@@ -41,16 +41,16 @@ describe('Header', () => {
     expect(links()).toEqual(['/eleva', '/login']);
   });
 
-  it('shows the academy to students, the material only with access', async () => {
+  it('shows the academy to students, without a separate material link', async () => {
     await as({});
     expect(links()).toEqual(['/eleva', '/academy']);
     await as({ academy: true });
-    expect(links()).toEqual(['/eleva', '/academy', '/repository']);
+    expect(links()).toEqual(['/eleva', '/academy']);
   });
 
   it('shows the admin link to admins', async () => {
     await as({ academy: true, admin: true });
-    expect(links()).toEqual(['/eleva', '/academy', '/repository', '/admin']);
+    expect(links()).toEqual(['/eleva', '/academy', '/admin']);
   });
 
   it('signs out and goes home', async () => {

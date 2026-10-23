@@ -14,7 +14,6 @@ test('a new visitor registers and lands in the academy as a pending student', as
   await expect(page).toHaveURL('/academy');
   await expect(page.getByRole('heading', { name: 'Hola, María Fernández' })).toBeVisible();
   await expect(page.getByText('Tu inscripción está pendiente.')).toBeVisible();
-  await expect(nav(page).getByRole('link', { name: 'Material' })).toHaveCount(0);
   await expect(nav(page).getByRole('link', { name: 'Administración' })).toHaveCount(0);
 
   const uid = await uidOf('maria@indab.test');
@@ -27,7 +26,7 @@ test('a new visitor registers and lands in the academy as a pending student', as
   expect(await getDocument(`enrollments/${uid}`)).toBeNull();
 
   // Pending students cannot open the material, even by URL.
-  await page.goto('/repository');
+  await page.goto('/academy/material');
   await expect(page).toHaveURL('/academy');
 });
 
@@ -58,10 +57,10 @@ test('login rejects a wrong password', async ({ page }) => {
 
 test('login returns to the page the visitor asked for', async ({ page }) => {
   await createUser('Ana', 'ana@indab.test', { academy: true });
-  await page.goto('/repository');
-  await expect(page).toHaveURL('/login?returnUrl=%2Frepository');
+  await page.goto('/academy/material');
+  await expect(page).toHaveURL('/login?returnUrl=%2Facademy%2Fmaterial');
   await signIn(page, 'ana@indab.test', page.url());
-  await expect(page).toHaveURL('/repository');
+  await expect(page).toHaveURL('/academy/material');
   await expect(page.getByRole('heading', { name: 'Material de estudio' })).toBeVisible();
 });
 
