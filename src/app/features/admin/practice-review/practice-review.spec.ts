@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 import { Candle } from '../../../core/models/practice';
-import { MarketDataService } from '../../practice/market-data.service';
+import { HISTORY_BARS, MarketDataService } from '../../practice/market-data.service';
 import { PracticeService } from '../../practice/practice.service';
 import { ReplayChart } from '../../practice/replay-chart';
 import { PracticeReview } from './practice-review';
@@ -126,11 +126,11 @@ describe('PracticeReview', () => {
     button(sessionRows()[0], 'Ver práctica').click();
     await fixture.whenStable();
     expect(practice.sessionTrades).toHaveBeenCalledWith('s1');
-    // The same window the student saw: 150 hourly candles of history before the replay.
+    // The same window the student saw: HISTORY_BARS hourly candles of history before the replay.
     expect(market.loadCandles).toHaveBeenCalledWith(
       'PAXGUSDT',
       '1h',
-      Date.UTC(2021, 4, 10) - 150 * 3_600_000,
+      Date.UTC(2021, 4, 10) - HISTORY_BARS * 3_600_000,
     );
     expect(chart()?.candles()).toEqual([candle]);
     expect(chart()?.trades()).toHaveLength(2);

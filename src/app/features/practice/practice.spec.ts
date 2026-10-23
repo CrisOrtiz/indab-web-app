@@ -33,7 +33,7 @@ const klines = (interval: string, from: number, limit = 1000, minutes = Infinity
   if (interval === '1m') {
     begin ||= from / 1000 + 60;
   } else {
-    begin ||= from / 1000 + 150 * seconds;
+    begin ||= from / 1000 + HISTORY_BARS * seconds;
   }
   const count =
     interval === '1m' ? Math.min(limit, minutes - (from / 1000 - begin + 60) / 60) : limit;
@@ -198,7 +198,7 @@ describe('Practice page', () => {
       (begin - HISTORY_BARS * 3600) * 1000,
       HISTORY_BARS,
     );
-    // 150 hours of history and the hour being formed by the first 15 minutes.
+    // HISTORY_BARS hours of history and the hour being formed by the first 15 minutes.
     expect(chart().barSeconds()).toBe(3600);
     expect(chart().candles()).toHaveLength(HISTORY_BARS + 1);
     expect(chart().candles().at(-1)).toMatchObject({ time: begin, close: 101 });

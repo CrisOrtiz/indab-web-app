@@ -22,6 +22,7 @@ const lw = vi.hoisted(() => {
     subscribeSizeChange: vi.fn(),
   };
   const pane = { setHeight: vi.fn() };
+  const priceScale = { width: () => 60, applyOptions: vi.fn() };
   const handlers: { click?: (param: unknown) => void } = {};
   const chart = {
     addSeries: vi.fn((type: string) => {
@@ -35,14 +36,14 @@ const lw = vi.hoisted(() => {
     removeSeries: vi.fn(),
     applyOptions: vi.fn(),
     timeScale: () => timeScale,
-    priceScale: () => ({ width: () => 60 }),
+    priceScale: () => priceScale,
     panes: () => [pane, pane],
     subscribeCrosshairMove: vi.fn(),
     subscribeClick: vi.fn((handler) => (handlers.click = handler)),
     remove: vi.fn(),
   };
   const markers = { setMarkers: vi.fn() };
-  return { series, lines, chart, markers, pane, handlers };
+  return { series, lines, chart, markers, pane, priceScale, handlers };
 });
 
 vi.mock('lightweight-charts', () => ({
@@ -132,9 +133,12 @@ describe('ReplayChart', () => {
     expect(lw.series.update.mock.calls.slice(-2)).toEqual([[c(2, 1.8)], [c(3)]]);
     expect(lw.series.setData).toHaveBeenCalledTimes(1);
 
+    // Other bars (another timeframe) are drawn from scratch with the price range fitted again.
+    lw.priceScale.applyOptions.mockClear();
     host.candles.set([c(10)]);
     await fixture.whenStable();
     expect(lw.series.setData).toHaveBeenLastCalledWith([c(10)]);
+    expect(lw.priceScale.applyOptions).toHaveBeenCalledWith({ autoScale: true });
 
     fixture.destroy();
     expect(lw.chart.remove).toHaveBeenCalled();

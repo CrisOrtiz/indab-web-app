@@ -282,6 +282,9 @@ export class ReplayChart {
       }
     } else {
       this.series.setData(candles.map((c) => this.point(c)));
+      // A new set of bars (another timeframe) gets the price range fitted again, even if the
+      // student had dragged the price scale, and shows the latest bar.
+      this.chart?.priceScale('right').applyOptions({ autoScale: true });
       this.chart?.timeScale().scrollToRealTime();
     }
     this.drawn = candles;
