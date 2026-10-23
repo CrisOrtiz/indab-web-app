@@ -1,3 +1,5 @@
+<div class="scroll-progress" aria-hidden="true"></div>
+
 <section class="hero inverted">
   <div class="container hero-inner">
     <div class="hero-copy">
@@ -54,7 +56,7 @@
 
 <section id="nosotros" class="section">
   <div class="container two-col">
-    <div>
+    <div appReveal>
       <p class="eyebrow">Nosotros</p>
       <h2>Formamos traders con método</h2>
       <p>
@@ -72,7 +74,7 @@
     </div>
     <ul class="cards cards-2">
       @for (p of pillars; track p.title) {
-        <li class="card">
+        <li class="card" [appReveal]="$index * 100">
           <h3>{{ p.title }}</h3>
           <p>{{ p.text }}</p>
         </li>
@@ -83,11 +85,11 @@
 
 <section id="programas" class="section surface">
   <div class="container">
-    <p class="eyebrow">Qué vas a aprender</p>
-    <h2>Programas por niveles</h2>
+    <p class="eyebrow" appReveal>Qué vas a aprender</p>
+    <h2 appReveal>Programas por niveles</h2>
     <ul class="cards cards-4">
       @for (p of programs; track p.title) {
-        <li class="card">
+        <li class="card" [appReveal]="$index * 100">
           <span class="badge">{{ p.level }}</span>
           <h3>{{ p.title }}</h3>
           <p>{{ p.text }}</p>
@@ -99,11 +101,11 @@
 
 <section id="metodologia" class="section">
   <div class="container">
-    <p class="eyebrow">Metodología</p>
-    <h2>Un proceso en cuatro pasos</h2>
+    <p class="eyebrow" appReveal>Metodología</p>
+    <h2 appReveal>Un proceso en cuatro pasos</h2>
     <ol class="steps">
       @for (s of steps; track s.title; let i = $index) {
-        <li>
+        <li [appReveal]="i * 120">
           <span class="step-number">{{ i + 1 }}</span>
           <h3>{{ s.title }}</h3>
           <p>{{ s.text }}</p>
@@ -115,11 +117,11 @@
 
 <section id="plataforma" class="section surface">
   <div class="container">
-    <p class="eyebrow">La plataforma</p>
-    <h2>Todo tu aprendizaje en un solo lugar</h2>
+    <p class="eyebrow" appReveal>La plataforma</p>
+    <h2 appReveal>Todo tu aprendizaje en un solo lugar</h2>
     <ul class="cards cards-4">
       @for (f of features; track f.title) {
-        <li class="card">
+        <li class="card" [appReveal]="$index * 100">
           @if (f.soon) {
             <span class="badge badge-solid">Próximamente</span>
           }
@@ -133,7 +135,7 @@
 
 <section id="eleva" class="section inverted">
   <div class="container two-col">
-    <div>
+    <div appReveal>
       <p class="eyebrow">Eleva Inversiones</p>
       <h2>El brazo de inversión de INDAB</h2>
       <p>
@@ -143,7 +145,7 @@
       </p>
       <a routerLink="/eleva" class="btn btn-light">Conoce Eleva Inversiones</a>
     </div>
-    <p class="disclaimer">
+    <p class="disclaimer" [appReveal]="150">
       <strong>Aviso de riesgo:</strong> el trading y la inversión en mercados financieros implican
       riesgo de pérdida, incluso del capital invertido. Los rendimientos pasados no garantizan
       resultados futuros y ningún rendimiento mensual está asegurado. Invierte solo dinero que
@@ -154,11 +156,11 @@
 
 <section id="testimonios" class="section">
   <div class="container">
-    <p class="eyebrow">Testimonios</p>
-    <h2>Lo que dicen nuestros estudiantes</h2>
+    <p class="eyebrow" appReveal>Testimonios</p>
+    <h2 appReveal>Lo que dicen nuestros estudiantes</h2>
     <ul class="cards cards-3">
       @for (t of testimonials; track $index) {
-        <li class="card">
+        <li class="card" [appReveal]="$index * 100">
           <blockquote>“{{ t.quote }}”</blockquote>
           <p class="author">
             <strong>{{ t.name }}</strong
@@ -173,10 +175,10 @@
 
 <section id="preguntas" class="section surface">
   <div class="container narrow">
-    <p class="eyebrow">Preguntas frecuentes</p>
-    <h2>Resolvemos tus dudas</h2>
+    <p class="eyebrow" appReveal>Preguntas frecuentes</p>
+    <h2 appReveal>Resolvemos tus dudas</h2>
     @for (f of faqs; track f.question) {
-      <details class="faq">
+      <details class="faq" [appReveal]="$index * 60">
         <summary>{{ f.question }}</summary>
         <p>{{ f.answer }}</p>
       </details>
@@ -186,7 +188,7 @@
 
 <section id="contacto" class="section">
   <div class="container two-col">
-    <div>
+    <div appReveal>
       <p class="eyebrow">Contacto</p>
       <h2>Hablemos</h2>
       <p>
@@ -194,7 +196,7 @@
         brevedad.
       </p>
     </div>
-    <ul class="contact">
+    <ul class="contact" [appReveal]="150">
       <li>
         <span>Correo</span> <a href="mailto:contacto@indab.academy">contacto&#64;indab.academy</a>
       </li>
@@ -206,7 +208,7 @@
 
 <section class="section inverted cta">
   <div class="container">
-    <h2>Empieza hoy tu camino como trader</h2>
+    <h2 appReveal>Empieza hoy tu camino como trader</h2>
     @if (!auth.isLoggedIn()) {
       <a routerLink="/register" class="btn btn-light">Crear mi cuenta</a>
     }
@@ -227,6 +229,13 @@
       <a routerLink="/login">Ingresar</a>
       <a routerLink="/register">Crear cuenta</a>
     </div>
-    <p class="legal">© {{ year }} INDAB. Contenido educativo; no constituye asesoría financiera.</p>
+    <div class="legal">
+      <p>© {{ year }} INDAB y crisortizdev. Todos los derechos reservados.</p>
+      <p>
+        Desarrollado por
+        <a href="https://crisortiz.github.io" target="_blank" rel="noopener">crisortizdev</a>
+      </p>
+      <p>Contenido educativo; no constituye asesoría financiera.</p>
+    </div>
   </div>
 </footer>

@@ -69,3 +69,34 @@ a {
     color: var(--color-accent);
   }
 }
+
+html {
+  scroll-behavior: smooth;
+}
+
+// Scroll-in animation, toggled by the `appReveal` directive (src/app/shared/reveal).
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
+  transition-delay: var(--reveal-delay, 0ms);
+
+  &.revealed {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
