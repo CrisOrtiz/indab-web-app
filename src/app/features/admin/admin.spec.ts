@@ -1,5 +1,6 @@
 import { computed, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 import { AuthService } from '../../core/auth/auth.service';
 import { Enrollment, UserProfile } from '../../core/models/user-profile';
@@ -37,7 +38,10 @@ describe('Admin page', () => {
     ]);
     TestBed.configureTestingModule({
       imports: [Admin],
-      providers: [{ provide: AuthService, useValue: { user: signal({ uid: 'boss' }) } }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: { user: signal({ uid: 'boss' }) } },
+      ],
     });
     TestBed.overrideComponent(Admin, {
       set: { providers: [{ provide: AdminService, useValue: fake }] },

@@ -37,6 +37,12 @@ export const routes: Routes = [
 
   // Enrolled users only
   {
+    path: 'academy/practice',
+    title: 'Práctica de trading | INDAB',
+    canActivate: [enrolledGuard],
+    loadComponent: () => import('./features/practice/practice').then((m) => m.Practice),
+  },
+  {
     path: 'repository',
     title: 'Material de estudio | INDAB',
     canActivate: [enrolledGuard],
@@ -49,6 +55,13 @@ export const routes: Routes = [
     title: 'Administración | INDAB',
     canActivate: [adminGuard],
     loadComponent: () => import('./features/admin/admin').then((m) => m.Admin),
+  },
+  {
+    path: 'admin/practice',
+    title: 'Prácticas de trading | INDAB',
+    canActivate: [adminGuard],
+    loadComponent: () =>
+      import('./features/admin/practice-review/practice-review').then((m) => m.PracticeReview),
   },
 
   {

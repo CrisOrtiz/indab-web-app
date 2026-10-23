@@ -39,6 +39,7 @@ const fromField = (field: any): unknown => {
   if ('arrayValue' in field) return (field.arrayValue.values ?? []).map(fromField);
   if ('booleanValue' in field) return field.booleanValue;
   if ('integerValue' in field) return Number(field.integerValue);
+  if ('doubleValue' in field) return field.doubleValue;
   if ('nullValue' in field) return null;
   return field.stringValue ?? field.timestampValue;
 };
@@ -57,6 +58,15 @@ export async function getDocument(path: string): Promise<Record<string, unknown>
   if (response.status === 404) return null;
   const { fields = {} } = await response.json();
   return Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, fromField(v)]));
+}
+
+/** Lists a collection's documents, each with its `id`. */
+export async function listDocuments(path: string): Promise<Record<string, unknown>[]> {
+  const { documents = [] } = await request(`${firestoreUrl}/${path}`, { headers: owner });
+  return documents.map((d: { name: string; fields?: Record<string, unknown> }) => ({
+    id: d.name.split('/').pop(),
+    ...Object.fromEntries(Object.entries(d.fields ?? {}).map(([k, v]) => [k, fromField(v)])),
+  }));
 }
 
 /** Finds the uid of the account registered with this email. */

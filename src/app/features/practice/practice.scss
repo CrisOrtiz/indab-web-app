@@ -1,0 +1,261 @@
+:host {
+  display: block;
+  padding: 48px 0;
+}
+
+h1 {
+  margin: 8px 0 0;
+}
+
+h2 {
+  margin: 32px 0 12px;
+  font-size: 1.25rem;
+}
+
+.page-header p,
+.muted {
+  color: var(--color-muted);
+}
+
+.back {
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.up {
+  color: var(--color-up);
+}
+
+.down {
+  color: var(--color-down);
+}
+
+input,
+select {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+
+  &.check {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    font-weight: 400;
+  }
+}
+
+.message.error,
+.order-error {
+  color: var(--color-error);
+}
+
+.message {
+  padding: 10px 14px;
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius);
+}
+
+.setup {
+  display: grid;
+  gap: 16px;
+  max-width: 420px;
+  margin-top: 24px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 24px 0 8px;
+}
+
+.market {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+
+  .price {
+    margin-left: 8px;
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+progress {
+  width: 100%;
+  height: 4px;
+  margin-bottom: 12px;
+  accent-color: var(--color-accent);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 16px;
+
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ticket {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+
+  h2 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+}
+
+.sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.side {
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+
+  &.buy.selected {
+    border-color: var(--color-up);
+    background: var(--color-up);
+    color: var(--color-accent-contrast);
+  }
+
+  &.sell.selected {
+    border-color: var(--color-down);
+    background: var(--color-down);
+    color: var(--color-accent-contrast);
+  }
+}
+
+.account {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+
+  dt {
+    color: var(--color-muted);
+  }
+
+  dd {
+    margin: 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+
+  strong {
+    font-size: 1.5rem;
+  }
+
+  span {
+    color: var(--color-muted);
+  }
+}
+
+.result app-replay-chart {
+  margin-bottom: 16px;
+}
+
+.trades {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+
+  th,
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+  }
+
+  th {
+    color: var(--color-muted);
+    font-weight: 600;
+  }
+
+  .empty {
+    text-align: center;
+  }
+
+  @media (max-width: 640px) {
+    thead {
+      display: none;
+    }
+
+    tr {
+      display: block;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    td {
+      display: flex;
+      justify-content: space-between;
+      border: 0;
+      padding: 4px 0;
+
+      &[data-label]::before {
+        content: attr(data-label);
+        color: var(--color-muted);
+      }
+    }
+  }
+}
+
+.btn.small {
+  padding: 4px 10px;
+}

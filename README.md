@@ -77,7 +77,7 @@ npm run test:all     # all three, as CI runs them
 | --- | --- | --- |
 | Unit | `src/**/*.spec.ts` | `AuthService`, guards, routes, login/register forms, admin page and service, header. Firebase is faked with `vi.mock`, no emulator needed. |
 | Rules | `tests/firestore.rules.test.ts` | every collection in `firestore.rules`, allowed and denied, for visitor, student, enrolled, owner and admin |
-| End-to-end | `e2e/*.spec.ts` | the real app in Chromium against the Auth + Firestore emulators: register, login, guards, sign-out, admin grants access and promotes users |
+| End-to-end | `e2e/*.spec.ts` | the real app in Chromium against the Auth + Firestore emulators: register, login, guards, sign-out, admin grants access and promotes users, a practice replay is logged and reviewed (market data mocked) |
 
 Before the first `npm run test:e2e`, install the browser once with `npx playwright install chromium`.
 The e2e tests wipe the emulator data on every test, so stop `npm run emulators` before running them.
@@ -176,6 +176,8 @@ The service account needs the *Firebase Admin* and *Service Usage Consumer* role
 | `courses/{id}/lessons/{id}` | users enrolled in that course or with academy access | admins |
 | `materials/{id}` | users with academy access (`enrollments/{uid}.academy == true`), admins | admins |
 | `investors/{uid}` (Eleva) | owner, admins | admins |
+| `practiceSessions/{id}` (chart replay) | owner, admins | owner with academy access creates it and updates its summary until `finished`; admins delete |
+| `practiceSessions/{id}/trades/{id}` | session owner, admins | session owner opens trades while the session is active and closes each once (entry never editable); admins delete |
 
 A user gets access to the academy and the material repository when an admin turns on
 "Acceso a la academia" for them in `/admin` (which writes `enrollments/{uid}` with
@@ -192,7 +194,23 @@ the rules are what actually protect the data. Anything not listed is denied.
 | `/login`, `/register` | signed-out visitors |
 | `/academy` | signed-in users (shows "pending" until enrolled) |
 | `/repository` | enrolled users |
+| `/academy/practice` | enrolled users (chart-replay trading practice) |
 | `/admin` | admins (users, roles, academy access) |
+| `/admin/practice` | admins (review students' practice sessions and trades) |
+
+## Trading practice (chart replay)
+
+`/academy/practice` replays real historical candles bar by bar. Candles come from Binance's
+public market-data API (`data-api.binance.vision`, falling back to `api.binance.com`): free,
+no API key, fetched by the student's browser. Markets: BTC, ETH, SOL, gold (PAXG) and EUR
+(EURUSDT), on 15m/1h/4h/1d. Each session picks a random window (150 candles of context plus
+up to 850 to replay), dates can be hidden, and students open long/short trades with optional
+stop loss and take profit on 10,000 virtual USD without leverage. Sessions and trades are
+written to Firestore as they happen; admins review them at `/admin/practice`.
+
+The chart is TradingView's [lightweight-charts](https://github.com/tradingview/lightweight-charts)
+(Apache-2.0; its logo on the chart is the required attribution). P/L figures are computed in the
+student's browser, so treat them as practice data, not as graded results.
 
 ## Scripts
 

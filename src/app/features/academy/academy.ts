@@ -11,13 +11,25 @@ import { AuthService } from '../../core/auth/auth.service';
       <h1>Hola, {{ auth.profile()?.displayName || auth.user()?.email }}</h1>
       @if (auth.hasAcademyAccess()) {
         <p>Bienvenido a la academia.</p>
-        <a routerLink="/repository" class="btn">Ver material de estudio</a>
+        <div class="actions">
+          <a routerLink="/repository" class="btn">Ver material de estudio</a>
+          <a routerLink="/academy/practice" class="btn btn-outline">Práctica de trading</a>
+        </div>
       } @else {
-        <p>Tu inscripción está pendiente. Cuando el equipo de INDAB la active, verás aquí tus cursos.</p>
+        <p>
+          Tu inscripción está pendiente. Cuando el equipo de INDAB la active, verás aquí tus cursos.
+        </p>
       }
     </section>
   `,
   styleUrl: '../placeholder.scss',
+  styles: `
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+  `,
 })
 export class Academy {
   protected readonly auth = inject(AuthService);

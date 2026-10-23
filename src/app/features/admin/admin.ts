@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { UserRole } from '../../core/models/user-profile';
 import { AdminService } from './admin.service';
@@ -7,7 +8,7 @@ import { AdminUserFilter, AdminUserRow, filterUsers, hasAcademyAccess } from './
 
 @Component({
   selector: 'app-admin',
-  imports: [DatePipe],
+  imports: [DatePipe, RouterLink],
   providers: [AdminService],
   templateUrl: './admin.html',
   styleUrl: './admin.scss',

@@ -8,6 +8,9 @@ rules_version = '2';
 //   courses/{courseId}/lessons/{id}      lesson content; enrolled users only
 //   materials/{materialId}               learning-material repository; enrolled users only
 //   investors/{uid}                      Eleva Inversiones investor account; owner reads, admins write
+//   practiceSessions/{id}                chart-replay practice by a student with academy access;
+//                                        owner writes while active, admins read all
+//   practiceSessions/{id}/trades/{id}    simulated trades of that session; opened once, closed once
 //
 // Admins are users whose profile has role == 'admin'. Promote the first admin by editing
 // their users/{uid} document in the Firebase console; after that, admins manage roles and
@@ -100,6 +103,88 @@ service cloud.firestore {
     match /investors/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow write: if isAdmin();
+    }
+
+    // Chart-replay practice. Students log their own sessions and trades; nothing can be
+    // deleted or rewritten afterwards, so instructors see every trade as it happened.
+    match /practiceSessions/{sessionId} {
+      function validSummary(data) {
+        return data.balance is number && data.pnl is number
+          && data.tradeCount is int && data.tradeCount >= 0;
+      }
+
+      allow read: if isOwner(resource.data.uid) || isAdmin();
+
+      allow create: if hasAcademyAccess()
+        && request.resource.data.keys().hasOnly(['uid', 'userName', 'symbol', 'interval',
+          'replayStart', 'startingBalance', 'balance', 'pnl', 'tradeCount', 'status', 'startedAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.userName is string
+        && request.resource.data.userName.size() <= 120
+        && request.resource.data.symbol is string
+        && request.resource.data.symbol.size() <= 20
+        && request.resource.data.interval in ['15m', '1h', '4h', '1d']
+        && request.resource.data.replayStart is int
+        && request.resource.data.startingBalance is number
+        && request.resource.data.balance == request.resource.data.startingBalance
+        && request.resource.data.pnl == 0
+        && request.resource.data.tradeCount == 0
+        && request.resource.data.status == 'active'
+        && request.resource.data.startedAt == request.time;
+
+      // While active, the owner refreshes the summary and finally marks it finished.
+      allow update: if isOwner(resource.data.uid)
+        && resource.data.status == 'active'
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['balance', 'pnl', 'tradeCount', 'status', 'endedAt'])
+        && validSummary(request.resource.data)
+        && (request.resource.data.status == 'active'
+          || (request.resource.data.status == 'finished' && request.resource.data.endedAt == request.time));
+
+      allow delete: if isAdmin();
+
+      match /trades/{tradeId} {
+        function session() {
+          return get(/databases/$(database)/documents/practiceSessions/$(sessionId)).data;
+        }
+
+        function isPrice(value) {
+          return value is number && value > 0;
+        }
+
+        allow read: if isAdmin() || (signedIn() && session().uid == request.auth.uid);
+
+        // Opened by the session's owner while the session is active.
+        allow create: if signedIn()
+          && session().uid == request.auth.uid
+          && session().status == 'active'
+          && request.resource.data.keys().hasOnly(['uid', 'side', 'quantity', 'entryPrice',
+            'entryTime', 'stopLoss', 'takeProfit', 'status', 'openedAt'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.side in ['long', 'short']
+          && isPrice(request.resource.data.quantity)
+          && isPrice(request.resource.data.entryPrice)
+          && request.resource.data.entryTime is int
+          && (request.resource.data.stopLoss == null || isPrice(request.resource.data.stopLoss))
+          && (request.resource.data.takeProfit == null || isPrice(request.resource.data.takeProfit))
+          && request.resource.data.status == 'open'
+          && request.resource.data.openedAt == request.time;
+
+        // Closed exactly once; the entry can never be edited.
+        allow update: if isOwner(resource.data.uid)
+          && resource.data.status == 'open'
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'exitPrice', 'exitTime', 'exitReason', 'pnl', 'closedAt'])
+          && request.resource.data.status == 'closed'
+          && isPrice(request.resource.data.exitPrice)
+          && request.resource.data.exitTime is int
+          && request.resource.data.exitTime >= resource.data.entryTime
+          && request.resource.data.exitReason in ['manual', 'stopLoss', 'takeProfit', 'sessionEnd']
+          && request.resource.data.pnl is number
+          && request.resource.data.closedAt == request.time;
+
+        allow delete: if isAdmin();
+      }
     }
 
     // Everything else is closed by default.

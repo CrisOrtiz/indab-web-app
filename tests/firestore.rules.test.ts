@@ -4,7 +4,19 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
@@ -250,6 +262,157 @@ describe('investors', () => {
     await assertSucceeds(getDoc(doc(as('admin'), 'investors/investor')));
     await assertSucceeds(updateDoc(doc(as('admin'), 'investors/investor'), { balance: 1100 }));
     await assertFails(setDoc(doc(as('new'), 'investors/new'), { balance: 1 }));
+  });
+});
+
+describe('trading practice', () => {
+  const session = (uid: string, extra: Record<string, unknown> = {}) => ({
+    uid,
+    userName: 'Ana',
+    symbol: 'BTCUSDT',
+    interval: '1h',
+    replayStart: 1_620_000_000_000,
+    startingBalance: 10000,
+    balance: 10000,
+    pnl: 0,
+    tradeCount: 0,
+    status: 'active',
+    startedAt: serverTimestamp(),
+    ...extra,
+  });
+  const trade = (uid: string, extra: Record<string, unknown> = {}) => ({
+    uid,
+    side: 'long',
+    quantity: 0.02,
+    entryPrice: 50000.5,
+    entryTime: 1_620_000_000,
+    stopLoss: 49000,
+    takeProfit: null,
+    status: 'open',
+    openedAt: serverTimestamp(),
+    ...extra,
+  });
+  const close = (extra: Record<string, unknown> = {}) => ({
+    status: 'closed',
+    exitPrice: 51000,
+    exitTime: 1_620_003_600,
+    exitReason: 'manual',
+    pnl: 19.99,
+    closedAt: serverTimestamp(),
+    ...extra,
+  });
+  const sessionRef = (uid: string | null, id = 's1') => doc(as(uid), `practiceSessions/${id}`);
+  const tradeRef = (uid: string | null, id = 't1', sessionId = 's1') =>
+    doc(as(uid), `practiceSessions/${sessionId}/trades/${id}`);
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'enrollments/other'), { academy: true, courses: [] });
+      await setDoc(doc(db, 'practiceSessions/s1'), {
+        ...session('enrolled'),
+        startedAt: new Date(),
+      });
+      await setDoc(doc(db, 'practiceSessions/s1/trades/t1'), {
+        ...trade('enrolled'),
+        openedAt: new Date(),
+      });
+      await setDoc(doc(db, 'practiceSessions/done'), {
+        ...session('enrolled'),
+        status: 'finished',
+        startedAt: new Date(),
+      });
+    });
+  });
+
+  it('lets students with academy access start their own session', async () => {
+    await assertSucceeds(setDoc(sessionRef('enrolled', 'new'), session('enrolled')));
+    await assertSucceeds(setDoc(sessionRef('admin', 'new2'), session('admin')));
+    await assertFails(setDoc(sessionRef('partial', 'new3'), session('partial')));
+    await assertFails(setDoc(sessionRef('student', 'new4'), session('student')));
+    await assertFails(setDoc(sessionRef(null, 'new5'), session('enrolled')));
+  });
+
+  it('validates a new session', async () => {
+    const create = (extra: Record<string, unknown>) =>
+      setDoc(sessionRef('enrolled', 'new'), session('enrolled', extra));
+    await assertFails(setDoc(sessionRef('enrolled', 'new'), session('other')));
+    await assertFails(create({ status: 'finished' }));
+    await assertFails(create({ pnl: 500 }));
+    await assertFails(create({ balance: 1_000_000 }));
+    await assertFails(create({ interval: '1s' }));
+    await assertFails(create({ startedAt: new Date(2020, 0, 1) }));
+    await assertFails(create({ grade: 'A' }));
+  });
+
+  it('keeps sessions private to their owner and admins', async () => {
+    await assertSucceeds(getDoc(sessionRef('enrolled')));
+    await assertSucceeds(getDoc(sessionRef('admin')));
+    await assertFails(getDoc(sessionRef('other')));
+    await assertFails(getDoc(sessionRef(null)));
+
+    const sessions = (uid: string) => collection(as(uid), 'practiceSessions');
+    await assertSucceeds(
+      getDocs(
+        query(sessions('enrolled'), where('uid', '==', 'enrolled'), orderBy('startedAt', 'desc')),
+      ),
+    );
+    await assertFails(getDocs(sessions('enrolled')));
+    await assertSucceeds(getDocs(query(sessions('admin'), orderBy('startedAt', 'desc'))));
+  });
+
+  it('lets the owner update the summary and finish the session, once', async () => {
+    await assertFails(updateDoc(sessionRef('other'), { pnl: 5 }));
+    await assertFails(updateDoc(sessionRef('enrolled'), { symbol: 'ETHUSDT' }));
+    await assertFails(updateDoc(sessionRef('enrolled'), { tradeCount: 1.5 }));
+    await assertSucceeds(
+      updateDoc(sessionRef('enrolled'), { balance: 10020.5, pnl: 20.5, tradeCount: 1 }),
+    );
+    await assertFails(updateDoc(sessionRef('enrolled'), { status: 'finished' }));
+    await assertSucceeds(
+      updateDoc(sessionRef('enrolled'), { status: 'finished', endedAt: serverTimestamp() }),
+    );
+    await assertFails(updateDoc(sessionRef('enrolled'), { pnl: 9999 }));
+    await assertFails(updateDoc(sessionRef('enrolled', 'done'), { status: 'active' }));
+  });
+
+  it('lets only admins delete sessions and trades', async () => {
+    await assertFails(deleteDoc(tradeRef('enrolled')));
+    await assertFails(deleteDoc(sessionRef('enrolled')));
+    await assertSucceeds(deleteDoc(tradeRef('admin')));
+    await assertSucceeds(deleteDoc(sessionRef('admin')));
+  });
+
+  it('lets the owner open valid trades in an active session', async () => {
+    await assertSucceeds(setDoc(tradeRef('enrolled', 't2'), trade('enrolled')));
+    await assertSucceeds(
+      setDoc(tradeRef('enrolled', 't3'), trade('enrolled', { side: 'short', stopLoss: null })),
+    );
+    await assertFails(setDoc(tradeRef('other', 't4'), trade('other')));
+    await assertFails(setDoc(tradeRef('admin', 't4'), trade('admin')));
+    await assertFails(setDoc(tradeRef('enrolled', 't4', 'done'), trade('enrolled')));
+    await assertFails(setDoc(tradeRef('enrolled', 't4'), trade('enrolled', { status: 'closed' })));
+    await assertFails(setDoc(tradeRef('enrolled', 't4'), trade('enrolled', { side: 'up' })));
+    await assertFails(setDoc(tradeRef('enrolled', 't4'), trade('enrolled', { quantity: 0 })));
+    await assertFails(setDoc(tradeRef('enrolled', 't4'), trade('enrolled', { stopLoss: -1 })));
+    await assertFails(setDoc(tradeRef('enrolled', 't4'), trade('enrolled', { pnl: 100 })));
+  });
+
+  it('shows trades to the session owner and admins only', async () => {
+    await assertSucceeds(getDocs(collection(as('enrolled'), 'practiceSessions/s1/trades')));
+    await assertSucceeds(getDocs(collection(as('admin'), 'practiceSessions/s1/trades')));
+    await assertFails(getDocs(collection(as('other'), 'practiceSessions/s1/trades')));
+    await assertFails(getDoc(tradeRef(null)));
+  });
+
+  it('closes a trade exactly once and never edits its entry', async () => {
+    await assertFails(updateDoc(tradeRef('other'), close()));
+    await assertFails(updateDoc(tradeRef('enrolled'), { ...close(), entryPrice: 1 }));
+    await assertFails(updateDoc(tradeRef('enrolled'), close({ exitReason: 'magic' })));
+    await assertFails(updateDoc(tradeRef('enrolled'), close({ exitTime: 1 })));
+    await assertFails(updateDoc(tradeRef('enrolled'), { stopLoss: 48000 }));
+    await assertSucceeds(updateDoc(tradeRef('enrolled'), close({ exitReason: 'stopLoss' })));
+    await assertFails(updateDoc(tradeRef('enrolled'), close({ pnl: 5000 })));
   });
 });
 

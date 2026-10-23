@@ -1,0 +1,137 @@
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/admin" class="back">← Administración</a>
+    <h1>Prácticas de trading</h1>
+    <p>
+      Sesiones de práctica con replay de los estudiantes y cada operación que abrieron. Las fechas
+      del periodo se muestran aquí aunque el estudiante las haya practicado ocultas.
+    </p>
+  </header>
+
+  <div class="stats">
+    <div class="stat">
+      <strong>{{ stats().sessions }}</strong
+      ><span>Sesiones</span>
+    </div>
+    <div class="stat">
+      <strong>{{ stats().students }}</strong
+      ><span>Estudiantes</span>
+    </div>
+    <div class="stat">
+      <strong>{{ stats().trades }}</strong
+      ><span>Operaciones</span>
+    </div>
+  </div>
+
+  <div class="filters">
+    <input
+      type="search"
+      placeholder="Buscar por estudiante o mercado"
+      aria-label="Buscar prácticas"
+      [value]="search()"
+      (input)="search.set($any($event.target).value)"
+    />
+  </div>
+
+  @if (error(); as message) {
+    <p class="message error">{{ message }}</p>
+  }
+
+  @if (loading()) {
+    <p class="muted">Cargando prácticas…</p>
+  } @else {
+    <table class="users sessions">
+      <thead>
+        <tr>
+          <th>Estudiante</th>
+          <th>Inicio</th>
+          <th>Mercado</th>
+          <th>Periodo practicado</th>
+          <th>Operaciones</th>
+          <th>Ganancia / pérdida</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (s of visible(); track s.id) {
+          <tr>
+            <td data-label="Estudiante" class="name">{{ s.userName }}</td>
+            <td data-label="Inicio">{{ s.startedAt?.toDate() | date: 'd MMM y, HH:mm' }}</td>
+            <td data-label="Mercado">{{ s.symbol }} · {{ s.interval }}</td>
+            <td data-label="Periodo practicado">{{ s.replayStart | date: 'd MMM y' }}</td>
+            <td data-label="Operaciones">{{ s.tradeCount }}</td>
+            <td data-label="Ganancia / pérdida" [class.up]="s.pnl > 0" [class.down]="s.pnl < 0">
+              {{ s.pnl | number: '1.2-2' }}
+            </td>
+            <td data-label="Estado">{{ s.status === 'active' ? 'En curso' : 'Terminada' }}</td>
+            <td>
+              <button
+                type="button"
+                class="btn btn-outline small"
+                [attr.aria-expanded]="selected() === s.id"
+                (click)="toggle(s)"
+              >
+                {{ selected() === s.id ? 'Ocultar' : 'Ver operaciones' }}
+              </button>
+            </td>
+          </tr>
+          @if (selected() === s.id) {
+            <tr class="detail">
+              <td colspan="8">
+                @if (trades(); as list) {
+                  <table class="trades">
+                    <thead>
+                      <tr>
+                        <th>Dirección</th>
+                        <th>Apertura</th>
+                        <th>Entrada</th>
+                        <th>Monto</th>
+                        <th>SL / TP</th>
+                        <th>Cierre</th>
+                        <th>Salida</th>
+                        <th>Motivo</th>
+                        <th>P/L</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (t of list; track t.id) {
+                        <tr>
+                          <td>{{ t.side === 'long' ? 'Compra' : 'Venta' }}</td>
+                          <td>{{ t.entryTime * 1000 | date: 'd MMM y, HH:mm' : 'UTC' }}</td>
+                          <td>{{ t.entryPrice | number: priceDigits(t.entryPrice) }}</td>
+                          <td>{{ t.quantity * t.entryPrice | number: '1.2-2' }}</td>
+                          <td>{{ t.stopLoss ?? '—' }} / {{ t.takeProfit ?? '—' }}</td>
+                          @if (t.status === 'closed') {
+                            <td>{{ t.exitTime! * 1000 | date: 'd MMM y, HH:mm' : 'UTC' }}</td>
+                            <td>{{ t.exitPrice | number: priceDigits(t.exitPrice!) }}</td>
+                            <td>{{ exitReasons[t.exitReason!] }}</td>
+                            <td [class.up]="t.pnl! > 0" [class.down]="t.pnl! < 0">
+                              {{ t.pnl | number: '1.2-2' }}
+                            </td>
+                          } @else {
+                            <td colspan="4" class="muted">Abierta</td>
+                          }
+                        </tr>
+                      } @empty {
+                        <tr>
+                          <td colspan="9" class="muted empty">Sin operaciones en esta sesión.</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                } @else {
+                  <p class="muted">Cargando operaciones…</p>
+                }
+              </td>
+            </tr>
+          }
+        } @empty {
+          <tr>
+            <td colspan="8" class="muted empty">No hay prácticas registradas.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>
