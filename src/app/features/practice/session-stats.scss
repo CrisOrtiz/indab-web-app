@@ -1,0 +1,81 @@
+:host {
+  display: block;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+
+  span,
+  small {
+    color: var(--color-muted);
+    font-size: 0.8rem;
+  }
+
+  strong {
+    font-size: 1.05rem;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.up {
+  color: var(--color-up);
+}
+
+.down {
+  color: var(--color-down);
+}
+
+.curve {
+  margin: 12px 0 0;
+
+  figcaption {
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+  }
+
+  svg {
+    display: block;
+    width: 100%;
+    height: 140px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+  }
+
+  polyline {
+    fill: none;
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+
+    &.up {
+      stroke: var(--color-up);
+    }
+
+    &.down {
+      stroke: var(--color-down);
+    }
+  }
+
+  .baseline {
+    stroke: var(--color-border);
+    stroke-dasharray: 4 4;
+    vector-effect: non-scaling-stroke;
+  }
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}

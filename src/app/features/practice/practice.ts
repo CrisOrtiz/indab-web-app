@@ -21,6 +21,8 @@ import {
   TIMEFRAMES,
   Timeframe,
   randomReplayStart,
+  replayStartAt,
+  replayWindow,
 } from './market-data.service';
 import {
   EXIT_REASONS,
@@ -46,9 +48,10 @@ import {
   tradePnl,
 } from './replay';
 import { LevelMove, LevelRemove, OrderDraft, ReplayChart } from './replay-chart';
+import { SessionStatsPanel } from './session-stats';
 
 type Phase = 'setup' | 'loading' | 'playing' | 'finished';
-type Tab = 'positions' | 'orders' | 'history';
+type Tab = 'positions' | 'orders' | 'history' | 'stats';
 type LevelField = 'stopLoss' | 'takeProfit';
 
 export const SPEEDS = [1, 2, 5, 10];
@@ -74,7 +77,7 @@ const PREFETCH_MINUTES = 600;
  */
 @Component({
   selector: 'app-practice',
-  imports: [RouterLink, DatePipe, DecimalPipe, PercentPipe, ReplayChart],
+  imports: [RouterLink, DatePipe, DecimalPipe, PercentPipe, ReplayChart, SessionStatsPanel],
   templateUrl: './practice.html',
   styleUrls: ['./practice.scss', './trading-panel.scss', './trading-account.scss'],
   host: { '(window:keydown)': 'onKey($event)' },
@@ -112,6 +115,15 @@ export class Practice {
   // Setup
   protected readonly symbol = signal(INSTRUMENTS[0].symbol);
   protected readonly hideDates = signal(true);
+  /** Replay start the student picked (yyyy-mm-dd, UTC), or '' for a random one. */
+  protected readonly startDate = signal('');
+  protected readonly randomStart = signal(true);
+  /** Dates the student can pick a replay start from. */
+  protected readonly dateRange = computed(() => {
+    const { earliest, latest } = replayWindow(this.instrument());
+    const day = (time: number) => new Date(time).toISOString().slice(0, 10);
+    return { min: day(earliest), max: day(latest) };
+  });
 
   // Session
   protected readonly phase = signal<Phase>('setup');
@@ -144,9 +156,10 @@ export class Practice {
   protected readonly orderError = signal<string | null>(null);
   protected readonly placing = signal(false);
 
-  protected readonly instrumentLabel = computed(
-    () => INSTRUMENTS.find((i) => i.symbol === this.symbol())?.label ?? this.symbol(),
+  protected readonly instrument = computed(
+    () => INSTRUMENTS.find((i) => i.symbol === this.symbol()) ?? INSTRUMENTS[0],
   );
+  protected readonly instrumentLabel = computed(() => this.instrument().label);
   /** The history bars plus the replayed minutes built into bars of the chart's timeframe. */
   protected readonly visibleCandles = computed(() => {
     const replay = this.replay();
@@ -233,7 +246,7 @@ export class Practice {
   }
 
   protected async start(): Promise<void> {
-    const instrument = INSTRUMENTS.find((i) => i.symbol === this.symbol())!;
+    const instrument = this.instrument();
     const { symbol } = instrument;
     const timeframe = DEFAULT_TIMEFRAME;
     const user = this.auth.user();
@@ -243,7 +256,10 @@ export class Practice {
     this.error.set(null);
     this.phase.set('loading');
     try {
-      const replayStart = randomReplayStart(instrument);
+      const replayStart =
+        this.randomStart() || !this.startDate()
+          ? randomReplayStart(instrument)
+          : replayStartAt(instrument, Date.parse(`${this.startDate()}T00:00:00Z`));
       // The minute before the start is the replay's history: its close is the first price.
       const [minutes, history] = await Promise.all([
         this.market.loadCandles(symbol, '1m', replayStart - MINUTE),

@@ -98,6 +98,7 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   await page.getByRole('button', { name: 'Terminar sesión' }).click();
   await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
   await expect(page.locator('.stat strong').first()).toHaveText('199.00');
+  await expect(page.getByRole('img', { name: 'Saldo de 200 a 199 USD' })).toBeVisible();
 
   // Everything is logged under the student's account.
   await expect(page.getByRole('alert')).toHaveCount(0);
@@ -134,6 +135,7 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   await expect(page.getByRole('cell', { name: 'José Pérez', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Ver práctica' }).click();
   await expect(page.locator('.detail app-replay-chart canvas').first()).toBeVisible();
+  await expect(page.locator('.detail app-session-stats')).toContainText('Acierto');
   await expect(page.getByRole('cell', { name: 'Fin de sesión', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: 'Manual', exact: true })).toBeVisible();
 

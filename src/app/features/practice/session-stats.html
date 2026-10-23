@@ -1,0 +1,65 @@
+@let s = stats();
+<div class="grid">
+  <div class="item">
+    <span>Operaciones cerradas</span><strong>{{ s.trades }}</strong>
+  </div>
+  <div class="item">
+    <span>Acierto</span>
+    <strong>{{ s.winRate === null ? '—' : (s.winRate | percent) }}</strong>
+    <small>{{ s.wins }} ganadas · {{ s.losses }} perdidas</small>
+  </div>
+  <div class="item">
+    <span>Factor de beneficio</span>
+    <strong>{{ s.profitFactor === null ? '—' : (s.profitFactor | number: '1.2-2') }}</strong>
+  </div>
+  <div class="item">
+    <span>Promedio por operación</span>
+    <strong [class.up]="(s.expectancy ?? 0) > 0" [class.down]="(s.expectancy ?? 0) < 0">
+      {{ s.expectancy === null ? '—' : signed(s.expectancy) }}
+    </strong>
+  </div>
+  <div class="item">
+    <span>Ganancia media</span>
+    <strong class="up">{{ s.avgWin === null ? '—' : signed(s.avgWin) }}</strong>
+  </div>
+  <div class="item">
+    <span>Pérdida media</span>
+    <strong class="down">{{ s.avgLoss === null ? '—' : signed(s.avgLoss) }}</strong>
+  </div>
+  <div class="item">
+    <span>Mejor / peor</span>
+    <strong>
+      {{ s.best === null ? '—' : signed(s.best) }} / {{ s.worst === null ? '—' : signed(s.worst) }}
+    </strong>
+  </div>
+  <div class="item">
+    <span>Drawdown máximo</span>
+    <strong [class.down]="s.maxDrawdown > 0">{{ s.maxDrawdown | number: '1.2-2' }} USD</strong>
+    <small>{{ s.maxDrawdownPct | percent: '1.0-1' }} desde el máximo</small>
+  </div>
+</div>
+
+<figure class="curve">
+  <figcaption>Curva de capital</figcaption>
+  @if (s.equity.length > 1) {
+    <svg
+      [attr.viewBox]="'0 0 ' + width + ' ' + height"
+      preserveAspectRatio="none"
+      role="img"
+      [attr.aria-label]="
+        'Saldo de ' + startingBalance() + ' a ' + s.equity.at(-1)!.balance + ' USD'
+      "
+    >
+      <line
+        class="baseline"
+        x1="0"
+        [attr.x2]="width"
+        [attr.y1]="curve().baseline"
+        [attr.y2]="curve().baseline"
+      />
+      <polyline [class.up]="curve().up" [class.down]="!curve().up" [attr.points]="curve().points" />
+    </svg>
+  } @else {
+    <p class="empty">Cierra operaciones para ver cómo evoluciona tu saldo.</p>
+  }
+</figure>

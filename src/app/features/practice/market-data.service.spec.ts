@@ -8,6 +8,8 @@ import {
   intervalMs,
   parseKlines,
   randomReplayStart,
+  replayStartAt,
+  replayWindow,
 } from './market-data.service';
 
 const HOUR = 3_600_000;
@@ -31,6 +33,19 @@ describe('randomReplayStart', () => {
     expect(last + REPLAY_DAYS * 24 * HOUR).toBeLessThanOrEqual(now);
     expect(last % (4 * HOUR)).toBe(0);
     expect(randomReplayStart(gold, now, () => 0.5) % (4 * HOUR)).toBe(0);
+  });
+});
+
+describe('replayStartAt', () => {
+  const now = Date.UTC(2026, 9, 1);
+
+  it('starts on the 4-hour bar of the picked date, inside the replay window', () => {
+    expect(replayStartAt(gold, Date.UTC(2023, 5, 15), now)).toBe(Date.UTC(2023, 5, 15));
+    expect(replayStartAt(gold, Date.UTC(2023, 5, 15, 1), now)).toBe(Date.UTC(2023, 5, 15, 4));
+    const { earliest, latest } = replayWindow(gold, now);
+    expect(replayStartAt(gold, Date.UTC(2019, 0, 1), now)).toBe(earliest);
+    expect(replayStartAt(gold, now, now)).toBe(latest);
+    expect(latest + REPLAY_DAYS * 24 * HOUR).toBeLessThanOrEqual(now);
   });
 });
 

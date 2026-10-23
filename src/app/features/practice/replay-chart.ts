@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import {
   Component,
   DestroyRef,
@@ -19,7 +20,7 @@ import {
   ISeriesMarkersPluginApi,
   LineSeries,
   LineStyle,
-  MouseEventParams,
+  Logical,
   SeriesMarker,
   Time,
   createChart,
@@ -27,7 +28,7 @@ import {
 } from 'lightweight-charts';
 import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/practice';
 import { INDICATORS, RSI_LEVELS, computeIndicator } from './indicators';
-import { formatLots, orderLabel, roundPrice, signedMoney } from './practice-format';
+import { formatLots, orderLabel, priceDigits, roundPrice, signedMoney } from './practice-format';
 import { tradeLots } from './replay';
 
 /** The order being set up in the ticket, drawn as draggable lines before it is placed. */
@@ -88,14 +89,31 @@ interface PlacedLabel extends LineLabel {
   line: Line;
 }
 
-type Tool = 'hline' | 'trend';
+type Tool = 'hline' | 'trend' | 'rect' | 'fib';
+/** Drawings made of two points: a trend line, a rectangle or a Fibonacci retracement. */
+type TwoPointKind = 'trend' | 'rect' | 'fib';
 type Drawing =
   | { id: number; kind: 'hline'; price: number }
-  | { id: number; kind: 'trend'; points: [ChartPoint, ChartPoint] };
+  | { id: number; kind: TwoPointKind; points: [ChartPoint, ChartPoint] };
 interface ChartPoint {
   time: number;
   price: number;
 }
+
+/** A rectangle or Fibonacci retracement placed on the chart, in pixels. */
+interface PlacedShape {
+  id: number;
+  kind: 'rect' | 'fib';
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  /** Fibonacci levels: their ratio, price and height. */
+  levels: { ratio: number; price: number; y: number }[];
+}
+
+/** Retracement levels, as TradingView draws them by default. */
+export const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 
 /** How close (px) the pointer must be to a line to grab it. */
 const GRAB_DISTANCE = 6;
@@ -111,10 +129,12 @@ const RSI_PANE_HEIGHT = 110;
  * `levelMoved` and the page decides whether to accept it.
  *
  * A toolbar adds indicators (moving averages, RSI in its own pane) and drawings (horizontal
- * and trend lines). Indicators only use the candles shown, so they never peek ahead.
+ * and trend lines, rectangles and Fibonacci retracements). Indicators only use the candles
+ * shown, so they never peek ahead.
  */
 @Component({
   selector: 'app-replay-chart',
+  imports: [DecimalPipe],
   templateUrl: './replay-chart.html',
   styleUrl: './replay-chart.scss',
 })
@@ -135,12 +155,20 @@ export class ReplayChart {
 
   protected readonly indicators = INDICATORS;
   protected readonly signed = signedMoney;
+  protected readonly priceDigits = priceDigits;
   protected readonly active = signal<ReadonlySet<string>>(new Set());
   protected readonly tool = signal<Tool | null>(null);
   /** First point of a trend line being drawn. */
   protected readonly anchor = signal<ChartPoint | null>(null);
   protected readonly drawings = signal<Drawing[]>([]);
   protected readonly labels = signal<PlacedLabel[]>([]);
+  protected readonly shapes = signal<PlacedShape[]>([]);
+  protected readonly toolHints: Record<Tool, [string, string]> = {
+    hline: ['Haz clic en el gráfico para poner la línea.', ''],
+    trend: ['Haz clic en el primer punto de la línea.', 'Haz clic en el segundo punto.'],
+    rect: ['Haz clic en una esquina del rectángulo.', 'Haz clic en la esquina opuesta.'],
+    fib: ['Haz clic en el inicio del movimiento.', 'Haz clic en el final del movimiento.'],
+  };
   /** Width of the price scale, so labels sit just left of it. */
   protected readonly scaleWidth = signal(0);
 
@@ -202,7 +230,13 @@ export class ReplayChart {
       this.chart.timeScale().subscribeVisibleLogicalRangeChange(relayout);
       this.chart.timeScale().subscribeSizeChange(relayout);
       this.chart.subscribeCrosshairMove(relayout);
-      this.chart.subscribeClick((param) => this.onChartClick(param));
+      // The chart's own click event drops a second click within half a second (it waits for a
+      // double click), so drawings listen to the DOM.
+      const canvas = this.canvas().nativeElement;
+      canvas.addEventListener('click', (event) => {
+        const box = canvas.getBoundingClientRect();
+        this.onChartClick(event.clientX - box.left, event.clientY - box.top);
+      });
     });
 
     effect(() => this.draw(this.candles()));
@@ -487,6 +521,73 @@ export class ReplayChart {
     }
     this.labels.set(placed);
     this.scaleWidth.set(this.chart.priceScale('right').width());
+    this.shapes.set(this.placeShapes());
+  }
+
+  /** Rectangles and Fibonacci retracements in pixels, for the overlay. */
+  private placeShapes(): PlacedShape[] {
+    const series = this.series!;
+    const shapes: PlacedShape[] = [];
+    for (const d of untracked(this.drawings)) {
+      if (d.kind !== 'rect' && d.kind !== 'fib') {
+        continue;
+      }
+      const [a, b] = d.points;
+      const xa = this.timeToX(a.time);
+      const xb = this.timeToX(b.time);
+      const ya = series.priceToCoordinate(a.price);
+      const yb = series.priceToCoordinate(b.price);
+      if (xa === null || xb === null || ya === null || yb === null) {
+        continue;
+      }
+      // A retracement runs from the end of the move (0) back to its start (1).
+      const levels =
+        d.kind === 'fib'
+          ? FIB_LEVELS.map((ratio) => {
+              const price = roundPrice(b.price + (a.price - b.price) * ratio);
+              return { ratio, price, y: series.priceToCoordinate(price) ?? 0 };
+            })
+          : [];
+      shapes.push({
+        id: d.id,
+        kind: d.kind,
+        left: Math.min(xa, xb),
+        right: Math.max(xa, xb),
+        top: Math.min(ya, yb),
+        bottom: Math.max(ya, yb),
+        levels,
+      });
+    }
+    return shapes;
+  }
+
+  /** Time of the bar at x; past either end of the candles, the first or last one. */
+  private xToTime(x: number): number | null {
+    const logical = this.chart?.timeScale().coordinateToLogical(x);
+    if (logical === null || logical === undefined || !this.drawn.length) {
+      return null;
+    }
+    const index = Math.min(this.drawn.length - 1, Math.max(0, Math.round(logical)));
+    return this.drawn[index].time;
+  }
+
+  /** X of the bar a time falls in; times outside the candles stick to the first or last. */
+  private timeToX(time: number): number | null {
+    const candles = this.drawn;
+    if (!candles.length || !this.chart) {
+      return null;
+    }
+    let low = 0;
+    let high = candles.length - 1;
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
+      if (candles[mid].time <= time) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return this.chart.timeScale().logicalToCoordinate(low as Logical);
   }
 
   private drawIndicators(candles: Candle[], active: ReadonlySet<string>): void {
@@ -569,12 +670,20 @@ export class ReplayChart {
   }
 
   /** Places a horizontal line, or the two points of a trend line, where the student clicks. */
-  private onChartClick(param: MouseEventParams<Time>): void {
+  private onChartClick(x: number, y: number): void {
     const tool = untracked(this.tool);
-    if (!tool || !param.point || !this.series || (param.paneIndex ?? 0) !== 0) {
+    const chart = this.chart;
+    // Only clicks on the candles' pane count, not on the scales or the RSI pane.
+    if (
+      !tool ||
+      !this.series ||
+      !chart ||
+      x > chart.timeScale().width() ||
+      y > chart.panes()[0].getHeight()
+    ) {
       return;
     }
-    const raw = this.series.coordinateToPrice(param.point.y);
+    const raw = this.series.coordinateToPrice(y);
     if (raw === null || raw <= 0) {
       return;
     }
@@ -585,20 +694,24 @@ export class ReplayChart {
       this.tool.set(null);
       return;
     }
-    if (param.time === undefined) {
+    const time = this.xToTime(x);
+    if (time === null) {
       return;
     }
-    const point = { time: param.time as number, price };
+    const point = { time, price };
     const anchor = untracked(this.anchor);
     if (!anchor) {
       this.anchor.set(point);
       return;
     }
-    if (anchor.time === point.time) {
+    if (anchor.time === point.time && tool === 'trend') {
       return;
     }
-    const points = [anchor, point].sort((a, b) => a.time - b.time) as [ChartPoint, ChartPoint];
-    this.drawings.update((list) => [...list, { id, kind: 'trend', points }]);
+    // A retracement keeps the order of the move; the other drawings go left to right.
+    const points = (
+      tool === 'fib' ? [anchor, point] : [anchor, point].sort((a, b) => a.time - b.time)
+    ) as [ChartPoint, ChartPoint];
+    this.drawings.update((list) => [...list, { id, kind: tool, points }]);
     this.anchor.set(null);
     this.tool.set(null);
   }
