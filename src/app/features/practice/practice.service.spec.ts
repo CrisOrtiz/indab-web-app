@@ -15,7 +15,7 @@ vi.mock('firebase/firestore', () => ({
   orderBy: vi.fn((...args) => ['orderBy', ...args]),
   limit: vi.fn((n) => ['limit', n]),
   getDocs: vi.fn(async () => ({
-    docs: [{ id: 's1', data: () => ({ symbol: 'BTCUSDT', id: 'ignored' }) }],
+    docs: [{ id: 's1', data: () => ({ symbol: 'XAUUSD', id: 'ignored' }) }],
   })),
   setDoc: vi.fn(async () => undefined),
   updateDoc: vi.fn(async () => undefined),
@@ -53,7 +53,7 @@ describe('PracticeService', () => {
     const id = await service.startSession({
       uid: 'u1',
       userName: 'Ana',
-      symbol: 'BTCUSDT',
+      symbol: 'XAUUSD',
       interval: '1h',
       replayStart: 1000,
       startingBalance: 10000,
@@ -64,7 +64,7 @@ describe('PracticeService', () => {
       {
         uid: 'u1',
         userName: 'Ana',
-        symbol: 'BTCUSDT',
+        symbol: 'XAUUSD',
         interval: '1h',
         replayStart: 1000,
         startingBalance: 10000,
@@ -129,7 +129,7 @@ describe('PracticeService', () => {
   });
 
   it("reads the student's own sessions, every session and a session's trades", async () => {
-    expect(await service.mySessions('u1')).toEqual([{ symbol: 'BTCUSDT', id: 's1' }]);
+    expect(await service.mySessions('u1')).toEqual([{ symbol: 'XAUUSD', id: 's1' }]);
     expect(where).toHaveBeenCalledWith('uid', '==', 'u1');
     expect(await service.allSessions()).toHaveLength(1);
     expect(await service.sessionTrades('s1')).toHaveLength(1);

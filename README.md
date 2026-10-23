@@ -200,13 +200,19 @@ the rules are what actually protect the data. Anything not listed is denied.
 
 ## Trading practice (chart replay)
 
-`/academy/practice` replays real historical candles bar by bar. Candles come from Binance's
-public market-data API (`data-api.binance.vision`, falling back to `api.binance.com`): free,
-no API key, fetched by the student's browser. Markets: BTC, ETH, SOL, gold (PAXG) and EUR
-(EURUSDT), on 15m/1h/4h/1d. Each session picks a random window (150 candles of context plus
-up to 850 to replay), dates can be hidden, and students open long/short trades with optional
-stop loss and take profit on 10,000 virtual USD without leverage. Sessions and trades are
-written to Firestore as they happen; admins review them at `/admin/practice`.
+`/academy/practice` replays real historical candles bar by bar for three markets: gold
+(XAU/USD), USD/JPY and the NASDAQ 100 (Dukascopy's US Tech 100 CFD), on 15m (last year),
+1h (6 years), 4h (10 years) and 1d (12 years). Each session picks a random window (150 candles
+of context plus up to 850 to replay), dates can be hidden, and students open long/short trades
+with optional stop loss and take profit on 10,000 virtual USD without leverage. Sessions and
+trades are written to Firestore as they happen; admins review them at `/admin/practice`.
+
+The candles are static JSON files in `public/market-data/`, served by Hosting with the app.
+They come from Dukascopy's free historical data feed (bid prices, UTC) and are downloaded by
+`scripts/fetch-market-data.mjs` (`npm run market-data`). Refresh them from GitHub: Actions →
+"Market data" → Run workflow on a new branch; it commits the files to that branch, then open a
+pull request. Adding a market: add it to `INSTRUMENTS` in the script and in
+`src/app/features/practice/market-data.service.ts`.
 
 The chart is TradingView's [lightweight-charts](https://github.com/tradingview/lightweight-charts)
 (Apache-2.0; its logo on the chart is the required attribution). P/L figures are computed in the

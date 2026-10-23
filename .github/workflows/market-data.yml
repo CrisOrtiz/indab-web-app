@@ -1,0 +1,52 @@
+# Downloads the trading-practice candles (scripts/fetch-market-data.mjs) and commits them to
+# public/market-data/ on the branch it runs on. Run it from the Actions tab on a new branch
+# ("Run workflow", pick the branch), then open a pull request: main only takes PRs.
+# It also runs by itself when the script or this workflow change on a branch.
+name: Market data
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths:
+      - scripts/fetch-market-data.mjs
+      - .github/workflows/market-data.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: market-data-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fetch:
+    name: Fetch market data
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Dukascopy sometimes answers with a bot check that dukascopy-node solves in Chromium.
+      - name: Install Chromium
+        timeout-minutes: 5
+        run: npx playwright install chromium
+      - name: Fetch candles
+        run: |
+          export CHROME_PATH="$(node -p "require('playwright-core').chromium.executablePath()")"
+          npm run market-data
+      - name: Commit the data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/market-data
+          if git diff --cached --quiet; then
+            echo "Market data unchanged."
+          else
+            git commit -m "Update trading practice market data"
+            git push
+          fi

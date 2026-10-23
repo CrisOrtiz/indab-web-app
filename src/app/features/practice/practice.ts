@@ -3,13 +3,7 @@ import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { PracticeSession, PracticeTrade, TradeSide } from '../../core/models/practice';
-import {
-  HISTORY_BARS,
-  INSTRUMENTS,
-  MarketDataService,
-  TIMEFRAMES,
-  randomWindowStart,
-} from './market-data.service';
+import { HISTORY_BARS, INSTRUMENTS, MarketDataService, TIMEFRAMES } from './market-data.service';
 import { EXIT_REASONS, priceDigits } from './practice-format';
 import { PracticeService } from './practice.service';
 import { Replay, STARTING_BALANCE, tradePnl } from './replay';
@@ -19,7 +13,7 @@ type Phase = 'setup' | 'loading' | 'playing' | 'finished';
 
 export const SPEEDS = [1, 2, 5, 10];
 
-/** Fewer replay candles than this means the window hit the end of the data: try another. */
+/** A replay needs at least this many candles after the visible history. */
 const MIN_REPLAY_BARS = 50;
 
 /**
@@ -95,8 +89,8 @@ export class Practice {
   }
 
   protected async start(): Promise<void> {
-    const instrument = INSTRUMENTS.find((i) => i.symbol === this.symbol())!;
-    const timeframe = TIMEFRAMES.find((t) => t.interval === this.interval())!;
+    const symbol = this.symbol();
+    const interval = this.interval();
     const user = this.auth.user();
     if (!user) {
       return;
@@ -104,11 +98,7 @@ export class Practice {
     this.error.set(null);
     this.phase.set('loading');
     try {
-      const candles = await this.market.loadCandles(
-        instrument.symbol,
-        timeframe.interval,
-        randomWindowStart(instrument, timeframe),
-      );
+      const candles = await this.market.loadRandomWindow(symbol, interval);
       if (candles.length < HISTORY_BARS + MIN_REPLAY_BARS) {
         throw new Error('Not enough data');
       }
@@ -116,8 +106,8 @@ export class Practice {
       const sessionId = await this.practice.startSession({
         uid: user.uid,
         userName: this.auth.profile()?.displayName || user.email || user.uid,
-        symbol: instrument.symbol,
-        interval: timeframe.interval,
+        symbol,
+        interval,
         replayStart: candles[HISTORY_BARS].time * 1000,
         startingBalance: replay.startingBalance,
       });

@@ -35,9 +35,9 @@ describe('PracticeReview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     practice.allSessions.mockResolvedValue([
-      session('s1', 'ana', 'Ana', 'BTCUSDT', 25),
-      session('s2', 'ana', 'Ana', 'ETHUSDT', -5),
-      session('s3', 'luis', 'Luis', 'BTCUSDT', 0),
+      session('s1', 'ana', 'Ana', 'XAUUSD', 25),
+      session('s2', 'ana', 'Ana', 'NAS100', -5),
+      session('s3', 'luis', 'Luis', 'XAUUSD', 0),
     ]);
     practice.sessionTrades.mockResolvedValue([
       {
