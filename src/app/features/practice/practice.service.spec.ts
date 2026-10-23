@@ -15,7 +15,7 @@ vi.mock('firebase/firestore', () => ({
   orderBy: vi.fn((...args) => ['orderBy', ...args]),
   limit: vi.fn((n) => ['limit', n]),
   getDocs: vi.fn(async () => ({
-    docs: [{ id: 's1', data: () => ({ symbol: 'XAUUSD', id: 'ignored' }) }],
+    docs: [{ id: 's1', data: () => ({ symbol: 'PAXGUSDT', id: 'ignored' }) }],
   })),
   setDoc: vi.fn(async () => undefined),
   updateDoc: vi.fn(async () => undefined),
@@ -56,7 +56,7 @@ describe('PracticeService', () => {
     const id = await service.startSession({
       uid: 'u1',
       userName: 'Ana',
-      symbol: 'XAUUSD',
+      symbol: 'PAXGUSDT',
       interval: '1h',
       replayStart: 1000,
       startingBalance: 10000,
@@ -67,7 +67,7 @@ describe('PracticeService', () => {
       {
         uid: 'u1',
         userName: 'Ana',
-        symbol: 'XAUUSD',
+        symbol: 'PAXGUSDT',
         interval: '1h',
         replayStart: 1000,
         startingBalance: 10000,
@@ -163,12 +163,12 @@ describe('PracticeService', () => {
   });
 
   it("reads the student's own sessions, every session and a session's trades", async () => {
-    expect(await service.mySessions('u1')).toEqual([{ symbol: 'XAUUSD', id: 's1' }]);
+    expect(await service.mySessions('u1')).toEqual([{ symbol: 'PAXGUSDT', id: 's1' }]);
     expect(where).toHaveBeenCalledWith('uid', '==', 'u1');
     expect(await service.allSessions()).toHaveLength(1);
     // Trades logged before order types existed read as market orders.
     expect(await service.sessionTrades('s1')).toEqual([
-      { orderType: 'market', orderPrice: null, symbol: 'XAUUSD', id: 's1' },
+      { orderType: 'market', orderPrice: null, symbol: 'PAXGUSDT', id: 's1' },
     ]);
     expect(vi.mocked(query).mock.calls[2][0]).toEqual({ path: 'practiceSessions/s1/trades' });
     expect(getDocs).toHaveBeenCalledTimes(3);

@@ -2,24 +2,17 @@ import { Page, expect, test } from '@playwright/test';
 import { createUser, listDocuments, resetEmulators } from './emulators';
 import { nav, signIn, signOut } from './helpers';
 
-// The market-data files are replaced by a fixed series: 1000 hourly candles at 100, then +1
-// per candle, so every entry and exit price below is predictable.
-const HOUR = 3600;
-const candles = Array.from({ length: 1000 }, (_, i) => {
+// Binance is replaced by a fixed series: 1000 hourly candles at 100, then +1 per candle,
+// so every entry and exit price below is predictable.
+const HOUR = 3_600_000;
+const klines = Array.from({ length: 1000 }, (_, i) => {
   const close = i < 150 ? 100 : 100 + (i - 149);
-  return [Date.UTC(2021, 4, 10) / 1000 + i * HOUR, close, close, close, close];
+  return [Date.UTC(2021, 4, 10) + i * HOUR, `${close}`, `${close}`, `${close}`, `${close}`, '1'];
 });
-const index = {
-  source: 'test',
-  generatedAt: '2026-10-23T00:00:00Z',
-  instruments: {
-    USDJPY: { '1h': [{ file: 'USDJPY/1h/2021.json', count: 1000, from: 0, to: 0 }] },
-  },
-};
 
 const mockMarket = (page: Page) =>
-  page.route('**/market-data/**', (route) =>
-    route.fulfill({ json: route.request().url().endsWith('index.json') ? index : candles }),
+  page.route(/binance\.(vision|com)\/api\/v3\/klines/, (route) =>
+    route.fulfill({ json: klines, headers: { 'Access-Control-Allow-Origin': '*' } }),
   );
 
 let studentUid: string;
@@ -45,7 +38,6 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   await expect(page).toHaveURL('/academy/practice');
   await expect(page.getByText('Aún no has hecho ninguna práctica.')).toBeVisible();
 
-  await page.getByLabel('Mercado').selectOption('USDJPY');
   await page.getByRole('button', { name: 'Comenzar práctica' }).click();
   await expect(page.locator('.market .price')).toHaveText('100.000');
 
@@ -87,7 +79,7 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   expect(session).toMatchObject({
     uid: studentUid,
     userName: 'José Pérez',
-    symbol: 'USDJPY',
+    symbol: 'PAXGUSDT',
     interval: '1h',
     status: 'finished',
     tradeCount: 2,
@@ -102,7 +94,7 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   ]);
 
   await page.getByRole('button', { name: 'Nueva práctica' }).click();
-  await expect(page.getByRole('cell', { name: 'USDJPY · 1h' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'PAXGUSDT · 1h' })).toBeVisible();
 
   // An admin sees the session and its trades.
   await signOut(page);

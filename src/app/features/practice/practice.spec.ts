@@ -29,7 +29,7 @@ const candles = (replayed = 60): Candle[] =>
 describe('Practice page', () => {
   let fixture: ComponentFixture<Practice>;
   let el: HTMLElement;
-  const market = { loadRandomWindow: vi.fn() };
+  const market = { loadCandles: vi.fn() };
   const practice = {
     startSession: vi.fn(async () => 'session-1'),
     newTradeId: vi.fn(),
@@ -51,11 +51,11 @@ describe('Practice page', () => {
     vi.clearAllMocks();
     let n = 0;
     practice.newTradeId.mockImplementation(() => `t${++n}`);
-    market.loadRandomWindow.mockResolvedValue(candles());
+    market.loadCandles.mockResolvedValue(candles());
     practice.mySessions.mockResolvedValue([
       {
         id: 'old',
-        symbol: 'USDJPY',
+        symbol: 'PAXGUSDT',
         interval: '4h',
         tradeCount: 3,
         pnl: -12.5,
@@ -107,17 +107,17 @@ describe('Practice page', () => {
     expect(el.querySelector('h1')?.textContent).toContain('Práctica de trading');
     expect(el.querySelectorAll('select')).toHaveLength(2);
     expect(practice.mySessions).toHaveBeenCalledWith('u1');
-    expect(el.textContent).toContain('USDJPY · 4h');
+    expect(el.textContent).toContain('PAXGUSDT · 4h');
     expect(el.textContent).toContain('Terminada');
   });
 
   it('starts a session on a random window with the dates hidden', async () => {
     await start();
-    expect(market.loadRandomWindow).toHaveBeenCalledWith('XAUUSD', '1h');
+    expect(market.loadCandles).toHaveBeenCalledWith('PAXGUSDT', '1h', expect.any(Number));
     expect(practice.startSession).toHaveBeenCalledWith({
       uid: 'u1',
       userName: 'Ana',
-      symbol: 'XAUUSD',
+      symbol: 'PAXGUSDT',
       interval: '1h',
       replayStart: (1000 + HISTORY_BARS * 3600) * 1000,
       startingBalance: 10000,
@@ -133,7 +133,7 @@ describe('Practice page', () => {
   });
 
   it('shows an error and stays on the setup when the data cannot load', async () => {
-    market.loadRandomWindow.mockRejectedValueOnce(new Error('offline'));
+    market.loadCandles.mockRejectedValueOnce(new Error('offline'));
     await start();
     expect(el.querySelector('[role="alert"]')?.textContent).toContain(
       'No se pudieron cargar los datos del mercado',
@@ -293,7 +293,7 @@ describe('Practice page', () => {
   });
 
   it('ends the session by itself after the last candle', async () => {
-    market.loadRandomWindow.mockResolvedValueOnce(candles(50));
+    market.loadCandles.mockResolvedValueOnce(candles(50));
     await start();
     for (let i = 0; i < 50; i++) {
       button('Siguiente vela').click();

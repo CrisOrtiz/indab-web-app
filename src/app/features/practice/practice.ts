@@ -3,7 +3,13 @@ import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { OrderType, PracticeSession, PracticeTrade, TradeSide } from '../../core/models/practice';
-import { HISTORY_BARS, INSTRUMENTS, MarketDataService, TIMEFRAMES } from './market-data.service';
+import {
+  HISTORY_BARS,
+  INSTRUMENTS,
+  MarketDataService,
+  TIMEFRAMES,
+  randomWindowStart,
+} from './market-data.service';
 import { EXIT_REASONS, ORDER_TYPES, orderLabel, priceDigits, roundPrice } from './practice-format';
 import { PracticeService } from './practice.service';
 import { Replay, STARTING_BALANCE, fillsBelow, tradePnl } from './replay';
@@ -18,7 +24,7 @@ const DEFAULT_ORDER_OFFSET = 0.005;
 const DEFAULT_STOP_OFFSET = 0.01;
 const DEFAULT_TARGET_OFFSET = 0.02;
 
-/** A replay needs at least this many candles after the visible history. */
+/** Fewer replay candles than this means the window hit the end of the data: try another. */
 const MIN_REPLAY_BARS = 50;
 
 /**
@@ -112,8 +118,10 @@ export class Practice {
   }
 
   protected async start(): Promise<void> {
-    const symbol = this.symbol();
-    const interval = this.interval();
+    const instrument = INSTRUMENTS.find((i) => i.symbol === this.symbol())!;
+    const timeframe = TIMEFRAMES.find((t) => t.interval === this.interval())!;
+    const { symbol } = instrument;
+    const { interval } = timeframe;
     const user = this.auth.user();
     if (!user) {
       return;
@@ -121,7 +129,11 @@ export class Practice {
     this.error.set(null);
     this.phase.set('loading');
     try {
-      const candles = await this.market.loadRandomWindow(symbol, interval);
+      const candles = await this.market.loadCandles(
+        symbol,
+        interval,
+        randomWindowStart(instrument, timeframe),
+      );
       if (candles.length < HISTORY_BARS + MIN_REPLAY_BARS) {
         throw new Error('Not enough data');
       }
