@@ -27,6 +27,7 @@ jobs:
   test:
     name: Build and test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       CI: true
     steps:
@@ -52,9 +53,21 @@ jobs:
         run: npm run test:ci
       - name: Firestore rules tests
         run: npm run test:rules
+      # ubuntu-latest already has Chrome's system libraries, so skip --with-deps (its apt-get
+      # step can hang). The browser download is cached per Playwright version.
+      - name: Get Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: npx playwright install chromium
       - name: End-to-end tests
+        timeout-minutes: 10
         run: npm run test:e2e
 
       - name: Upload coverage
