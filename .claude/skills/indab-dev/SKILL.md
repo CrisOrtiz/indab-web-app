@@ -51,6 +51,7 @@ otherwise create a feature service.
 | `courses/{id}/lessons/{id}` | enrolled in course or academy access | admins |
 | `materials/{id}` | academy access | admins |
 | `investors/{uid}` (Eleva) | owner, admins | admins |
+| `practiceSessions/{id}` + `/trades/{id}` | owner, admins | owner (academy access) while active; trades closed once; admins delete |
 
 Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`,
 `hasAcademyAccess()`, `isEnrolledIn(courseId)`. Everything not matched is denied.
@@ -126,6 +127,13 @@ Module notes:
   (add a `FIREBASE_STORAGE` token and emulator wiring in `firebase.providers.ts`).
 - **Academy (`/academy`)**: published `courses` and their `lessons`, filtered by
   `enrollment().courses` or full academy access. Shows the pending notice when not enrolled.
+- **Trading practice (`/academy/practice`, built)**: `features/practice/`. `Replay` (`replay.ts`)
+  is the pure bar-by-bar engine (stepping, SL/TP fills, P/L); `ReplayChart` wraps
+  lightweight-charts (fake it in component specs, it needs a canvas); `MarketDataService` loads
+  Binance public klines (no key; mock them with `page.route` in e2e); `PracticeService` logs
+  `practiceSessions` and their `trades`. Admin review at `/admin/practice`
+  (`features/admin/practice-review/`). Adding a market: add it to `INSTRUMENTS`; a new
+  timeframe must also be added to the `interval` list in `firestore.rules`.
 - **Eleva (`/eleva`, investor area)**: the public page stays unguarded. Investor data lives in
   `investors/{uid}` and subcollections (e.g. `investors/{uid}/statements/{month}`), admin-written,
   owner-read. Financial figures are never computed or written by the client.

@@ -1,0 +1,296 @@
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/academy" class="back">← Academia</a>
+    <h1>Práctica de trading</h1>
+    <p>
+      Opera sobre datos históricos reales sin arriesgar dinero. Te mostramos un momento al azar del
+      pasado y avanzas vela por vela: no sabes qué viene después. Todas tus operaciones quedan
+      registradas para que tu instructor las revise.
+    </p>
+  </header>
+
+  @if (error(); as message) {
+    <p class="message error" role="alert">{{ message }}</p>
+  }
+
+  @switch (phase()) {
+    @case ('playing') {
+      @if (replay(); as r) {
+        <div class="toolbar">
+          <div class="market">
+            <strong>{{ instrumentLabel() }}</strong>
+            <span class="muted">· {{ interval() }}</span>
+            <span class="price">{{
+              r.current().close | number: priceDigits(r.current().close)
+            }}</span>
+          </div>
+          <div class="controls">
+            <button type="button" class="btn btn-outline" (click)="step()">Siguiente vela</button>
+            <button type="button" class="btn btn-outline" (click)="togglePlay()">
+              {{ playing() ? 'Pausar' : 'Reproducir' }}
+            </button>
+            <select
+              aria-label="Velocidad"
+              [value]="speed()"
+              (change)="setSpeed(+$any($event.target).value)"
+            >
+              @for (s of speeds; track s) {
+                <option [value]="s">{{ s }} velas/s</option>
+              }
+            </select>
+            <button type="button" class="btn" (click)="finish()">Terminar sesión</button>
+          </div>
+        </div>
+        <progress aria-label="Avance de la sesión" [value]="r.progress()" max="1"></progress>
+
+        <div class="workspace">
+          <app-replay-chart
+            [candles]="visibleCandles()"
+            [trades]="r.trades()"
+            [hideDates]="datesHidden()"
+          />
+
+          <aside class="ticket">
+            <h2>Nueva operación</h2>
+            <div class="sides" role="group" aria-label="Dirección">
+              <button
+                type="button"
+                class="side buy"
+                [class.selected]="side() === 'long'"
+                [attr.aria-pressed]="side() === 'long'"
+                (click)="side.set('long')"
+              >
+                Comprar
+              </button>
+              <button
+                type="button"
+                class="side sell"
+                [class.selected]="side() === 'short'"
+                [attr.aria-pressed]="side() === 'short'"
+                (click)="side.set('short')"
+              >
+                Vender
+              </button>
+            </div>
+            <label>
+              Monto (USD)
+              <input
+                type="number"
+                min="1"
+                step="any"
+                [value]="amount()"
+                (input)="amount.set(+$any($event.target).value)"
+              />
+            </label>
+            <label>
+              Stop loss (opcional)
+              <input
+                type="number"
+                step="any"
+                [value]="stopLoss() ?? ''"
+                (input)="stopLoss.set(numberOrNull($any($event.target).value))"
+              />
+            </label>
+            <label>
+              Take profit (opcional)
+              <input
+                type="number"
+                step="any"
+                [value]="takeProfit() ?? ''"
+                (input)="takeProfit.set(numberOrNull($any($event.target).value))"
+              />
+            </label>
+            @if (orderError(); as message) {
+              <p class="order-error" role="alert">{{ message }}</p>
+            }
+            <button type="button" class="btn" [disabled]="placing()" (click)="openTrade()">
+              Abrir operación
+            </button>
+
+            <dl class="account">
+              <dt>Saldo</dt>
+              <dd>{{ r.balance() | number: '1.2-2' }}</dd>
+              <dt>Disponible</dt>
+              <dd>{{ r.available() | number: '1.2-2' }}</dd>
+              <dt>P/L abierto</dt>
+              <dd [class.up]="r.unrealized() > 0" [class.down]="r.unrealized() < 0">
+                {{ r.unrealized() | number: '1.2-2' }}
+              </dd>
+              <dt>Patrimonio</dt>
+              <dd>{{ r.equity() | number: '1.2-2' }}</dd>
+            </dl>
+            <p class="muted hint">Atajo: flecha derecha → siguiente vela.</p>
+          </aside>
+        </div>
+
+        <h2>Operaciones abiertas</h2>
+        <table class="trades">
+          <thead>
+            <tr>
+              <th>Dirección</th>
+              <th>Entrada</th>
+              <th>Monto</th>
+              <th>SL / TP</th>
+              <th>P/L</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of r.openTrades(); track t.id) {
+              <tr>
+                <td data-label="Dirección">{{ t.side === 'long' ? 'Compra' : 'Venta' }}</td>
+                <td data-label="Entrada">{{ t.entryPrice | number: priceDigits(t.entryPrice) }}</td>
+                <td data-label="Monto">{{ tradeAmount(t) | number: '1.2-2' }}</td>
+                <td data-label="SL / TP">
+                  {{ t.stopLoss === null ? '—' : (t.stopLoss | number: priceDigits(t.stopLoss)) }} /
+                  {{
+                    t.takeProfit === null ? '—' : (t.takeProfit | number: priceDigits(t.takeProfit))
+                  }}
+                </td>
+                <td data-label="P/L">{{ openPnl(r, t) | number: '1.2-2' }}</td>
+                <td>
+                  <button type="button" class="btn btn-outline small" (click)="closeTrade(t)">
+                    Cerrar
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="muted empty">No tienes operaciones abiertas.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <h2>Operaciones cerradas</h2>
+        <table class="trades">
+          <thead>
+            <tr>
+              <th>Dirección</th>
+              <th>Entrada</th>
+              <th>Salida</th>
+              <th>Motivo</th>
+              <th>P/L</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of closedTrades(); track t.id) {
+              <tr>
+                <td data-label="Dirección">{{ t.side === 'long' ? 'Compra' : 'Venta' }}</td>
+                <td data-label="Entrada">{{ t.entryPrice | number: priceDigits(t.entryPrice) }}</td>
+                <td data-label="Salida">{{ t.exitPrice | number: priceDigits(t.exitPrice!) }}</td>
+                <td data-label="Motivo">{{ exitReasons[t.exitReason!] }}</td>
+                <td data-label="P/L" [class.up]="t.pnl! > 0" [class.down]="t.pnl! < 0">
+                  {{ t.pnl | number: '1.2-2' }}
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="muted empty">Aún no has cerrado operaciones.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    }
+
+    @case ('finished') {
+      @if (replay(); as r) {
+        <div class="result">
+          <h2>Sesión terminada</h2>
+          <div class="stats">
+            <div class="stat">
+              <strong>{{ r.balance() | number: '1.2-2' }}</strong
+              ><span>Saldo final (USD)</span>
+            </div>
+            <div class="stat">
+              <strong [class.up]="r.realized() > 0" [class.down]="r.realized() < 0">
+                {{ r.realized() | number: '1.2-2' }}
+              </strong>
+              <span>Ganancia / pérdida</span>
+            </div>
+            <div class="stat">
+              <strong>{{ r.trades().length }}</strong
+              ><span>Operaciones</span>
+            </div>
+            <div class="stat">
+              <strong>{{ r.winRate() === null ? '—' : (r.winRate() | percent) }}</strong>
+              <span>Acierto</span>
+            </div>
+          </div>
+          <p class="muted">
+            {{ instrumentLabel() }} · {{ interval() }} · desde
+            {{ r.candles[r.historyBars].time * 1000 | date: 'd MMM y, HH:mm' }}
+          </p>
+          <app-replay-chart [candles]="visibleCandles()" [trades]="r.trades()" />
+          <button type="button" class="btn" (click)="reset()">Nueva práctica</button>
+        </div>
+      }
+    }
+
+    @default {
+      <form class="setup" (submit)="$event.preventDefault(); start()">
+        <label>
+          Mercado
+          <select [value]="symbol()" (change)="symbol.set($any($event.target).value)">
+            @for (i of instruments; track i.symbol) {
+              <option [value]="i.symbol">{{ i.label }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          Temporalidad
+          <select [value]="interval()" (change)="interval.set($any($event.target).value)">
+            @for (t of timeframes; track t.interval) {
+              <option [value]="t.interval">{{ t.label }}</option>
+            }
+          </select>
+        </label>
+        <label class="check">
+          <input
+            type="checkbox"
+            [checked]="hideDates()"
+            (change)="hideDates.set($any($event.target).checked)"
+          />
+          Ocultar fechas durante la práctica
+        </label>
+        <p class="muted">
+          Empiezas con {{ startingBalance | number: '1.0-0' }} USD virtuales, sin apalancamiento.
+        </p>
+        <button type="submit" class="btn" [disabled]="phase() === 'loading'">
+          {{ phase() === 'loading' ? 'Cargando…' : 'Comenzar práctica' }}
+        </button>
+      </form>
+
+      <h2>Tus sesiones</h2>
+      <table class="trades">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Mercado</th>
+            <th>Operaciones</th>
+            <th>Ganancia / pérdida</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (s of history(); track s.id) {
+            <tr>
+              <td data-label="Fecha">{{ s.startedAt?.toDate() | date: 'd MMM y, HH:mm' }}</td>
+              <td data-label="Mercado">{{ s.symbol }} · {{ s.interval }}</td>
+              <td data-label="Operaciones">{{ s.tradeCount }}</td>
+              <td data-label="Ganancia / pérdida" [class.up]="s.pnl > 0" [class.down]="s.pnl < 0">
+                {{ s.pnl | number: '1.2-2' }}
+              </td>
+              <td data-label="Estado">{{ s.status === 'active' ? 'En curso' : 'Terminada' }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="5" class="muted empty">Aún no has hecho ninguna práctica.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  }
+</section>
