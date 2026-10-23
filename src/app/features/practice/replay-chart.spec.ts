@@ -2,13 +2,16 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { Candle, PracticeTrade } from '../../core/models/practice';
-import { ReplayChart } from './replay-chart';
+import { LevelMove, OrderDraft, ReplayChart } from './replay-chart';
 
 const lw = vi.hoisted(() => {
   const series = {
     setData: vi.fn(),
     update: vi.fn(),
-    createPriceLine: vi.fn((options) => options),
+    createPriceLine: vi.fn((options) => ({ ...options, applyOptions: vi.fn() })),
+    // y = 500 - price, so prices and pixels are easy to reason about.
+    priceToCoordinate: vi.fn((price: number) => 500 - price),
+    coordinateToPrice: vi.fn((y: number) => 500 - y),
     removePriceLine: vi.fn(),
   };
   const timeScale = { scrollToRealTime: vi.fn() };
@@ -33,12 +36,20 @@ const c = (time: number): Candle => ({ time, open: 1, high: 2, low: 0.5, close: 
 
 @Component({
   imports: [ReplayChart],
-  template: `<app-replay-chart [candles]="candles()" [trades]="trades()" [hideDates]="hide()" />`,
+  template: `<app-replay-chart
+    [candles]="candles()"
+    [trades]="trades()"
+    [draft]="draft()"
+    [hideDates]="hide()"
+    (levelMoved)="moves.push($event)"
+  />`,
 })
 class Host {
   readonly candles = signal([c(1), c(2)]);
   readonly trades = signal<PracticeTrade[]>([]);
+  readonly draft = signal<OrderDraft | null>(null);
   readonly hide = signal(true);
+  readonly moves: LevelMove[] = [];
 }
 
 describe('ReplayChart', () => {
@@ -79,7 +90,15 @@ describe('ReplayChart', () => {
 
   it('marks entries and exits and draws lines for open trades', async () => {
     const fixture = await render();
-    const base = { uid: 'u', quantity: 1, entryPrice: 100, takeProfit: null } as const;
+    const base = {
+      uid: 'u',
+      quantity: 1,
+      entryPrice: 100,
+      takeProfit: null,
+      orderType: 'market',
+      orderPrice: null,
+      placedTime: 1,
+    } as const;
     fixture.componentInstance.trades.set([
       { ...base, id: 'a', side: 'long', entryTime: 1, stopLoss: 95, status: 'open' },
       {
@@ -104,5 +123,53 @@ describe('ReplayChart', () => {
     fixture.componentInstance.trades.set([]);
     await fixture.whenStable();
     expect(lw.series.removePriceLine).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets the student drag the draft and trade levels, not the entry of an open trade', async () => {
+    const fixture = await render();
+    const host = fixture.componentInstance;
+    host.draft.set({ side: 'long', orderType: 'limit', price: 98, stopLoss: 95, takeProfit: null });
+    host.trades.set([
+      {
+        id: 'a',
+        uid: 'u',
+        side: 'long',
+        orderType: 'market',
+        orderPrice: null,
+        placedTime: 1,
+        quantity: 1,
+        entryPrice: 120,
+        entryTime: 1,
+        stopLoss: 110,
+        takeProfit: null,
+        status: 'open',
+      },
+    ]);
+    await fixture.whenStable();
+    const el: HTMLElement = fixture.nativeElement.querySelector('app-replay-chart');
+    const pointer = (type: string, clientY: number) =>
+      el.dispatchEvent(new MouseEvent(type, { clientY, bubbles: true }));
+
+    // The stop loss of the draft sits at y = 405: grab it and drop it at 410 (price 90).
+    pointer('pointerdown', 406);
+    expect(lw.chart.applyOptions).toHaveBeenLastCalledWith({
+      handleScroll: false,
+      handleScale: false,
+    });
+    pointer('pointermove', 410);
+    pointer('pointerup', 410);
+    expect(host.moves).toEqual([{ target: 'draft', field: 'stopLoss', price: 90 }]);
+    expect(lw.chart.applyOptions).toHaveBeenLastCalledWith({
+      handleScroll: true,
+      handleScale: true,
+    });
+
+    // The open trade's stop loss (y = 390) moves; its entry line (y = 380) does not.
+    pointer('pointerdown', 390);
+    pointer('pointermove', 392);
+    pointer('pointerup', 392);
+    pointer('pointerdown', 380);
+    pointer('pointerup', 370);
+    expect(host.moves.slice(1)).toEqual([{ target: 'a', field: 'stopLoss', price: 108 }]);
   });
 });

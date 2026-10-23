@@ -65,19 +65,52 @@ export class PracticeService {
     });
   }
 
+  /** Logs a new order: `open` for market orders, `pending` for limit and stop orders. */
   openTrade(sessionId: string, uid: string, trade: PracticeTrade): Promise<void> {
-    const { id, side, quantity, entryPrice, entryTime, stopLoss, takeProfit } = trade;
+    const { id, side, orderType, orderPrice, placedTime, quantity, entryPrice, entryTime } = trade;
     return setDoc(doc(this.trades(sessionId), id), {
       uid,
       side,
+      orderType,
+      orderPrice,
+      placedTime,
       quantity,
       entryPrice,
       entryTime,
-      stopLoss,
-      takeProfit,
-      status: 'open',
+      stopLoss: trade.stopLoss,
+      takeProfit: trade.takeProfit,
+      status: trade.status,
       openedAt: serverTimestamp(),
     });
+  }
+
+  fillOrder(sessionId: string, trade: PracticeTrade): Promise<void> {
+    return updateDoc(doc(this.trades(sessionId), trade.id), {
+      status: 'open',
+      entryPrice: trade.entryPrice,
+      entryTime: trade.entryTime,
+      filledAt: serverTimestamp(),
+    });
+  }
+
+  cancelOrder(sessionId: string, trade: PracticeTrade): Promise<void> {
+    return updateDoc(doc(this.trades(sessionId), trade.id), {
+      status: 'cancelled',
+      closedAt: serverTimestamp(),
+    });
+  }
+
+  /** Saves moved stop loss / take profit, and a pending order's price. */
+  updateLevels(sessionId: string, trade: PracticeTrade): Promise<void> {
+    const levels: Record<string, number | null> = {
+      stopLoss: trade.stopLoss,
+      takeProfit: trade.takeProfit,
+    };
+    if (trade.status === 'pending') {
+      levels['orderPrice'] = trade.orderPrice;
+      levels['entryPrice'] = trade.entryPrice;
+    }
+    return updateDoc(doc(this.trades(sessionId), trade.id), levels);
   }
 
   closeTrade(sessionId: string, trade: PracticeTrade): Promise<void> {
@@ -107,6 +140,9 @@ export class PracticeService {
 
   async sessionTrades(sessionId: string): Promise<PracticeTrade[]> {
     const snapshot = await getDocs(query(this.trades(sessionId), orderBy('entryTime')));
-    return snapshot.docs.map((d) => ({ ...(d.data() as PracticeTrade), id: d.id }));
+    // Trades logged before order types existed were market orders.
+    return snapshot.docs.map(
+      (d) => ({ orderType: 'market', orderPrice: null, ...d.data(), id: d.id }) as PracticeTrade,
+    );
   }
 }

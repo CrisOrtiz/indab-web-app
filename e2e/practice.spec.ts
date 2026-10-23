@@ -66,12 +66,23 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   await page.getByLabel('Stop loss (opcional)').fill('');
   await page.getByRole('button', { name: 'Abrir operación' }).click();
   await expect(page.getByRole('button', { name: 'Cerrar', exact: true })).toBeVisible();
+
+  // A sell limit at 110 waits above the market, never fills and expires with the session.
+  await page.getByLabel('Tipo de orden').selectOption('limit');
+  await expect(page.getByLabel('Precio de la orden')).toHaveValue('102.51');
+  await page.getByLabel('Precio de la orden').fill('110');
+  await page.getByRole('button', { name: 'Colocar orden' }).click();
+  await expect(page.getByRole('cell', { name: 'Venta límite' })).toBeVisible();
   await page.getByRole('button', { name: 'Siguiente vela' }).click();
   await page.getByRole('button', { name: 'Terminar sesión' }).click();
   await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
   await expect(page.locator('.stat strong').first()).toHaveText('10,015.10');
 
   // Everything is logged under the student's account.
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect
+    .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
+    .toBe('finished');
   const [session] = await listDocuments('practiceSessions');
   expect(session).toMatchObject({
     uid: studentUid,
@@ -83,9 +94,11 @@ test('a student practises on a replay and an admin reviews the trades', async ({
     pnl: 15.1,
   });
   const trades = await listDocuments(`practiceSessions/${session['id']}/trades`);
-  expect(trades.map((t) => [t['side'], t['exitReason'], t['pnl']]).sort()).toEqual([
-    ['long', 'manual', 20],
-    ['short', 'sessionEnd', -4.9],
+  const summary = trades.map((t) => [t['side'], t['orderType'], t['status'], t['pnl'] ?? null]);
+  expect(summary.sort()).toEqual([
+    ['long', 'market', 'closed', 20],
+    ['short', 'limit', 'cancelled', null],
+    ['short', 'market', 'closed', -4.9],
   ]);
 
   await page.getByRole('button', { name: 'Nueva práctica' }).click();

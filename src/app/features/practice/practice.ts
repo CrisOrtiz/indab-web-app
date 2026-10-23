@@ -2,16 +2,21 @@ import { DatePipe, DecimalPipe, PercentPipe } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { PracticeSession, PracticeTrade, TradeSide } from '../../core/models/practice';
+import { OrderType, PracticeSession, PracticeTrade, TradeSide } from '../../core/models/practice';
 import { HISTORY_BARS, INSTRUMENTS, MarketDataService, TIMEFRAMES } from './market-data.service';
-import { EXIT_REASONS, priceDigits } from './practice-format';
+import { EXIT_REASONS, ORDER_TYPES, orderLabel, priceDigits, roundPrice } from './practice-format';
 import { PracticeService } from './practice.service';
-import { Replay, STARTING_BALANCE, tradePnl } from './replay';
-import { ReplayChart } from './replay-chart';
+import { Replay, STARTING_BALANCE, fillsBelow, tradePnl } from './replay';
+import { LevelMove, OrderDraft, ReplayChart } from './replay-chart';
 
 type Phase = 'setup' | 'loading' | 'playing' | 'finished';
 
 export const SPEEDS = [1, 2, 5, 10];
+
+// Where new levels start, as a fraction of the reference price; students then drag them.
+const DEFAULT_ORDER_OFFSET = 0.005;
+const DEFAULT_STOP_OFFSET = 0.01;
+const DEFAULT_TARGET_OFFSET = 0.02;
 
 /** A replay needs at least this many candles after the visible history. */
 const MIN_REPLAY_BARS = 50;
@@ -39,6 +44,8 @@ export class Practice {
   protected readonly exitReasons = EXIT_REASONS;
   protected readonly startingBalance = STARTING_BALANCE;
   protected readonly priceDigits = priceDigits;
+  protected readonly orderLabel = orderLabel;
+  protected readonly orderTypes = Object.entries(ORDER_TYPES) as [OrderType, string][];
 
   // Setup
   protected readonly symbol = signal(INSTRUMENTS[0].symbol);
@@ -56,6 +63,9 @@ export class Practice {
 
   // Order ticket
   protected readonly side = signal<TradeSide>('long');
+  protected readonly orderType = signal<OrderType>('market');
+  /** Limit or stop price. */
+  protected readonly orderPrice = signal<number | null>(null);
   protected readonly amount = signal(1000);
   protected readonly stopLoss = signal<number | null>(null);
   protected readonly takeProfit = signal<number | null>(null);
@@ -73,6 +83,19 @@ export class Practice {
   protected readonly datesHidden = computed(() => this.hideDates() && this.phase() === 'playing');
   protected readonly closedTrades = computed(() =>
     [...(this.replay()?.closedTrades() ?? [])].reverse(),
+  );
+
+  /** The ticket's order, drawn on the chart as lines the student can drag. */
+  protected readonly draft = computed<OrderDraft | null>(() =>
+    this.phase() === 'playing'
+      ? {
+          side: this.side(),
+          orderType: this.orderType(),
+          price: this.orderType() === 'market' ? null : this.orderPrice(),
+          stopLoss: this.stopLoss(),
+          takeProfit: this.takeProfit(),
+        }
+      : null,
   );
 
   private timer?: ReturnType<typeof setInterval>;
@@ -133,6 +156,10 @@ export class Practice {
     }
     const result = replay.step();
     result?.closed.forEach((trade) => this.persistClose(trade));
+    result?.filled.forEach((trade) => this.persist((id) => this.practice.fillOrder(id, trade)));
+    if (result?.filled.length && !result.closed.length) {
+      this.persist((sessionId) => this.practice.updateSummary(sessionId, this.summary(replay)));
+    }
     if (replay.finished()) {
       void this.finish();
     }
@@ -165,6 +192,8 @@ export class Practice {
     try {
       trade = replay.open(this.practice.newTradeId(sessionId), {
         side: this.side(),
+        orderType: this.orderType(),
+        price: this.orderPrice(),
         amount: this.amount(),
         stopLoss: this.stopLoss(),
         takeProfit: this.takeProfit(),
@@ -179,6 +208,7 @@ export class Practice {
       await this.practice.openTrade(sessionId, uid, trade);
       this.stopLoss.set(null);
       this.takeProfit.set(null);
+      this.setOrderType(this.orderType());
     } catch {
       replay.discard(trade.id);
       this.orderError.set('No se pudo registrar la operación. Intenta de nuevo.');
@@ -194,6 +224,76 @@ export class Practice {
     }
   }
 
+  protected cancelOrder(order: PracticeTrade): void {
+    const replay = this.replay();
+    if (replay) {
+      const cancelled = replay.cancel(order.id);
+      this.persist((id) => this.practice.cancelOrder(id, cancelled));
+    }
+  }
+
+  protected setSide(side: TradeSide): void {
+    this.side.set(side);
+    this.setOrderType(this.orderType());
+    this.stopLoss.set(null);
+    this.takeProfit.set(null);
+  }
+
+  /** Switches the ticket's order type, starting a limit or stop price next to the market. */
+  protected setOrderType(type: OrderType): void {
+    this.orderType.set(type);
+    const current = this.replay()?.current().close;
+    if (type === 'market' || current === undefined) {
+      this.orderPrice.set(null);
+      return;
+    }
+    const below = fillsBelow(this.side(), type);
+    this.orderPrice.set(roundPrice(current * (1 + (below ? -1 : 1) * DEFAULT_ORDER_OFFSET)));
+  }
+
+  /** Adds a stop loss or take profit at a default distance, ready to drag. */
+  protected addLevel(field: 'stopLoss' | 'takeProfit'): void {
+    const current = this.replay()?.current().close;
+    if (current === undefined) {
+      return;
+    }
+    const reference = this.orderType() === 'market' ? current : (this.orderPrice() ?? current);
+    const direction = (this.side() === 'long' ? 1 : -1) * (field === 'stopLoss' ? -1 : 1);
+    const offset = field === 'stopLoss' ? DEFAULT_STOP_OFFSET : DEFAULT_TARGET_OFFSET;
+    this[field].set(roundPrice(reference * (1 + direction * offset)));
+  }
+
+  /** A line dragged on the chart: updates the ticket, or moves a pending order or open trade. */
+  protected onLevelMoved(move: LevelMove): void {
+    if (move.target === 'draft') {
+      const field = {
+        price: this.orderPrice,
+        stopLoss: this.stopLoss,
+        takeProfit: this.takeProfit,
+      };
+      field[move.field].set(move.price);
+      return;
+    }
+    const replay = this.replay();
+    const trade = replay?.trades().find((t) => t.id === move.target);
+    if (!replay || !trade) {
+      return;
+    }
+    const levels = {
+      stopLoss: trade.stopLoss,
+      takeProfit: trade.takeProfit,
+      orderPrice: trade.orderPrice,
+      [move.field === 'price' ? 'orderPrice' : move.field]: move.price,
+    };
+    try {
+      const updated = replay.modify(trade.id, levels);
+      this.persist((id) => this.practice.updateLevels(id, updated), trade);
+      this.orderError.set(null);
+    } catch (e) {
+      this.orderError.set((e as Error).message);
+    }
+  }
+
   /** Closes every open trade at the current price and marks the session finished. */
   protected async finish(): Promise<void> {
     const replay = this.replay();
@@ -203,9 +303,12 @@ export class Practice {
     }
     this.pause();
     this.phase.set('finished');
-    const closed = replay.closeAll('sessionEnd');
+    const { cancelled, closed } = replay.closeAll('sessionEnd');
     try {
-      await Promise.all(closed.map((trade) => this.practice.closeTrade(sessionId, trade)));
+      await Promise.all([
+        ...cancelled.map((order) => this.practice.cancelOrder(sessionId, order)),
+        ...closed.map((trade) => this.practice.closeTrade(sessionId, trade)),
+      ]);
       await this.practice.finishSession(sessionId, this.summary(replay));
     } catch {
       this.error.set('No se pudo guardar el cierre de la sesión.');
@@ -263,11 +366,28 @@ export class Practice {
     ]).catch(() => this.error.set('No se pudo registrar el cierre de una operación.'));
   }
 
+  /**
+   * Logs a change in the background. If it fails, says so, and puts back `previous` (the
+   * trade before an edit) so the screen matches what was saved.
+   */
+  private persist(write: (sessionId: string) => Promise<void>, previous?: PracticeTrade): void {
+    const sessionId = this.sessionId();
+    if (!sessionId) {
+      return;
+    }
+    write(sessionId).catch(() => {
+      if (previous) {
+        this.replay()?.restore(previous);
+      }
+      this.error.set('No se pudo registrar un cambio en tus operaciones.');
+    });
+  }
+
   private summary(replay: Replay) {
     return {
       balance: replay.balance(),
       pnl: replay.realized(),
-      tradeCount: replay.trades().length,
+      tradeCount: replay.filledCount(),
     };
   }
 

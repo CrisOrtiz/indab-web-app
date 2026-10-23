@@ -283,6 +283,9 @@ describe('trading practice', () => {
   const trade = (uid: string, extra: Record<string, unknown> = {}) => ({
     uid,
     side: 'long',
+    orderType: 'market',
+    orderPrice: null,
+    placedTime: 1_620_000_000,
     quantity: 0.02,
     entryPrice: 50000.5,
     entryTime: 1_620_000_000,
@@ -292,6 +295,14 @@ describe('trading practice', () => {
     openedAt: serverTimestamp(),
     ...extra,
   });
+  const limitOrder = (uid: string, extra: Record<string, unknown> = {}) =>
+    trade(uid, {
+      orderType: 'limit',
+      orderPrice: 49500,
+      entryPrice: 49500,
+      status: 'pending',
+      ...extra,
+    });
   const close = (extra: Record<string, unknown> = {}) => ({
     status: 'closed',
     exitPrice: 51000,
@@ -315,6 +326,10 @@ describe('trading practice', () => {
       });
       await setDoc(doc(db, 'practiceSessions/s1/trades/t1'), {
         ...trade('enrolled'),
+        openedAt: new Date(),
+      });
+      await setDoc(doc(db, 'practiceSessions/s1/trades/p1'), {
+        ...limitOrder('enrolled'),
         openedAt: new Date(),
       });
       await setDoc(doc(db, 'practiceSessions/done'), {
@@ -396,6 +411,82 @@ describe('trading practice', () => {
     await assertFails(setDoc(tradeRef('enrolled', 't4'), trade('enrolled', { quantity: 0 })));
     await assertFails(setDoc(tradeRef('enrolled', 't4'), trade('enrolled', { stopLoss: -1 })));
     await assertFails(setDoc(tradeRef('enrolled', 't4'), trade('enrolled', { pnl: 100 })));
+    await assertFails(
+      setDoc(tradeRef('enrolled', 't4'), trade('enrolled', { orderType: 'iceberg' })),
+    );
+    await assertFails(
+      setDoc(tradeRef('enrolled', 't4'), trade('enrolled', { orderPrice: 50000.5 })),
+    );
+  });
+
+  it('places limit and stop orders as pending at their price', async () => {
+    await assertSucceeds(setDoc(tradeRef('enrolled', 'p2'), limitOrder('enrolled')));
+    await assertSucceeds(
+      setDoc(
+        tradeRef('enrolled', 'p3'),
+        limitOrder('enrolled', { orderType: 'stop', stopLoss: null }),
+      ),
+    );
+    await assertFails(
+      setDoc(tradeRef('enrolled', 'p4'), limitOrder('enrolled', { status: 'open' })),
+    );
+    await assertFails(
+      setDoc(tradeRef('enrolled', 'p4'), limitOrder('enrolled', { orderPrice: null })),
+    );
+    await assertFails(
+      setDoc(tradeRef('enrolled', 'p4'), limitOrder('enrolled', { entryPrice: 1 })),
+    );
+    await assertFails(
+      setDoc(tradeRef('enrolled', 'p4'), limitOrder('enrolled', { entryTime: 1_620_003_600 })),
+    );
+  });
+
+  it('lets the owner move, fill or cancel a pending order, once', async () => {
+    const order = tradeRef('enrolled', 'p1');
+    await assertFails(updateDoc(tradeRef('other', 'p1'), { stopLoss: 49100 }));
+    await assertSucceeds(
+      updateDoc(order, {
+        orderPrice: 49600,
+        entryPrice: 49600,
+        stopLoss: 49100,
+        takeProfit: 52000,
+      }),
+    );
+    await assertFails(updateDoc(order, { orderPrice: 49700 }));
+    await assertFails(updateDoc(order, { quantity: 5 }));
+    await assertFails(
+      updateDoc(order, {
+        status: 'closed',
+        exitPrice: 1,
+        exitTime: 1_620_003_600,
+        exitReason: 'manual',
+        pnl: 0,
+        closedAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      updateDoc(order, {
+        status: 'open',
+        entryPrice: 49600,
+        entryTime: 1_620_000_000,
+        filledAt: serverTimestamp(),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(order, {
+        status: 'open',
+        entryPrice: 49550,
+        entryTime: 1_620_003_600,
+        filledAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(updateDoc(order, { status: 'cancelled', closedAt: serverTimestamp() }));
+
+    await assertSucceeds(setDoc(tradeRef('enrolled', 'p2'), limitOrder('enrolled')));
+    await assertSucceeds(
+      updateDoc(tradeRef('enrolled', 'p2'), { status: 'cancelled', closedAt: serverTimestamp() }),
+    );
+    await assertFails(updateDoc(tradeRef('enrolled', 'p2'), { stopLoss: 49000 }));
   });
 
   it('shows trades to the session owner and admins only', async () => {
@@ -405,14 +496,18 @@ describe('trading practice', () => {
     await assertFails(getDoc(tradeRef(null)));
   });
 
-  it('closes a trade exactly once and never edits its entry', async () => {
+  it('moves stops of an open trade, closes it once and never edits its entry', async () => {
     await assertFails(updateDoc(tradeRef('other'), close()));
     await assertFails(updateDoc(tradeRef('enrolled'), { ...close(), entryPrice: 1 }));
     await assertFails(updateDoc(tradeRef('enrolled'), close({ exitReason: 'magic' })));
     await assertFails(updateDoc(tradeRef('enrolled'), close({ exitTime: 1 })));
-    await assertFails(updateDoc(tradeRef('enrolled'), { stopLoss: 48000 }));
+    await assertFails(updateDoc(tradeRef('enrolled'), { stopLoss: 48000, entryPrice: 1 }));
+    await assertFails(updateDoc(tradeRef('other'), { stopLoss: 48000 }));
+    await assertSucceeds(updateDoc(tradeRef('enrolled'), { stopLoss: 48000, takeProfit: 55000 }));
+    await assertFails(updateDoc(tradeRef('enrolled'), { stopLoss: -1 }));
     await assertSucceeds(updateDoc(tradeRef('enrolled'), close({ exitReason: 'stopLoss' })));
     await assertFails(updateDoc(tradeRef('enrolled'), close({ pnl: 5000 })));
+    await assertFails(updateDoc(tradeRef('enrolled'), { stopLoss: 47000 }));
   });
 });
 

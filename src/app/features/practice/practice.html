@@ -47,7 +47,9 @@
           <app-replay-chart
             [candles]="visibleCandles()"
             [trades]="r.trades()"
+            [draft]="draft()"
             [hideDates]="datesHidden()"
+            (levelMoved)="onLevelMoved($event)"
           />
 
           <aside class="ticket">
@@ -58,7 +60,7 @@
                 class="side buy"
                 [class.selected]="side() === 'long'"
                 [attr.aria-pressed]="side() === 'long'"
-                (click)="side.set('long')"
+                (click)="setSide('long')"
               >
                 Comprar
               </button>
@@ -67,11 +69,30 @@
                 class="side sell"
                 [class.selected]="side() === 'short'"
                 [attr.aria-pressed]="side() === 'short'"
-                (click)="side.set('short')"
+                (click)="setSide('short')"
               >
                 Vender
               </button>
             </div>
+            <label>
+              Tipo de orden
+              <select [value]="orderType()" (change)="setOrderType($any($event.target).value)">
+                @for (type of orderTypes; track type[0]) {
+                  <option [value]="type[0]">{{ type[1] }}</option>
+                }
+              </select>
+            </label>
+            @if (orderType() !== 'market') {
+              <label>
+                Precio de la orden
+                <input
+                  type="number"
+                  step="any"
+                  [value]="orderPrice() ?? ''"
+                  (input)="orderPrice.set(numberOrNull($any($event.target).value))"
+                />
+              </label>
+            }
             <label>
               Monto (USD)
               <input
@@ -82,29 +103,55 @@
                 (input)="amount.set(+$any($event.target).value)"
               />
             </label>
-            <label>
-              Stop loss (opcional)
-              <input
-                type="number"
-                step="any"
-                [value]="stopLoss() ?? ''"
-                (input)="stopLoss.set(numberOrNull($any($event.target).value))"
-              />
-            </label>
-            <label>
-              Take profit (opcional)
-              <input
-                type="number"
-                step="any"
-                [value]="takeProfit() ?? ''"
-                (input)="takeProfit.set(numberOrNull($any($event.target).value))"
-              />
-            </label>
+            <div class="level">
+              <label>
+                Stop loss (opcional)
+                <input
+                  type="number"
+                  step="any"
+                  [value]="stopLoss() ?? ''"
+                  (input)="stopLoss.set(numberOrNull($any($event.target).value))"
+                />
+              </label>
+              @if (stopLoss() === null) {
+                <button type="button" class="btn btn-outline small" (click)="addLevel('stopLoss')">
+                  Añadir SL
+                </button>
+              } @else {
+                <button type="button" class="btn btn-outline small" (click)="stopLoss.set(null)">
+                  Quitar
+                </button>
+              }
+            </div>
+            <div class="level">
+              <label>
+                Take profit (opcional)
+                <input
+                  type="number"
+                  step="any"
+                  [value]="takeProfit() ?? ''"
+                  (input)="takeProfit.set(numberOrNull($any($event.target).value))"
+                />
+              </label>
+              @if (takeProfit() === null) {
+                <button
+                  type="button"
+                  class="btn btn-outline small"
+                  (click)="addLevel('takeProfit')"
+                >
+                  Añadir TP
+                </button>
+              } @else {
+                <button type="button" class="btn btn-outline small" (click)="takeProfit.set(null)">
+                  Quitar
+                </button>
+              }
+            </div>
             @if (orderError(); as message) {
               <p class="order-error" role="alert">{{ message }}</p>
             }
             <button type="button" class="btn" [disabled]="placing()" (click)="openTrade()">
-              Abrir operación
+              {{ orderType() === 'market' ? 'Abrir operación' : 'Colocar orden' }}
             </button>
 
             <dl class="account">
@@ -119,15 +166,58 @@
               <dt>Patrimonio</dt>
               <dd>{{ r.equity() | number: '1.2-2' }}</dd>
             </dl>
-            <p class="muted hint">Atajo: flecha derecha → siguiente vela.</p>
+            <p class="muted hint">
+              Arrastra en el gráfico las líneas de la orden, del SL y del TP para ajustarlas. Flecha
+              derecha → siguiente vela.
+            </p>
           </aside>
         </div>
+
+        @if (r.pendingOrders().length) {
+          <h2>Órdenes pendientes</h2>
+          <table class="trades">
+            <thead>
+              <tr>
+                <th>Orden</th>
+                <th>Precio</th>
+                <th>Monto</th>
+                <th>SL / TP</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (o of r.pendingOrders(); track o.id) {
+                <tr>
+                  <td data-label="Orden">{{ orderLabel(o) }}</td>
+                  <td data-label="Precio">
+                    {{ o.orderPrice | number: priceDigits(o.orderPrice!) }}
+                  </td>
+                  <td data-label="Monto">{{ tradeAmount(o) | number: '1.2-2' }}</td>
+                  <td data-label="SL / TP">
+                    {{ o.stopLoss === null ? '—' : (o.stopLoss | number: priceDigits(o.stopLoss)) }}
+                    /
+                    {{
+                      o.takeProfit === null
+                        ? '—'
+                        : (o.takeProfit | number: priceDigits(o.takeProfit))
+                    }}
+                  </td>
+                  <td>
+                    <button type="button" class="btn btn-outline small" (click)="cancelOrder(o)">
+                      Cancelar
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
 
         <h2>Operaciones abiertas</h2>
         <table class="trades">
           <thead>
             <tr>
-              <th>Dirección</th>
+              <th>Operación</th>
               <th>Entrada</th>
               <th>Monto</th>
               <th>SL / TP</th>
@@ -138,7 +228,7 @@
           <tbody>
             @for (t of r.openTrades(); track t.id) {
               <tr>
-                <td data-label="Dirección">{{ t.side === 'long' ? 'Compra' : 'Venta' }}</td>
+                <td data-label="Operación">{{ orderLabel(t) }}</td>
                 <td data-label="Entrada">{{ t.entryPrice | number: priceDigits(t.entryPrice) }}</td>
                 <td data-label="Monto">{{ tradeAmount(t) | number: '1.2-2' }}</td>
                 <td data-label="SL / TP">
@@ -166,7 +256,7 @@
         <table class="trades">
           <thead>
             <tr>
-              <th>Dirección</th>
+              <th>Operación</th>
               <th>Entrada</th>
               <th>Salida</th>
               <th>Motivo</th>
@@ -176,7 +266,7 @@
           <tbody>
             @for (t of closedTrades(); track t.id) {
               <tr>
-                <td data-label="Dirección">{{ t.side === 'long' ? 'Compra' : 'Venta' }}</td>
+                <td data-label="Operación">{{ orderLabel(t) }}</td>
                 <td data-label="Entrada">{{ t.entryPrice | number: priceDigits(t.entryPrice) }}</td>
                 <td data-label="Salida">{{ t.exitPrice | number: priceDigits(t.exitPrice!) }}</td>
                 <td data-label="Motivo">{{ exitReasons[t.exitReason!] }}</td>

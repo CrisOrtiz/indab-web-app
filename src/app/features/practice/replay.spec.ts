@@ -1,5 +1,13 @@
 import { Candle, PracticeTrade } from '../../core/models/practice';
-import { Replay, stopHit, tradePnl, validateOrder } from './replay';
+import {
+  OpenTradeInput,
+  Replay,
+  fillsBelow,
+  orderFill,
+  stopHit,
+  tradePnl,
+  validateOrder,
+} from './replay';
 
 const candle = (time: number, open: number, high: number, low: number, close: number): Candle => ({
   time,
@@ -20,12 +28,25 @@ const trade = (patch: Partial<PracticeTrade>): PracticeTrade => ({
   id: 't',
   uid: 'u',
   side: 'long',
+  orderType: 'market',
+  orderPrice: null,
+  placedTime: 2,
   quantity: 2,
   entryPrice: 100,
   entryTime: 2,
   stopLoss: null,
   takeProfit: null,
   status: 'open',
+  ...patch,
+});
+
+const order = (patch: Partial<OpenTradeInput> = {}): OpenTradeInput => ({
+  side: 'long',
+  orderType: 'market',
+  price: null,
+  amount: 100,
+  stopLoss: null,
+  takeProfit: null,
   ...patch,
 });
 
@@ -68,19 +89,42 @@ describe('stopHit', () => {
   });
 });
 
-describe('validateOrder', () => {
-  const order = (patch = {}) => ({
-    side: 'long' as const,
-    amount: 100,
-    stopLoss: null,
-    takeProfit: null,
-    ...patch,
+describe('pending orders', () => {
+  it('buy limits and sell stops wait below the price, the others above', () => {
+    expect(fillsBelow('long', 'limit')).toBe(true);
+    expect(fillsBelow('short', 'stop')).toBe(true);
+    expect(fillsBelow('long', 'stop')).toBe(false);
+    expect(fillsBelow('short', 'limit')).toBe(false);
   });
 
-  it('accepts a valid order', () => {
+  it('fill at their price, or at the open after a gap', () => {
+    const buyLimit = trade({ orderType: 'limit', orderPrice: 95, status: 'pending' });
+    expect(orderFill(buyLimit, candle(3, 100, 101, 96, 97))).toBeNull();
+    expect(orderFill(buyLimit, candle(3, 100, 101, 94, 97))).toBe(95);
+    expect(orderFill(buyLimit, candle(3, 93, 96, 92, 95))).toBe(93);
+
+    const buyStop = trade({ orderType: 'stop', orderPrice: 105, status: 'pending' });
+    expect(orderFill(buyStop, candle(3, 100, 104, 99, 103))).toBeNull();
+    expect(orderFill(buyStop, candle(3, 100, 106, 99, 103))).toBe(105);
+    expect(orderFill(buyStop, candle(3, 107, 108, 106, 107))).toBe(107);
+  });
+});
+
+describe('validateOrder', () => {
+  it('accepts valid orders', () => {
     expect(validateOrder(order({ stopLoss: 90, takeProfit: 120 }), 100, 1000)).toBeNull();
     expect(
       validateOrder(order({ side: 'short', stopLoss: 110, takeProfit: 80 }), 100, 1000),
+    ).toBeNull();
+    expect(
+      validateOrder(
+        order({ orderType: 'limit', price: 95, stopLoss: 93, takeProfit: 99 }),
+        100,
+        1000,
+      ),
+    ).toBeNull();
+    expect(
+      validateOrder(order({ side: 'short', orderType: 'stop', price: 95 }), 100, 1000),
     ).toBeNull();
   });
 
@@ -96,6 +140,21 @@ describe('validateOrder', () => {
       'por debajo',
     );
     expect(validateOrder(order({ stopLoss: -5 }), 100, 1000)).toContain('mayores a 0');
+  });
+
+  it('checks limit and stop prices against the market and stops against the order price', () => {
+    expect(validateOrder(order({ orderType: 'limit', price: null }), 100, 1000)).toContain(
+      'precio de la orden',
+    );
+    expect(validateOrder(order({ orderType: 'limit', price: 101 }), 100, 1000)).toBe(
+      'Una compra límite debe tener su precio por debajo del precio actual.',
+    );
+    expect(validateOrder(order({ orderType: 'stop', price: 99 }), 100, 1000)).toBe(
+      'Una compra stop debe tener su precio por encima del precio actual.',
+    );
+    expect(validateOrder(order({ orderType: 'limit', price: 95, stopLoss: 97 }), 100, 1000)).toBe(
+      'En una compra, el stop loss debe estar por debajo del precio de la orden.',
+    );
   });
 });
 
@@ -119,14 +178,14 @@ describe('Replay', () => {
     expect(() => new Replay(series(), 3)).toThrow();
   });
 
-  it('opens trades at the current close and tracks balance, equity and margin', () => {
+  it('opens market trades at the current close and tracks balance, equity and margin', () => {
     const replay = new Replay(series(candle(3, 100, 111, 99, 110)), 2, 1000);
-    const t = replay.open('a', { side: 'long', amount: 500, stopLoss: null, takeProfit: null });
+    const t = replay.open('a', order({ amount: 500 }));
     expect(t).toMatchObject({ entryPrice: 100, entryTime: 2, quantity: 5, status: 'open' });
     expect(replay.available()).toBe(500);
-    expect(() =>
-      replay.open('b', { side: 'short', amount: 600, stopLoss: null, takeProfit: null }),
-    ).toThrow('saldo disponible');
+    expect(() => replay.open('b', order({ side: 'short', amount: 600 }))).toThrow(
+      'saldo disponible',
+    );
 
     replay.step();
     expect(replay.unrealized()).toBe(50);
@@ -142,9 +201,9 @@ describe('Replay', () => {
 
   it('closes trades whose stop loss or take profit the new candle hits', () => {
     const replay = new Replay(series(candle(3, 100, 103, 94, 96), candle(4, 96, 97, 95, 96)), 2);
-    replay.open('sl', { side: 'long', amount: 100, stopLoss: 95, takeProfit: null });
-    replay.open('tp', { side: 'short', amount: 100, stopLoss: null, takeProfit: 97 });
-    replay.open('keep', { side: 'long', amount: 100, stopLoss: 90, takeProfit: null });
+    replay.open('sl', order({ stopLoss: 95 }));
+    replay.open('tp', order({ side: 'short', takeProfit: 97 }));
+    replay.open('keep', order({ stopLoss: 90 }));
 
     const { closed } = replay.step()!;
     expect(closed.map((t) => [t.id, t.exitReason, t.exitPrice])).toEqual([
@@ -154,14 +213,76 @@ describe('Replay', () => {
     expect(replay.openTrades().map((t) => t.id)).toEqual(['keep']);
     expect(replay.realized()).toBe(-2);
     expect(replay.winRate()).toBe(0.5);
+  });
 
-    expect(replay.closeAll('sessionEnd').map((t) => t.exitReason)).toEqual(['sessionEnd']);
+  it('keeps limit and stop orders pending, reserving cash, until a candle reaches them', () => {
+    const replay = new Replay(
+      series(candle(3, 100, 101, 98, 99), candle(4, 99, 99, 94, 95), candle(5, 95, 96, 89, 90)),
+      2,
+      1000,
+    );
+    const limit = replay.open(
+      'l',
+      order({ orderType: 'limit', price: 96, amount: 480, stopLoss: 91 }),
+    );
+    expect(limit).toMatchObject({ status: 'pending', orderPrice: 96, entryPrice: 96, quantity: 5 });
+    expect(replay.available()).toBe(520);
+    expect(replay.filledCount()).toBe(0);
+
+    expect(replay.step()!.filled).toEqual([]);
+    const { filled } = replay.step()!;
+    expect(filled).toEqual([
+      expect.objectContaining({ id: 'l', status: 'open', entryPrice: 96, entryTime: 4 }),
+    ]);
+    expect(replay.filledCount()).toBe(1);
+
+    // Checked for its stop loss from the next candle on.
+    const { closed } = replay.step()!;
+    expect(closed).toEqual([expect.objectContaining({ exitPrice: 91, pnl: -25 })]);
+  });
+
+  it('moves the levels of pending orders and open trades, validating them', () => {
+    const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 2);
+    replay.open('l', order({ orderType: 'limit', price: 95 }));
+    expect(replay.modify('l', { stopLoss: 90, takeProfit: 105, orderPrice: 97 })).toMatchObject({
+      orderPrice: 97,
+      entryPrice: 97,
+      stopLoss: 90,
+      takeProfit: 105,
+    });
+    expect(() => replay.modify('l', { stopLoss: 98, takeProfit: null })).toThrow('stop loss');
+    expect(() => replay.modify('l', { stopLoss: null, takeProfit: null, orderPrice: 101 })).toThrow(
+      'por debajo del precio actual',
+    );
+
+    replay.open('m', order());
+    expect(replay.modify('m', { stopLoss: 99, takeProfit: null })).toMatchObject({ stopLoss: 99 });
+    expect(() => replay.modify('m', { stopLoss: 101, takeProfit: null })).toThrow('stop loss');
+    replay.close('m');
+    expect(() => replay.modify('m', { stopLoss: 99, takeProfit: null })).toThrow('cerrada');
+  });
+
+  it('cancels pending orders, by hand or when the replay ends', () => {
+    const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 2);
+    replay.open('a', order({ orderType: 'stop', price: 105 }));
+    replay.open('b', order({ orderType: 'limit', price: 95 }));
+    replay.open('c', order());
+    expect(replay.cancel('a').status).toBe('cancelled');
+    expect(() => replay.cancel('a')).toThrow();
+
+    const { cancelled, closed } = replay.closeAll('sessionEnd');
+    expect(cancelled.map((t) => t.id)).toEqual(['b']);
+    expect(closed.map((t) => [t.id, t.exitReason])).toEqual([['c', 'sessionEnd']]);
+    expect(replay.pendingOrders()).toEqual([]);
     expect(replay.openTrades()).toEqual([]);
   });
 
-  it('can forget an open trade that was never logged', () => {
+  it('can forget an order that was never logged and restore an edit that failed', () => {
     const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 2);
-    replay.open('a', { side: 'long', amount: 100, stopLoss: null, takeProfit: null });
+    const before = replay.open('a', order({ stopLoss: 90 }));
+    replay.modify('a', { stopLoss: 95, takeProfit: null });
+    replay.restore(before);
+    expect(replay.trades()[0].stopLoss).toBe(90);
     replay.discard('a');
     expect(replay.trades()).toEqual([]);
   });

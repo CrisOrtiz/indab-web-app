@@ -41,11 +41,15 @@ async function fetchCandles(instrument, timeframe, from, to) {
     volumes: false,
     ignoreFlats: true,
     format: 'array',
-    batchSize: 10,
-    pauseBetweenBatchesMs: 500,
+    // Dukascopy rate-limits hard (HTTP 429), so go slowly.
+    batchSize: 2,
+    pauseBetweenBatchesMs: 1000,
+    requestIntervalMs: 500,
+    rateLimitRetryCount: 6,
     retryCount: 3,
-    pauseBetweenRetriesMs: 2000,
+    pauseBetweenRetriesMs: 5000,
     wafMode: 'auto',
+    wafTokenCache: true,
     chromePath: process.env.CHROME_PATH || undefined,
   });
   const round = (n) => Number(n.toFixed(instrument.decimals));

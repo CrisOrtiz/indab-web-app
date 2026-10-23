@@ -83,7 +83,7 @@
                   <table class="trades">
                     <thead>
                       <tr>
-                        <th>Dirección</th>
+                        <th>Operación</th>
                         <th>Apertura</th>
                         <th>Entrada</th>
                         <th>Monto</th>
@@ -97,7 +97,7 @@
                     <tbody>
                       @for (t of list; track t.id) {
                         <tr>
-                          <td>{{ t.side === 'long' ? 'Compra' : 'Venta' }}</td>
+                          <td>{{ orderLabel(t) }}</td>
                           <td>{{ t.entryTime * 1000 | date: 'd MMM y, HH:mm' : 'UTC' }}</td>
                           <td>{{ t.entryPrice | number: priceDigits(t.entryPrice) }}</td>
                           <td>{{ t.quantity * t.entryPrice | number: '1.2-2' }}</td>
@@ -110,7 +110,7 @@
                               {{ t.pnl | number: '1.2-2' }}
                             </td>
                           } @else {
-                            <td colspan="4" class="muted">Abierta</td>
+                            <td colspan="4" class="muted">{{ statusLabels[t.status] }}</td>
                           }
                         </tr>
                       } @empty {

@@ -2,7 +2,7 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PracticeSession, PracticeTrade } from '../../../core/models/practice';
-import { EXIT_REASONS, priceDigits } from '../../practice/practice-format';
+import { EXIT_REASONS, orderLabel, priceDigits } from '../../practice/practice-format';
 import { PracticeService } from '../../practice/practice.service';
 
 /** Admin view of every student's chart-replay sessions and the trades logged in each. */
@@ -17,6 +17,13 @@ export class PracticeReview {
 
   protected readonly exitReasons = EXIT_REASONS;
   protected readonly priceDigits = priceDigits;
+  protected readonly orderLabel = orderLabel;
+  protected readonly statusLabels: Record<PracticeTrade['status'], string> = {
+    pending: 'Orden pendiente',
+    open: 'Abierta',
+    closed: 'Cerrada',
+    cancelled: 'Orden cancelada',
+  };
 
   protected readonly sessions = signal<PracticeSession[]>([]);
   protected readonly loading = signal(true);

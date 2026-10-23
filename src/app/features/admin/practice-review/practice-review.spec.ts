@@ -43,6 +43,8 @@ describe('PracticeReview', () => {
       {
         id: 't1',
         side: 'long',
+        orderType: 'limit',
+        orderPrice: 50000,
         quantity: 0.01,
         entryPrice: 50000,
         entryTime: 1_620_000_000,
@@ -57,12 +59,14 @@ describe('PracticeReview', () => {
       {
         id: 't2',
         side: 'short',
+        orderType: 'stop',
+        orderPrice: 100,
         quantity: 1,
         entryPrice: 100,
         entryTime: 1_620_000_000,
         stopLoss: null,
         takeProfit: null,
-        status: 'open',
+        status: 'pending',
       },
     ]);
   });
@@ -94,7 +98,9 @@ describe('PracticeReview', () => {
     const detail = el.querySelector('.detail')!;
     expect(detail.textContent).toContain('Take profit');
     expect(detail.textContent).toContain('52,500.00');
-    expect(detail.textContent).toContain('Abierta');
+    expect(detail.textContent).toContain('Compra límite');
+    expect(detail.textContent).toContain('Venta stop');
+    expect(detail.textContent).toContain('Orden pendiente');
 
     sessionRows()[0].querySelector('button')!.click();
     await fixture.whenStable();
