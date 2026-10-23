@@ -2,9 +2,10 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Candle, PracticeSession, PracticeTrade } from '../../../core/models/practice';
-import { HISTORY_BARS, MarketDataService, TIMEFRAMES } from '../../practice/market-data.service';
+import { HISTORY_BARS, MarketDataService, intervalMs } from '../../practice/market-data.service';
 import { EXIT_REASONS, orderLabel, priceDigits } from '../../practice/practice-format';
 import { PracticeService } from '../../practice/practice.service';
+import { LOT_SIZE } from '../../practice/replay';
 import { ReplayChart } from '../../practice/replay-chart';
 
 /**
@@ -24,6 +25,7 @@ export class PracticeReview {
   protected readonly exitReasons = EXIT_REASONS;
   protected readonly priceDigits = priceDigits;
   protected readonly orderLabel = orderLabel;
+  protected readonly lotSize = LOT_SIZE;
   protected readonly statusLabels: Record<PracticeTrade['status'], string> = {
     pending: 'Orden pendiente',
     open: 'Abierta',
@@ -41,6 +43,8 @@ export class PracticeReview {
   protected readonly trades = signal<PracticeTrade[] | null>(null);
   /** Candles of the selected session; `null` while loading, `[]` when they could not load. */
   protected readonly candles = signal<Candle[] | null>(null);
+  /** Bar length of those candles, so trade markers land on their bar. */
+  protected readonly barSeconds = signal(0);
   /** Session being deleted. */
   protected readonly deleting = signal<string | null>(null);
 
@@ -118,14 +122,15 @@ export class PracticeReview {
 
   /** Loads the replay window again: `HISTORY_BARS` of context before `replayStart`. */
   private async loadCandles(session: PracticeSession): Promise<void> {
-    const timeframe = TIMEFRAMES.find((t) => t.interval === session.interval);
+    const ms = intervalMs(session.interval);
     try {
-      if (!timeframe) {
+      if (!ms) {
         throw new Error(`Unknown interval ${session.interval}`);
       }
-      const start = session.replayStart - HISTORY_BARS * timeframe.ms;
+      const start = session.replayStart - HISTORY_BARS * ms;
       const candles = await this.market.loadCandles(session.symbol, session.interval, start);
       if (this.selected() === session.id) {
+        this.barSeconds.set(ms / 1000);
         this.candles.set(candles);
       }
     } catch {

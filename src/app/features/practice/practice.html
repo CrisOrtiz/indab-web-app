@@ -19,10 +19,22 @@
         <div class="toolbar">
           <div class="market">
             <strong>{{ instrumentLabel() }}</strong>
-            <span class="muted">· {{ interval() }}</span>
             <span class="price">{{
               r.current().close | number: priceDigits(r.current().close)
             }}</span>
+          </div>
+          <div class="timeframes" role="group" aria-label="Temporalidad">
+            @for (t of timeframes; track t.interval) {
+              <button
+                type="button"
+                [class.selected]="timeframe().interval === t.interval"
+                [attr.aria-pressed]="timeframe().interval === t.interval"
+                [disabled]="switching() !== null"
+                (click)="setTimeframe(t)"
+              >
+                {{ switching() === t.interval ? '…' : t.label }}
+              </button>
+            }
           </div>
           <div class="controls">
             <button type="button" class="btn btn-outline" (click)="step()">Siguiente vela</button>
@@ -41,45 +53,48 @@
             <button type="button" class="btn" (click)="finish()">Terminar sesión</button>
           </div>
         </div>
-        <progress aria-label="Avance de la sesión" [value]="r.progress()" max="1"></progress>
+        <p class="muted elapsed">Tiempo de mercado transcurrido: {{ elapsed() }}</p>
 
         <div class="workspace">
-          <div class="chart-area">
-            <app-replay-chart
-              [candles]="visibleCandles()"
-              [trades]="r.trades()"
-              [draft]="draft()"
-              [hideDates]="datesHidden()"
-              (levelMoved)="onLevelMoved($event)"
-            />
+          <app-replay-chart
+            [candles]="visibleCandles()"
+            [trades]="r.trades()"
+            [draft]="draft()"
+            [hideDates]="datesHidden()"
+            [barSeconds]="barSeconds()"
+            (levelMoved)="onLevelMoved($event)"
+            (levelRemoved)="onLevelRemoved($event)"
+            (tradeClosed)="onTradeClosed($event)"
+          >
             <div class="quick" role="group" aria-label="Operación rápida a mercado">
               <button
                 type="button"
                 class="quick-sell"
-                [attr.aria-label]="'Vender ' + (amount() | number: '1.0-2') + ' USD a mercado'"
+                [attr.aria-label]="'Vender ' + formatLots(lots()) + ' lotes a mercado'"
                 [disabled]="placing()"
                 (click)="quickTrade('short')"
               >
-                <span>Vender</span>
                 <strong>{{ r.current().close | number: priceDigits(r.current().close) }}</strong>
+                <span>VENDER</span>
               </button>
+              <span class="quick-size">{{ formatLots(lots()) }}</span>
               <button
                 type="button"
                 class="quick-buy"
-                [attr.aria-label]="'Comprar ' + (amount() | number: '1.0-2') + ' USD a mercado'"
+                [attr.aria-label]="'Comprar ' + formatLots(lots()) + ' lotes a mercado'"
                 [disabled]="placing()"
                 (click)="quickTrade('long')"
               >
-                <span>Comprar</span>
                 <strong>{{ r.current().close | number: priceDigits(r.current().close) }}</strong>
+                <span>COMPRAR</span>
               </button>
             </div>
-          </div>
+          </app-replay-chart>
 
           <aside class="ticket" aria-label="Panel de órdenes">
             <div class="ticket-head">
               <strong>{{ symbol() }}</strong>
-              <span class="muted">Disponible {{ r.available() | number: '1.2-2' }} USD</span>
+              <span class="muted">1:{{ leverage }}</span>
             </div>
             <div class="sides" role="group" aria-label="Dirección">
               <button
@@ -119,7 +134,7 @@
 
             @if (orderType() !== 'market') {
               <label>
-                Precio de la orden
+                <span class="field-name">Precio de la orden</span>
                 <input
                   type="number"
                   step="any"
@@ -129,34 +144,46 @@
               </label>
             }
             <label>
-              Monto (USD)
-              <input
-                type="number"
-                min="1"
-                step="any"
-                [value]="amount()"
-                (input)="amount.set(+$any($event.target).value)"
-              />
+              <span class="field-name">Lotes (tamaño {{ lotSize }} oz)</span>
+              <span class="field">
+                <input
+                  type="number"
+                  [min]="lotStep"
+                  [step]="lotStep"
+                  [value]="lots()"
+                  (input)="lots.set(+$any($event.target).value)"
+                />
+                <span class="muted">{{ margin() | number: '1.2-2' }} USD margen</span>
+              </span>
             </label>
-            <div class="fractions" role="group" aria-label="Parte del saldo disponible">
+            <div class="fractions" role="group" aria-label="Parte del margen libre">
               @for (f of fractions; track f) {
-                <button type="button" (click)="useFraction(f)">{{ f | percent }}</button>
+                <button type="button" (click)="useFraction(f)">
+                  {{ f === 1 ? 'Máx.' : (f | percent) }}
+                </button>
               }
             </div>
-            <p class="muted units">≈ {{ units() | number: '1.4-4' }} unidades</p>
+            <dl class="facts">
+              <dt>Margen libre</dt>
+              <dd>{{ r.available() | number: '1.2-2' }} USD</dd>
+              <dt>Valor de 1 punto</dt>
+              <dd>{{ units() | number: '1.2-2' }} USD</dd>
+            </dl>
 
+            <h3>Salidas</h3>
             @for (level of ticketLevels; track level.field) {
-              <div class="bracket" [class.on]="levelPrice(level.field) !== null">
-                <label class="check">
+              <div class="bracket">
+                <label class="switch">
+                  <span class="field-name">{{ level.label }}</span>
                   <input
                     type="checkbox"
+                    role="switch"
                     [checked]="levelPrice(level.field) !== null"
                     (change)="toggleLevel(level.field, $any($event.target).checked)"
                   />
-                  {{ level.label }}
                 </label>
                 @if (levelPrice(level.field); as price) {
-                  <div class="bracket-fields">
+                  <span class="field">
                     <input
                       type="number"
                       step="any"
@@ -167,12 +194,15 @@
                     <span [class.up]="levelPnl(price) > 0" [class.down]="levelPnl(price) < 0">
                       {{ signed(levelPnl(price)) }} USD
                     </span>
-                  </div>
+                  </span>
                 }
               </div>
             }
             @if (riskReward(); as ratio) {
-              <p class="muted ratio">Riesgo / beneficio 1 : {{ ratio | number: '1.2-2' }}</p>
+              <dl class="facts ratio">
+                <dt>Riesgo / beneficio</dt>
+                <dd>{{ ratio | number: '1.2-2' }}</dd>
+              </dl>
             }
 
             @if (orderError(); as message) {
@@ -186,7 +216,8 @@
               [disabled]="placing()"
               (click)="openTrade()"
             >
-              {{ submitLabel() }}
+              <strong>{{ side() === 'long' ? 'Comprar' : 'Vender' }}</strong>
+              <span>{{ submitDetail() }}</span>
             </button>
             <p class="muted hint">
               Arrastra en el gráfico las líneas de la orden, del SL y del TP. Flecha derecha →
@@ -209,7 +240,16 @@
             </strong>
           </div>
           <div>
-            <span>Disponible</span><strong>{{ r.available() | number: '1.2-2' }}</strong>
+            <span>Margen usado</span><strong>{{ r.usedMargin() | number: '1.2-2' }}</strong>
+          </div>
+          <div>
+            <span>Margen libre</span><strong>{{ r.available() | number: '1.2-2' }}</strong>
+          </div>
+          <div>
+            <span>Nivel de margen</span>
+            <strong [class.down]="(r.marginLevel() ?? 1) < 1">
+              {{ r.marginLevel() === null ? '—' : (r.marginLevel() | percent: '1.0-0') }}
+            </strong>
           </div>
         </div>
 
@@ -247,7 +287,7 @@
                 <tr>
                   <th>Orden</th>
                   <th>Precio</th>
-                  <th>Monto</th>
+                  <th>Lotes</th>
                   <th>Stop loss</th>
                   <th>Take profit</th>
                   <th></th>
@@ -266,7 +306,7 @@
                     <td data-label="Precio">
                       {{ o.orderPrice | number: priceDigits(o.orderPrice!) }}
                     </td>
-                    <td data-label="Monto">{{ tradeAmount(o) | number: '1.2-2' }}</td>
+                    <td data-label="Lotes">{{ formatLots(tradeLots(o)) }}</td>
                     <td data-label="Stop loss">
                       {{
                         o.stopLoss === null ? '—' : (o.stopLoss | number: priceDigits(o.stopLoss))
@@ -332,7 +372,7 @@
               <thead>
                 <tr>
                   <th>Posición</th>
-                  <th>Unidades</th>
+                  <th>Lotes</th>
                   <th>Entrada</th>
                   <th>Stop loss</th>
                   <th>Take profit</th>
@@ -350,7 +390,7 @@
                     >
                       {{ t.side === 'long' ? 'Compra' : 'Venta' }}
                     </td>
-                    <td data-label="Unidades">{{ t.quantity | number: '1.4-4' }}</td>
+                    <td data-label="Lotes">{{ formatLots(tradeLots(t)) }}</td>
                     <td data-label="Entrada">
                       {{ t.entryPrice | number: priceDigits(t.entryPrice) }}
                     </td>
@@ -429,10 +469,14 @@
             </div>
           </div>
           <p class="muted">
-            {{ instrumentLabel() }} · {{ interval() }} · desde
-            {{ r.candles[r.historyBars].time * 1000 | date: 'd MMM y, HH:mm' }}
+            {{ instrumentLabel() }} · desde {{ replayStart() | date: 'd MMM y, HH:mm' }} ·
+            {{ elapsed() }} de mercado
           </p>
-          <app-replay-chart [candles]="visibleCandles()" [trades]="r.trades()" />
+          <app-replay-chart
+            [candles]="visibleCandles()"
+            [trades]="r.trades()"
+            [barSeconds]="barSeconds()"
+          />
           <button type="button" class="btn" (click)="reset()">Nueva práctica</button>
         </div>
       }
@@ -448,14 +492,6 @@
             }
           </select>
         </label>
-        <label>
-          Temporalidad
-          <select [value]="interval()" (change)="interval.set($any($event.target).value)">
-            @for (t of timeframes; track t.interval) {
-              <option [value]="t.interval">{{ t.label }}</option>
-            }
-          </select>
-        </label>
         <label class="check">
           <input
             type="checkbox"
@@ -465,7 +501,10 @@
           Ocultar fechas durante la práctica
         </label>
         <p class="muted">
-          Empiezas con {{ startingBalance | number: '1.0-0' }} USD virtuales, sin apalancamiento.
+          Empiezas con {{ startingBalance | number: '1.0-0' }} USD virtuales y apalancamiento 1:{{
+            leverage
+          }}. Operas en lotes de {{ lotSize }} oz; si tu patrimonio cae por debajo del 50% del
+          margen usado, tus posiciones se cierran (stop out).
         </p>
         <button type="submit" class="btn" [disabled]="phase() === 'loading'">
           {{ phase() === 'loading' ? 'Cargando…' : 'Comenzar práctica' }}

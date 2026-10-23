@@ -20,32 +20,52 @@ export const INSTRUMENTS: Instrument[] = [
   { symbol: 'PAXGUSDT', label: 'Oro (XAU/USD vía PAXG)', listedAt: Date.UTC(2020, 9, 1) },
 ];
 
-const MINUTE = 60_000;
+export const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+/** Timeframes the student can switch between during the practice, as in TradingView. */
 export const TIMEFRAMES: Timeframe[] = [
-  { interval: '15m', label: '15 minutos', ms: 15 * MINUTE },
-  { interval: '1h', label: '1 hora', ms: 60 * MINUTE },
-  { interval: '4h', label: '4 horas', ms: 240 * MINUTE },
-  { interval: '1d', label: '1 día', ms: 1440 * MINUTE },
+  { interval: '1m', label: '1m', ms: MINUTE },
+  { interval: '3m', label: '3m', ms: 3 * MINUTE },
+  { interval: '5m', label: '5m', ms: 5 * MINUTE },
+  { interval: '15m', label: '15m', ms: 15 * MINUTE },
+  { interval: '1h', label: '1h', ms: HOUR },
+  { interval: '4h', label: '4h', ms: 4 * HOUR },
 ];
+export const DEFAULT_TIMEFRAME = TIMEFRAMES[3];
+/** The longest timeframe: replays start on one of its bars, so every timeframe lines up. */
+const LONGEST = TIMEFRAMES.at(-1)!;
 
-/** Candles per replay: the first `HISTORY_BARS` are visible context, the rest are replayed. */
+/** Length in ms of a Binance interval, including '1d' from older sessions. */
+export function intervalMs(interval: string): number | null {
+  return interval === '1d'
+    ? 24 * HOUR
+    : (TIMEFRAMES.find((t) => t.interval === interval)?.ms ?? null);
+}
+
+/** Most klines Binance returns per request. */
 export const REPLAY_BARS = 1000;
+/** Bars of context shown before the replay starts, in every timeframe. */
 export const HISTORY_BARS = 150;
+/** How far a replay can run: it is fed one-minute candles, a chunk at a time. */
+export const REPLAY_DAYS = 30;
 
 // Binance's public market-data endpoints: free, no API key, CORS enabled. The second is the
 // fallback if the first is unreachable from the student's network.
 const ENDPOINTS = ['https://data-api.binance.vision', 'https://api.binance.com'];
 
-/** Picks a random window start (ms) between the listing date and the most recent full window. */
-export function randomWindowStart(
+/**
+ * Picks a random replay start (ms), on a 4-hour boundary, with room for the history before it
+ * and a full replay after it.
+ */
+export function randomReplayStart(
   instrument: Instrument,
-  timeframe: Timeframe,
   now = Date.now(),
   random = Math.random,
 ): number {
-  const latest = now - (REPLAY_BARS + 1) * timeframe.ms;
-  const start = instrument.listedAt + random() * Math.max(0, latest - instrument.listedAt);
-  return Math.floor(start / timeframe.ms) * timeframe.ms;
+  const earliest = instrument.listedAt + HISTORY_BARS * LONGEST.ms;
+  const latest = now - (REPLAY_DAYS + 1) * 24 * HOUR;
+  const start = earliest + random() * Math.max(0, latest - earliest);
+  return Math.ceil(start / LONGEST.ms) * LONGEST.ms;
 }
 
 /** Parses Binance klines (`[openTime, open, high, low, close, ...]` with string prices). */
@@ -62,12 +82,17 @@ export function parseKlines(rows: unknown[][]): Candle[] {
 /** Loads historical candles for the replay straight from the browser. */
 @Injectable({ providedIn: 'root' })
 export class MarketDataService {
-  async loadCandles(symbol: string, interval: string, startTime: number): Promise<Candle[]> {
+  async loadCandles(
+    symbol: string,
+    interval: string,
+    startTime: number,
+    limit = REPLAY_BARS,
+  ): Promise<Candle[]> {
     const params = new URLSearchParams({
       symbol,
       interval,
       startTime: String(startTime),
-      limit: String(REPLAY_BARS),
+      limit: String(limit),
     });
     let lastError: unknown;
     for (const base of ENDPOINTS) {

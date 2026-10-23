@@ -1,4 +1,4 @@
-import { computed, signal } from '@angular/core';
+import { WritableSignal, computed, signal } from '@angular/core';
 import {
   Candle,
   OrderType,
@@ -8,14 +8,22 @@ import {
 } from '../../core/models/practice';
 
 export const STARTING_BALANCE = 200;
+/** Units (troy ounces of gold) in one lot, as brokers quote XAU/USD. */
+export const LOT_SIZE = 100;
+/** Smallest lot step. */
+export const LOT_STEP = 0.01;
+/** 1:100: a position needs margin of 1% of its value. */
+export const LEVERAGE = 100;
+/** Positions are closed when equity falls below this share of the margin in use. */
+export const STOP_OUT_LEVEL = 0.5;
 
 export interface OpenTradeInput {
   side: TradeSide;
   orderType: OrderType;
   /** Limit or stop price; ignored for market orders. */
   price: number | null;
-  /** Position size in USD at the entry price. */
-  amount: number;
+  /** Position size in lots of `LOT_SIZE` units. */
+  lots: number;
   stopLoss: number | null;
   takeProfit: number | null;
 }
@@ -31,6 +39,16 @@ const round = (value: number, decimals: number) => {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
 };
+
+/** Size of a trade in lots. */
+export function tradeLots(trade: Pick<PracticeTrade, 'quantity'>): number {
+  return round(trade.quantity / LOT_SIZE, 4);
+}
+
+/** Margin (USD) a position of `lots` at `price` ties up. */
+export function marginFor(lots: number, price: number): number {
+  return round((lots * LOT_SIZE * price) / LEVERAGE, 2);
+}
 
 /** Profit or loss (USD) of a trade if it closed at `exitPrice`. */
 export function tradePnl(trade: PracticeTrade, exitPrice: number): number {
@@ -139,13 +157,17 @@ export function validateOrder(
   current: number,
   available: number,
 ): string | null {
-  if (!(input.amount > 0)) {
-    return 'Ingresa un monto mayor a 0.';
-  }
-  if (input.amount > available) {
-    return `El monto supera tu saldo disponible (${available.toFixed(2)} USD).`;
+  if (
+    !(input.lots >= LOT_STEP) ||
+    Math.abs(input.lots / LOT_STEP - Math.round(input.lots / LOT_STEP)) > 1e-6
+  ) {
+    return `Ingresa un tamaño en lotes de ${LOT_STEP} en ${LOT_STEP}.`;
   }
   const market = input.orderType === 'market';
+  const margin = marginFor(input.lots, market || !(input.price! > 0) ? current : input.price!);
+  if (margin > available) {
+    return `Margen insuficiente: la orden necesita ${margin.toFixed(2)} USD y tienes ${available.toFixed(2)} USD libres.`;
+  }
   return (
     validateOrderPrice(input.side, input.orderType, input.price, current) ??
     validateLevels(
@@ -160,17 +182,24 @@ export function validateOrder(
 
 /**
  * Bar-by-bar replay of a candle series with simulated orders. Pure state (no Firestore,
- * no chart): the page persists what it returns and draws the visible candles.
+ * no chart): the page persists what it returns and draws the visible candles. The series can
+ * grow while the replay runs (`extend`), so the page can fetch it a chunk at a time.
  */
 export class Replay {
   private readonly _cursor = signal(0);
   private readonly _trades = signal<PracticeTrade[]>([]);
+  private readonly _candles: WritableSignal<Candle[]>;
+  /** False while more candles may still be appended. */
+  private readonly complete: WritableSignal<boolean>;
 
   /** Index of the last visible candle. */
   readonly cursor = this._cursor.asReadonly();
   readonly trades = this._trades.asReadonly();
   readonly current = computed(() => this.candles[this.cursor()]);
-  readonly finished = computed(() => this.cursor() >= this.candles.length - 1);
+  /** The last loaded candle is showing: stepping needs more data, or the replay is over. */
+  readonly atEnd = computed(() => this.cursor() >= this._candles().length - 1);
+  readonly finished = computed(() => this.atEnd() && this.complete());
+  readonly hasAllCandles = computed(() => this.complete());
   readonly progress = computed(
     () => (this.cursor() - this.historyBars + 1) / (this.candles.length - this.historyBars),
   );
@@ -193,16 +222,25 @@ export class Replay {
     ),
   );
   readonly equity = computed(() => round(this.balance() + this.unrealized(), 2));
-  /** Cash not tied up in open positions or reserved by pending orders (no leverage). */
-  readonly available = computed(() =>
+  /** Margin tied up by open positions. */
+  readonly usedMargin = computed(() =>
     round(
-      this.balance() -
-        [...this.openTrades(), ...this.pendingOrders()].reduce(
-          (sum, t) => sum + t.quantity * t.entryPrice,
-          0,
-        ),
+      this.openTrades().reduce((sum, t) => sum + marginFor(tradeLots(t), t.entryPrice), 0),
       2,
     ),
+  );
+  /** Free margin: equity not tied up by positions nor reserved by pending orders. */
+  readonly available = computed(() =>
+    round(
+      this.equity() -
+        this.usedMargin() -
+        this.pendingOrders().reduce((sum, t) => sum + marginFor(tradeLots(t), t.entryPrice), 0),
+      2,
+    ),
+  );
+  /** Equity as a share of the margin in use, or null with no open positions. */
+  readonly marginLevel = computed(() =>
+    this.usedMargin() > 0 ? this.equity() / this.usedMargin() : null,
   );
   readonly winRate = computed(() => {
     const closed = this.closedTrades();
@@ -210,23 +248,41 @@ export class Replay {
   });
 
   constructor(
-    readonly candles: Candle[],
+    candles: Candle[],
     readonly historyBars: number,
     readonly startingBalance = STARTING_BALANCE,
+    /** True when `extend` will append more candles later. */
+    more = false,
   ) {
     if (candles.length <= historyBars) {
       throw new Error('Not enough candles to replay');
     }
+    this._candles = signal(candles);
+    this.complete = signal(!more);
     this._cursor.set(historyBars - 1);
+  }
+
+  get candles(): Candle[] {
+    return this._candles();
+  }
+
+  /** Appends candles after the last one; `last` says no more will come. */
+  extend(candles: Candle[], last = false): void {
+    const end = this.candles.at(-1)!.time;
+    this._candles.update((list) => [...list, ...candles.filter((c) => c.time > end)]);
+    if (last) {
+      this.complete.set(true);
+    }
   }
 
   /**
    * Shows the next candle, fills the pending orders it reaches and closes the trades whose
    * stop loss or take profit it hits. An order filled on this candle is checked for its
-   * stops from the next candle on.
+   * stops from the next candle on. If equity then falls below `STOP_OUT_LEVEL` of the margin
+   * in use, every position is closed at the close (stop out), as a broker would.
    */
   step(): { candle: Candle; filled: PracticeTrade[]; closed: PracticeTrade[] } | null {
-    if (this.finished()) {
+    if (this.atEnd()) {
       return null;
     }
     this._cursor.update((i) => i + 1);
@@ -246,6 +302,10 @@ export class Replay {
           this.replace({ ...order, status: 'open', entryPrice: price, entryTime: candle.time }),
         );
       }
+    }
+    const level = this.marginLevel();
+    if (level !== null && level < STOP_OUT_LEVEL) {
+      closed.push(...this.openTrades().map((t) => this.close(t.id, 'stopOut')));
     }
     return { candle, filled, closed };
   }
@@ -269,7 +329,7 @@ export class Replay {
       orderType: input.orderType,
       orderPrice: market ? null : price,
       placedTime: time,
-      quantity: round(input.amount / price, 8),
+      quantity: round(input.lots * LOT_SIZE, 6),
       entryPrice: price,
       entryTime: time,
       stopLoss: input.stopLoss,

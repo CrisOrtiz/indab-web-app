@@ -3,8 +3,10 @@ import {
   OpenTradeInput,
   Replay,
   fillsBelow,
+  marginFor,
   orderFill,
   stopHit,
+  tradeLots,
   tradePnl,
   validateOrder,
 } from './replay';
@@ -44,7 +46,7 @@ const order = (patch: Partial<OpenTradeInput> = {}): OpenTradeInput => ({
   side: 'long',
   orderType: 'market',
   price: null,
-  amount: 100,
+  lots: 0.01,
   stopLoss: null,
   takeProfit: null,
   ...patch,
@@ -55,6 +57,14 @@ describe('tradePnl', () => {
     expect(tradePnl(trade({ side: 'long' }), 110)).toBe(20);
     expect(tradePnl(trade({ side: 'short' }), 110)).toBe(-20);
     expect(tradePnl(trade({ side: 'short' }), 95.5)).toBe(9);
+  });
+});
+
+describe('lots and margin', () => {
+  it('counts 100 units per lot and asks 1% of the position as margin (1:100)', () => {
+    expect(tradeLots(trade({ quantity: 5 }))).toBe(0.05);
+    expect(marginFor(0.05, 4000)).toBe(200);
+    expect(marginFor(0.01, 100)).toBe(1);
   });
 });
 
@@ -128,9 +138,12 @@ describe('validateOrder', () => {
     ).toBeNull();
   });
 
-  it('rejects bad amounts and levels on the wrong side of the price', () => {
-    expect(validateOrder(order({ amount: 0 }), 100, 1000)).toContain('mayor a 0');
-    expect(validateOrder(order({ amount: 2000 }), 100, 1000)).toContain('saldo disponible');
+  it('rejects bad sizes, too little margin and levels on the wrong side of the price', () => {
+    expect(validateOrder(order({ lots: 0 }), 100, 1000)).toContain('lotes de 0.01 en 0.01');
+    expect(validateOrder(order({ lots: 0.015 }), 100, 1000)).toContain('lotes de 0.01 en 0.01');
+    expect(validateOrder(order({ lots: 20 }), 100, 1000)).toBe(
+      'Margen insuficiente: la orden necesita 2000.00 USD y tienes 1000.00 USD libres.',
+    );
     expect(validateOrder(order({ stopLoss: 101 }), 100, 1000)).toContain('por debajo');
     expect(validateOrder(order({ takeProfit: 99 }), 100, 1000)).toContain('por encima');
     expect(validateOrder(order({ side: 'short', stopLoss: 99 }), 100, 1000)).toContain(
@@ -174,22 +187,39 @@ describe('Replay', () => {
     expect(replay.step()).toBeNull();
   });
 
+  it('can grow while it runs and only finishes once told no more candles come', () => {
+    const replay = new Replay(series(candle(3, 100, 100, 100, 101)), 2, 200, true);
+    replay.step();
+    expect(replay.atEnd()).toBe(true);
+    expect(replay.finished()).toBe(false);
+    expect(replay.step()).toBeNull();
+
+    // Candles it already has are skipped.
+    replay.extend([candle(3, 1, 1, 1, 1), candle(4, 101, 102, 100, 102)], true);
+    expect(replay.candles.map((c) => c.time)).toEqual([1, 2, 3, 4]);
+    expect(replay.step()?.candle.close).toBe(102);
+    expect(replay.finished()).toBe(true);
+  });
+
   it('needs candles to replay after the history', () => {
     expect(() => new Replay(series(), 3)).toThrow();
   });
 
   it('opens market trades at the current close and tracks balance, equity and margin', () => {
     const replay = new Replay(series(candle(3, 100, 111, 99, 110)), 2, 1000);
-    const t = replay.open('a', order({ amount: 500 }));
+    const t = replay.open('a', order({ lots: 0.05 }));
     expect(t).toMatchObject({ entryPrice: 100, entryTime: 2, quantity: 5, status: 'open' });
-    expect(replay.available()).toBe(500);
-    expect(() => replay.open('b', order({ side: 'short', amount: 600 }))).toThrow(
-      'saldo disponible',
+    expect(replay.usedMargin()).toBe(5);
+    expect(replay.available()).toBe(995);
+    expect(() => replay.open('b', order({ side: 'short', lots: 10 }))).toThrow(
+      'Margen insuficiente',
     );
 
     replay.step();
     expect(replay.unrealized()).toBe(50);
     expect(replay.equity()).toBe(1050);
+    expect(replay.available()).toBe(1045);
+    expect(replay.marginLevel()).toBe(210);
 
     const closed = replay.close('a');
     expect(closed).toMatchObject({ status: 'closed', exitPrice: 110, exitTime: 3, pnl: 50 });
@@ -227,10 +257,10 @@ describe('Replay', () => {
     );
     const limit = replay.open(
       'l',
-      order({ orderType: 'limit', price: 96, amount: 480, stopLoss: 91 }),
+      order({ orderType: 'limit', price: 96, lots: 0.05, stopLoss: 91 }),
     );
     expect(limit).toMatchObject({ status: 'pending', orderPrice: 96, entryPrice: 96, quantity: 5 });
-    expect(replay.available()).toBe(520);
+    expect(replay.available()).toBe(995.2);
     expect(replay.filledCount()).toBe(0);
 
     expect(replay.step()!.filled).toEqual([]);
@@ -243,6 +273,26 @@ describe('Replay', () => {
     // Checked for its stop loss from the next candle on.
     const { closed } = replay.step()!;
     expect(closed).toEqual([expect.objectContaining({ exitPrice: 91, pnl: -25 })]);
+  });
+
+  it('stops out every position when equity falls below half the margin in use', () => {
+    const replay = new Replay(
+      series(candle(3, 100, 100, 99, 99), candle(4, 99, 99, 98.4, 98.4)),
+      2,
+      200,
+    );
+    replay.open('a', order({ lots: 1 }));
+    expect(replay.usedMargin()).toBe(100);
+    // Equity 100 against 100 of margin: 100%, still open.
+    expect(replay.step()!.closed).toEqual([]);
+    expect(replay.marginLevel()).toBe(1);
+    // Equity 40: 40% < 50%.
+    const { closed } = replay.step()!;
+    expect(closed).toEqual([
+      expect.objectContaining({ id: 'a', exitReason: 'stopOut', exitPrice: 98.4, pnl: -160 }),
+    ]);
+    expect(replay.balance()).toBe(40);
+    expect(replay.marginLevel()).toBeNull();
   });
 
   it('moves the levels of pending orders and open trades, validating them', () => {

@@ -207,17 +207,27 @@ from Binance's public market-data API (`data-api.binance.vision`, falling back t
 are planned but need a data source licensed for showing prices to students (Dukascopy's free
 feed is for personal use only, and free APIs don't allow display to third parties).
 
-Each session picks a random window (150 candles of context plus up to 850 to replay), dates
-can be hidden, and students trade 200 virtual USD without leverage with market, limit and
-stop orders, optional stop loss and take profit. The screen follows TradingView: one-click
-Buy/Sell over the chart, an order panel with Market/Limit/Stop tabs and take profit / stop
-loss checkboxes that show their P/L and the reward to risk, and Positions / Orders / History
-tabs under the chart. The order price, stop loss and take profit are lines on the chart,
-labelled with their P/L, that can be dragged for the order being set up, pending orders and
-open trades. Pending orders fill when a later candle reaches their price, can be cancelled,
-and expire when the session ends. Sessions and orders are written to Firestore as they
-happen; admins review them at `/admin/practice`, where each session's trades are drawn on the
-same candles (fetched again from Binance) and a session can be deleted with its trades.
+Each session starts at a random moment (on a 4-hour boundary, at least 30 days before today)
+with the dates optionally hidden. The replay runs on one-minute candles, fetched 1000 at a time
+as it goes, and the chart builds them into bars of the timeframe the student picks: 1m, 3m, 5m,
+15m (the default), 1h or 4h, switchable at any time; each timeframe shows its 150 bars of
+history before the start. "Siguiente vela" shows the next bar of that timeframe, and orders,
+stops and the stop out are checked minute by minute.
+
+Students start with 200 virtual USD and trade in lots (1 lot = 100 oz) with 1:100 leverage: a
+position ties up 1% of its value as margin, and every position is closed (stop out) when equity
+falls below 50% of the margin in use. Orders are market, limit or stop, with optional stop loss
+and take profit. The screen follows TradingView: one-click Buy/Sell over the chart, an order
+panel with Market/Limit/Stop tabs, lots with their margin, and take profit / stop loss switches
+that show their P/L and the reward to risk, plus an account summary and Positions / Orders /
+History tabs under the chart. Every order, position, stop loss and take profit is a line on the
+chart with a label showing its size and P/L and a × to close, cancel or remove it; order prices
+and stops can be dragged by the line or the label. The chart toolbar adds MA 20, MA 50, EMA 21
+and RSI 14 (in its own pane, computed only from the bars shown) and horizontal and trend lines.
+
+Sessions and orders are written to Firestore as they happen; admins review them at
+`/admin/practice`, where each session's trades are drawn on its candles (fetched again from
+Binance) and a session can be deleted with its trades.
 
 The chart is TradingView's [lightweight-charts](https://github.com/tradingview/lightweight-charts)
 (Apache-2.0; its logo on the chart is the required attribution). P/L figures are computed in the

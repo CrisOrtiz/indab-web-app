@@ -2,17 +2,30 @@ import { DatePipe, DecimalPipe, PercentPipe, formatNumber } from '@angular/commo
 import { Component, DestroyRef, LOCALE_ID, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { OrderType, PracticeSession, PracticeTrade, TradeSide } from '../../core/models/practice';
 import {
+  Candle,
+  OrderType,
+  PracticeSession,
+  PracticeTrade,
+  TradeSide,
+} from '../../core/models/practice';
+import { BarBuilder, formatElapsed, nextBarEnd } from './bars';
+import {
+  DEFAULT_TIMEFRAME,
   HISTORY_BARS,
   INSTRUMENTS,
+  MINUTE,
   MarketDataService,
+  REPLAY_BARS,
+  REPLAY_DAYS,
   TIMEFRAMES,
-  randomWindowStart,
+  Timeframe,
+  randomReplayStart,
 } from './market-data.service';
 import {
   EXIT_REASONS,
   ORDER_TYPES,
+  formatLots,
   orderLabel,
   priceDigits,
   roundPrice,
@@ -20,14 +33,19 @@ import {
 } from './practice-format';
 import { PracticeService } from './practice.service';
 import {
+  LEVERAGE,
+  LOT_SIZE,
+  LOT_STEP,
   OpenTradeInput,
   Replay,
   STARTING_BALANCE,
   TradeLevels,
   fillsBelow,
+  marginFor,
+  tradeLots,
   tradePnl,
 } from './replay';
-import { LevelMove, OrderDraft, ReplayChart } from './replay-chart';
+import { LevelMove, LevelRemove, OrderDraft, ReplayChart } from './replay-chart';
 
 type Phase = 'setup' | 'loading' | 'playing' | 'finished';
 type Tab = 'positions' | 'orders' | 'history';
@@ -40,8 +58,10 @@ const DEFAULT_ORDER_OFFSET = 0.005;
 const DEFAULT_STOP_OFFSET = 0.01;
 const DEFAULT_TARGET_OFFSET = 0.02;
 
-/** Fewer replay candles than this means the window hit the end of the data: try another. */
-const MIN_REPLAY_BARS = 50;
+/** Fewer one-minute candles than this means the window hit the end of the data. */
+const MIN_REPLAY_MINUTES = 60;
+/** Fetch the next chunk of minutes when fewer than this are left to replay. */
+const PREFETCH_MINUTES = 600;
 
 /**
  * Chart-replay trading practice: the student picks a market, gets a random stretch of real
@@ -56,7 +76,7 @@ const MIN_REPLAY_BARS = 50;
   selector: 'app-practice',
   imports: [RouterLink, DatePipe, DecimalPipe, PercentPipe, ReplayChart],
   templateUrl: './practice.html',
-  styleUrls: ['./practice.scss', './trading-panel.scss'],
+  styleUrls: ['./practice.scss', './trading-panel.scss', './trading-account.scss'],
   host: { '(window:keydown)': 'onKey($event)' },
 })
 export class Practice {
@@ -74,7 +94,12 @@ export class Practice {
   protected readonly orderLabel = orderLabel;
   protected readonly orderTypes = Object.entries(ORDER_TYPES) as [OrderType, string][];
   protected readonly signed = signedMoney;
-  /** Shortcuts for the amount, as parts of the available balance. */
+  protected readonly leverage = LEVERAGE;
+  protected readonly lotSize = LOT_SIZE;
+  protected readonly lotStep = LOT_STEP;
+  protected readonly formatLots = formatLots;
+  protected readonly tradeLots = tradeLots;
+  /** Size shortcuts, as parts of the largest order the free margin allows. */
   protected readonly fractions = [0.25, 0.5, 1];
   /** Stop loss and take profit, in the order of the position columns. */
   protected readonly levels: { field: LevelField; label: string; short: string }[] = [
@@ -86,7 +111,6 @@ export class Practice {
 
   // Setup
   protected readonly symbol = signal(INSTRUMENTS[0].symbol);
-  protected readonly interval = signal(TIMEFRAMES[1].interval);
   protected readonly hideDates = signal(true);
 
   // Session
@@ -98,13 +122,23 @@ export class Practice {
   protected readonly speed = signal(SPEEDS[1]);
   protected readonly history = signal<PracticeSession[]>([]);
   protected readonly tab = signal<Tab>('positions');
+  /** Timeframe on the chart; the replay itself moves minute by minute. */
+  protected readonly timeframe = signal<Timeframe>(DEFAULT_TIMEFRAME);
+  /** Timeframe whose history is loading. */
+  protected readonly switching = signal<string | null>(null);
+  protected readonly replayStart = signal(0);
+  /** Bars before the replay start, per timeframe, fetched when first shown. */
+  private readonly histories = signal<Record<string, Candle[]>>({});
+  private builders = new Map<string, BarBuilder>();
+  private loadingMinutes = false;
 
   // Order ticket
   protected readonly side = signal<TradeSide>('long');
   protected readonly orderType = signal<OrderType>('market');
   /** Limit or stop price. */
   protected readonly orderPrice = signal<number | null>(null);
-  protected readonly amount = signal(100);
+  /** Size in lots. */
+  protected readonly lots = signal(LOT_STEP);
   protected readonly stopLoss = signal<number | null>(null);
   protected readonly takeProfit = signal<number | null>(null);
   protected readonly orderError = signal<string | null>(null);
@@ -113,9 +147,28 @@ export class Practice {
   protected readonly instrumentLabel = computed(
     () => INSTRUMENTS.find((i) => i.symbol === this.symbol())?.label ?? this.symbol(),
   );
+  /** The history bars plus the replayed minutes built into bars of the chart's timeframe. */
   protected readonly visibleCandles = computed(() => {
     const replay = this.replay();
-    return replay ? replay.candles.slice(0, replay.cursor() + 1) : [];
+    if (!replay) {
+      return [];
+    }
+    const { interval, ms } = this.timeframe();
+    let builder = this.builders.get(interval);
+    if (!builder) {
+      builder = new BarBuilder(ms / 1000, replay.historyBars);
+      this.builders.set(interval, builder);
+    }
+    return [
+      ...(this.histories()[interval] ?? []),
+      ...builder.build(replay.candles, replay.cursor()),
+    ];
+  });
+  protected readonly barSeconds = computed(() => this.timeframe().ms / 1000);
+  /** Market time replayed so far. */
+  protected readonly elapsed = computed(() => {
+    const replay = this.replay();
+    return replay ? formatElapsed(replay.current().time + 60 - this.replayStart() / 1000) : '';
   });
   /** Dates come back once the replay is over. */
   protected readonly datesHidden = computed(() => this.hideDates() && this.phase() === 'playing');
@@ -128,9 +181,9 @@ export class Practice {
     const current = this.replay()?.current().close ?? 0;
     return this.orderType() === 'market' ? current : (this.orderPrice() ?? current);
   });
-  protected readonly units = computed(() =>
-    this.reference() > 0 ? this.amount() / this.reference() : 0,
-  );
+  /** Units (ounces) of the ticket's order. */
+  protected readonly units = computed(() => this.lots() * LOT_SIZE);
+  protected readonly margin = computed(() => marginFor(this.lots(), this.reference()));
   /** Reward per unit of risk, once the ticket has both a stop loss and a take profit. */
   protected readonly riskReward = computed(() => {
     const stopLoss = this.stopLoss();
@@ -141,17 +194,15 @@ export class Practice {
     const risk = Math.abs(this.reference() - stopLoss);
     return risk > 0 ? Math.abs(takeProfit - this.reference()) / risk : null;
   });
-  /** "Comprar 0.0435 PAXGUSDT a mercado", "Vender 0.0435 PAXGUSDT límite a 2,310.00". */
-  protected readonly submitLabel = computed(() => {
-    const side = this.side() === 'long' ? 'Comprar' : 'Vender';
-    const units = formatNumber(this.units(), this.locale, '1.4-4');
+  /** The order button, as TradingView words it: "0.05 PAXGUSDT MERCADO", "... LÍMITE 2,310.00". */
+  protected readonly submitDetail = computed(() => {
     const type = this.orderType();
     const price = this.orderPrice();
     const where =
       type === 'market' || price === null
-        ? 'a mercado'
-        : `${ORDER_TYPES[type].toLowerCase()} a ${formatNumber(price, this.locale, priceDigits(price))}`;
-    return `${side} ${units} ${this.symbol()} ${where}`;
+        ? 'MERCADO'
+        : `${ORDER_TYPES[type].toUpperCase()} ${formatNumber(price, this.locale, priceDigits(price))}`;
+    return `${formatLots(this.lots())} ${this.symbol()} ${where}`;
   });
 
   /** The ticket's order, drawn on the chart as lines the student can drag. */
@@ -171,7 +222,7 @@ export class Practice {
   private timer?: ReturnType<typeof setInterval>;
 
   constructor() {
-    this.loadHistory();
+    this.loadSessions();
     inject(DestroyRef).onDestroy(() => {
       this.pause();
       // Leaving mid-replay ends the session, so open trades are not left dangling.
@@ -183,9 +234,8 @@ export class Practice {
 
   protected async start(): Promise<void> {
     const instrument = INSTRUMENTS.find((i) => i.symbol === this.symbol())!;
-    const timeframe = TIMEFRAMES.find((t) => t.interval === this.interval())!;
     const { symbol } = instrument;
-    const { interval } = timeframe;
+    const timeframe = DEFAULT_TIMEFRAME;
     const user = this.auth.user();
     if (!user) {
       return;
@@ -193,23 +243,31 @@ export class Practice {
     this.error.set(null);
     this.phase.set('loading');
     try {
-      const candles = await this.market.loadCandles(
-        symbol,
-        interval,
-        randomWindowStart(instrument, timeframe),
-      );
-      if (candles.length < HISTORY_BARS + MIN_REPLAY_BARS) {
+      const replayStart = randomReplayStart(instrument);
+      // The minute before the start is the replay's history: its close is the first price.
+      const [minutes, history] = await Promise.all([
+        this.market.loadCandles(symbol, '1m', replayStart - MINUTE),
+        this.loadHistory(symbol, timeframe, replayStart),
+      ]);
+      if (minutes.length < MIN_REPLAY_MINUTES) {
         throw new Error('Not enough data');
       }
-      const replay = new Replay(candles, HISTORY_BARS);
+      const replay = new Replay(minutes, 1, STARTING_BALANCE, true);
+      if (minutes.length < REPLAY_BARS) {
+        replay.extend([], true);
+      }
       const sessionId = await this.practice.startSession({
         uid: user.uid,
         userName: this.auth.profile()?.displayName || user.email || user.uid,
         symbol,
-        interval,
-        replayStart: candles[HISTORY_BARS].time * 1000,
+        interval: timeframe.interval,
+        replayStart,
         startingBalance: replay.startingBalance,
       });
+      this.builders = new Map();
+      this.histories.set({ [timeframe.interval]: history });
+      this.timeframe.set(timeframe);
+      this.replayStart.set(replayStart);
       this.replay.set(replay);
       this.sessionId.set(sessionId);
       this.orderError.set(null);
@@ -225,20 +283,60 @@ export class Practice {
     }
   }
 
-  /** Shows the next candle; ends the session after the last one. */
+  /** Switches the chart's timeframe, loading its history the first time. */
+  protected async setTimeframe(timeframe: Timeframe): Promise<void> {
+    const { interval } = timeframe;
+    if (!this.histories()[interval]) {
+      this.switching.set(interval);
+      try {
+        const history = await this.loadHistory(this.symbol(), timeframe, this.replayStart());
+        this.histories.update((all) => ({ ...all, [interval]: history }));
+      } catch {
+        this.error.set('No se pudo cargar esa temporalidad. Intenta de nuevo.');
+        return;
+      } finally {
+        this.switching.set(null);
+      }
+    }
+    this.timeframe.set(timeframe);
+    if (this.playing()) {
+      this.pause();
+      this.play();
+    }
+  }
+
+  /**
+   * Shows the next bar of the chart's timeframe, minute by minute so orders fill and stops
+   * trigger at the right moment. Waits for data when the loaded minutes run out, and ends the
+   * session after the last one.
+   */
   protected step(): void {
     const replay = this.replay();
     if (!replay || this.phase() !== 'playing') {
       return;
     }
-    const result = replay.step();
-    result?.closed.forEach((trade) => this.persistClose(trade));
-    result?.filled.forEach((trade) => this.persist((id) => this.practice.fillOrder(id, trade)));
-    if (result?.filled.length && !result.closed.length) {
+    const end = nextBarEnd(replay.current().time, this.barSeconds());
+    if (replay.candles.at(-1)!.time < end && !replay.hasAllCandles()) {
+      void this.loadMinutes();
+      return;
+    }
+    const closed: PracticeTrade[] = [];
+    const filled: PracticeTrade[] = [];
+    while (!replay.atEnd() && replay.current().time < end) {
+      const result = replay.step()!;
+      closed.push(...result.closed);
+      filled.push(...result.filled);
+    }
+    // Fills go first: an order can fill and close within the same bar.
+    filled.forEach((trade) => this.persist((id) => this.practice.fillOrder(id, trade)));
+    closed.forEach((trade) => this.persistClose(trade));
+    if (filled.length && !closed.length) {
       this.persist((sessionId) => this.practice.updateSummary(sessionId, this.summary(replay)));
     }
     if (replay.finished()) {
       void this.finish();
+    } else if (replay.candles.length - 1 - replay.cursor() < PREFETCH_MINUTES) {
+      void this.loadMinutes();
     }
   }
 
@@ -264,7 +362,7 @@ export class Practice {
       side: this.side(),
       orderType: this.orderType(),
       price: this.orderPrice(),
-      amount: this.amount(),
+      lots: this.lots(),
       stopLoss: this.stopLoss(),
       takeProfit: this.takeProfit(),
     });
@@ -276,13 +374,13 @@ export class Practice {
     }
   }
 
-  /** One-click market order from the chart, with the ticket's amount and no SL/TP. */
+  /** One-click market order from the chart, with the ticket's size and no SL/TP. */
   protected async quickTrade(side: TradeSide): Promise<void> {
     const placed = await this.place({
       side,
       orderType: 'market',
       price: null,
-      amount: this.amount(),
+      lots: this.lots(),
       stopLoss: null,
       takeProfit: null,
     });
@@ -379,7 +477,9 @@ export class Practice {
 
   protected useFraction(fraction: number): void {
     const available = this.replay()?.available() ?? 0;
-    this.amount.set(Math.floor(available * fraction * 100) / 100);
+    const perLot = marginFor(1, this.reference());
+    const steps = perLot > 0 ? Math.floor((available / perLot / LOT_STEP) * fraction) : 0;
+    this.lots.set(Number((Math.max(1, steps) * LOT_STEP).toFixed(2)));
   }
 
   /** Adds a stop loss or take profit to a position or pending order, ready to drag. */
@@ -457,7 +557,7 @@ export class Practice {
     } catch {
       this.error.set('No se pudo guardar el cierre de la sesión.');
     }
-    this.loadHistory();
+    this.loadSessions();
   }
 
   protected reset(): void {
@@ -475,8 +575,30 @@ export class Practice {
     return tradePnl(trade, replay.current().close);
   }
 
-  protected tradeAmount(trade: PracticeTrade): number {
-    return trade.quantity * trade.entryPrice;
+  /** The × on a chart label: closes a position or cancels a pending order. */
+  protected onTradeClosed(id: string): void {
+    const trade = this.replay()
+      ?.trades()
+      .find((t) => t.id === id);
+    if (trade?.status === 'open') {
+      this.closeTrade(trade);
+    } else if (trade?.status === 'pending') {
+      this.cancelOrder(trade);
+    }
+  }
+
+  /** The × on a stop loss or take profit label. */
+  protected onLevelRemoved({ target, field }: LevelRemove): void {
+    if (target === 'draft') {
+      this.setLevel(field, null);
+      return;
+    }
+    const trade = this.replay()
+      ?.trades()
+      .find((t) => t.id === target);
+    if (trade) {
+      this.setTradeLevel(trade, field, null);
+    }
   }
 
   protected onKey(event: KeyboardEvent): void {
@@ -486,6 +608,42 @@ export class Practice {
       event.preventDefault();
       this.step();
     }
+  }
+
+  /** Fetches the next chunk of one-minute candles, up to `REPLAY_DAYS` after the start. */
+  private async loadMinutes(): Promise<void> {
+    const replay = this.replay();
+    if (!replay || this.loadingMinutes || replay.hasAllCandles()) {
+      return;
+    }
+    this.loadingMinutes = true;
+    try {
+      const from = (replay.candles.at(-1)!.time + 60) * 1000;
+      const limit = this.replayStart() + REPLAY_DAYS * 24 * 60 * MINUTE;
+      const more = await this.market.loadCandles(this.symbol(), '1m', from);
+      const within = more.filter((c) => c.time * 1000 < limit);
+      replay.extend(within, more.length < REPLAY_BARS || within.length < more.length);
+    } catch {
+      this.pause();
+      this.error.set('No se pudieron cargar más velas del mercado. Revisa tu conexión.');
+    } finally {
+      this.loadingMinutes = false;
+    }
+  }
+
+  /** The `HISTORY_BARS` bars of a timeframe before the replay starts. */
+  private async loadHistory(
+    symbol: string,
+    timeframe: Timeframe,
+    replayStart: number,
+  ): Promise<Candle[]> {
+    const bars = await this.market.loadCandles(
+      symbol,
+      timeframe.interval,
+      replayStart - HISTORY_BARS * timeframe.ms,
+      HISTORY_BARS,
+    );
+    return bars.filter((c) => c.time * 1000 < replayStart);
   }
 
   private play(): void {
@@ -535,7 +693,7 @@ export class Practice {
     };
   }
 
-  private loadHistory(): void {
+  private loadSessions(): void {
     const uid = this.auth.user()?.uid;
     if (uid) {
       this.practice

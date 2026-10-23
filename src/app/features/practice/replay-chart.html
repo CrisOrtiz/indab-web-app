@@ -1,0 +1,79 @@
+@if (tools()) {
+  <div class="tools" role="toolbar" aria-label="Herramientas del gráfico">
+    @for (indicator of indicators; track indicator.id) {
+      <button
+        type="button"
+        [class.on]="active().has(indicator.id)"
+        [attr.aria-pressed]="active().has(indicator.id)"
+        (click)="toggleIndicator(indicator.id)"
+      >
+        <span class="swatch" [style.background]="indicator.color"></span>{{ indicator.label }}
+      </button>
+    }
+    <span class="sep"></span>
+    <button
+      type="button"
+      [class.on]="tool() === 'hline'"
+      [attr.aria-pressed]="tool() === 'hline'"
+      (click)="pick('hline')"
+    >
+      Línea horizontal
+    </button>
+    <button
+      type="button"
+      [class.on]="tool() === 'trend'"
+      [attr.aria-pressed]="tool() === 'trend'"
+      (click)="pick('trend')"
+    >
+      Línea de tendencia
+    </button>
+    <button type="button" [disabled]="!drawings().length" (click)="clearDrawings()">
+      Borrar dibujos
+    </button>
+  </div>
+}
+<div class="stage" #stage>
+  <div class="canvas" #canvas></div>
+  @for (label of labels(); track label.key) {
+    <div
+      class="line-label"
+      [class.draggable]="!!label.line.drag"
+      [style.top.px]="label.y"
+      [style.right.px]="scaleWidth() + 12"
+      [style.border-color]="label.color"
+      (pointerdown)="grab(label, $event)"
+    >
+      @if (label.text) {
+        <span class="text" [style.color]="label.color">{{ label.text }}</span>
+      }
+      @if (label.pnl !== null) {
+        <span class="pnl" [class.up]="label.pnl > 0" [class.down]="label.pnl < 0">
+          {{ signed(label.pnl) }} USD
+        </span>
+      }
+      @if (label.action; as action) {
+        <button
+          type="button"
+          class="x"
+          [attr.aria-label]="action.label"
+          (pointerdown)="$event.stopPropagation()"
+          (click)="act(action)"
+        >
+          ×
+        </button>
+      }
+    </div>
+  }
+  @if (tool(); as current) {
+    <p class="tool-hint" role="status">
+      {{
+        current === 'hline'
+          ? 'Haz clic en el gráfico para poner la línea.'
+          : anchor()
+            ? 'Haz clic en el segundo punto.'
+            : 'Haz clic en el primer punto de la línea.'
+      }}
+    </p>
+  }
+  <ng-content />
+</div>

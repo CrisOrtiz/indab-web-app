@@ -91,7 +91,11 @@
               <td colspan="8">
                 @if (candles(); as candles) {
                   @if (candles.length) {
-                    <app-replay-chart [candles]="candles" [trades]="trades() ?? []" />
+                    <app-replay-chart
+                      [candles]="candles"
+                      [trades]="trades() ?? []"
+                      [barSeconds]="barSeconds()"
+                    />
                   } @else {
                     <p class="muted">No se pudo cargar el gráfico del mercado.</p>
                   }
@@ -105,7 +109,7 @@
                         <th>Operación</th>
                         <th>Apertura</th>
                         <th>Entrada</th>
-                        <th>Monto</th>
+                        <th>Lotes</th>
                         <th>SL / TP</th>
                         <th>Cierre</th>
                         <th>Salida</th>
@@ -119,7 +123,7 @@
                           <td>{{ orderLabel(t) }}</td>
                           <td>{{ t.entryTime * 1000 | date: 'd MMM y, HH:mm' : 'UTC' }}</td>
                           <td>{{ t.entryPrice | number: priceDigits(t.entryPrice) }}</td>
-                          <td>{{ t.quantity * t.entryPrice | number: '1.2-2' }}</td>
+                          <td>{{ t.quantity / lotSize | number: '1.2-4' }}</td>
                           <td>{{ t.stopLoss ?? '—' }} / {{ t.takeProfit ?? '—' }}</td>
                           @if (t.status === 'closed') {
                             <td>{{ t.exitTime! * 1000 | date: 'd MMM y, HH:mm' : 'UTC' }}</td>

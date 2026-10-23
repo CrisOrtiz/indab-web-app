@@ -360,6 +360,14 @@ describe('trading practice', () => {
     await assertFails(create({ grade: 'A' }));
   });
 
+  it('accepts sessions on every practice timeframe', async () => {
+    for (const interval of ['1m', '3m', '5m', '15m', '1h', '4h']) {
+      await assertSucceeds(
+        setDoc(sessionRef('enrolled', `tf-${interval}`), session('enrolled', { interval })),
+      );
+    }
+  });
+
   it('keeps sessions private to their owner and admins', async () => {
     await assertSucceeds(getDoc(sessionRef('enrolled')));
     await assertSucceeds(getDoc(sessionRef('admin')));
@@ -508,6 +516,11 @@ describe('trading practice', () => {
     await assertSucceeds(updateDoc(tradeRef('enrolled'), close({ exitReason: 'stopLoss' })));
     await assertFails(updateDoc(tradeRef('enrolled'), close({ pnl: 5000 })));
     await assertFails(updateDoc(tradeRef('enrolled'), { stopLoss: 47000 }));
+  });
+
+  it('closes a trade on a margin stop out', async () => {
+    await assertSucceeds(setDoc(tradeRef('enrolled', 't2'), trade('enrolled')));
+    await assertSucceeds(updateDoc(tradeRef('enrolled', 't2'), close({ exitReason: 'stopOut' })));
   });
 });
 

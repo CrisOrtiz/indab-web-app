@@ -4,6 +4,7 @@ export const EXIT_REASONS: Record<TradeExitReason, string> = {
   manual: 'Manual',
   stopLoss: 'Stop loss',
   takeProfit: 'Take profit',
+  stopOut: 'Stop out (margen)',
   sessionEnd: 'Fin de sesión',
 };
 
@@ -12,6 +13,11 @@ export const ORDER_TYPES: Record<OrderType, string> = {
   limit: 'Límite',
   stop: 'Stop',
 };
+
+/** Lots with two decimals, as brokers size gold orders: "0.05". */
+export function formatLots(lots: number): string {
+  return lots.toFixed(2);
+}
 
 /** "Compra", "Venta límite", "Compra stop"... */
 export function orderLabel(trade: Pick<PracticeTrade, 'side' | 'orderType'>): string {

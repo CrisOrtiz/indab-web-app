@@ -13,6 +13,7 @@ import { PracticeReview } from './practice-review';
 class FakeChart {
   readonly candles = input<Candle[]>([]);
   readonly trades = input<unknown[]>([]);
+  readonly barSeconds = input(0);
 }
 
 const candle: Candle = { time: 1_620_000_000, open: 1, high: 2, low: 0.5, close: 1.5 };
@@ -133,6 +134,7 @@ describe('PracticeReview', () => {
     );
     expect(chart()?.candles()).toEqual([candle]);
     expect(chart()?.trades()).toHaveLength(2);
+    expect(chart()?.barSeconds()).toBe(3600);
     const detail = el.querySelector('.detail')!;
     expect(detail.textContent).toContain('Take profit');
     expect(detail.textContent).toContain('52,500.00');

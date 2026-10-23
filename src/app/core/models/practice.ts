@@ -13,7 +13,7 @@ export type TradeSide = 'long' | 'short';
 /** `market` fills at once; `limit` and `stop` wait in the book until a candle reaches `orderPrice`. */
 export type OrderType = 'market' | 'limit' | 'stop';
 export type TradeStatus = 'pending' | 'open' | 'closed' | 'cancelled';
-export type TradeExitReason = 'manual' | 'stopLoss' | 'takeProfit' | 'sessionEnd';
+export type TradeExitReason = 'manual' | 'stopLoss' | 'takeProfit' | 'stopOut' | 'sessionEnd';
 
 /**
  * Stored at `practiceSessions/{id}`: one chart replay by one student. Created by the student

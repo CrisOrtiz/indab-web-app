@@ -1,14 +1,16 @@
 import { vi } from 'vitest';
 import {
+  HISTORY_BARS,
   INSTRUMENTS,
   MarketDataService,
   REPLAY_BARS,
-  TIMEFRAMES,
+  REPLAY_DAYS,
+  intervalMs,
   parseKlines,
-  randomWindowStart,
+  randomReplayStart,
 } from './market-data.service';
 
-const hour = TIMEFRAMES.find((t) => t.interval === '1h')!;
+const HOUR = 3_600_000;
 const gold = INSTRUMENTS[0];
 
 describe('parseKlines', () => {
@@ -19,16 +21,24 @@ describe('parseKlines', () => {
   });
 });
 
-describe('randomWindowStart', () => {
+describe('randomReplayStart', () => {
   const now = Date.UTC(2026, 9, 1);
 
-  it('stays between the listing date and the last full window, aligned to the timeframe', () => {
-    const first = randomWindowStart(gold, hour, now, () => 0);
-    const last = randomWindowStart(gold, hour, now, () => 0.999999);
-    expect(first).toBeGreaterThanOrEqual(gold.listedAt);
-    expect(last + REPLAY_BARS * hour.ms).toBeLessThanOrEqual(now);
-    expect(last % hour.ms).toBe(0);
-    expect(randomWindowStart(gold, hour, now, () => 0.5) % hour.ms).toBe(0);
+  it('leaves room for the history and a full replay, on a 4-hour boundary', () => {
+    const first = randomReplayStart(gold, now, () => 0);
+    const last = randomReplayStart(gold, now, () => 0.999999);
+    expect(first - HISTORY_BARS * 4 * HOUR).toBeGreaterThanOrEqual(gold.listedAt);
+    expect(last + REPLAY_DAYS * 24 * HOUR).toBeLessThanOrEqual(now);
+    expect(last % (4 * HOUR)).toBe(0);
+    expect(randomReplayStart(gold, now, () => 0.5) % (4 * HOUR)).toBe(0);
+  });
+});
+
+describe('intervalMs', () => {
+  it('knows the practice timeframes and the daily bars of older sessions', () => {
+    expect(intervalMs('3m')).toBe(180_000);
+    expect(intervalMs('1d')).toBe(24 * HOUR);
+    expect(intervalMs('2w')).toBeNull();
   });
 });
 
@@ -42,6 +52,8 @@ describe('MarketDataService', () => {
     const fetch = vi.fn(async (_url: string) => new Response(JSON.stringify(rows)));
     vi.stubGlobal('fetch', fetch);
     const candles = await service.loadCandles('PAXGUSDT', '4h', 123);
+    await service.loadCandles('PAXGUSDT', '15m', 456, 150);
+    expect(new URL(fetch.mock.calls[1][0]).searchParams.get('limit')).toBe('150');
     expect(candles).toHaveLength(1);
     const url = new URL(fetch.mock.calls[0][0]);
     expect(url.origin).toBe('https://data-api.binance.vision');
