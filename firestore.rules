@@ -1,7 +1,8 @@
 rules_version = '2';
 
 // Data model
-//   users/{uid}                          profile; created by the user, role changes by admins only
+//   users/{uid}                          profile; created by the user, who edits displayName and
+//                                        photoURL (a small data: URL image); role changes by admins only
 //   enrollments/{uid}                    { academy: bool, courses: [courseId], updatedAt, updatedBy };
 //                                        admin-managed from the /admin area
 //   courses/{courseId}                   course catalog; published courses are public
@@ -63,16 +64,25 @@ service cloud.firestore {
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() <= 80;
 
-      // Admins can change a user's role (never their own). Users can edit their own profile
-      // but never their role or identity fields.
+      // The profile photo is a small image stored inline (no Cloud Storage bucket needed).
+      function validPhoto(data) {
+        return !('photoURL' in data)
+          || (data.photoURL is string
+            && data.photoURL.size() <= 100000
+            && data.photoURL.matches('data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+'));
+      }
+
+      // Admins can change a user's role (never their own). Users can edit their own name and
+      // photo but never their role or identity fields.
       allow update: if (isAdmin()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
           && request.resource.data.role in ['student', 'admin']
           && !isOwner(uid))
         || (isOwner(uid)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL'])
           && request.resource.data.displayName is string
-          && request.resource.data.displayName.size() <= 80);
+          && request.resource.data.displayName.size() <= 80
+          && validPhoto(request.resource.data));
 
       allow delete: if isAdmin();
     }

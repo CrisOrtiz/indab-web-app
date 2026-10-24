@@ -9,7 +9,8 @@ export async function signIn(page: Page, email: string, path = '/login'): Promis
 }
 
 export async function signOut(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Cerrar sesión' }).click();
+  await page.getByRole('button', { name: 'Tu cuenta' }).click();
+  await page.getByRole('menuitem', { name: 'Cerrar sesión' }).click();
   await expect(page).toHaveURL('/');
 }
 

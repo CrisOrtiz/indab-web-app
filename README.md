@@ -171,7 +171,7 @@ The service account needs the *Firebase Admin* and *Service Usage Consumer* role
 
 | Collection | Who can read | Who can write |
 | --- | --- | --- |
-| `users/{uid}` | owner, admins | owner creates as `student` and edits `displayName`; admins change `role` (not their own) |
+| `users/{uid}` | owner, admins | owner creates as `student` and edits `displayName` and `photoURL` (an inline JPEG/PNG/WebP `data:` URL up to 100,000 characters); admins change `role` (not their own) |
 | `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, admins | admins |
 | `courses/{id}` | everyone if `published`, admins | admins |
 | `courses/{id}/lessons/{id}` | users enrolled in that course or with academy access | admins |
@@ -194,6 +194,7 @@ the rules are what actually protect the data. Anything not listed is denied.
 | `/` landing, `/eleva` | public |
 | `/login`, `/register` | signed-out visitors |
 | `/academy` | signed-in users (shows "pending" until enrolled) |
+| `/profile` | signed-in users (photo, name, password, language, practice P/L; opened from the avatar menu in the header) |
 | `/academy/material` | enrolled users (learning material, opened from the academy; `/repository` redirects here) |
 | `/academy/practice` | enrolled users (chart-replay trading practice) |
 | `/admin` | admins (users, roles, academy access) |

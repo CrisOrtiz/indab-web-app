@@ -15,6 +15,11 @@ const keys: Record<string, keyof AuthErrors> = {
   'auth/too-many-requests': 'tooManyRequests',
   'auth/popup-closed-by-user': 'popupClosed',
   'auth/network-request-failed': 'network',
+  // Profile page: linking or changing a password.
+  'auth/missing-password': 'invalidCredentials',
+  'auth/requires-recent-login': 'recentLogin',
+  'auth/credential-already-in-use': 'credentialInUse',
+  'auth/provider-already-linked': 'alreadyLinked',
 };
 
 /** Maps a Firebase Auth error to a message the user can act on, in `messages`' language. */
