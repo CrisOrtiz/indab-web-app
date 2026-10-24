@@ -253,14 +253,31 @@ export const en: Messages = {
   },
 
   academy: {
+    eyebrow: 'INDAB Academy',
     hello: (name: string) => `Hi, ${name}`,
-    welcome: 'Welcome to the academy.',
-    material: 'See study material',
-    practice: 'Trading practice',
-    ranking: 'Evaluation ranking',
-    calendar: 'Economic calendar',
+    welcome: 'Welcome to the academy. What would you like to do today?',
     pending:
       'Your enrollment is pending. Once the INDAB team activates it, your courses will show up here.',
+    cards: {
+      material: {
+        title: 'Study material',
+        text: 'Guides, videos and readings to learn at your own pace.',
+      },
+      practice: {
+        title: 'Trading practice',
+        text: 'Trade gold candle by candle with a 200 USD demo account.',
+      },
+      ranking: {
+        title: 'Evaluation ranking',
+        text: 'See how you did in evaluations against the group.',
+      },
+      calendar: {
+        title: 'Economic calendar',
+        text: "This week's news that moves the market.",
+      },
+    },
+    open: 'Open',
+    locked: 'Unlocks with your enrollment',
     back: '← Academy',
   },
 

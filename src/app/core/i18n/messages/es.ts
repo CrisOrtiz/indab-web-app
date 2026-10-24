@@ -250,14 +250,31 @@ export const es = {
   },
 
   academy: {
+    eyebrow: 'Academia INDAB',
     hello: (name: string) => `Hola, ${name}`,
-    welcome: 'Bienvenido a la academia.',
-    material: 'Ver material de estudio',
-    practice: 'Práctica de trading',
-    ranking: 'Ranking de evaluaciones',
-    calendar: 'Calendario económico',
+    welcome: 'Bienvenido a la academia. ¿Qué quieres hacer hoy?',
     pending:
       'Tu inscripción está pendiente. Cuando el equipo de INDAB la active, verás aquí tus cursos.',
+    cards: {
+      material: {
+        title: 'Material de estudio',
+        text: 'Guías, videos y lecturas para aprender a tu ritmo.',
+      },
+      practice: {
+        title: 'Práctica de trading',
+        text: 'Opera el oro vela a vela con 200 USD de cuenta demo.',
+      },
+      ranking: {
+        title: 'Ranking de evaluaciones',
+        text: 'Mira cómo te fue en las evaluaciones frente al grupo.',
+      },
+      calendar: {
+        title: 'Calendario económico',
+        text: 'Las noticias de la semana que mueven el mercado.',
+      },
+    },
+    open: 'Entrar',
+    locked: 'Se habilita con tu inscripción',
     back: '← Academia',
   },
 

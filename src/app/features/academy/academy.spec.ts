@@ -28,16 +28,26 @@ describe('Academy', () => {
     expect(el.textContent).toContain('Tu inscripción está pendiente.');
     expect(el.querySelector('a[href="/academy/material"]')).toBeNull();
     expect(el.querySelector('a[href="/academy/practice"]')).toBeNull();
+    // The sections still show, locked, so students see what is coming.
+    expect(el.querySelectorAll('.card.locked')).toHaveLength(4);
+    expect(el.textContent).toContain('Se habilita con tu inscripción');
   });
 
-  it('links to the material with academy access', async () => {
+  it('shows a card for each section with academy access', async () => {
     auth.hasAcademyAccess.set(true);
     auth.profile.set(null);
     const el = await render();
     expect(el.querySelector('h1')?.textContent).toContain('Hola, ana@indab.co');
-    expect(el.querySelector('a[href="/academy/material"]')).not.toBeNull();
-    expect(el.querySelector('a[href="/academy/practice"]')?.textContent).toContain(
-      'Práctica de trading',
-    );
+    const links = [...el.querySelectorAll('a.card')].map((a) => a.getAttribute('href'));
+    expect(links).toEqual([
+      '/academy/material',
+      '/academy/practice',
+      '/academy/ranking',
+      '/academy/calendar',
+    ]);
+    const practice = el.querySelector('a[href="/academy/practice"]');
+    expect(practice?.querySelector('h2')?.textContent).toBe('Práctica de trading');
+    expect(practice?.textContent).toContain('200 USD');
+    expect(el.querySelector('.locked')).toBeNull();
   });
 });

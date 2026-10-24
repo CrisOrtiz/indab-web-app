@@ -65,7 +65,7 @@ test('granting academy access opens the material to the student', async ({ page 
   await signOut(page);
   await signIn(page, 'luis@indab.test');
   await expect(page.getByText('Bienvenido a la academia.')).toBeVisible();
-  await page.getByRole('link', { name: 'Ver material de estudio' }).click();
+  await page.getByRole('link', { name: 'Material de estudio' }).click();
   await expect(page).toHaveURL('/academy/material');
 });
 
