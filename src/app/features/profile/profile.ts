@@ -1,17 +1,25 @@
-import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n, LANGUAGES, Language } from '../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../core/i18n/local-date.pipe';
 import { PracticeSession } from '../../core/models/practice';
+import { DeviceSession } from '../../core/models/user-profile';
 import { Avatar } from '../../shared/avatar/avatar';
 import { PhotoError } from '../../shared/avatar/resize-image';
+import {
+  MIN_BIRTH_DATE,
+  detailsForm,
+  detailsValue,
+  today,
+} from '../../shared/personal-details/personal-details';
 import { authErrorMessage } from '../auth/auth-errors';
 import { signedMoney } from '../practice/practice-format';
 import { PracticeService } from '../practice/practice.service';
 import { summarizePractice } from './practice-summary';
 import { ProfileService, signInMethods } from './profile.service';
+import { SessionsService, openSessions } from './sessions.service';
 
 /** How many of the latest practice sessions the summary covers. */
 export const PRACTICE_SESSIONS = 50;
@@ -19,10 +27,13 @@ export const PRACTICE_SESSIONS = 50;
 /** How many sessions the "latest" list shows. */
 const RECENT_SESSIONS = 5;
 
-type Section = 'photo' | 'name' | 'password';
+type Section = 'photo' | 'name' | 'password' | 'sessions';
 type Status = { kind: 'error' | 'notice'; text: string };
 
-/** `/profile`: the signed-in user's photo, name, password, language and practice results. */
+/**
+ * `/profile`: the signed-in user's photo, name and details, password, open sessions, language
+ * and practice results.
+ */
 @Component({
   selector: 'app-profile',
   imports: [ReactiveFormsModule, RouterLink, Avatar, LocalDatePipe],
@@ -34,7 +45,10 @@ export class Profile {
   protected readonly i18n = inject(I18n);
   private readonly profiles = inject(ProfileService);
   private readonly practice = inject(PracticeService);
+  private readonly devices = inject(SessionsService);
   private readonly fb = inject(FormBuilder).nonNullable;
+  private readonly destroyRef = inject(DestroyRef);
+  private destroyed = false;
 
   protected readonly languages = LANGUAGES;
   protected readonly signed = signedMoney;
@@ -69,7 +83,11 @@ export class Profile {
 
   protected readonly nameForm = this.fb.group({
     displayName: ['', [Validators.required, Validators.maxLength(80)]],
+    details: detailsForm(),
   });
+  protected readonly details = this.nameForm.controls.details;
+  protected readonly minBirthDate = MIN_BIRTH_DATE;
+  protected readonly maxBirthDate = today();
   protected readonly passwordForm = this.fb.group({
     current: [''],
     password: ['', [Validators.required, Validators.minLength(6)]],
@@ -83,17 +101,38 @@ export class Profile {
   protected readonly recent = computed(() => (this.sessions() ?? []).slice(0, RECENT_SESSIONS));
   protected readonly maxSessions = PRACTICE_SESSIONS;
 
+  /** Browsers the account is signed in on, this one first; null while loading. */
+  private readonly deviceSessions = signal<DeviceSession[] | null>(null);
+  protected readonly sessionsFailed = signal(false);
+  protected readonly openSessions = computed(() => {
+    const all = this.deviceSessions();
+    if (!all) {
+      return null;
+    }
+    const current = this.auth.sessionId();
+    return openSessions(all).sort((a, b) => Number(b.id === current) - Number(a.id === current));
+  });
+  protected readonly otherSessions = computed(() =>
+    (this.openSessions() ?? []).filter((s) => s.id !== this.auth.sessionId()),
+  );
+
   constructor() {
-    // Fill the name once the profile loads, without overwriting what the user is typing.
+    // Fill the form once the profile loads, without overwriting what the user is typing.
     effect(() => {
-      const name = this.auth.profile()?.displayName ?? this.auth.user()?.displayName ?? '';
+      const profile = this.auth.profile();
+      const name = profile?.displayName ?? this.auth.user()?.displayName ?? '';
       untracked(() => {
         if (!this.nameForm.dirty) {
-          this.nameForm.setValue({ displayName: name });
+          this.nameForm.setValue({
+            displayName: name,
+            details: { birthDate: profile?.birthDate ?? '', whatsapp: profile?.whatsapp ?? '' },
+          });
         }
       });
     });
+    this.destroyRef.onDestroy(() => (this.destroyed = true));
     this.loadPractice();
+    this.watchSessions();
   }
 
   protected async changePhoto(input: HTMLInputElement): Promise<void> {
@@ -120,10 +159,25 @@ export class Profile {
       this.nameForm.markAllAsTouched();
       return;
     }
-    await this.run('name', this.i18n.messages().profile.nameSaved, async () => {
-      await this.profiles.updateDisplayName(control.value);
+    await this.run('name', this.i18n.messages().profile.detailsSaved, async () => {
+      await this.profiles.updatePersonal(control.value, detailsValue(this.details));
       this.nameForm.markAsPristine();
     });
+  }
+
+  protected signOutSession(id: string): Promise<void> {
+    const uid = this.auth.user()!.uid;
+    return this.run('sessions', this.i18n.messages().profile.sessionSignedOut, () =>
+      this.devices.signOut(uid, id),
+    );
+  }
+
+  protected signOutOthers(): Promise<void> {
+    const uid = this.auth.user()!.uid;
+    const ids = this.otherSessions().map((s) => s.id);
+    return this.run('sessions', this.i18n.messages().profile.othersSignedOut, () =>
+      this.devices.signOutAll(uid, ids),
+    );
   }
 
   protected async savePassword(): Promise<void> {
@@ -173,6 +227,30 @@ export class Profile {
       this.practiceFailed.set(true);
       this.sessions.set([]);
     }
+  }
+
+  private async watchSessions(): Promise<void> {
+    await this.auth.whenReady();
+    const uid = this.auth.user()?.uid;
+    if (!uid || this.destroyed) {
+      return;
+    }
+    let pruned = false;
+    const stop = this.devices.watch(
+      uid,
+      (sessions) => {
+        this.deviceSessions.set(sessions);
+        if (!pruned) {
+          pruned = true;
+          this.devices.prune(uid, sessions).catch(() => undefined);
+        }
+      },
+      () => {
+        this.sessionsFailed.set(true);
+        this.deviceSessions.set([]);
+      },
+    );
+    this.destroyRef.onDestroy(stop);
   }
 
   private async run(section: Section, done: string, action: () => Promise<void>): Promise<void> {

@@ -4,6 +4,7 @@ import {
   enrolledGuard,
   guestGuard,
   preloadFirestore,
+  setupGuard,
   staffGuard,
 } from './core/auth/auth.guards';
 import { SeoData } from './core/seo/seo.service';
@@ -42,6 +43,14 @@ export const routes: Routes = [
   },
 
   // Signed-in users
+  {
+    // Confirming the email and the details asked at registration; the other guards send here.
+    path: 'account-setup',
+    title: 'accountSetup',
+    canActivate: [setupGuard],
+    loadComponent: () =>
+      import('./features/account-setup/account-setup').then((m) => m.AccountSetup),
+  },
   {
     path: 'academy',
     title: 'academy',

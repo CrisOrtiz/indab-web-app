@@ -86,11 +86,20 @@ export async function uidOf(email: string): Promise<string> {
   return users[0].localId;
 }
 
-/** Creates an account with its profile, as the app would after registration. */
+/**
+ * Creates an account with its profile, as the app would after registration and once the email
+ * is confirmed. `verified: false` leaves the email unconfirmed; `birthDate: null` leaves it out
+ * (as for older and Google accounts).
+ */
 export async function createUser(
   displayName: string,
   email: string,
-  options: { role?: 'student' | 'trainer' | 'admin'; academy?: boolean } = {},
+  options: {
+    role?: 'student' | 'trainer' | 'admin';
+    academy?: boolean;
+    verified?: boolean;
+    birthDate?: string | null;
+  } = {},
 ): Promise<string> {
   const { localId: uid } = await request(
     `${authUrl}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-api-key`,
@@ -100,12 +109,24 @@ export async function createUser(
       body: JSON.stringify({ email, password: PASSWORD, displayName }),
     },
   );
+  if (options.verified !== false) {
+    await request(
+      `${authUrl}/identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:update`,
+      {
+        method: 'POST',
+        headers: { ...owner, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ localId: uid, emailVerified: true }),
+      },
+    );
+  }
+  const birthDate = options.birthDate === undefined ? '1990-05-15' : options.birthDate;
   await setDocument(`users/${uid}`, {
     uid,
     email,
     displayName,
     role: options.role ?? 'student',
     createdAt: new Date(),
+    ...(birthDate ? { birthDate } : {}),
   });
   if (options.academy !== undefined) {
     await setDocument(`enrollments/${uid}`, {
@@ -115,4 +136,15 @@ export async function createUser(
     });
   }
   return uid;
+}
+
+/** Opens the email confirmation link the Auth emulator "sent" to this address. */
+export async function confirmEmail(email: string): Promise<void> {
+  const { oobCodes = [] } = await request(`${authUrl}/emulator/v1/projects/${projectId}/oobCodes`);
+  const code = oobCodes
+    .filter((c: { email: string; requestType: string }) => c.email === email)
+    .findLast((c: { requestType: string }) => c.requestType === 'VERIFY_EMAIL');
+  if (!code) throw new Error(`No confirmation email for ${email}`);
+  const response = await fetch(code.oobLink);
+  if (!response.ok) throw new Error(`Confirming ${email} failed: ${response.status}`);
 }

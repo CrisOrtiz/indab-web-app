@@ -51,24 +51,30 @@ otherwise create a feature service.
 
 ## Access model
 
-| Collection | Read | Write |
-| --- | --- | --- |
-| `users/{uid}` | owner, staff | owner creates as `student`, edits `displayName` and `photoURL`; admins change `role` (`student`/`trainer`/`admin`) of others only |
-| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, staff | admins (shape validated) |
-| `courses/{id}` | everyone if `published`, admins | admins |
-| `courses/{id}/lessons/{id}` | enrolled in course or academy access | admins |
-| `materials/{id}` | academy access | admins |
-| `investors/{uid}` (Eleva) | owner, admins | admins |
-| `evaluations/{id}` | staff, assigned students | staff (shape validated) |
-| `practiceSessions/{id}` + `/trades/{id}` | owner, staff; attempts at published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
+| Collection                                                       | Read                                                                        | Write                                                                                                                                                     |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users/{uid}`                                                    | owner, staff                                                                | owner creates as `student`, edits `displayName`, `photoURL`, `birthDate`, `whatsapp`; admins change `role` (`student`/`trainer`/`admin`) of others only   |
+| `users/{uid}/sessions/{id}`                                      | owner                                                                       | each browser records itself; owner sets `revoked` once, deletes; admins delete                                                                            |
+| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, staff                                                                | admins (shape validated)                                                                                                                                  |
+| `courses/{id}`                                                   | everyone if `published`, admins                                             | admins                                                                                                                                                    |
+| `courses/{id}/lessons/{id}`                                      | enrolled in course or academy access                                        | admins                                                                                                                                                    |
+| `materials/{id}`                                                 | academy access                                                              | admins                                                                                                                                                    |
+| `investors/{uid}` (Eleva)                                        | owner, admins                                                               | admins                                                                                                                                                    |
+| `evaluations/{id}`                                               | staff, assigned students                                                    | staff (shape validated)                                                                                                                                   |
+| `practiceSessions/{id}` + `/trades/{id}`                         | owner, staff; attempts at published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
 
 Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`, `isStaff()`
-(trainers and admins), `hasAcademyAccess()` (staff count as having it), `isEnrolledIn(courseId)`.
+(trainers and admins), `emailVerified()`, `hasAcademyAccess()` (staff count as having it; needs
+a verified email), `isEnrolledIn(courseId)`. Tests sign in with `email_verified: true` unless
+they pass `as(uid, false)`.
 Everything not matched is denied. Trainers run evaluations and review practice; anything about
 users, access or deleting practice stays admin-only.
 
 Guards in `src/app/core/auth/auth.guards.ts`: `authGuard` (signed in), `guestGuard`
 (signed out), `enrolledGuard` (academy access), `staffGuard` (trainer or admin), `adminGuard` (admin role).
+All but `guestGuard` first send users with an `AuthService.setupStep()` (`verifyEmail`, then
+`details` while `users/{uid}.birthDate` is missing) to `/account-setup` (`setupGuard`); a new
+guarded page gets that for free. E2e `createUser()` seeds verified users with a birth date.
 `AuthService.isStaff()` mirrors `isStaff()`. Guards are UX only; the rules are the security.
 Users can never grant themselves a role, enrollment or investor data from the client.
 
@@ -208,6 +214,14 @@ Module notes:
 - **Eleva (`/eleva`, investor area)**: the public page stays unguarded. Investor data lives in
   `investors/{uid}` and subcollections (e.g. `investors/{uid}/statements/{month}`), admin-written,
   owner-read. Financial figures are never computed or written by the client.
+- **Account setup and sessions (built)**: registration asks for the birth date (required) and
+  WhatsApp (optional, stored as `+digits`); validators and helpers in `shared/personal-details`
+  (each form shows the fields itself so its styles apply). `AuthService` sends the confirmation
+  email and `checkEmailVerified()` reloads the user and refreshes the ID token (the rules read the
+  flag from it). `core/auth/session-tracker.ts` (lazy, with Firestore) records each browser in
+  `users/{uid}/sessions` (id kept in `localStorage`), signs it out when it sees `revoked`
+  (`/login?ended=1`) and deletes it on sign-out; `/profile` lists them (`SessionsService`).
+  Revoking only asks that browser to sign out: Cris wants $0, so no Admin SDK token revocation.
 - **Profile (`/profile`, built)**: `features/profile/`, opened from the avatar menu in the header
   (`shared/layout/header`, avatar in `shared/avatar`). The photo is resized in the browser
   (`resizeImage`, 192 px JPEG) and stored inline as `users/{uid}.photoURL`, so no Cloud Storage

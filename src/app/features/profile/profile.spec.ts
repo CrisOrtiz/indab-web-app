@@ -8,6 +8,8 @@ import { PracticeSession } from '../../core/models/practice';
 import { PracticeService } from '../practice/practice.service';
 import { PRACTICE_SESSIONS, Profile } from './profile';
 import { ProfileService } from './profile.service';
+import { SessionsService } from './sessions.service';
+import { DeviceSession } from '../../core/models/user-profile';
 
 import { PhotoError } from '../../shared/avatar/resize-image';
 
@@ -35,11 +37,12 @@ describe('Profile', () => {
     profile: signal<Record<string, unknown> | null>(null),
     isAdmin: signal(false),
     hasAcademyAccess: signal(false),
+    sessionId: signal<string | null>('here'),
     whenReady: () => Promise.resolve(),
     sendPasswordReset: vi.fn(async (_email: string) => undefined),
   };
   const profiles = {
-    updateDisplayName: vi.fn(async (_name: string) => undefined),
+    updatePersonal: vi.fn(async (_name: string, _details: unknown) => undefined),
     uploadPhoto: vi.fn(async (_file: File) => undefined),
     removePhoto: vi.fn(async () => undefined),
     setPassword: vi.fn(async (_password: string) => undefined),
@@ -48,6 +51,27 @@ describe('Profile', () => {
   const practice = {
     mySessions: vi.fn(async (_uid: string, _max: number) => [] as PracticeSession[]),
   };
+  const devices = {
+    next: null as ((sessions: DeviceSession[]) => void) | null,
+    stop: vi.fn(),
+    watch: vi.fn((_uid: string, next: (sessions: DeviceSession[]) => void) => {
+      devices.next = next;
+      return devices.stop;
+    }),
+    signOut: vi.fn(async (_uid: string, _id: string) => undefined),
+    signOutAll: vi.fn(async (_uid: string, _ids: string[]) => undefined),
+    prune: vi.fn(async () => undefined),
+  };
+  const device = (id: string, extra: Partial<DeviceSession> = {}) =>
+    ({
+      id,
+      browser: 'Chrome',
+      os: 'Windows',
+      mobile: false,
+      revoked: false,
+      lastSeen: { toDate: () => new Date(), toMillis: () => Date.now() },
+      ...extra,
+    }) as DeviceSession;
 
   const session = (id: string, pnl: number, tradeCount: number, status = 'finished') =>
     ({
@@ -81,6 +105,7 @@ describe('Profile', () => {
         { provide: AuthService, useValue: auth },
         { provide: ProfileService, useValue: profiles },
         { provide: PracticeService, useValue: practice },
+        { provide: SessionsService, useValue: devices },
       ],
     });
     const fixture = TestBed.createComponent(Profile);
@@ -172,21 +197,85 @@ describe('Profile', () => {
     );
   });
 
-  it('edits the name', async () => {
+  it('edits the name and details', async () => {
+    auth.profile.update((p) => ({ ...p, birthDate: '1995-04-30' }));
     const { el, stable } = await render();
     const name = input(el, 'Nombre completo');
     expect(name.value).toBe('Ana Pérez');
+    expect(input(el, 'Fecha de nacimiento').value).toBe('1995-04-30');
+    expect(input(el, 'WhatsApp').value).toBe('');
     type(name, '   ');
-    button(el, 'Guardar nombre')!.click();
+    button(el, 'Guardar datos')!.click();
     await stable();
-    expect(profiles.updateDisplayName).not.toHaveBeenCalled();
+    expect(profiles.updatePersonal).not.toHaveBeenCalled();
     expect(el.textContent).toContain('Ingresa tu nombre');
 
     type(name, '  Ana María Pérez ');
-    button(el, 'Guardar nombre')!.click();
+    type(input(el, 'WhatsApp'), '55 1234 5678');
+    button(el, 'Guardar datos')!.click();
     await stable();
-    expect(profiles.updateDisplayName).toHaveBeenCalledWith('Ana María Pérez');
-    expect(el.textContent).toContain('Nombre actualizado.');
+    expect(el.textContent).toContain('Escribe el número con el código de país');
+    expect(profiles.updatePersonal).not.toHaveBeenCalled();
+
+    type(input(el, 'WhatsApp'), '+52 55 1234 5678');
+    button(el, 'Guardar datos')!.click();
+    await stable();
+    expect(profiles.updatePersonal).toHaveBeenCalledWith('Ana María Pérez', {
+      birthDate: '1995-04-30',
+      whatsapp: '+525512345678',
+    });
+    expect(el.textContent).toContain('Datos actualizados.');
+  });
+
+  it('requires a birth date', async () => {
+    const { el, stable } = await render();
+    button(el, 'Guardar datos')!.click();
+    await stable();
+    expect(el.textContent).toContain('Ingresa tu fecha de nacimiento.');
+    type(input(el, 'Fecha de nacimiento'), '2999-01-01');
+    button(el, 'Guardar datos')!.click();
+    await stable();
+    expect(el.textContent).toContain('Revisa la fecha de nacimiento.');
+    expect(profiles.updatePersonal).not.toHaveBeenCalled();
+  });
+
+  it('lists the open sessions with this device first and signs others out', async () => {
+    const { el, stable } = await render();
+    expect(devices.watch).toHaveBeenCalledWith('u1', expect.any(Function), expect.any(Function));
+    expect(el.textContent).toContain('Sesiones abiertas');
+    const sessions = [
+      device('phone', { browser: 'Safari', os: 'iOS', mobile: true }),
+      device('here'),
+      device('old', { revoked: true }),
+      device('tablet', { browser: '', os: '' }),
+    ];
+    devices.next!(sessions);
+    await stable();
+    expect(devices.prune).toHaveBeenCalledWith('u1', sessions);
+    const items = [...el.querySelectorAll('.sessions li')];
+    expect(items.map((li) => li.querySelector('strong')?.textContent?.trim())).toEqual([
+      'Chrome en Windows Este dispositivo',
+      'Safari en iOS',
+      'Navegador en otro sistema',
+    ]);
+    expect(items[1].textContent).toContain('Celular o tableta');
+    // No button to sign out the current device: the header does that.
+    expect(items[0].querySelector('button')).toBeNull();
+
+    (items[1].querySelector('button') as HTMLElement).click();
+    await stable();
+    expect(devices.signOut).toHaveBeenCalledWith('u1', 'phone');
+    expect(el.textContent).toContain('Ese dispositivo se cerrará apenas se conecte.');
+
+    button(el, 'Cerrar las demás sesiones')!.click();
+    await stable();
+    expect(devices.signOutAll).toHaveBeenCalledWith('u1', ['phone', 'tablet']);
+  });
+
+  it('stops listening to the sessions when leaving the page', async () => {
+    const { fixture } = await render();
+    fixture.destroy();
+    expect(devices.stop).toHaveBeenCalled();
   });
 
   it('lets a Google user create a password', async () => {

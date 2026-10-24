@@ -98,6 +98,15 @@
                   }
                 </div>
                 <div class="muted email">{{ row.profile.email }}</div>
+                @if (row.profile.whatsapp; as whatsapp) {
+                  <a
+                    class="muted email"
+                    [href]="'https://wa.me/' + whatsapp.slice(1)"
+                    target="_blank"
+                    rel="noopener"
+                    >WhatsApp {{ whatsapp }}</a
+                  >
+                }
               </td>
               <td [attr.data-label]="t.joined">
                 {{ row.profile.createdAt?.toDate() | localDate: 'd MMM y' }}

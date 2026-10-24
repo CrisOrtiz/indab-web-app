@@ -1,0 +1,68 @@
+@let t = i18n.messages().setup;
+@let d = i18n.messages().details;
+@let birthDate = form.controls.birthDate;
+@let whatsapp = form.controls.whatsapp;
+<section class="auth">
+  <div class="card">
+    @if (step() === 'verifyEmail') {
+      <h1>{{ t.verifyTitle }}</h1>
+      <p class="intro">{{ t.verifyText(email()) }}</p>
+      <p class="hint">{{ t.verifySpam }}</p>
+      @if (status(); as s) {
+        <p [class]="s.kind" [attr.role]="s.kind === 'error' ? 'alert' : 'status'">{{ s.text }}</p>
+      }
+      <div class="actions">
+        <button type="button" class="btn" [disabled]="busy()" (click)="checkVerified()">
+          {{ t.checkVerified }}
+        </button>
+        <button type="button" class="btn btn-outline" [disabled]="busy()" (click)="resend()">
+          {{ t.resend }}
+        </button>
+      </div>
+    } @else {
+      <h1>{{ t.detailsTitle }}</h1>
+      <p class="intro">{{ t.detailsText }}</p>
+      <form [formGroup]="form" (ngSubmit)="save()">
+        <label>
+          {{ d.birthDate }}
+          <input
+            type="date"
+            formControlName="birthDate"
+            autocomplete="bday"
+            [min]="minBirthDate"
+            [max]="maxBirthDate"
+          />
+        </label>
+        @if (birthDate.touched && birthDate.invalid) {
+          <p class="error">
+            {{ birthDate.hasError('required') ? d.birthDateRequired : d.birthDateInvalid }}
+          </p>
+        }
+        <label>
+          {{ d.whatsapp }}
+          <input
+            type="tel"
+            formControlName="whatsapp"
+            autocomplete="tel"
+            inputmode="tel"
+            [placeholder]="d.whatsappPlaceholder"
+          />
+        </label>
+        @if (whatsapp.touched && whatsapp.invalid) {
+          <p class="error">{{ d.whatsappInvalid }}</p>
+        } @else {
+          <p class="hint">{{ d.whatsappHint }}</p>
+        }
+        @if (status(); as s) {
+          <p [class]="s.kind" [attr.role]="s.kind === 'error' ? 'alert' : 'status'">
+            {{ s.text }}
+          </p>
+        }
+        <button type="submit" class="btn" [disabled]="busy()">{{ t.save }}</button>
+      </form>
+    }
+    <div class="links">
+      <button type="button" (click)="signOut()">{{ t.signOut }}</button>
+    </div>
+  </div>
+</section>

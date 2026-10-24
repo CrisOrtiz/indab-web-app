@@ -13,12 +13,16 @@ const fb = vi.hoisted(() => ({
   listeners: new Map<string, Listener>(),
   unsubscribes: [] as ReturnType<typeof vi.fn>[],
   existing: new Set<string>(),
+  /** The browser's own entry in users/{uid}/sessions (see session-tracker.spec.ts). */
+  sessionListener: null as ((snapshot: unknown) => void) | null,
 }));
 
 vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class {},
   onAuthStateChanged: vi.fn((_auth, callback) => (fb.authCallback = callback)),
   createUserWithEmailAndPassword: vi.fn(),
+  reload: vi.fn(async () => undefined),
+  sendEmailVerification: vi.fn(async () => undefined),
   signInWithEmailAndPassword: vi.fn(),
   signInWithPopup: vi.fn(),
   sendPasswordResetEmail: vi.fn(),
@@ -27,11 +31,25 @@ vi.mock('firebase/auth', () => ({
 }));
 
 vi.mock('firebase/firestore', () => ({
-  doc: vi.fn((_db, collection: string, id: string) => ({ path: `${collection}/${id}` })),
+  collection: vi.fn((_db, ...segments: string[]) => ({ path: segments.join('/') })),
+  // doc(db, collection, id), or doc(collectionRef[, id]) with an automatic id `browser-1`.
+  doc: vi.fn((parent: { path?: string }, ...segments: string[]) => {
+    if (!parent.path) {
+      return { path: segments.join('/') };
+    }
+    const id = segments[0] ?? 'browser-1';
+    return { path: `${parent.path}/${id}`, id };
+  }),
   getDoc: vi.fn(async (ref: { path: string }) => ({ exists: () => fb.existing.has(ref.path) })),
   setDoc: vi.fn(),
+  updateDoc: vi.fn(),
+  deleteDoc: vi.fn(),
   serverTimestamp: vi.fn(() => 'SERVER_TIMESTAMP'),
   onSnapshot: vi.fn((ref: { path: string }, next, error) => {
+    if (ref.path.includes('/sessions/')) {
+      fb.sessionListener = next;
+      return () => undefined;
+    }
     fb.listeners.set(ref.path, { next, error });
     const unsubscribe = vi.fn();
     fb.unsubscribes.push(unsubscribe);
@@ -39,6 +57,7 @@ vi.mock('firebase/firestore', () => ({
   }),
 }));
 
+import { Router } from '@angular/router';
 import * as auth from 'firebase/auth';
 import * as firestore from 'firebase/firestore';
 
@@ -59,6 +78,8 @@ describe('AuthService', () => {
     fb.listeners.clear();
     fb.unsubscribes = [];
     fb.existing.clear();
+    fb.sessionListener = null;
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [
         { provide: FIREBASE_AUTH, useValue: {} },
@@ -173,9 +194,18 @@ describe('AuthService', () => {
       user: user('new'),
     } as auth.UserCredential);
 
-    await service.registerWithEmail('Nuevo Alumno', 'new@indab.co', 'secret1');
+    Object.assign(TestBed.inject(FIREBASE_AUTH), { currentUser: user('new') });
 
-    expect(auth.createUserWithEmailAndPassword).toHaveBeenCalledWith({}, 'new@indab.co', 'secret1');
+    await service.registerWithEmail('Nuevo Alumno', 'new@indab.co', 'secret1', {
+      birthDate: '1998-03-21',
+      whatsapp: '+5215512345678',
+    });
+
+    expect(auth.createUserWithEmailAndPassword).toHaveBeenCalledWith(
+      TestBed.inject(FIREBASE_AUTH),
+      'new@indab.co',
+      'secret1',
+    );
     expect(auth.updateProfile).toHaveBeenCalledWith(user('new'), { displayName: 'Nuevo Alumno' });
     expect(firestore.setDoc).toHaveBeenCalledWith(
       { path: 'users/new' },
@@ -185,8 +215,101 @@ describe('AuthService', () => {
         displayName: 'Nuevo Alumno',
         role: 'student',
         createdAt: 'SERVER_TIMESTAMP',
+        birthDate: '1998-03-21',
+        whatsapp: '+5215512345678',
       },
     );
+    expect(auth.sendEmailVerification).toHaveBeenCalledWith(user('new'), {
+      url: `${location.origin}/account-setup`,
+    });
+  });
+
+  it('leaves out an empty WhatsApp number and survives a failed verification email', async () => {
+    vi.mocked(auth.createUserWithEmailAndPassword).mockResolvedValue({
+      user: user('new'),
+    } as auth.UserCredential);
+    vi.mocked(auth.sendEmailVerification).mockRejectedValueOnce(new Error('network'));
+    Object.assign(TestBed.inject(FIREBASE_AUTH), { currentUser: user('new') });
+
+    await service.registerWithEmail('Nuevo', 'new@indab.co', 'secret1', {
+      birthDate: '1998-03-21',
+      whatsapp: '',
+    });
+    expect(vi.mocked(firestore.setDoc).mock.calls[0][1]).not.toHaveProperty('whatsapp');
+  });
+
+  it('asks unverified users to confirm their email, then for missing details', async () => {
+    expect(service.setupStep()).toBeNull();
+    const unverified = user('ana', { emailVerified: false });
+    fb.authCallback!(unverified);
+    await vi.waitFor(() => expect(fb.listeners.has('enrollments/ana')).toBe(true));
+    fb.listeners.get('users/ana')!.next(snapshot({ role: 'student' }));
+    expect(service.setupStep()).toBe('verifyEmail');
+
+    // Opening the link elsewhere only shows here once the user is reloaded.
+    vi.mocked(auth.reload).mockImplementationOnce(async (u) => {
+      Object.assign(u, { emailVerified: true });
+    });
+    const getIdToken = vi.fn(async () => 'token');
+    Object.assign(unverified, { getIdToken });
+    Object.assign(TestBed.inject(FIREBASE_AUTH), { currentUser: unverified });
+    expect(await service.checkEmailVerified()).toBe(true);
+    expect(getIdToken).toHaveBeenCalledWith(true);
+    expect(service.setupStep()).toBe('details');
+
+    fb.listeners.get('users/ana')!.next(snapshot({ role: 'student', birthDate: '1990-01-01' }));
+    expect(service.setupStep()).toBeNull();
+  });
+
+  it('does not ask for details while the profile is missing', async () => {
+    fb.authCallback!(user('ana', { emailVerified: true }));
+    await vi.waitFor(() => expect(fb.listeners.has('users/ana')).toBe(true));
+    fb.listeners.get('users/ana')!.next(snapshot(undefined));
+    expect(service.setupStep()).toBeNull();
+  });
+
+  it('keeps the email step while the link is not opened', async () => {
+    const unverified = user('ana', { emailVerified: false, getIdToken: vi.fn() });
+    Object.assign(TestBed.inject(FIREBASE_AUTH), { currentUser: unverified });
+    expect(await service.checkEmailVerified()).toBe(false);
+    expect(unverified.getIdToken).not.toHaveBeenCalled();
+  });
+
+  it("records this browser's session and removes it on sign-out", async () => {
+    await signInAs('ana', { role: 'student' });
+    expect(service.sessionId()).toBe('browser-1');
+    await vi.waitFor(() =>
+      expect(firestore.setDoc).toHaveBeenCalledWith(
+        { path: 'users/ana/sessions/browser-1', id: 'browser-1' },
+        expect.objectContaining({ revoked: false }),
+      ),
+    );
+
+    await service.signOut();
+    expect(firestore.deleteDoc).toHaveBeenCalledWith({
+      path: 'users/ana/sessions/browser-1',
+      id: 'browser-1',
+    });
+    expect(vi.mocked(firestore.deleteDoc).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(auth.signOut).mock.invocationCallOrder[0],
+    );
+  });
+
+  it('forgets the session when the user signs out elsewhere', async () => {
+    await signInAs('ana', { role: 'student' });
+    fb.authCallback!(null);
+    await service.whenReady();
+    expect(service.sessionId()).toBeNull();
+  });
+
+  it('signs out when the session is signed out from another device', async () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    await signInAs('ana', { role: 'student' });
+    await vi.waitFor(() => expect(fb.sessionListener).not.toBeNull());
+    fb.sessionListener!({ data: () => ({ revoked: true }) });
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/login?ended=1'));
+    expect(auth.signOut).toHaveBeenCalled();
+    expect(firestore.deleteDoc).toHaveBeenCalled();
   });
 
   it('creates a profile on the first Google sign-in only', async () => {

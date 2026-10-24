@@ -19,6 +19,8 @@
       }
       @if (notice()) {
         <p class="notice" role="status">{{ notice() }}</p>
+      } @else if (ended() && !error()) {
+        <p class="notice" role="status">{{ a.login.sessionEnded }}</p>
       }
       <button type="submit" class="btn" [disabled]="loading()">{{ a.login.submit }}</button>
     </form>

@@ -116,4 +116,12 @@ describe('Login', () => {
     await click('¿Olvidaste tu contraseña?');
     expect(el.querySelector('[role=alert]')?.textContent).toContain('Demasiados intentos.');
   });
+
+  it('explains that the session was ended from another device', async () => {
+    fixture.componentRef.setInput('ended', '1');
+    await fixture.whenStable();
+    expect(el.querySelector('[role=status]')?.textContent).toContain(
+      'Cerraste esta sesión desde otro dispositivo.',
+    );
+  });
 });

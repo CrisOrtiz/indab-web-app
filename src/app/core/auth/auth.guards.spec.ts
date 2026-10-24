@@ -8,13 +8,21 @@ import {
 } from '@angular/router';
 import { signal } from '@angular/core';
 import { AuthService } from './auth.service';
-import { adminGuard, authGuard, enrolledGuard, guestGuard, staffGuard } from './auth.guards';
+import {
+  adminGuard,
+  authGuard,
+  enrolledGuard,
+  guestGuard,
+  setupGuard,
+  staffGuard,
+} from './auth.guards';
 
 describe('auth guards', () => {
   const isLoggedIn = signal(false);
   const hasAcademyAccess = signal(false);
   const isAdmin = signal(false);
   const isStaff = signal(false);
+  const setupStep = signal<'verifyEmail' | 'details' | null>(null);
   const state = { url: '/repository' } as RouterStateSnapshot;
   const route = {} as ActivatedRouteSnapshot;
 
@@ -23,6 +31,7 @@ describe('auth guards', () => {
     hasAcademyAccess.set(false);
     isAdmin.set(false);
     isStaff.set(false);
+    setupStep.set(null);
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -33,6 +42,7 @@ describe('auth guards', () => {
             hasAcademyAccess,
             isAdmin,
             isStaff,
+            setupStep,
             whenReady: () => Promise.resolve(),
           },
         },
@@ -81,5 +91,26 @@ describe('auth guards', () => {
     expect(url(await run(staffGuard))).toBe('/academy');
     isStaff.set(true);
     expect(await run(staffGuard)).toBe(true);
+  });
+
+  it('sends users with a setup step left to the account setup page', async () => {
+    isLoggedIn.set(true);
+    hasAcademyAccess.set(true);
+    isStaff.set(true);
+    isAdmin.set(true);
+    setupStep.set('verifyEmail');
+    for (const guard of [authGuard, enrolledGuard, staffGuard, adminGuard]) {
+      expect(url(await run(guard))).toBe('/account-setup?returnUrl=%2Frepository');
+    }
+    setupStep.set('details');
+    expect(url(await run(authGuard))).toBe('/account-setup?returnUrl=%2Frepository');
+  });
+
+  it('setupGuard opens the setup page only while a step is left', async () => {
+    expect(url(await run(setupGuard))).toBe('/login?returnUrl=%2Frepository');
+    isLoggedIn.set(true);
+    expect(url(await run(setupGuard))).toBe('/academy');
+    setupStep.set('details');
+    expect(await run(setupGuard)).toBe(true);
   });
 });

@@ -17,6 +17,7 @@ export const en: Messages = {
     adminEvaluations: 'Practice evaluations | INDAB',
     notFound: 'Page not found | INDAB',
     profile: 'My profile | INDAB',
+    accountSetup: 'Activate your account | INDAB',
   },
 
   seo: {
@@ -232,6 +233,33 @@ export const en: Messages = {
     },
   },
 
+  // Birth date and WhatsApp: asked at registration, on the account setup page and in the profile.
+  details: {
+    birthDate: 'Date of birth',
+    birthDateRequired: 'Enter your date of birth.',
+    birthDateInvalid: 'Check your date of birth.',
+    whatsapp: 'WhatsApp (optional)',
+    whatsappPlaceholder: '+1 305 123 4567',
+    whatsappHint:
+      'Include the country code. We use it for class notices and to help with your account.',
+    whatsappInvalid: 'Write the number with its country code, for example +1 305 123 4567.',
+  },
+
+  setup: {
+    verifyTitle: 'Confirm your email',
+    verifyText: (email: string) =>
+      `We sent a link to ${email}. Open it to activate your account, then come back to this page.`,
+    verifySpam: "Can't find it? Check your spam or promotions folder.",
+    checkVerified: "I've confirmed it",
+    resend: 'Resend email',
+    resent: 'We sent you another email.',
+    notVerified: "We can't see the confirmation yet. Open the link in the email and try again.",
+    detailsTitle: 'Complete your details',
+    detailsText: 'Before you go in we need your date of birth. WhatsApp is optional.',
+    save: 'Save and continue',
+    signOut: 'Sign out',
+  },
+
   auth: {
     email: 'Email',
     password: 'Password',
@@ -245,6 +273,8 @@ export const en: Messages = {
       register: 'Create account',
       resetNeedsEmail: 'Enter your email to recover your password.',
       resetSent: 'We sent you an email to reset your password.',
+      sessionEnded:
+        'You signed this session out from another device. Sign in again if that was you.',
     },
     register: {
       title: 'Create account',
@@ -721,8 +751,8 @@ export const en: Messages = {
     name: 'Full name',
     nameRequired: 'Enter your name (80 characters at most).',
     email: 'Email',
-    saveName: 'Save name',
-    nameSaved: 'Name updated.',
+    saveDetails: 'Save details',
+    detailsSaved: 'Details updated.',
     preferences: 'Preferences',
     language: 'Site language',
     languageHint: 'Remembered on this device.',
@@ -743,6 +773,23 @@ export const en: Messages = {
     passwordChanged: 'Password updated.',
     forgot: "Don't remember your current password?",
     resetSent: (email) => `We sent an email to ${email} to reset it.`,
+    openSessions: 'Open sessions',
+    sessionsIntro: 'The browsers where your account is signed in.',
+    sessionsLoading: 'Loading…',
+    sessionsFailed: "We couldn't load your sessions.",
+    device: (browser: string, os: string) => `${browser} on ${os}`,
+    unknownBrowser: 'Browser',
+    unknownSystem: 'another system',
+    mobile: 'Phone or tablet',
+    computer: 'Computer',
+    thisDevice: 'This device',
+    lastActive: 'Last active',
+    signOutSession: 'Sign out',
+    signOutOthers: 'Sign out all other sessions',
+    sessionSignedOut: 'Done. That device will sign out as soon as it goes online.',
+    othersSignedOut: 'Done. The other devices will sign out as soon as they go online.',
+    sessionsHint:
+      'If you think someone else knows your password, change it: that ends every other session at once.',
   },
 
   stats: {

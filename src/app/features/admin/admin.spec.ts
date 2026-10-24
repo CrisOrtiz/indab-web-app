@@ -77,6 +77,21 @@ describe('Admin page', () => {
     expect(el.textContent).toContain('4 de 4 usuarios');
   });
 
+  it("links to a user's WhatsApp when they gave one", async () => {
+    rows.update((list) =>
+      list.map((r) =>
+        r.profile.uid === 'jose'
+          ? { ...r, profile: { ...r.profile, whatsapp: '+525512345678' } }
+          : r,
+      ),
+    );
+    await fixture.whenStable();
+    const link = rowOf('José Pérez').querySelector('a')!;
+    expect(link.getAttribute('href')).toBe('https://wa.me/525512345678');
+    expect(link.textContent?.trim()).toBe('WhatsApp +525512345678');
+    expect(rowOf('Luis Díaz').querySelector('a')).toBeNull();
+  });
+
   it('shows trainers the evaluations and practice review, not the users', async () => {
     isAdmin.set(false);
     await fixture.whenStable();

@@ -265,6 +265,52 @@ form .btn {
   }
 }
 
+// Open sessions.
+.sessions {
+  display: grid;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .device {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+
+    strong {
+      overflow-wrap: anywhere;
+    }
+
+    .muted {
+      font-size: 0.85rem;
+    }
+  }
+
+  .badge {
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--color-surface);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .small {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+}
+
 @media (max-width: 700px) {
   .card {
     padding: 16px;

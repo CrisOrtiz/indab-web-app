@@ -1,14 +1,18 @@
 import { User } from 'firebase/auth';
 import { Firestore, doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
-import { Enrollment, UserProfile } from '../models/user-profile';
+import { Enrollment, PersonalDetails, UserProfile } from '../models/user-profile';
 
 // The Firestore side of `AuthService`, loaded with the Firestore SDK once someone signs in.
 
-/** Creates `users/{uid}` on first sign-in. New users always start as students. */
+/**
+ * Creates `users/{uid}` on first sign-in. New users always start as students. Google sign-ups
+ * have no `details` yet: the account setup page asks for them.
+ */
 export async function ensureProfile(
   firestore: Firestore,
   user: User,
   displayName: string,
+  details?: PersonalDetails,
 ): Promise<void> {
   const ref = doc(firestore, 'users', user.uid);
   if ((await getDoc(ref)).exists()) {
@@ -20,7 +24,15 @@ export async function ensureProfile(
     displayName,
     role: 'student',
     createdAt: serverTimestamp(),
+    ...(details && detailFields(details)),
   });
+}
+
+/** The stored form of `details`: an empty WhatsApp number is left out. */
+export function detailFields(details: PersonalDetails): Partial<PersonalDetails> {
+  return details.whatsapp
+    ? { birthDate: details.birthDate, whatsapp: details.whatsapp }
+    : { birthDate: details.birthDate };
 }
 
 /**

@@ -1,4 +1,7 @@
 @let a = i18n.messages().auth;
+@let d = i18n.messages().details;
+@let birthDate = details.controls.birthDate;
+@let whatsapp = details.controls.whatsapp;
 <section class="auth">
   <div class="card">
     <h1>{{ a.register.title }}</h1>
@@ -22,6 +25,36 @@
         <input type="password" formControlName="password" autocomplete="new-password" />
       </label>
       <p class="hint">{{ a.register.passwordHint }}</p>
+      <label>
+        {{ d.birthDate }}
+        <input
+          type="date"
+          [formControl]="birthDate"
+          autocomplete="bday"
+          [min]="minBirthDate"
+          [max]="maxBirthDate"
+        />
+      </label>
+      @if (birthDate.touched && birthDate.invalid) {
+        <p class="error">
+          {{ birthDate.hasError('required') ? d.birthDateRequired : d.birthDateInvalid }}
+        </p>
+      }
+      <label>
+        {{ d.whatsapp }}
+        <input
+          type="tel"
+          [formControl]="whatsapp"
+          autocomplete="tel"
+          inputmode="tel"
+          [placeholder]="d.whatsappPlaceholder"
+        />
+      </label>
+      @if (whatsapp.touched && whatsapp.invalid) {
+        <p class="error">{{ d.whatsappInvalid }}</p>
+      } @else {
+        <p class="hint">{{ d.whatsappHint }}</p>
+      }
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
       }
