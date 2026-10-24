@@ -58,3 +58,26 @@ test('unknown pages show the not-found page', async ({ page }) => {
   await page.getByRole('link', { name: 'Volver al inicio' }).click();
   await expect(page).toHaveURL('/');
 });
+
+test('visitors can switch the site to English or Portuguese, and it stays that way', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'es-419');
+  const language = page.getByRole('combobox', { name: 'Idioma' });
+
+  await language.selectOption('en-US');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en-US');
+  await expect(page.getByRole('link', { name: 'Join the academy' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Programs by level' })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Programs by level' })).toBeVisible();
+  await page.getByRole('link', { name: 'Sign in' }).first().click();
+  await expect(page).toHaveTitle('Sign in | INDAB');
+  await expect(page.getByLabel('Password')).toBeVisible();
+
+  await page.getByRole('combobox', { name: 'Language' }).selectOption('pt-BR');
+  await expect(page).toHaveTitle('Entrar | INDAB');
+  await expect(page.getByLabel('Senha')).toBeVisible();
+});

@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import {
   GoogleAuthProvider,
   User,
@@ -12,6 +12,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { FIREBASE_AUTH, FIRESTORE } from '../firebase/firebase.providers';
+import { I18n } from '../i18n/i18n.service';
 import { Enrollment, UserProfile } from '../models/user-profile';
 
 @Injectable({ providedIn: 'root' })
@@ -41,6 +42,9 @@ export class AuthService {
       this.settled = this.watchUserData(user);
       this.settled.then(resolveInitial);
     });
+    // Password reset emails and the Google sign-in window use the site's language.
+    const i18n = inject(I18n);
+    effect(() => (this.auth.languageCode = i18n.language()));
   }
 
   /** Resolves once the session is restored and the current user's profile and enrollment have loaded. */

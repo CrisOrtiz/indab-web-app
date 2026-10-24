@@ -1,0 +1,546 @@
+import { OrderType, TradeSide } from '../../models/practice';
+
+/**
+ * Spanish (Latin America) texts: the default language and the source of the `Messages` type.
+ * `en.ts` and `pt.ts` must have exactly the same keys, so a missing translation fails the build.
+ * Texts with values are functions.
+ */
+export const es = {
+  titles: {
+    landing: 'INDAB Academy',
+    eleva: 'Eleva Inversiones',
+    login: 'Ingresar | INDAB',
+    register: 'Crear cuenta | INDAB',
+    academy: 'Academia | INDAB',
+    practice: 'Práctica de trading | INDAB',
+    material: 'Material de estudio | INDAB',
+    admin: 'Administración | INDAB',
+    adminPractice: 'Prácticas de trading | INDAB',
+    notFound: 'Página no encontrada | INDAB',
+  },
+
+  header: {
+    eleva: 'Eleva Inversiones',
+    academy: 'Academia',
+    admin: 'Administración',
+    signOut: 'Cerrar sesión',
+    signIn: 'Ingresar',
+    language: 'Idioma',
+  },
+
+  landing: {
+    eyebrow: 'Academia de trading',
+    tagline: 'Conocimiento. Disciplina. Estrategia. Resultados.',
+    lead: 'Aprende a leer el mercado, construir tu plan de trading y operar con gestión de riesgo, acompañado de mentores y una comunidad que opera todos los días.',
+    goToAcademy: 'Ir a la academia',
+    join: 'Únete a la academia',
+    haveAccount: 'Ya tengo cuenta',
+    sections: {
+      about: 'Nosotros',
+      programs: 'Programas',
+      method: 'Metodología',
+      platform: 'Plataforma',
+      eleva: 'Eleva Inversiones',
+      faq: 'Preguntas',
+      contact: 'Contacto',
+    },
+    about: {
+      eyebrow: 'Nosotros',
+      title: 'Formamos traders con método',
+      text: 'INDAB es una academia de trading enfocada en la formación práctica. Enseñamos un proceso claro y medible para que tomes decisiones con criterio, no por impulso.',
+    },
+    stats: [
+      { value: '+500', label: 'Estudiantes' },
+      { value: '+40', label: 'Clases grabadas' },
+      { value: '24/7', label: 'Acceso al material' },
+    ],
+    pillars: [
+      {
+        title: 'Conocimiento',
+        text: 'Bases sólidas de mercados, análisis técnico y fundamental, explicadas paso a paso.',
+      },
+      {
+        title: 'Disciplina',
+        text: 'Rutinas, diario de trading y reglas claras para operar con constancia.',
+      },
+      {
+        title: 'Estrategia',
+        text: 'Planes de trading probados, con entradas, salidas y gestión del riesgo definidas.',
+      },
+      {
+        title: 'Resultados',
+        text: 'Medimos tu progreso con métricas reales para que mejores operación tras operación.',
+      },
+    ],
+    programsEyebrow: 'Qué vas a aprender',
+    programsTitle: 'Programas por niveles',
+    programs: [
+      {
+        level: 'Nivel 1',
+        title: 'Fundamentos del trading',
+        text: 'Qué es un mercado, tipos de activos, velas japonesas, soportes, resistencias y tendencias.',
+      },
+      {
+        level: 'Nivel 2',
+        title: 'Análisis técnico avanzado',
+        text: 'Estructura de mercado, zonas de liquidez, indicadores y confluencias para tus entradas.',
+      },
+      {
+        level: 'Nivel 3',
+        title: 'Gestión de riesgo y capital',
+        text: 'Tamaño de posición, ratio riesgo/beneficio, drawdown y cómo proteger tu cuenta.',
+      },
+      {
+        level: 'Nivel 4',
+        title: 'Psicología del trader',
+        text: 'Control emocional, sesgos, rutinas y el diario de trading como herramienta de mejora.',
+      },
+    ],
+    methodEyebrow: 'Metodología',
+    methodTitle: 'Un proceso en cuatro pasos',
+    steps: [
+      { title: 'Aprende', text: 'Clases en vivo y grabadas, con material descargable por módulo.' },
+      {
+        title: 'Practica',
+        text: 'Repite el mercado vela a vela y entrena sin arriesgar tu dinero.',
+      },
+      { title: 'Opera', text: 'Aplica tu plan con mentoría y revisión de tus operaciones.' },
+      { title: 'Mejora', text: 'Analiza tus métricas y ajusta tu estrategia con la comunidad.' },
+    ],
+    platformEyebrow: 'La plataforma',
+    platformTitle: 'Todo tu aprendizaje en un solo lugar',
+    soon: 'Próximamente',
+    features: [
+      {
+        title: 'Cursos y lecciones',
+        text: 'Todo el contenido organizado por niveles, a tu ritmo y desde cualquier dispositivo.',
+        soon: false,
+      },
+      {
+        title: 'Material de estudio',
+        text: 'Repositorio de guías, PDFs, plantillas y videos para estudiantes inscritos.',
+        soon: false,
+      },
+      {
+        title: 'Práctica con repetición de gráficos',
+        text: 'Vuelve a reproducir el mercado vela a vela, toma decisiones y mide tus resultados.',
+        soon: true,
+      },
+      {
+        title: 'Comunidad y mentoría',
+        text: 'Sesiones de análisis en vivo y acompañamiento de nuestros mentores.',
+        soon: false,
+      },
+    ],
+    eleva: {
+      eyebrow: 'Eleva Inversiones',
+      title: 'El brazo de inversión de INDAB',
+      text: 'Eleva Inversiones gestiona capital de inversionistas aplicando en los mercados la misma disciplina y gestión de riesgo que enseñamos. Los inversionistas reciben reportes mensuales de su cuenta y de los resultados.',
+      cta: 'Conoce Eleva Inversiones',
+      riskTitle: 'Aviso de riesgo:',
+      risk: 'el trading y la inversión en mercados financieros implican riesgo de pérdida, incluso del capital invertido. Los rendimientos pasados no garantizan resultados futuros y ningún rendimiento mensual está asegurado. Invierte solo dinero que puedas permitirte perder.',
+    },
+    testimonialsEyebrow: 'Testimonios',
+    testimonialsTitle: 'Lo que dicen nuestros estudiantes',
+    testimonials: [
+      {
+        quote: 'Testimonio de ejemplo: aquí irá la experiencia real de un estudiante de INDAB.',
+        name: 'Nombre del estudiante',
+        role: 'Estudiante, Nivel 2',
+      },
+      {
+        quote: 'Testimonio de ejemplo: qué aprendió, cómo cambió su forma de operar.',
+        name: 'Nombre del estudiante',
+        role: 'Estudiante, Nivel 3',
+      },
+      {
+        quote: 'Testimonio de ejemplo: opinión sobre la mentoría y la comunidad.',
+        name: 'Nombre del estudiante',
+        role: 'Egresado',
+      },
+    ],
+    faqEyebrow: 'Preguntas frecuentes',
+    faqTitle: 'Resolvemos tus dudas',
+    faqs: [
+      {
+        question: '¿Necesito experiencia previa?',
+        answer: 'No. El Nivel 1 parte desde cero y te lleva paso a paso hasta operar con un plan.',
+      },
+      {
+        question: '¿Cómo accedo al material?',
+        answer:
+          'Crea tu cuenta y, cuando tu inscripción esté confirmada, se habilita tu acceso a la academia y al material de estudio.',
+      },
+      {
+        question: '¿Las clases quedan grabadas?',
+        answer:
+          'Sí. Las clases en vivo se publican en la plataforma para que las veas cuando quieras.',
+      },
+      {
+        question: '¿Cuánto capital necesito para empezar?',
+        answer:
+          'Puedes aprender y practicar sin capital. Recomendamos operar con dinero real solo cuando tengas un plan probado.',
+      },
+      {
+        question: '¿Qué es Eleva Inversiones?',
+        answer:
+          'Es el brazo de inversión de INDAB. Gestiona capital de inversionistas en los mercados. Toda inversión tiene riesgo; conoce los detalles en su página.',
+      },
+    ],
+    contact: {
+      eyebrow: 'Contacto',
+      title: 'Hablemos',
+      text: '¿Tienes preguntas sobre los programas o las inscripciones? Escríbenos y te respondemos a la brevedad.',
+      email: 'Correo',
+    },
+    ctaTitle: 'Empieza hoy tu camino como trader',
+    ctaButton: 'Crear mi cuenta',
+    footer: {
+      signIn: 'Ingresar',
+      register: 'Crear cuenta',
+      rights: (year: number) => `© ${year} INDAB y crisortizdev. Todos los derechos reservados.`,
+      builtBy: 'Desarrollado por',
+      disclaimer: 'Contenido educativo; no constituye asesoría financiera.',
+    },
+  },
+
+  auth: {
+    email: 'Correo electrónico',
+    password: 'Contraseña',
+    invalidEmail: 'Ingresa un correo válido.',
+    login: {
+      title: 'Ingresar',
+      submit: 'Ingresar',
+      or: 'o',
+      google: 'Continuar con Google',
+      forgot: '¿Olvidaste tu contraseña?',
+      register: 'Crear cuenta',
+      resetNeedsEmail: 'Escribe tu correo para recuperar la contraseña.',
+      resetSent: 'Te enviamos un correo para restablecer tu contraseña.',
+    },
+    register: {
+      title: 'Crear cuenta',
+      name: 'Nombre completo',
+      nameRequired: 'Ingresa tu nombre.',
+      passwordHint: 'Mínimo 6 caracteres.',
+      submit: 'Crear cuenta',
+      haveAccount: '¿Ya tienes cuenta?',
+      signIn: 'Ingresar',
+    },
+    errors: {
+      invalidCredentials: 'Correo o contraseña incorrectos.',
+      invalidEmail: 'El correo no es válido.',
+      userDisabled: 'Esta cuenta está deshabilitada.',
+      emailInUse: 'Ya existe una cuenta con este correo.',
+      weakPassword: 'La contraseña debe tener al menos 6 caracteres.',
+      tooManyRequests: 'Demasiados intentos. Intenta de nuevo más tarde.',
+      popupClosed: 'Se cerró la ventana de Google antes de terminar.',
+      network: 'Error de conexión. Revisa tu internet.',
+      unexpected: 'Ocurrió un error inesperado. Intenta de nuevo.',
+    },
+  },
+
+  academy: {
+    hello: (name: string) => `Hola, ${name}`,
+    welcome: 'Bienvenido a la academia.',
+    material: 'Ver material de estudio',
+    practice: 'Práctica de trading',
+    pending:
+      'Tu inscripción está pendiente. Cuando el equipo de INDAB la active, verás aquí tus cursos.',
+    back: '← Academia',
+  },
+
+  material: {
+    title: 'Material de estudio',
+    soon: 'Aquí estará el repositorio de material de la academia.',
+  },
+
+  eleva: {
+    title: 'Eleva Inversiones',
+    soon: 'Próximamente.',
+  },
+
+  notFound: {
+    title: 'Página no encontrada',
+    home: 'Volver al inicio',
+  },
+
+  admin: {
+    title: 'Administración',
+    intro: 'Gestiona los usuarios de INDAB: asigna roles y da o quita el acceso a la academia.',
+    reviewPractice: 'Revisar prácticas de trading',
+    back: '← Administración',
+    users: 'Usuarios',
+    withAccess: 'Con acceso a la academia',
+    admins: 'Administradores',
+    search: 'Buscar por nombre o correo',
+    searchLabel: 'Buscar usuarios',
+    roleFilter: 'Filtrar por rol',
+    allRoles: 'Todos los roles',
+    students: 'Estudiantes',
+    accessFilter: 'Filtrar por acceso',
+    allAccess: 'Todo acceso',
+    granted: 'Con acceso',
+    pendingFilter: 'Pendientes',
+    close: 'Cerrar',
+    loading: 'Cargando usuarios…',
+    count: (shown: number, total: number) => `${shown} de ${total} usuarios`,
+    user: 'Usuario',
+    joined: 'Registro',
+    role: 'Rol',
+    access: 'Acceso a la academia',
+    noName: 'Sin nombre',
+    you: 'Tú',
+    roleOf: (name: string) => `Rol de ${name}`,
+    ownRole: 'No puedes quitarte tu propio rol de administrador',
+    student: 'Estudiante',
+    admin: 'Administrador',
+    enabled: 'Habilitado',
+    pending: 'Pendiente',
+    adminsHaveAccess: 'Los administradores ya tienen acceso.',
+    noMatches: 'No hay usuarios que coincidan con la búsqueda.',
+    confirmAdmin: (name: string) => `¿Dar permisos de administrador a ${name}?`,
+    roleChanged: (name: string, admin: boolean) =>
+      `${name} ahora es ${admin ? 'administrador' : 'estudiante'}.`,
+    accessGranted: (name: string) => `${name} ahora tiene acceso a la academia.`,
+    accessRemoved: (name: string) => `Se quitó el acceso a la academia a ${name}.`,
+    saveFailed: (name: string) => `No se pudo guardar el cambio para ${name}. Intenta de nuevo.`,
+    loadFailed:
+      'No se pudo cargar la lista de usuarios. Verifica que tu cuenta sea administradora.',
+  },
+
+  review: {
+    title: 'Prácticas de trading',
+    intro:
+      'Sesiones de práctica con replay de los estudiantes y cada operación que abrieron, sobre el gráfico que practicaron. Las fechas del periodo se muestran aquí aunque el estudiante las haya practicado ocultas.',
+    sessions: 'Sesiones',
+    students: 'Estudiantes',
+    trades: 'Operaciones',
+    search: 'Buscar por estudiante o mercado',
+    searchLabel: 'Buscar prácticas',
+    loading: 'Cargando prácticas…',
+    student: 'Estudiante',
+    started: 'Inicio',
+    market: 'Mercado',
+    period: 'Periodo practicado',
+    pnl: 'Ganancia / pérdida',
+    status: 'Estado',
+    hide: 'Ocultar',
+    show: 'Ver práctica',
+    deleting: 'Eliminando…',
+    delete: 'Eliminar',
+    deleteLabel: (name: string) => `Eliminar práctica de ${name}`,
+    chartFailed: 'No se pudo cargar el gráfico del mercado.',
+    loadingChart: 'Cargando gráfico…',
+    trade: 'Operación',
+    opened: 'Apertura',
+    entry: 'Entrada',
+    lots: 'Lotes',
+    closed: 'Cierre',
+    exit: 'Salida',
+    reason: 'Motivo',
+    noTrades: 'Sin operaciones en esta sesión.',
+    loadingTrades: 'Cargando operaciones…',
+    empty: 'No hay prácticas registradas.',
+    confirmDelete: (name: string, date: string) =>
+      `¿Eliminar la práctica de ${name} del ${date}? No se puede deshacer.`,
+    loadFailed: 'No se pudieron cargar las prácticas. Verifica que tu cuenta sea administradora.',
+    deleteFailed: 'No se pudo eliminar la práctica.',
+    tradesFailed: 'No se pudieron cargar las operaciones de la sesión.',
+  },
+
+  /** Trading words shared by the practice, its chart and the admin review. */
+  trading: {
+    buy: 'Comprar',
+    sell: 'Vender',
+    long: 'Compra',
+    short: 'Venta',
+    orderTypes: { market: 'Mercado', limit: 'Límite', stop: 'Stop' } as Record<OrderType, string>,
+    /** "Compra", "Venta límite", "Compra stop"... */
+    orderLabel: (side: TradeSide, type: OrderType) => {
+      const name = side === 'long' ? 'Compra' : 'Venta';
+      return type === 'market' ? name : `${name} ${type === 'limit' ? 'límite' : 'stop'}`;
+    },
+    exitReasons: {
+      manual: 'Manual',
+      stopLoss: 'Stop loss',
+      takeProfit: 'Take profit',
+      stopOut: 'Stop out (margen)',
+      sessionEnd: 'Fin de sesión',
+    },
+    statuses: {
+      pending: 'Orden pendiente',
+      open: 'Abierta',
+      closed: 'Cerrada',
+      cancelled: 'Orden cancelada',
+    },
+    active: 'En curso',
+    finished: 'Terminada',
+    stopLoss: 'Stop loss',
+    takeProfit: 'Take profit',
+    /** Instrument names by symbol. */
+    instruments: { PAXGUSDT: 'Oro (XAU/USD vía PAXG)' } as Record<string, string>,
+  },
+
+  /** Order checks of the replay engine. */
+  orderErrors: {
+    levelsPositive: 'El stop loss y el take profit deben ser precios mayores a 0.',
+    /** A stop loss or take profit on the wrong side of the entry, order or current price. */
+    level: (
+      side: TradeSide,
+      field: 'stopLoss' | 'takeProfit',
+      below: boolean,
+      reference: 'entry' | 'order' | 'current',
+    ) =>
+      `En una ${side === 'long' ? 'compra' : 'venta'}, el ${
+        field === 'stopLoss' ? 'stop loss' : 'take profit'
+      } debe estar por ${below ? 'debajo' : 'encima'} ${
+        {
+          entry: 'del precio de entrada',
+          order: 'del precio de la orden',
+          current: 'del precio actual',
+        }[reference]
+      }.`,
+    priceRequired: 'Ingresa el precio de la orden.',
+    orderPrice: (side: TradeSide, type: OrderType, below: boolean) =>
+      `Una ${side === 'long' ? 'compra' : 'venta'} ${type === 'limit' ? 'límite' : 'stop'} debe tener su precio por ${
+        below ? 'debajo' : 'encima'
+      } del precio actual.`,
+    lotStep: (step: number) => `Ingresa un tamaño en lotes de ${step} en ${step}.`,
+    margin: (needed: string, available: string) =>
+      `Margen insuficiente: la orden necesita ${needed} USD y tienes ${available} USD libres.`,
+    closed: 'La operación ya está cerrada.',
+  },
+
+  practice: {
+    title: 'Práctica de trading',
+    intro:
+      'Opera sobre datos históricos reales sin arriesgar dinero. Eliges una fecha del pasado o te mostramos una al azar, y avanzas vela por vela: no sabes qué viene después. Todas tus operaciones quedan registradas para que tu instructor las revise.',
+    timeframe: 'Temporalidad',
+    nextBar: 'Siguiente vela',
+    pause: 'Pausar',
+    play: 'Reproducir',
+    speed: 'Velocidad',
+    barsPerSecond: (n: number) => `${n} velas/s`,
+    finish: 'Terminar sesión',
+    elapsed: (time: string) => `Tiempo de mercado transcurrido: ${time}`,
+    quickTrade: 'Operación rápida a mercado',
+    quickSell: (lots: string) => `Vender ${lots} lotes a mercado`,
+    quickBuy: (lots: string) => `Comprar ${lots} lotes a mercado`,
+    sellCaps: 'VENDER',
+    buyCaps: 'COMPRAR',
+    ticket: 'Panel de órdenes',
+    direction: 'Dirección',
+    orderType: 'Tipo de orden',
+    orderPrice: 'Precio de la orden',
+    lotsField: (size: number) => `Lotes (tamaño ${size} oz)`,
+    margin: (amount: string) => `${amount} USD margen`,
+    fractions: 'Parte del margen libre',
+    max: 'Máx.',
+    freeMargin: 'Margen libre',
+    pointValue: 'Valor de 1 punto',
+    exits: 'Salidas',
+    levelPrice: (level: string) => `Precio del ${level.toLowerCase()}`,
+    riskReward: 'Riesgo / beneficio',
+    marketCaps: 'MERCADO',
+    hint: 'Arrastra en el gráfico las líneas de la orden, del SL y del TP. Flecha derecha → siguiente vela.',
+    balance: 'Saldo',
+    equity: 'Patrimonio',
+    openPnl: 'P/L abierto',
+    usedMargin: 'Margen usado',
+    marginLevel: 'Nivel de margen',
+    trades: 'Operaciones',
+    positions: (n: number) => `Posiciones (${n})`,
+    orders: (n: number) => `Órdenes (${n})`,
+    history: (n: number) => `Historial (${n})`,
+    stats: 'Estadísticas',
+    order: 'Orden',
+    price: 'Precio',
+    lots: 'Lotes',
+    cancel: 'Cancelar',
+    noOrders: 'No tienes órdenes pendientes.',
+    trade: 'Operación',
+    entry: 'Entrada',
+    exit: 'Salida',
+    reason: 'Motivo',
+    noClosed: 'Aún no has cerrado operaciones.',
+    position: 'Posición',
+    remove: (level: string) => `Quitar ${level.toLowerCase()}`,
+    close: 'Cerrar',
+    noPositions: 'No tienes posiciones abiertas.',
+    finished: 'Sesión terminada',
+    finalBalance: 'Saldo final (USD)',
+    pnl: 'Ganancia / pérdida',
+    winRate: 'Acierto',
+    summary: (instrument: string, date: string, elapsed: string) =>
+      `${instrument} · desde ${date} · ${elapsed} de mercado`,
+    newSession: 'Nueva práctica',
+    market: 'Mercado',
+    start: 'Inicio',
+    random: 'Un momento al azar',
+    pickDate: 'Elegir fecha',
+    startDate: 'Fecha de inicio',
+    hideDates: 'Ocultar fechas durante la práctica',
+    rules: (balance: string, leverage: number, lotSize: number) =>
+      `Empiezas con ${balance} USD virtuales y apalancamiento 1:${leverage}. Operas en lotes de ${lotSize} oz; si tu patrimonio cae por debajo del 50% del margen usado, tus posiciones se cierran (stop out).`,
+    loading: 'Cargando…',
+    begin: 'Comenzar práctica',
+    yourSessions: 'Tus sesiones',
+    date: 'Fecha',
+    status: 'Estado',
+    noSessions: 'Aún no has hecho ninguna práctica.',
+    startFailed:
+      'No se pudieron cargar los datos del mercado o iniciar la sesión. Intenta de nuevo.',
+    timeframeFailed: 'No se pudo cargar esa temporalidad. Intenta de nuevo.',
+    saveTradeFailed: 'No se pudo registrar la operación. Intenta de nuevo.',
+    finishFailed: 'No se pudo guardar el cierre de la sesión.',
+    moreBarsFailed: 'No se pudieron cargar más velas del mercado. Revisa tu conexión.',
+    closeFailed: 'No se pudo registrar el cierre de una operación.',
+    changeFailed: 'No se pudo registrar un cambio en tus operaciones.',
+  },
+
+  chart: {
+    tools: 'Herramientas del gráfico',
+    hlineTitle: 'Línea horizontal',
+    hline: 'Horizontal',
+    trendTitle: 'Línea de tendencia',
+    trend: 'Tendencia',
+    rect: 'Rectángulo',
+    fib: 'Fibonacci',
+    clear: 'Borrar dibujos',
+    eraseRect: 'Borrar rectángulo',
+    eraseFib: 'Borrar Fibonacci',
+    eraseLine: 'Borrar línea',
+    orderLots: 'Lotes de la orden',
+    plus: 'Opciones en este precio',
+    addOrder: (price: string) => `Añadir orden en ${price}…`,
+    drawLine: (price: string) => `Dibujar línea horizontal en ${price}`,
+    closePosition: 'Cerrar posición',
+    cancelOrder: 'Cancelar orden',
+    removeLevel: (level: string) => `Quitar ${level.toLowerCase()}`,
+    hints: {
+      hline: ['Haz clic en el gráfico para poner la línea.', ''],
+      trend: ['Haz clic en el primer punto de la línea.', 'Haz clic en el segundo punto.'],
+      rect: ['Haz clic en una esquina del rectángulo.', 'Haz clic en la esquina opuesta.'],
+      fib: ['Haz clic en el inicio del movimiento.', 'Haz clic en el final del movimiento.'],
+    } as Record<'hline' | 'trend' | 'rect' | 'fib', [string, string]>,
+  },
+
+  stats: {
+    closedTrades: 'Operaciones cerradas',
+    winRate: 'Acierto',
+    winsLosses: (wins: number, losses: number) => `${wins} ganadas · ${losses} perdidas`,
+    profitFactor: 'Factor de beneficio',
+    expectancy: 'Promedio por operación',
+    avgWin: 'Ganancia media',
+    avgLoss: 'Pérdida media',
+    bestWorst: 'Mejor / peor',
+    maxDrawdown: 'Drawdown máximo',
+    fromPeak: (pct: string) => `${pct} desde el máximo`,
+    curve: 'Curva de capital',
+    curveLabel: (from: number, to: number) => `Saldo de ${from} a ${to} USD`,
+    curveEmpty: 'Cierra operaciones para ver cómo evoluciona tu saldo.',
+  },
+};
+
+export type Messages = typeof es;

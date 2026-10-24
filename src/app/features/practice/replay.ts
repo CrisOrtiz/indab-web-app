@@ -6,6 +6,7 @@ import {
   TradeExitReason,
   TradeSide,
 } from '../../core/models/practice';
+import { Messages, es } from '../../core/i18n/messages/es';
 
 export const STARTING_BALANCE = 200;
 /** Units (troy ounces of gold) in one lot, as brokers quote XAU/USD. */
@@ -101,81 +102,88 @@ export function stopHit(
   return null;
 }
 
-/** Spanish error if the stop loss or take profit is on the wrong side of `reference`. */
+/** Texts of the order checks; Spanish unless the page passes the current language. */
+export type OrderMessages = Messages['orderErrors'];
+type Reference = Parameters<OrderMessages['level']>[3];
+
+/** Error if the stop loss or take profit is on the wrong side of `reference`. */
 export function validateLevels(
   side: TradeSide,
-  reference: number,
+  price: number,
   stopLoss: number | null,
   takeProfit: number | null,
-  referenceName = 'del precio de entrada',
+  reference: Reference = 'entry',
+  t: OrderMessages = es.orderErrors,
 ): string | null {
   if ((stopLoss !== null && !(stopLoss > 0)) || (takeProfit !== null && !(takeProfit > 0))) {
-    return 'El stop loss y el take profit deben ser precios mayores a 0.';
+    return t.levelsPositive;
   }
   if (side === 'long') {
-    if (stopLoss !== null && stopLoss >= reference) {
-      return `En una compra, el stop loss debe estar por debajo ${referenceName}.`;
+    if (stopLoss !== null && stopLoss >= price) {
+      return t.level(side, 'stopLoss', true, reference);
     }
-    if (takeProfit !== null && takeProfit <= reference) {
-      return `En una compra, el take profit debe estar por encima ${referenceName}.`;
+    if (takeProfit !== null && takeProfit <= price) {
+      return t.level(side, 'takeProfit', false, reference);
     }
   } else {
-    if (stopLoss !== null && stopLoss <= reference) {
-      return `En una venta, el stop loss debe estar por encima ${referenceName}.`;
+    if (stopLoss !== null && stopLoss <= price) {
+      return t.level(side, 'stopLoss', false, reference);
     }
-    if (takeProfit !== null && takeProfit >= reference) {
-      return `En una venta, el take profit debe estar por debajo ${referenceName}.`;
+    if (takeProfit !== null && takeProfit >= price) {
+      return t.level(side, 'takeProfit', true, reference);
     }
   }
   return null;
 }
 
-/** Spanish error if a limit or stop price is on the wrong side of the current price. */
+/** Error if a limit or stop price is on the wrong side of the current price. */
 export function validateOrderPrice(
   side: TradeSide,
   orderType: OrderType,
   price: number | null,
   current: number,
+  t: OrderMessages = es.orderErrors,
 ): string | null {
   if (orderType === 'market') {
     return null;
   }
   if (price === null || !(price > 0)) {
-    return 'Ingresa el precio de la orden.';
+    return t.priceRequired;
   }
   const below = fillsBelow(side, orderType);
   if (below ? price >= current : price <= current) {
-    const name = `${side === 'long' ? 'compra' : 'venta'} ${orderType === 'limit' ? 'límite' : 'stop'}`;
-    return `Una ${name} debe tener su precio por ${below ? 'debajo' : 'encima'} del precio actual.`;
+    return t.orderPrice(side, orderType, below);
   }
   return null;
 }
 
-/** Returns a Spanish error message if the order is invalid, or null if it is fine. */
+/** Returns an error message if the order is invalid, or null if it is fine. */
 export function validateOrder(
   input: OpenTradeInput,
   current: number,
   available: number,
+  t: OrderMessages = es.orderErrors,
 ): string | null {
   if (
     !(input.lots >= LOT_STEP) ||
     Math.abs(input.lots / LOT_STEP - Math.round(input.lots / LOT_STEP)) > 1e-6
   ) {
-    return `Ingresa un tamaño en lotes de ${LOT_STEP} en ${LOT_STEP}.`;
+    return t.lotStep(LOT_STEP);
   }
   const market = input.orderType === 'market';
   const margin = marginFor(input.lots, market || !(input.price! > 0) ? current : input.price!);
   if (margin > available) {
-    return `Margen insuficiente: la orden necesita ${margin.toFixed(2)} USD y tienes ${available.toFixed(2)} USD libres.`;
+    return t.margin(margin.toFixed(2), available.toFixed(2));
   }
   return (
-    validateOrderPrice(input.side, input.orderType, input.price, current) ??
+    validateOrderPrice(input.side, input.orderType, input.price, current, t) ??
     validateLevels(
       input.side,
       market ? current : input.price!,
       input.stopLoss,
       input.takeProfit,
-      market ? 'del precio actual' : 'del precio de la orden',
+      market ? 'current' : 'order',
+      t,
     )
   );
 }
@@ -312,11 +320,11 @@ export class Replay {
 
   /**
    * Places an order: a market order opens at the current close, a limit or stop order waits.
-   * Throws the validation message if it is invalid.
+   * Throws the validation message, in the language of `t`, if it is invalid.
    */
-  open(id: string, input: OpenTradeInput): PracticeTrade {
+  open(id: string, input: OpenTradeInput, t: OrderMessages = es.orderErrors): PracticeTrade {
     const { close, time } = this.current();
-    const error = validateOrder(input, close, this.available());
+    const error = validateOrder(input, close, this.available(), t);
     if (error) {
       throw new Error(error);
     }
@@ -342,9 +350,10 @@ export class Replay {
 
   /**
    * Moves the stop loss and take profit of a pending order or open trade, and the price of a
-   * pending order. Throws the validation message if the new levels are invalid.
+   * pending order. Throws the validation message, in the language of `t`, if the new levels
+   * are invalid.
    */
-  modify(id: string, levels: TradeLevels): PracticeTrade {
+  modify(id: string, levels: TradeLevels, t: OrderMessages = es.orderErrors): PracticeTrade {
     const trade = this.find(id);
     const current = this.current().close;
     let error: string | null;
@@ -352,26 +361,14 @@ export class Replay {
     if (trade.status === 'pending') {
       const orderPrice = levels.orderPrice ?? trade.orderPrice;
       error =
-        validateOrderPrice(trade.side, trade.orderType, orderPrice, current) ??
-        validateLevels(
-          trade.side,
-          orderPrice!,
-          levels.stopLoss,
-          levels.takeProfit,
-          'del precio de la orden',
-        );
+        validateOrderPrice(trade.side, trade.orderType, orderPrice, current, t) ??
+        validateLevels(trade.side, orderPrice!, levels.stopLoss, levels.takeProfit, 'order', t);
       next = { ...trade, ...levels, orderPrice, entryPrice: orderPrice! };
     } else if (trade.status === 'open') {
-      error = validateLevels(
-        trade.side,
-        current,
-        levels.stopLoss,
-        levels.takeProfit,
-        'del precio actual',
-      );
+      error = validateLevels(trade.side, current, levels.stopLoss, levels.takeProfit, 'current', t);
       next = { ...trade, stopLoss: levels.stopLoss, takeProfit: levels.takeProfit };
     } else {
-      throw new Error('La operación ya está cerrada.');
+      throw new Error(t.closed);
     }
     if (error) {
       throw new Error(error);

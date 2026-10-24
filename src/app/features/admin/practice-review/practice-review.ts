@@ -1,9 +1,11 @@
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe, formatDate } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { I18n } from '../../../core/i18n/i18n.service';
+import { LocalDatePipe } from '../../../core/i18n/local-date.pipe';
 import { Candle, PracticeSession, PracticeTrade } from '../../../core/models/practice';
 import { HISTORY_BARS, MarketDataService, intervalMs } from '../../practice/market-data.service';
-import { EXIT_REASONS, orderLabel, priceDigits } from '../../practice/practice-format';
+import { priceDigits } from '../../practice/practice-format';
 import { PracticeService } from '../../practice/practice.service';
 import { LOT_SIZE } from '../../practice/replay';
 import { ReplayChart } from '../../practice/replay-chart';
@@ -15,7 +17,7 @@ import { SessionStatsPanel } from '../../practice/session-stats';
  */
 @Component({
   selector: 'app-practice-review',
-  imports: [DatePipe, DecimalPipe, RouterLink, ReplayChart, SessionStatsPanel],
+  imports: [DecimalPipe, LocalDatePipe, RouterLink, ReplayChart, SessionStatsPanel],
   templateUrl: './practice-review.html',
   styleUrls: ['../admin.scss', './practice-review.scss'],
 })
@@ -23,16 +25,10 @@ export class PracticeReview {
   private readonly practice = inject(PracticeService);
   private readonly market = inject(MarketDataService);
 
-  protected readonly exitReasons = EXIT_REASONS;
+  protected readonly i18n = inject(I18n);
+
   protected readonly priceDigits = priceDigits;
-  protected readonly orderLabel = orderLabel;
   protected readonly lotSize = LOT_SIZE;
-  protected readonly statusLabels: Record<PracticeTrade['status'], string> = {
-    pending: 'Orden pendiente',
-    open: 'Abierta',
-    closed: 'Cerrada',
-    cancelled: 'Orden cancelada',
-  };
 
   protected readonly sessions = signal<PracticeSession[]>([]);
   protected readonly loading = signal(true);
@@ -68,11 +64,7 @@ export class PracticeReview {
     this.practice
       .allSessions()
       .then((sessions) => this.sessions.set(sessions))
-      .catch(() =>
-        this.error.set(
-          'No se pudieron cargar las prácticas. Verifica que tu cuenta sea administradora.',
-        ),
-      )
+      .catch(() => this.error.set(this.i18n.messages().review.loadFailed))
       .finally(() => this.loading.set(false));
   }
 
@@ -88,10 +80,10 @@ export class PracticeReview {
   }
 
   protected async remove(session: PracticeSession): Promise<void> {
-    const when = session.startedAt?.toDate().toLocaleDateString('es') ?? '';
-    if (
-      !confirm(`¿Eliminar la práctica de ${session.userName} del ${when}? No se puede deshacer.`)
-    ) {
+    const t = this.i18n.messages().review;
+    const startedAt = session.startedAt?.toDate();
+    const when = startedAt ? formatDate(startedAt, 'shortDate', this.i18n.language()) : '';
+    if (!confirm(t.confirmDelete(session.userName, when))) {
       return;
     }
     this.error.set(null);
@@ -103,7 +95,7 @@ export class PracticeReview {
         this.selected.set(null);
       }
     } catch {
-      this.error.set('No se pudo eliminar la práctica.');
+      this.error.set(t.deleteFailed);
     } finally {
       this.deleting.set(null);
     }
@@ -117,7 +109,7 @@ export class PracticeReview {
       }
     } catch {
       this.trades.set([]);
-      this.error.set('No se pudieron cargar las operaciones de la sesión.');
+      this.error.set(this.i18n.messages().review.tradesFailed);
     }
   }
 

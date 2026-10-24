@@ -1,24 +1,24 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { I18n } from '../../core/i18n/i18n.service';
 
 // Placeholder: the academy area is built in its own module later.
 @Component({
   selector: 'app-academy',
   imports: [RouterLink],
   template: `
+    @let t = i18n.messages().academy;
     <section class="container">
-      <h1>Hola, {{ auth.profile()?.displayName || auth.user()?.email }}</h1>
+      <h1>{{ t.hello(auth.profile()?.displayName || auth.user()?.email || '') }}</h1>
       @if (auth.hasAcademyAccess()) {
-        <p>Bienvenido a la academia.</p>
+        <p>{{ t.welcome }}</p>
         <div class="actions">
-          <a routerLink="/academy/material" class="btn">Ver material de estudio</a>
-          <a routerLink="/academy/practice" class="btn btn-outline">Práctica de trading</a>
+          <a routerLink="/academy/material" class="btn">{{ t.material }}</a>
+          <a routerLink="/academy/practice" class="btn btn-outline">{{ t.practice }}</a>
         </div>
       } @else {
-        <p>
-          Tu inscripción está pendiente. Cuando el equipo de INDAB la active, verás aquí tus cursos.
-        </p>
+        <p>{{ t.pending }}</p>
       }
     </section>
   `,
@@ -33,4 +33,5 @@ import { AuthService } from '../../core/auth/auth.service';
 })
 export class Academy {
   protected readonly auth = inject(AuthService);
+  protected readonly i18n = inject(I18n);
 }

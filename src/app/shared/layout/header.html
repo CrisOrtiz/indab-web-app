@@ -1,3 +1,4 @@
+@let t = i18n.messages().header;
 <header class="header">
   <div class="container header-inner">
     <a routerLink="/" class="brand">
@@ -5,16 +6,17 @@
       <span>INDAB</span>
     </a>
     <nav class="nav">
-      <a routerLink="/eleva" routerLinkActive="active">Eleva Inversiones</a>
+      <a routerLink="/eleva" routerLinkActive="active">{{ t.eleva }}</a>
       @if (auth.isLoggedIn()) {
-        <a routerLink="/academy" routerLinkActive="active">Academia</a>
+        <a routerLink="/academy" routerLinkActive="active">{{ t.academy }}</a>
         @if (auth.isAdmin()) {
-          <a routerLink="/admin" routerLinkActive="active">Administración</a>
+          <a routerLink="/admin" routerLinkActive="active">{{ t.admin }}</a>
         }
-        <button type="button" class="btn btn-outline" (click)="signOut()">Cerrar sesión</button>
+        <button type="button" class="btn btn-outline" (click)="signOut()">{{ t.signOut }}</button>
       } @else {
-        <a routerLink="/login" class="btn">Ingresar</a>
+        <a routerLink="/login" class="btn">{{ t.signIn }}</a>
       }
     </nav>
+    <app-language-switcher class="language" />
   </div>
 </header>

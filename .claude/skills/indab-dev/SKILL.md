@@ -66,6 +66,7 @@ Users can never grant themselves a role, enrollment or investor data from the cl
 src/app/core/firebase/   DI tokens + provideFirebase()
 src/app/core/auth/       AuthService, guards
 src/app/core/models/     Firestore document interfaces (one file per domain)
+src/app/core/i18n/       I18n service, messages/{es,en,pt}.ts, title strategy, localDate pipe
 src/app/features/<name>/ one folder per feature; components named without suffix (Landing, Academy)
 src/app/shared/          reusable UI (layout/header, ...)
 src/styles.scss          global tokens: --color-*, --radius, --max-width, .container, .btn
@@ -79,7 +80,12 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
 - Model types: `Timestamp` from `firebase/firestore` for dates; write with `serverTimestamp()`.
 - Styling: black and white brand (logo `public/logo.jpg`, tagline "Conocimiento. Disciplina.
   Estrategia. Resultados."). Use the CSS variables in `src/styles.scss`, not hard-coded colors.
-- UI text in Spanish (route `title`s too, ending in `| INDAB`). Code, comments, commits in English.
+- UI text is translated: es-419 (default), en-US, pt-BR. Never hard-code copy in a template or
+  component. Add each text to `core/i18n/messages/es.ts` and its translation to `en.ts` and `pt.ts`
+  (same keys, or the build fails); read it with `inject(I18n).messages()` (`@let t = ...` in
+  templates). Texts with values are functions. Dates go through the `localDate` pipe; numbers
+  stay en-US (`1,250.00`). Route `title`s are keys of `messages.titles` (ending in `| INDAB`).
+  Firestore content is not translated. Code, comments, commits in English. See README "Languages".
 - Formatting: Prettier (`printWidth` 100, single quotes). Run `npx prettier --write` on changed files.
 
 ## Adding a module
@@ -91,7 +97,8 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
 3. **Service**: `src/app/features/<name>/<name>.service.ts` (`providedIn: 'root'`) using `FIRESTORE`.
 4. **Component(s)** in `src/app/features/<name>/`, replacing the placeholder and its
    `placeholder.scss` import.
-5. **Route** in `src/app/app.routes.ts` with `loadComponent`, a Spanish `title` and the right guard.
+5. **Route** in `src/app/app.routes.ts` with `loadComponent`, a `title` key (added to `titles` in
+   the three message files) and the right guard.
    Add a header link in `src/app/shared/layout/header.html` if it is a main section.
 6. **Indexes**: composite queries need an entry in `firestore.indexes.json`.
 7. **Docs**: update the access-model and routes tables in `README.md` and this skill.
@@ -113,7 +120,8 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
 - **E2E** (`e2e/*.spec.ts`, `npm run test:e2e`): Playwright drives `ng serve` against the Auth and
   Firestore emulators with the real rules. Each test calls `resetEmulators()` and seeds what it
   needs with `createUser()` / `setDocument()` from `e2e/emulators.ts` (REST, bypasses rules).
-  Select by role and Spanish label (`getByRole`, `getByLabel`), not CSS, where possible.
+  Select by role and Spanish label (`getByRole`, `getByLabel`), not CSS, where possible (tests run
+  in the default language unless they switch it).
   `PLAYWRIGHT_CHROMIUM_PATH` lets you use an already installed Chromium (e.g. in cloud sessions,
   `/opt/pw-browsers/chromium`) instead of `npx playwright install`.
 

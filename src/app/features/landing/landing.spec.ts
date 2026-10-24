@@ -1,7 +1,8 @@
-import { signal } from '@angular/core';
+import { ApplicationRef, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { I18n } from '../../core/i18n/i18n.service';
 import { Landing } from './landing';
 
 describe('Landing', () => {
@@ -26,6 +27,21 @@ describe('Landing', () => {
       'Únete a la academia',
     );
     expect(el.querySelector('.hero a[href="/login"]')).not.toBeNull();
+  });
+
+  it('switches to English and Portuguese without reloading', async () => {
+    auth.isLoggedIn.set(false);
+    const el = await render();
+    const i18n = TestBed.inject(I18n);
+    await i18n.use('en-US');
+    await TestBed.inject(ApplicationRef).whenStable();
+    expect(el.querySelector('.hero a[href="/register"]')?.textContent).toContain(
+      'Join the academy',
+    );
+    expect(el.querySelector('.section-nav a[href="#preguntas"]')?.textContent).toBe('FAQ');
+    await i18n.use('pt-BR');
+    await TestBed.inject(ApplicationRef).whenStable();
+    expect(el.textContent).toContain('Conhecimento. Disciplina. Estratégia. Resultados.');
   });
 
   it('sends signed-in users to the academy instead', async () => {

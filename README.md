@@ -10,7 +10,8 @@ Web app for **INDAB Academy** and **Eleva Inversiones**.
   (`investors/{uid}`) that only the investor and INDAB admins can read.
 
 Built with Angular 22 (standalone components, signals, SCSS) and Firebase Authentication and
-Cloud Firestore through the modular Firebase JS SDK (no AngularFire). The UI is in Spanish.
+Cloud Firestore through the modular Firebase JS SDK (no AngularFire). The UI is in Latin American
+Spanish (default), English and Brazilian Portuguese; see [Languages](#languages).
 
 ## Requirements
 
@@ -198,6 +199,33 @@ the rules are what actually protect the data. Anything not listed is denied.
 | `/admin` | admins (users, roles, academy access) |
 | `/admin/practice` | admins (review students' practice sessions on the chart, delete them) |
 
+## Languages
+
+The site speaks Spanish (Latin America, `es-419`, the default), English (`en-US`) and Brazilian
+Portuguese (`pt-BR`). Visitors pick the language in the header; the choice is saved in the browser
+(`localStorage`, key `indab.language`) and the page switches without reloading.
+
+Translation happens at runtime, not with Angular's build-time `@angular/localize`: that would build
+one copy of the site per language under `/es/`, `/en/`, `/pt/` and need a full reload to switch,
+which complicates the single Firebase Hosting site and its rewrites. No i18n library is used either
+(same reason as skipping AngularFire: they lag Angular releases).
+
+- `src/app/core/i18n/messages/es.ts` holds every text and defines the `Messages` type;
+  `en.ts` and `pt.ts` must have exactly the same keys, so a missing translation fails the build.
+  Texts with values are functions, e.g. `count: (shown, total) => ...`.
+- `I18n` (`i18n.service.ts`): `messages()` and `language()` signals and `use(language)`. Spanish
+  is bundled; English and Portuguese are lazy chunks loaded the first time they are picked.
+- Templates read `i18n.messages()` (often through `@let t = i18n.messages().section;`).
+- Route `title`s are keys of `messages.titles`, translated by `I18nTitleStrategy`.
+- Dates use the `localDate` pipe, which follows the language. Numbers and prices keep the
+  `1,250.00` format traders expect in every language.
+- `<html lang>` and Firebase Auth emails (password reset) follow the language too.
+- Content stored in Firestore (course and material titles, students' names) is not translated.
+
+To add a text: add it to `es.ts`, then to `en.ts` and `pt.ts` (the build tells you if one is
+missing). To add a language: a new file in `messages/`, an entry in `LANGUAGES` and `loaders` in
+`i18n.service.ts`, and its Angular locale data in `local-date.pipe.ts`.
+
 ## Trading practice (chart replay)
 
 `/academy/practice` replays real historical candles bar by bar. For now the only market is
@@ -265,8 +293,10 @@ src/app/
   core/firebase/   Firebase app, Auth and Firestore providers (DI tokens)
   core/auth/       AuthService (signals) and route guards
   core/models/     Firestore document types
+  core/i18n/       translations (es, en, pt), I18n service, title strategy, localDate pipe
   features/        landing, auth, academy, repository, eleva, admin
   shared/layout/   header
+  shared/language/ language switcher
 src/environments/  environment.ts (indab-academy) and environment.development.ts (emulators)
 firestore.rules    security rules (tested in tests/firestore.rules.test.ts)
 e2e/               Playwright end-to-end tests and emulator seeding helpers

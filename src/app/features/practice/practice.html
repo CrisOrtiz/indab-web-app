@@ -1,12 +1,10 @@
+@let t = i18n.messages().practice;
+@let tr = i18n.messages().trading;
 <section class="container">
   <header class="page-header">
-    <a routerLink="/academy" class="back">← Academia</a>
-    <h1>Práctica de trading</h1>
-    <p>
-      Opera sobre datos históricos reales sin arriesgar dinero. Eliges una fecha del pasado o te
-      mostramos una al azar, y avanzas vela por vela: no sabes qué viene después. Todas tus
-      operaciones quedan registradas para que tu instructor las revise.
-    </p>
+    <a routerLink="/academy" class="back">{{ i18n.messages().academy.back }}</a>
+    <h1>{{ t.title }}</h1>
+    <p>{{ t.intro }}</p>
   </header>
 
   @if (error(); as message) {
@@ -23,37 +21,37 @@
               r.current().close | number: priceDigits(r.current().close)
             }}</span>
           </div>
-          <div class="timeframes" role="group" aria-label="Temporalidad">
-            @for (t of timeframes; track t.interval) {
+          <div class="timeframes" role="group" [attr.aria-label]="t.timeframe">
+            @for (tf of timeframes; track tf.interval) {
               <button
                 type="button"
-                [class.selected]="timeframe().interval === t.interval"
-                [attr.aria-pressed]="timeframe().interval === t.interval"
+                [class.selected]="timeframe().interval === tf.interval"
+                [attr.aria-pressed]="timeframe().interval === tf.interval"
                 [disabled]="switching() !== null"
-                (click)="setTimeframe(t)"
+                (click)="setTimeframe(tf)"
               >
-                {{ switching() === t.interval ? '…' : t.label }}
+                {{ switching() === tf.interval ? '…' : tf.label }}
               </button>
             }
           </div>
           <div class="controls">
-            <button type="button" class="btn btn-outline" (click)="step()">Siguiente vela</button>
+            <button type="button" class="btn btn-outline" (click)="step()">{{ t.nextBar }}</button>
             <button type="button" class="btn btn-outline" (click)="togglePlay()">
-              {{ playing() ? 'Pausar' : 'Reproducir' }}
+              {{ playing() ? t.pause : t.play }}
             </button>
             <select
-              aria-label="Velocidad"
+              [attr.aria-label]="t.speed"
               [value]="speed()"
               (change)="setSpeed(+$any($event.target).value)"
             >
               @for (s of speeds; track s) {
-                <option [value]="s">{{ s }} velas/s</option>
+                <option [value]="s">{{ t.barsPerSecond(s) }}</option>
               }
             </select>
-            <button type="button" class="btn" (click)="finish()">Terminar sesión</button>
+            <button type="button" class="btn" (click)="finish()">{{ t.finish }}</button>
           </div>
         </div>
-        <p class="muted elapsed">Tiempo de mercado transcurrido: {{ elapsed() }}</p>
+        <p class="muted elapsed">{{ t.elapsed(elapsed()) }}</p>
 
         <div class="workspace">
           <app-replay-chart
@@ -70,45 +68,45 @@
             (orderAt)="onOrderAt($event)"
             (lotsChanged)="setLots($event)"
           >
-            <div class="quick" role="group" aria-label="Operación rápida a mercado">
+            <div class="quick" role="group" [attr.aria-label]="t.quickTrade">
               <button
                 type="button"
                 class="quick-sell"
-                [attr.aria-label]="'Vender ' + formatLots(lots()) + ' lotes a mercado'"
+                [attr.aria-label]="t.quickSell(formatLots(lots()))"
                 [disabled]="placing()"
                 (click)="quickTrade('short')"
               >
                 <strong>{{ r.current().close | number: priceDigits(r.current().close) }}</strong>
-                <span>VENDER</span>
+                <span>{{ t.sellCaps }}</span>
               </button>
               <input
                 class="quick-size"
                 type="number"
                 [min]="lotStep"
                 [step]="lotStep"
-                aria-label="Lotes"
+                [attr.aria-label]="t.lots"
                 [value]="formatLots(lots())"
                 (change)="setLots($any($event.target).value)"
               />
               <button
                 type="button"
                 class="quick-buy"
-                [attr.aria-label]="'Comprar ' + formatLots(lots()) + ' lotes a mercado'"
+                [attr.aria-label]="t.quickBuy(formatLots(lots()))"
                 [disabled]="placing()"
                 (click)="quickTrade('long')"
               >
                 <strong>{{ r.current().close | number: priceDigits(r.current().close) }}</strong>
-                <span>COMPRAR</span>
+                <span>{{ t.buyCaps }}</span>
               </button>
             </div>
           </app-replay-chart>
 
-          <aside class="ticket" aria-label="Panel de órdenes">
+          <aside class="ticket" [attr.aria-label]="t.ticket">
             <div class="ticket-head">
               <strong>{{ symbol() }}</strong>
               <span class="muted">1:{{ leverage }}</span>
             </div>
-            <div class="sides" role="group" aria-label="Dirección">
+            <div class="sides" role="group" [attr.aria-label]="t.direction">
               <button
                 type="button"
                 class="side sell"
@@ -116,7 +114,7 @@
                 [attr.aria-pressed]="side() === 'short'"
                 (click)="setSide('short')"
               >
-                <span>Vender</span>
+                <span>{{ tr.sell }}</span>
                 <strong>{{ r.current().close | number: priceDigits(r.current().close) }}</strong>
               </button>
               <button
@@ -126,27 +124,27 @@
                 [attr.aria-pressed]="side() === 'long'"
                 (click)="setSide('long')"
               >
-                <span>Comprar</span>
+                <span>{{ tr.buy }}</span>
                 <strong>{{ r.current().close | number: priceDigits(r.current().close) }}</strong>
               </button>
             </div>
 
-            <div class="tabs" role="group" aria-label="Tipo de orden">
-              @for (type of orderTypes; track type[0]) {
+            <div class="tabs" role="group" [attr.aria-label]="t.orderType">
+              @for (type of orderTypes; track type) {
                 <button
                   type="button"
-                  [class.selected]="orderType() === type[0]"
-                  [attr.aria-pressed]="orderType() === type[0]"
-                  (click)="setOrderType(type[0])"
+                  [class.selected]="orderType() === type"
+                  [attr.aria-pressed]="orderType() === type"
+                  (click)="setOrderType(type)"
                 >
-                  {{ type[1] }}
+                  {{ tr.orderTypes[type] }}
                 </button>
               }
             </div>
 
             @if (orderType() !== 'market') {
               <label>
-                <span class="field-name">Precio de la orden</span>
+                <span class="field-name">{{ t.orderPrice }}</span>
                 <input
                   type="number"
                   step="any"
@@ -156,7 +154,7 @@
               </label>
             }
             <label>
-              <span class="field-name">Lotes (tamaño {{ lotSize }} oz)</span>
+              <span class="field-name">{{ t.lotsField(lotSize) }}</span>
               <span class="field">
                 <input
                   type="number"
@@ -165,28 +163,28 @@
                   [value]="lots()"
                   (input)="lots.set(+$any($event.target).value)"
                 />
-                <span class="muted">{{ margin() | number: '1.2-2' }} USD margen</span>
+                <span class="muted">{{ t.margin((margin() | number: '1.2-2') ?? '') }}</span>
               </span>
             </label>
-            <div class="fractions" role="group" aria-label="Parte del margen libre">
+            <div class="fractions" role="group" [attr.aria-label]="t.fractions">
               @for (f of fractions; track f) {
                 <button type="button" (click)="useFraction(f)">
-                  {{ f === 1 ? 'Máx.' : (f | percent) }}
+                  {{ f === 1 ? t.max : (f | percent) }}
                 </button>
               }
             </div>
             <dl class="facts">
-              <dt>Margen libre</dt>
+              <dt>{{ t.freeMargin }}</dt>
               <dd>{{ r.available() | number: '1.2-2' }} USD</dd>
-              <dt>Valor de 1 punto</dt>
+              <dt>{{ t.pointValue }}</dt>
               <dd>{{ units() | number: '1.2-2' }} USD</dd>
             </dl>
 
-            <h3>Salidas</h3>
+            <h3>{{ t.exits }}</h3>
             @for (level of ticketLevels; track level.field) {
               <div class="bracket">
                 <label class="switch">
-                  <span class="field-name">{{ level.label }}</span>
+                  <span class="field-name">{{ tr[level.field] }}</span>
                   <input
                     type="checkbox"
                     role="switch"
@@ -199,7 +197,7 @@
                     <input
                       type="number"
                       step="any"
-                      [attr.aria-label]="'Precio del ' + level.label.toLowerCase()"
+                      [attr.aria-label]="t.levelPrice(tr[level.field])"
                       [value]="price"
                       (input)="setLevel(level.field, numberOrNull($any($event.target).value))"
                     />
@@ -212,7 +210,7 @@
             }
             @if (riskReward(); as ratio) {
               <dl class="facts ratio">
-                <dt>Riesgo / beneficio</dt>
+                <dt>{{ t.riskReward }}</dt>
                 <dd>{{ ratio | number: '1.2-2' }}</dd>
               </dl>
             }
@@ -228,51 +226,52 @@
               [disabled]="placing()"
               (click)="openTrade()"
             >
-              <strong>{{ side() === 'long' ? 'Comprar' : 'Vender' }}</strong>
+              <strong>{{ side() === 'long' ? tr.buy : tr.sell }}</strong>
               <span>{{ submitDetail() }}</span>
             </button>
-            <p class="muted hint">
-              Arrastra en el gráfico las líneas de la orden, del SL y del TP. Flecha derecha →
-              siguiente vela.
-            </p>
+            <p class="muted hint">{{ t.hint }}</p>
           </aside>
         </div>
 
         <div class="account">
           <div>
-            <span>Saldo</span><strong>{{ r.balance() | number: '1.2-2' }}</strong>
+            <span>{{ t.balance }}</span
+            ><strong>{{ r.balance() | number: '1.2-2' }}</strong>
           </div>
           <div>
-            <span>Patrimonio</span><strong>{{ r.equity() | number: '1.2-2' }}</strong>
+            <span>{{ t.equity }}</span
+            ><strong>{{ r.equity() | number: '1.2-2' }}</strong>
           </div>
           <div>
-            <span>P/L abierto</span>
+            <span>{{ t.openPnl }}</span>
             <strong [class.up]="r.unrealized() > 0" [class.down]="r.unrealized() < 0">
               {{ signed(r.unrealized()) }}
             </strong>
           </div>
           <div>
-            <span>Margen usado</span><strong>{{ r.usedMargin() | number: '1.2-2' }}</strong>
+            <span>{{ t.usedMargin }}</span
+            ><strong>{{ r.usedMargin() | number: '1.2-2' }}</strong>
           </div>
           <div>
-            <span>Margen libre</span><strong>{{ r.available() | number: '1.2-2' }}</strong>
+            <span>{{ t.freeMargin }}</span
+            ><strong>{{ r.available() | number: '1.2-2' }}</strong>
           </div>
           <div>
-            <span>Nivel de margen</span>
+            <span>{{ t.marginLevel }}</span>
             <strong [class.down]="(r.marginLevel() ?? 1) < 1">
               {{ r.marginLevel() === null ? '—' : (r.marginLevel() | percent: '1.0-0') }}
             </strong>
           </div>
         </div>
 
-        <div class="tabs panel-tabs" role="group" aria-label="Operaciones">
+        <div class="tabs panel-tabs" role="group" [attr.aria-label]="t.trades">
           <button
             type="button"
             [class.selected]="tab() === 'positions'"
             [attr.aria-pressed]="tab() === 'positions'"
             (click)="tab.set('positions')"
           >
-            Posiciones ({{ r.openTrades().length }})
+            {{ t.positions(r.openTrades().length) }}
           </button>
           <button
             type="button"
@@ -280,7 +279,7 @@
             [attr.aria-pressed]="tab() === 'orders'"
             (click)="tab.set('orders')"
           >
-            Órdenes ({{ r.pendingOrders().length }})
+            {{ t.orders(r.pendingOrders().length) }}
           </button>
           <button
             type="button"
@@ -288,7 +287,7 @@
             [attr.aria-pressed]="tab() === 'history'"
             (click)="tab.set('history')"
           >
-            Historial ({{ r.closedTrades().length }})
+            {{ t.history(r.closedTrades().length) }}
           </button>
           <button
             type="button"
@@ -296,7 +295,7 @@
             [attr.aria-pressed]="tab() === 'stats'"
             (click)="tab.set('stats')"
           >
-            Estadísticas
+            {{ t.stats }}
           </button>
         </div>
 
@@ -305,11 +304,11 @@
             <table class="trades">
               <thead>
                 <tr>
-                  <th>Orden</th>
-                  <th>Precio</th>
-                  <th>Lotes</th>
-                  <th>Stop loss</th>
-                  <th>Take profit</th>
+                  <th>{{ t.order }}</th>
+                  <th>{{ t.price }}</th>
+                  <th>{{ t.lots }}</th>
+                  <th>{{ tr.stopLoss }}</th>
+                  <th>{{ tr.takeProfit }}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -317,22 +316,22 @@
                 @for (o of r.pendingOrders(); track o.id) {
                   <tr>
                     <td
-                      data-label="Orden"
+                      [attr.data-label]="t.order"
                       [class.up]="o.side === 'long'"
                       [class.down]="o.side === 'short'"
                     >
-                      {{ orderLabel(o) }}
+                      {{ tr.orderLabel(o.side, o.orderType) }}
                     </td>
-                    <td data-label="Precio">
+                    <td [attr.data-label]="t.price">
                       {{ o.orderPrice | number: priceDigits(o.orderPrice!) }}
                     </td>
-                    <td data-label="Lotes">{{ formatLots(tradeLots(o)) }}</td>
-                    <td data-label="Stop loss">
+                    <td [attr.data-label]="t.lots">{{ formatLots(tradeLots(o)) }}</td>
+                    <td [attr.data-label]="tr.stopLoss">
                       {{
                         o.stopLoss === null ? '—' : (o.stopLoss | number: priceDigits(o.stopLoss))
                       }}
                     </td>
-                    <td data-label="Take profit">
+                    <td [attr.data-label]="tr.takeProfit">
                       {{
                         o.takeProfit === null
                           ? '—'
@@ -341,13 +340,13 @@
                     </td>
                     <td class="row-actions">
                       <button type="button" class="btn btn-outline small" (click)="cancelOrder(o)">
-                        Cancelar
+                        {{ t.cancel }}
                       </button>
                     </td>
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="6" class="muted empty">No tienes órdenes pendientes.</td>
+                    <td colspan="6" class="muted empty">{{ t.noOrders }}</td>
                   </tr>
                 }
               </tbody>
@@ -357,31 +356,33 @@
             <table class="trades">
               <thead>
                 <tr>
-                  <th>Operación</th>
-                  <th>Entrada</th>
-                  <th>Salida</th>
-                  <th>Motivo</th>
+                  <th>{{ t.trade }}</th>
+                  <th>{{ t.entry }}</th>
+                  <th>{{ t.exit }}</th>
+                  <th>{{ t.reason }}</th>
                   <th>P/L</th>
                 </tr>
               </thead>
               <tbody>
-                @for (t of closedTrades(); track t.id) {
+                @for (trade of closedTrades(); track trade.id) {
                   <tr>
-                    <td data-label="Operación">{{ orderLabel(t) }}</td>
-                    <td data-label="Entrada">
-                      {{ t.entryPrice | number: priceDigits(t.entryPrice) }}
+                    <td [attr.data-label]="t.trade">
+                      {{ tr.orderLabel(trade.side, trade.orderType) }}
                     </td>
-                    <td data-label="Salida">
-                      {{ t.exitPrice | number: priceDigits(t.exitPrice!) }}
+                    <td [attr.data-label]="t.entry">
+                      {{ trade.entryPrice | number: priceDigits(trade.entryPrice) }}
                     </td>
-                    <td data-label="Motivo">{{ exitReasons[t.exitReason!] }}</td>
-                    <td data-label="P/L" [class.up]="t.pnl! > 0" [class.down]="t.pnl! < 0">
-                      {{ signed(t.pnl!) }}
+                    <td [attr.data-label]="t.exit">
+                      {{ trade.exitPrice | number: priceDigits(trade.exitPrice!) }}
+                    </td>
+                    <td [attr.data-label]="t.reason">{{ tr.exitReasons[trade.exitReason!] }}</td>
+                    <td data-label="P/L" [class.up]="trade.pnl! > 0" [class.down]="trade.pnl! < 0">
+                      {{ signed(trade.pnl!) }}
                     </td>
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="5" class="muted empty">Aún no has cerrado operaciones.</td>
+                    <td colspan="5" class="muted empty">{{ t.noClosed }}</td>
                   </tr>
                 }
               </tbody>
@@ -394,39 +395,39 @@
             <table class="trades">
               <thead>
                 <tr>
-                  <th>Posición</th>
-                  <th>Lotes</th>
-                  <th>Entrada</th>
-                  <th>Stop loss</th>
-                  <th>Take profit</th>
+                  <th>{{ t.position }}</th>
+                  <th>{{ t.lots }}</th>
+                  <th>{{ t.entry }}</th>
+                  <th>{{ tr.stopLoss }}</th>
+                  <th>{{ tr.takeProfit }}</th>
                   <th>P/L</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                @for (t of r.openTrades(); track t.id) {
+                @for (trade of r.openTrades(); track trade.id) {
                   <tr>
                     <td
-                      data-label="Posición"
-                      [class.up]="t.side === 'long'"
-                      [class.down]="t.side === 'short'"
+                      [attr.data-label]="t.position"
+                      [class.up]="trade.side === 'long'"
+                      [class.down]="trade.side === 'short'"
                     >
-                      {{ t.side === 'long' ? 'Compra' : 'Venta' }}
+                      {{ trade.side === 'long' ? tr.long : tr.short }}
                     </td>
-                    <td data-label="Lotes">{{ formatLots(tradeLots(t)) }}</td>
-                    <td data-label="Entrada">
-                      {{ t.entryPrice | number: priceDigits(t.entryPrice) }}
+                    <td [attr.data-label]="t.lots">{{ formatLots(tradeLots(trade)) }}</td>
+                    <td [attr.data-label]="t.entry">
+                      {{ trade.entryPrice | number: priceDigits(trade.entryPrice) }}
                     </td>
                     @for (level of levels; track level.field) {
-                      <td [attr.data-label]="level.label">
-                        @if (t[level.field]; as price) {
+                      <td [attr.data-label]="tr[level.field]">
+                        @if (trade[level.field]; as price) {
                           <span class="level-value">
                             {{ price | number: priceDigits(price) }}
                             <button
                               type="button"
                               class="remove"
-                              [attr.aria-label]="'Quitar ' + level.label.toLowerCase()"
-                              (click)="setTradeLevel(t, level.field, null)"
+                              [attr.aria-label]="t.remove(tr[level.field])"
+                              (click)="setTradeLevel(trade, level.field, null)"
                             >
                               ×
                             </button>
@@ -435,7 +436,7 @@
                           <button
                             type="button"
                             class="btn btn-outline small"
-                            (click)="addTradeLevel(t, level.field)"
+                            (click)="addTradeLevel(trade, level.field)"
                           >
                             + {{ level.short }}
                           </button>
@@ -444,20 +445,24 @@
                     }
                     <td
                       data-label="P/L"
-                      [class.up]="openPnl(r, t) > 0"
-                      [class.down]="openPnl(r, t) < 0"
+                      [class.up]="openPnl(r, trade) > 0"
+                      [class.down]="openPnl(r, trade) < 0"
                     >
-                      {{ signed(openPnl(r, t)) }}
+                      {{ signed(openPnl(r, trade)) }}
                     </td>
                     <td class="row-actions">
-                      <button type="button" class="btn btn-outline small" (click)="closeTrade(t)">
-                        Cerrar
+                      <button
+                        type="button"
+                        class="btn btn-outline small"
+                        (click)="closeTrade(trade)"
+                      >
+                        {{ t.close }}
                       </button>
                     </td>
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="7" class="muted empty">No tienes posiciones abiertas.</td>
+                    <td colspan="7" class="muted empty">{{ t.noPositions }}</td>
                   </tr>
                 }
               </tbody>
@@ -470,39 +475,44 @@
     @case ('finished') {
       @if (replay(); as r) {
         <div class="result">
-          <h2>Sesión terminada</h2>
+          <h2>{{ t.finished }}</h2>
           <div class="stats">
             <div class="stat">
               <strong>{{ r.balance() | number: '1.2-2' }}</strong
-              ><span>Saldo final (USD)</span>
+              ><span>{{ t.finalBalance }}</span>
             </div>
             <div class="stat">
               <strong [class.up]="r.realized() > 0" [class.down]="r.realized() < 0">
                 {{ r.realized() | number: '1.2-2' }}
               </strong>
-              <span>Ganancia / pérdida</span>
+              <span>{{ t.pnl }}</span>
             </div>
             <div class="stat">
               <strong>{{ r.trades().length }}</strong
-              ><span>Operaciones</span>
+              ><span>{{ t.trades }}</span>
             </div>
             <div class="stat">
               <strong>{{ r.winRate() === null ? '—' : (r.winRate() | percent) }}</strong>
-              <span>Acierto</span>
+              <span>{{ t.winRate }}</span>
             </div>
           </div>
           <p class="muted">
-            {{ instrumentLabel() }} · desde {{ replayStart() | date: 'd MMM y, HH:mm' }} ·
-            {{ elapsed() }} de mercado
+            {{
+              t.summary(
+                instrumentLabel(),
+                (replayStart() | localDate: 'd MMM y, HH:mm') ?? '',
+                elapsed()
+              )
+            }}
           </p>
           <app-replay-chart
             [candles]="visibleCandles()"
             [trades]="r.trades()"
             [barSeconds]="barSeconds()"
           />
-          <h3>Estadísticas</h3>
+          <h3>{{ t.stats }}</h3>
           <app-session-stats [trades]="r.trades()" [startingBalance]="startingBalance" />
-          <button type="button" class="btn" (click)="reset()">Nueva práctica</button>
+          <button type="button" class="btn" (click)="reset()">{{ t.newSession }}</button>
         </div>
       }
     }
@@ -510,15 +520,15 @@
     @default {
       <form class="setup" (submit)="$event.preventDefault(); start()">
         <label>
-          Mercado
+          {{ t.market }}
           <select [value]="symbol()" (change)="symbol.set($any($event.target).value)">
             @for (i of instruments; track i.symbol) {
-              <option [value]="i.symbol">{{ i.label }}</option>
+              <option [value]="i.symbol">{{ tr.instruments[i.symbol] ?? i.label }}</option>
             }
           </select>
         </label>
         <fieldset class="start">
-          <legend>Inicio</legend>
+          <legend>{{ t.start }}</legend>
           <label class="check">
             <input
               type="radio"
@@ -526,7 +536,7 @@
               [checked]="randomStart()"
               (change)="randomStart.set(true)"
             />
-            Un momento al azar
+            {{ t.random }}
           </label>
           <label class="check">
             <input
@@ -535,12 +545,12 @@
               [checked]="!randomStart()"
               (change)="randomStart.set(false)"
             />
-            Elegir fecha
+            {{ t.pickDate }}
           </label>
           @if (!randomStart()) {
             <input
               type="date"
-              aria-label="Fecha de inicio"
+              [attr.aria-label]="t.startDate"
               required
               [min]="dateRange().min"
               [max]="dateRange().max"
@@ -555,44 +565,45 @@
             [checked]="hideDates()"
             (change)="hideDates.set($any($event.target).checked)"
           />
-          Ocultar fechas durante la práctica
+          {{ t.hideDates }}
         </label>
         <p class="muted">
-          Empiezas con {{ startingBalance | number: '1.0-0' }} USD virtuales y apalancamiento 1:{{
-            leverage
-          }}. Operas en lotes de {{ lotSize }} oz; si tu patrimonio cae por debajo del 50% del
-          margen usado, tus posiciones se cierran (stop out).
+          {{ t.rules((startingBalance | number: '1.0-0') ?? '', leverage, lotSize) }}
         </p>
         <button type="submit" class="btn" [disabled]="phase() === 'loading'">
-          {{ phase() === 'loading' ? 'Cargando…' : 'Comenzar práctica' }}
+          {{ phase() === 'loading' ? t.loading : t.begin }}
         </button>
       </form>
 
-      <h2>Tus sesiones</h2>
+      <h2>{{ t.yourSessions }}</h2>
       <table class="trades">
         <thead>
           <tr>
-            <th>Fecha</th>
-            <th>Mercado</th>
-            <th>Operaciones</th>
-            <th>Ganancia / pérdida</th>
-            <th>Estado</th>
+            <th>{{ t.date }}</th>
+            <th>{{ t.market }}</th>
+            <th>{{ t.trades }}</th>
+            <th>{{ t.pnl }}</th>
+            <th>{{ t.status }}</th>
           </tr>
         </thead>
         <tbody>
           @for (s of history(); track s.id) {
             <tr>
-              <td data-label="Fecha">{{ s.startedAt?.toDate() | date: 'd MMM y, HH:mm' }}</td>
-              <td data-label="Mercado">{{ s.symbol }} · {{ s.interval }}</td>
-              <td data-label="Operaciones">{{ s.tradeCount }}</td>
-              <td data-label="Ganancia / pérdida" [class.up]="s.pnl > 0" [class.down]="s.pnl < 0">
+              <td [attr.data-label]="t.date">
+                {{ s.startedAt?.toDate() | localDate: 'd MMM y, HH:mm' }}
+              </td>
+              <td [attr.data-label]="t.market">{{ s.symbol }} · {{ s.interval }}</td>
+              <td [attr.data-label]="t.trades">{{ s.tradeCount }}</td>
+              <td [attr.data-label]="t.pnl" [class.up]="s.pnl > 0" [class.down]="s.pnl < 0">
                 {{ s.pnl | number: '1.2-2' }}
               </td>
-              <td data-label="Estado">{{ s.status === 'active' ? 'En curso' : 'Terminada' }}</td>
+              <td [attr.data-label]="t.status">
+                {{ s.status === 'active' ? tr.active : tr.finished }}
+              </td>
             </tr>
           } @empty {
             <tr>
-              <td colspan="5" class="muted empty">Aún no has hecho ninguna práctica.</td>
+              <td colspan="5" class="muted empty">{{ t.noSessions }}</td>
             </tr>
           }
         </tbody>

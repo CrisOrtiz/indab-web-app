@@ -25,6 +25,7 @@
 }
 
 .nav {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -38,5 +39,19 @@
     &:hover {
       color: var(--color-text);
     }
+  }
+}
+
+// On phones the language picker shares the first row with the logo, and the links wrap below.
+@media (max-width: 600px) {
+  .language {
+    order: 1;
+  }
+
+  .nav {
+    order: 2;
+    margin-left: 0;
+    width: 100%;
+    padding-bottom: 12px;
   }
 }
