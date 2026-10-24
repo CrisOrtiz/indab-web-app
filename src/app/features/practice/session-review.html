@@ -1,0 +1,79 @@
+@let t = i18n.messages().review;
+@let tr = i18n.messages().trading;
+@if (error(); as message) {
+  <p class="message error">{{ message }}</p>
+}
+@if (candles(); as candles) {
+  @if (candles.length) {
+    <app-replay-chart
+      [candles]="candles"
+      [trades]="trades() ?? []"
+      [barSeconds]="barSeconds()"
+      [focusTrade]="selected()"
+    />
+  } @else {
+    <p class="muted">{{ t.chartFailed }}</p>
+  }
+} @else {
+  <p class="muted">{{ t.loadingChart }}</p>
+}
+@if (trades(); as list) {
+  @if (filled().length) {
+    <app-trade-navigator [trades]="filled()" [(selected)]="selected" />
+  } @else if (list.length) {
+    <p class="muted">{{ t.noFilled }}</p>
+  }
+  <app-session-stats [trades]="list" [startingBalance]="session().startingBalance" />
+  <div class="table-scroll">
+    <table class="trades">
+      <thead>
+        <tr>
+          <th>{{ t.trade }}</th>
+          <th>{{ t.opened }}</th>
+          <th>{{ t.entry }}</th>
+          <th>{{ t.lots }}</th>
+          <th>SL / TP</th>
+          <th>{{ t.closed }}</th>
+          <th>{{ t.exit }}</th>
+          <th>{{ t.reason }}</th>
+          <th>P/L</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (trade of list; track trade.id) {
+          <tr
+            [class.pickable]="trade.status === 'open' || trade.status === 'closed'"
+            [attr.aria-current]="trade.id === selected() || null"
+            (click)="pick(trade)"
+          >
+            <td>{{ tr.orderLabel(trade.side, trade.orderType) }}</td>
+            <td>
+              {{ trade.entryTime * 1000 | localDate: 'd MMM y, HH:mm' : 'UTC' }}
+            </td>
+            <td>{{ trade.entryPrice | number: priceDigits(trade.entryPrice) }}</td>
+            <td>{{ trade.quantity / lotSize | number: '1.2-4' }}</td>
+            <td>{{ trade.stopLoss ?? '—' }} / {{ trade.takeProfit ?? '—' }}</td>
+            @if (trade.status === 'closed') {
+              <td>
+                {{ trade.exitTime! * 1000 | localDate: 'd MMM y, HH:mm' : 'UTC' }}
+              </td>
+              <td>{{ trade.exitPrice | number: priceDigits(trade.exitPrice!) }}</td>
+              <td>{{ tr.exitReasons[trade.exitReason!] }}</td>
+              <td [class.up]="trade.pnl! > 0" [class.down]="trade.pnl! < 0">
+                {{ trade.pnl | number: '1.2-2' }}
+              </td>
+            } @else {
+              <td colspan="4" class="muted">{{ tr.statuses[trade.status] }}</td>
+            }
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="9" class="muted empty">{{ t.noTrades }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+} @else {
+  <p class="muted">{{ t.loadingTrades }}</p>
+}

@@ -46,7 +46,10 @@ import {
   validateOrder,
 } from './replay';
 import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
+import { SessionReview } from './session-review';
 import { SessionStatsPanel } from './session-stats';
+import { filledTrades } from './trade-boxes';
+import { TradeNavigator } from './trade-navigator';
 
 type Phase = 'setup' | 'loading' | 'playing' | 'finished';
 type Tab = 'positions' | 'orders' | 'history' | 'stats';
@@ -97,7 +100,16 @@ export function formatCountdown(ms: number): string {
  */
 @Component({
   selector: 'app-practice',
-  imports: [RouterLink, LocalDatePipe, DecimalPipe, PercentPipe, ReplayChart, SessionStatsPanel],
+  imports: [
+    RouterLink,
+    LocalDatePipe,
+    DecimalPipe,
+    PercentPipe,
+    ReplayChart,
+    SessionReview,
+    SessionStatsPanel,
+    TradeNavigator,
+  ],
   templateUrl: './practice.html',
   styleUrls: ['./practice.scss', './trading-panel.scss', './trading-account.scss'],
   host: { '(window:keydown)': 'onKey($event)' },
@@ -153,6 +165,11 @@ export class Practice {
   protected readonly playing = signal(false);
   protected readonly speed = signal(SPEEDS[1]);
   protected readonly history = signal<PracticeSession[]>([]);
+  /** Past session opened for review below its row. */
+  protected readonly reviewing = signal<string | null>(null);
+  /** Trade of the finished session that the navigator and the chart show. */
+  protected readonly focused = signal<string | null>(null);
+  protected readonly filledTrades = computed(() => filledTrades(this.replay()?.trades() ?? []));
   /** The student's assigned evaluations. */
   protected readonly evaluations = signal<EvaluationCard[]>([]);
   /** The evaluation being taken, if this session is an attempt. */
@@ -720,6 +737,7 @@ export class Practice {
   }
 
   protected reset(): void {
+    this.focused.set(null);
     this.evaluation.set(null);
     this.replay.set(null);
     this.sessionId.set(null);

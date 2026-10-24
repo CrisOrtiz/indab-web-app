@@ -86,6 +86,65 @@
 <div class="stage" #stage>
   <div class="canvas" #canvas></div>
   <img class="watermark" src="logo.jpg" alt="" aria-hidden="true" />
+  @if (boxes().length) {
+    <svg
+      class="positions"
+      [attr.width]="paneSize().width"
+      [attr.height]="paneSize().height"
+      aria-hidden="true"
+    >
+      @for (box of boxes(); track box.id) {
+        <g class="position" [class.focused]="box.focused">
+          @if (box.profit; as zone) {
+            <rect
+              class="profit"
+              [attr.x]="box.left"
+              [attr.y]="zone.top"
+              [attr.width]="box.right - box.left"
+              [attr.height]="zone.height"
+            />
+          }
+          @if (box.loss; as zone) {
+            <rect
+              class="loss"
+              [attr.x]="box.left"
+              [attr.y]="zone.top"
+              [attr.width]="box.right - box.left"
+              [attr.height]="zone.height"
+            />
+          }
+          <line
+            class="entry"
+            [attr.x1]="box.left"
+            [attr.x2]="box.right"
+            [attr.y1]="box.entryY"
+            [attr.y2]="box.entryY"
+          />
+          @if (box.exit; as exit) {
+            <line
+              class="path"
+              [attr.x1]="box.left"
+              [attr.y1]="box.entryY"
+              [attr.x2]="exit.x"
+              [attr.y2]="exit.y"
+            />
+            <circle class="exit" [attr.cx]="exit.x" [attr.cy]="exit.y" r="3" />
+          }
+          @if (box.focused && box.pnl !== null) {
+            <text
+              class="result"
+              [class.up]="box.pnl > 0"
+              [class.down]="box.pnl < 0"
+              [attr.x]="box.left + 4"
+              [attr.y]="box.entryY - 5"
+            >
+              {{ signed(box.pnl) }} USD
+            </text>
+          }
+        </g>
+      }
+    </svg>
+  }
   @if (shapes().length || cursor()?.touch) {
     <svg class="shapes" aria-hidden="true">
       @for (shape of shapes(); track shape.id) {

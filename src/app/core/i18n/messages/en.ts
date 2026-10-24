@@ -434,6 +434,14 @@ export const en: Messages = {
       'The practice sessions could not be loaded. Check that your account is an administrator.',
     deleteFailed: 'The practice session could not be deleted.',
     tradesFailed: "The session's trades could not be loaded.",
+    navigator: 'Step through trades',
+    tradeCounter: (n: number, total: number) => `Trade ${n} of ${total}`,
+    previous: 'Previous',
+    next: 'Next',
+    jumpTo: 'Go to trade',
+    noFilled: 'No order in this session was filled.',
+    result: 'Result',
+    stillOpen: 'Still open',
   },
 
   trading: {

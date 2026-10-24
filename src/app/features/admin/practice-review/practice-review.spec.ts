@@ -7,6 +7,7 @@ import { Candle } from '../../../core/models/practice';
 import { HISTORY_BARS, MarketDataService } from '../../practice/market-data.service';
 import { PracticeService } from '../../practice/practice.service';
 import { ReplayChart } from '../../practice/replay-chart';
+import { SessionReview } from '../../practice/session-review';
 import { PracticeReview } from './practice-review';
 
 // The real chart needs a canvas; the review only passes it data.
@@ -15,6 +16,7 @@ class FakeChart {
   readonly candles = input<Candle[]>([]);
   readonly trades = input<unknown[]>([]);
   readonly barSeconds = input(0);
+  readonly focusTrade = input<string | null>(null);
 }
 
 const candle: Candle = { time: 1_620_000_000, open: 1, high: 2, low: 0.5, close: 1.5 };
@@ -50,7 +52,7 @@ describe('PracticeReview', () => {
         { provide: AuthService, useValue: { isAdmin } },
       ],
     });
-    TestBed.overrideComponent(PracticeReview, {
+    TestBed.overrideComponent(SessionReview, {
       remove: { imports: [ReplayChart] },
       add: { imports: [FakeChart] },
     });
@@ -146,6 +148,9 @@ describe('PracticeReview', () => {
     expect(detail.textContent).toContain('Compra límite');
     expect(detail.textContent).toContain('Venta stop');
     expect(detail.textContent).toContain('Orden pendiente');
+    // The filled trade is picked and the chart scrolls to it; the pending order is not a step.
+    expect(chart()?.focusTrade()).toBe('t1');
+    expect(detail.querySelector('app-trade-navigator')?.textContent).toContain('Operación 1 de 1');
 
     button(sessionRows()[0], 'Ocultar').click();
     await fixture.whenStable();

@@ -4,47 +4,35 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 import { I18n } from '../../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../../core/i18n/local-date.pipe';
-import { Candle, PracticeSession, PracticeTrade } from '../../../core/models/practice';
-import { HISTORY_BARS, MarketDataService, intervalMs } from '../../practice/market-data.service';
-import { priceDigits } from '../../practice/practice-format';
+import { PracticeSession } from '../../../core/models/practice';
 import { PracticeService } from '../../practice/practice.service';
-import { LOT_SIZE } from '../../practice/replay';
-import { ReplayChart } from '../../practice/replay-chart';
-import { SessionStatsPanel } from '../../practice/session-stats';
+import { SessionReview } from '../../practice/session-review';
 
 /**
- * Trainer and admin view of every student's chart-replay sessions: the trades logged in each, drawn on the
- * same candles the student practised on, and a way to delete a session.
+ * Trainer and admin view of every student's chart-replay sessions: each one opens a
+ * `SessionReview` (its trades as position boxes on the candles the student practised on, and a
+ * navigator through them), and admins can delete a session.
  */
 @Component({
   selector: 'app-practice-review',
-  imports: [DecimalPipe, LocalDatePipe, RouterLink, ReplayChart, SessionStatsPanel],
+  imports: [DecimalPipe, LocalDatePipe, RouterLink, SessionReview],
   templateUrl: './practice-review.html',
   styleUrls: ['../admin.scss', './practice-review.scss'],
 })
 export class PracticeReview {
   private readonly practice = inject(PracticeService);
-  private readonly market = inject(MarketDataService);
 
   protected readonly i18n = inject(I18n);
   /** Trainers review; only admins delete. */
   protected readonly auth = inject(AuthService);
-
-  protected readonly priceDigits = priceDigits;
-  protected readonly lotSize = LOT_SIZE;
 
   protected readonly sessions = signal<PracticeSession[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly search = signal('');
 
-  /** Session whose trades are shown, and those trades once loaded. */
+  /** Session opened for review. */
   protected readonly selected = signal<string | null>(null);
-  protected readonly trades = signal<PracticeTrade[] | null>(null);
-  /** Candles of the selected session; `null` while loading, `[]` when they could not load. */
-  protected readonly candles = signal<Candle[] | null>(null);
-  /** Bar length of those candles, so trade markers land on their bar. */
-  protected readonly barSeconds = signal(0);
   /** Session being deleted. */
   protected readonly deleting = signal<string | null>(null);
 
@@ -71,15 +59,8 @@ export class PracticeReview {
       .finally(() => this.loading.set(false));
   }
 
-  protected async toggle(session: PracticeSession): Promise<void> {
-    if (this.selected() === session.id) {
-      this.selected.set(null);
-      return;
-    }
-    this.selected.set(session.id);
-    this.trades.set(null);
-    this.candles.set(null);
-    await Promise.all([this.loadTrades(session), this.loadCandles(session)]);
+  protected toggle(session: PracticeSession): void {
+    this.selected.set(this.selected() === session.id ? null : session.id);
   }
 
   protected async remove(session: PracticeSession): Promise<void> {
@@ -101,42 +82,6 @@ export class PracticeReview {
       this.error.set(t.deleteFailed);
     } finally {
       this.deleting.set(null);
-    }
-  }
-
-  private async loadTrades(session: PracticeSession): Promise<void> {
-    try {
-      const trades = await this.practice.sessionTrades(session.id);
-      if (this.selected() === session.id) {
-        this.trades.set(trades);
-      }
-    } catch {
-      this.trades.set([]);
-      this.error.set(this.i18n.messages().review.tradesFailed);
-    }
-  }
-
-  /** Loads the replay window again: `HISTORY_BARS` of context before `replayStart` and the replay. */
-  private async loadCandles(session: PracticeSession): Promise<void> {
-    const ms = intervalMs(session.interval);
-    try {
-      if (!ms) {
-        throw new Error(`Unknown interval ${session.interval}`);
-      }
-      const { symbol, interval, replayStart } = session;
-      const [history, replay] = await Promise.all([
-        this.market.loadHistory(symbol, interval, replayStart, HISTORY_BARS),
-        this.market.loadCandles(symbol, interval, replayStart),
-      ]);
-      const candles = [...history, ...replay];
-      if (this.selected() === session.id) {
-        this.barSeconds.set(ms / 1000);
-        this.candles.set(candles);
-      }
-    } catch {
-      if (this.selected() === session.id) {
-        this.candles.set([]);
-      }
     }
   }
 }

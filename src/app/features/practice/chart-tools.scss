@@ -286,3 +286,69 @@
     cursor: pointer;
   }
 }
+
+// Trades as TradingView's long/short position tool draws them.
+.positions {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+
+  .position {
+    opacity: 0.6;
+
+    &.focused {
+      opacity: 1;
+    }
+  }
+
+  .profit {
+    fill: color-mix(in srgb, var(--color-candle-up) 22%, transparent);
+  }
+
+  .loss {
+    fill: color-mix(in srgb, var(--color-candle-down) 22%, transparent);
+  }
+
+  .focused .profit {
+    stroke: var(--color-candle-up);
+  }
+
+  .focused .loss {
+    stroke: var(--color-candle-down);
+  }
+
+  .entry {
+    stroke: var(--color-muted);
+    stroke-width: 1;
+  }
+
+  .path {
+    stroke: var(--color-text);
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+  }
+
+  .exit {
+    fill: var(--color-text);
+  }
+
+  .result {
+    font-size: 11px;
+    font-weight: 600;
+    fill: var(--color-text);
+    paint-order: stroke;
+    stroke: var(--color-bg);
+    stroke-width: 3px;
+
+    &.up {
+      fill: var(--color-up);
+    }
+
+    &.down {
+      fill: var(--color-down);
+    }
+  }
+}
