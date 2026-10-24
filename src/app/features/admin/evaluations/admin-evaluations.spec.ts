@@ -108,7 +108,7 @@ describe('AdminEvaluations', () => {
     expect(service.create).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Semana 1',
-        symbol: 'PAXGUSDT',
+        symbol: 'XAUUSDT',
         durationMinutes: 60,
         hideDates: true,
         startingBalance: 200,

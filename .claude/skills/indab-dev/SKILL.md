@@ -51,16 +51,16 @@ otherwise create a feature service.
 
 ## Access model
 
-| Collection | Read | Write |
-| --- | --- | --- |
-| `users/{uid}` | owner, staff | owner creates as `student`, edits `displayName` and `photoURL`; admins change `role` (`student`/`trainer`/`admin`) of others only |
-| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, staff | admins (shape validated) |
-| `courses/{id}` | everyone if `published`, admins | admins |
-| `courses/{id}/lessons/{id}` | enrolled in course or academy access | admins |
-| `materials/{id}` | academy access | admins |
-| `investors/{uid}` (Eleva) | owner, admins | admins |
-| `evaluations/{id}` | staff, assigned students | staff (shape validated) |
-| `practiceSessions/{id}` + `/trades/{id}` | owner, staff; attempts at published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
+| Collection                                                       | Read                                                                        | Write                                                                                                                                                     |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users/{uid}`                                                    | owner, staff                                                                | owner creates as `student`, edits `displayName` and `photoURL`; admins change `role` (`student`/`trainer`/`admin`) of others only                         |
+| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, staff                                                                | admins (shape validated)                                                                                                                                  |
+| `courses/{id}`                                                   | everyone if `published`, admins                                             | admins                                                                                                                                                    |
+| `courses/{id}/lessons/{id}`                                      | enrolled in course or academy access                                        | admins                                                                                                                                                    |
+| `materials/{id}`                                                 | academy access                                                              | admins                                                                                                                                                    |
+| `investors/{uid}` (Eleva)                                        | owner, admins                                                               | admins                                                                                                                                                    |
+| `evaluations/{id}`                                               | staff, assigned students                                                    | staff (shape validated)                                                                                                                                   |
+| `practiceSessions/{id}` + `/trades/{id}`                         | owner, staff; attempts at published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
 
 Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`, `isStaff()`
 (trainers and admins), `hasAcademyAccess()` (staff count as having it), `isEnrolledIn(courseId)`.
@@ -187,7 +187,11 @@ Module notes:
   Drawings listen to DOM clicks, since the chart's `subscribeClick` drops a second click within
   500 ms. Cris chose to grow this with FX Replay's best ideas rather than clone it: session
   stats (`stats.ts`, `SessionStatsPanel`), rectangle/Fibonacci, picking the start date.
-  Cris wants exactly XAU/USD, USD/JPY and NASDAQ: only gold (PAXGUSDT) is live, the others
+  Gold is Binance Futures' XAUUSDT perpetual (PAXGUSDT, a thin token, looked nothing like the
+  market and is kept only for old sessions); `MarketDataService` drops bars while spot gold is
+  closed and empty minutes (`goldHours`), paging until it has the requested count, and
+  `loadHistory` reads backwards from the replay start. Candles use TradingView's colors.
+  Cris wants exactly XAU/USD, USD/JPY and NASDAQ: only gold (XAUUSDT) is live, the others
   wait for a data source licensed for display to students. Never bundle or serve data whose
   license is personal use only (e.g. Dukascopy). A new timeframe must also be added to the
   `interval` list in `firestore.rules`.
