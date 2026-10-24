@@ -55,11 +55,35 @@ describe('ProfileService', () => {
     service = TestBed.inject(ProfileService);
   });
 
-  it('saves the name in the profile and in Firebase Auth', async () => {
-    await service.updateDisplayName('Ana María');
-    expect(updateDoc).toHaveBeenCalledWith({ path: 'users/u1' }, { displayName: 'Ana María' });
+  it('saves the name and details in the profile, and the name in Firebase Auth', async () => {
+    await service.updatePersonal('Ana María', {
+      birthDate: '1994-07-02',
+      whatsapp: '+56912345678',
+    });
+    expect(updateDoc).toHaveBeenCalledWith(
+      { path: 'users/u1' },
+      { displayName: 'Ana María', birthDate: '1994-07-02', whatsapp: '+56912345678' },
+    );
     expect(auth.updateProfile).toHaveBeenCalledWith(currentUser, { displayName: 'Ana María' });
     expect(authService.refreshUser).toHaveBeenCalled();
+  });
+
+  it('leaves Firebase Auth alone when the name did not change, and removes an empty WhatsApp', async () => {
+    firebaseAuth.currentUser = { ...currentUser, displayName: 'Ana' };
+    await service.updatePersonal('Ana', { birthDate: '1994-07-02', whatsapp: '' });
+    expect(updateDoc).toHaveBeenCalledWith(
+      { path: 'users/u1' },
+      { displayName: 'Ana', birthDate: '1994-07-02', whatsapp: 'DELETE_FIELD' },
+    );
+    expect(auth.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it('saves the details asked on the account setup page', async () => {
+    await service.saveDetails({ birthDate: '2000-01-31', whatsapp: '+5491112345678' });
+    expect(updateDoc).toHaveBeenCalledWith(
+      { path: 'users/u1' },
+      { birthDate: '2000-01-31', whatsapp: '+5491112345678' },
+    );
   });
 
   it('shrinks and saves the photo, and removes it', async () => {

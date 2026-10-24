@@ -17,6 +17,7 @@ export const pt: Messages = {
     adminEvaluations: 'Avaliações de prática | INDAB',
     notFound: 'Página não encontrada | INDAB',
     profile: 'Meu perfil | INDAB',
+    accountSetup: 'Ative sua conta | INDAB',
   },
 
   seo: {
@@ -228,6 +229,32 @@ export const pt: Messages = {
     },
   },
 
+  // Birth date and WhatsApp: asked at registration, on the account setup page and in the profile.
+  details: {
+    birthDate: 'Data de nascimento',
+    birthDateRequired: 'Informe sua data de nascimento.',
+    birthDateInvalid: 'Confira a data de nascimento.',
+    whatsapp: 'WhatsApp (opcional)',
+    whatsappPlaceholder: '+55 11 91234 5678',
+    whatsappHint: 'Com o código do país. Usamos para avisos de aulas e para ajudar com sua conta.',
+    whatsappInvalid: 'Escreva o número com o código do país, por exemplo +55 11 91234 5678.',
+  },
+
+  setup: {
+    verifyTitle: 'Confirme seu e-mail',
+    verifyText: (email: string) =>
+      `Enviamos um link para ${email}. Abra-o para ativar sua conta e volte para esta página.`,
+    verifySpam: 'Não encontrou? Confira a pasta de spam ou promoções.',
+    checkVerified: 'Já confirmei',
+    resend: 'Reenviar e-mail',
+    resent: 'Enviamos outro e-mail.',
+    notVerified: 'Ainda não vemos a confirmação. Abra o link do e-mail e tente de novo.',
+    detailsTitle: 'Complete seus dados',
+    detailsText: 'Antes de entrar precisamos da sua data de nascimento. O WhatsApp é opcional.',
+    save: 'Salvar e continuar',
+    signOut: 'Sair',
+  },
+
   auth: {
     email: 'E-mail',
     password: 'Senha',
@@ -241,6 +268,7 @@ export const pt: Messages = {
       register: 'Criar conta',
       resetNeedsEmail: 'Digite seu e-mail para recuperar a senha.',
       resetSent: 'Enviamos um e-mail para você redefinir sua senha.',
+      sessionEnded: 'Você encerrou esta sessão de outro dispositivo. Entre de novo se foi você.',
     },
     register: {
       title: 'Criar conta',
@@ -723,8 +751,8 @@ export const pt: Messages = {
     name: 'Nome completo',
     nameRequired: 'Informe seu nome (no máximo 80 caracteres).',
     email: 'E-mail',
-    saveName: 'Salvar nome',
-    nameSaved: 'Nome atualizado.',
+    saveDetails: 'Salvar dados',
+    detailsSaved: 'Dados atualizados.',
     preferences: 'Preferências',
     language: 'Idioma do site',
     languageHint: 'Fica salvo neste dispositivo.',
@@ -745,6 +773,24 @@ export const pt: Messages = {
     passwordChanged: 'Senha atualizada.',
     forgot: 'Não lembra sua senha atual?',
     resetSent: (email) => `Enviamos um e-mail para ${email} para redefini-la.`,
+    openSessions: 'Sessões abertas',
+    sessionsIntro: 'Os navegadores em que sua conta está aberta.',
+    sessionsLoading: 'Carregando…',
+    sessionsFailed: 'Não foi possível carregar suas sessões.',
+    device: (browser: string, os: string) => `${browser} no ${os}`,
+    unknownBrowser: 'Navegador',
+    unknownSystem: 'outro sistema',
+    mobile: 'Celular ou tablet',
+    computer: 'Computador',
+    thisDevice: 'Este dispositivo',
+    lastActive: 'Última atividade',
+    signOutSession: 'Encerrar sessão',
+    signOutOthers: 'Encerrar as outras sessões',
+    sessionSignedOut: 'Pronto. Esse dispositivo será desconectado assim que ficar on-line.',
+    othersSignedOut:
+      'Pronto. Os outros dispositivos serão desconectados assim que ficarem on-line.',
+    sessionsHint:
+      'Se você acha que outra pessoa sabe sua senha, troque-a: isso encerra na hora todas as outras sessões.',
   },
 
   stats: {

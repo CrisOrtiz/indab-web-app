@@ -1,8 +1,11 @@
 rules_version = '2';
 
 // Data model
-//   users/{uid}                          profile; created by the user, who edits displayName and
-//                                        photoURL (a small data: URL image); role changes by admins only
+//   users/{uid}                          profile; created by the user, who edits displayName,
+//                                        photoURL (a small data: URL image), birthDate and whatsapp;
+//                                        role changes by admins only
+//   users/{uid}/sessions/{id}            browsers the user is signed in on; the owner signs one out
+//                                        by setting revoked, and that browser then signs itself out
 //   enrollments/{uid}                    { academy: bool, courses: [courseId], updatedAt, updatedBy };
 //                                        admin-managed from the /admin area
 //   courses/{courseId}                   course catalog; published courses are public
@@ -26,6 +29,8 @@ rules_version = '2';
 // academy access from the /admin area. Admins cannot remove their own admin role, so the
 // last admin can never lock everyone out. Trainers (role == 'trainer') run evaluations and
 // review practice, but cannot change roles, academy access or delete anything but evaluations.
+// Academy content also needs a verified email (emailVerified()), so an account registered with
+// someone else's address never opens it.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -60,26 +65,42 @@ service cloud.firestore {
       return signedIn() && exists(/databases/$(database)/documents/enrollments/$(request.auth.uid));
     }
 
+    // Google accounts are verified; email sign-ups confirm the link we email them.
+    function emailVerified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
     function hasAcademyAccess() {
-      return isStaff() || (hasEnrollment() && enrollment().academy == true);
+      return emailVerified() && (isStaff() || (hasEnrollment() && enrollment().academy == true));
     }
 
     function isEnrolledIn(courseId) {
       return hasAcademyAccess()
-        || (hasEnrollment() && enrollment().courses is list && courseId in enrollment().courses);
+        || (emailVerified() && hasEnrollment()
+          && enrollment().courses is list && courseId in enrollment().courses);
     }
 
     match /users/{uid} {
       // Trainers read profiles to assign students to evaluations.
       allow read: if isOwner(uid) || isStaff();
 
+      // Birth date as YYYY-MM-DD and an optional WhatsApp number with country code (+ and digits).
+      function validDetails(data) {
+        return (!('birthDate' in data)
+            || (data.birthDate is string && data.birthDate.matches('(19|20)[0-9]{2}-[01][0-9]-[0-3][0-9]')))
+          && (!('whatsapp' in data)
+            || (data.whatsapp is string && data.whatsapp.matches('[+][0-9]{8,15}')));
+      }
+
       // A new profile must belong to the caller and always starts as a student.
       allow create: if isOwner(uid)
-        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'createdAt',
+          'birthDate', 'whatsapp'])
         && request.resource.data.uid == uid
         && request.resource.data.role == 'student'
         && request.resource.data.displayName is string
-        && request.resource.data.displayName.size() <= 80;
+        && request.resource.data.displayName.size() <= 80
+        && validDetails(request.resource.data);
 
       // The profile photo is a small image stored inline (no Cloud Storage bucket needed).
       function validPhoto(data) {
@@ -89,19 +110,52 @@ service cloud.firestore {
             && data.photoURL.matches('data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+'));
       }
 
-      // Admins can change a user's role (never their own). Users can edit their own name and
-      // photo but never their role or identity fields.
+      // Admins can change a user's role (never their own). Users can edit their own name, photo
+      // and details but never their role or identity fields.
       allow update: if (isAdmin()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
           && request.resource.data.role in ['student', 'trainer', 'admin']
           && !isOwner(uid))
         || (isOwner(uid)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL'])
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['displayName', 'photoURL', 'birthDate', 'whatsapp'])
           && request.resource.data.displayName is string
           && request.resource.data.displayName.size() <= 80
-          && validPhoto(request.resource.data));
+          && validPhoto(request.resource.data)
+          && validDetails(request.resource.data));
 
       allow delete: if isAdmin();
+
+      // Each browser records itself; the owner sees them all and signs any of them out. This
+      // asks the other browser to sign out, it does not revoke its token (that needs the Admin
+      // SDK): changing the password does, as Firebase then ends every other session.
+      match /sessions/{sessionId} {
+        function validName(value) {
+          return value is string && value.size() <= 40;
+        }
+
+        allow read: if isOwner(uid);
+
+        allow create: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['browser', 'os', 'mobile', 'createdAt',
+            'lastSeen', 'revoked'])
+          && validName(request.resource.data.browser)
+          && validName(request.resource.data.os)
+          && request.resource.data.mobile is bool
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.lastSeen == request.time
+          && request.resource.data.revoked == false;
+
+        // The browser refreshes lastSeen; any of the owner's browsers can sign it out, once.
+        allow update: if isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'revoked'])
+          && (request.resource.data.lastSeen == resource.data.lastSeen
+            || request.resource.data.lastSeen == request.time)
+          && request.resource.data.revoked is bool
+          && (resource.data.revoked == false || request.resource.data.revoked == true);
+
+        allow delete: if isOwner(uid) || isAdmin();
+      }
     }
 
     match /enrollments/{uid} {

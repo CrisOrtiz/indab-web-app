@@ -12,6 +12,7 @@ import {
 } from 'firebase/auth';
 import { deleteField, doc, updateDoc } from 'firebase/firestore';
 import { AuthService } from '../../core/auth/auth.service';
+import { PersonalDetails } from '../../core/models/user-profile';
 import { FIREBASE_AUTH, FIRESTORE } from '../../core/firebase/firebase.providers';
 import { resizeImage } from '../../shared/avatar/resize-image';
 
@@ -25,7 +26,7 @@ export function signInMethods(user: User | null): SignInMethod[] {
 }
 
 /**
- * The signed-in user's own account settings: name, photo and password. Profile fields are
+ * The signed-in user's own account settings: name, details, photo and password. Profile fields are
  * written to `users/{uid}` (see `firestore.rules`); passwords go to Firebase Auth only.
  */
 @Injectable({ providedIn: 'root' })
@@ -34,11 +35,22 @@ export class ProfileService {
   private readonly firestore = inject(FIRESTORE);
   private readonly authService = inject(AuthService);
 
-  async updateDisplayName(displayName: string): Promise<void> {
+  /** Saves the name and details from the profile's personal data form. */
+  async updatePersonal(displayName: string, details: PersonalDetails): Promise<void> {
     const user = this.currentUser();
-    await updateDoc(doc(this.firestore, 'users', user.uid), { displayName });
-    await updateProfile(user, { displayName });
-    this.authService.refreshUser();
+    await updateDoc(doc(this.firestore, 'users', user.uid), {
+      displayName,
+      ...detailUpdate(details),
+    });
+    if (user.displayName !== displayName) {
+      await updateProfile(user, { displayName });
+      this.authService.refreshUser();
+    }
+  }
+
+  /** Saves the details the account setup page asks for. */
+  async saveDetails(details: PersonalDetails): Promise<void> {
+    await updateDoc(doc(this.firestore, 'users', this.currentUser().uid), detailUpdate(details));
   }
 
   /** Shrinks the picked image (see `resizeImage`) and saves it as the profile photo. */
@@ -90,4 +102,12 @@ export class ProfileService {
     }
     return user;
   }
+}
+
+/** An empty WhatsApp number removes the stored one. */
+function detailUpdate(details: PersonalDetails) {
+  return {
+    birthDate: details.birthDate,
+    whatsapp: details.whatsapp || deleteField(),
+  };
 }

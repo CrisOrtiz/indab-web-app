@@ -12,6 +12,8 @@ import { PracticeService } from './features/practice/practice.service';
 import { EvaluationService } from './features/evaluations/evaluation.service';
 import { Profile } from './features/profile/profile';
 import { ProfileService } from './features/profile/profile.service';
+import { SessionsService } from './features/profile/sessions.service';
+import { AccountSetup } from './features/account-setup/account-setup';
 import { en } from './core/i18n/messages/en';
 import { es } from './core/i18n/messages/es';
 import { pt } from './core/i18n/messages/pt';
@@ -24,6 +26,7 @@ describe('app routes', () => {
     hasAcademyAccess: signal(false),
     isAdmin: signal(false),
     isStaff: signal(false),
+    setupStep: signal<'verifyEmail' | 'details' | null>(null),
     whenReady: () => Promise.resolve(),
   };
 
@@ -37,12 +40,14 @@ describe('app routes', () => {
     auth.hasAcademyAccess.set(false);
     auth.isAdmin.set(false);
     auth.isStaff.set(false);
+    auth.setupStep.set(null);
     TestBed.configureTestingModule({
       providers: [
         provideRouter(routes),
         { provide: AuthService, useValue: auth },
         { provide: FIRESTORE_LOADER, useValue: firestore },
         { provide: ProfileService, useValue: {} },
+        { provide: SessionsService, useValue: { watch: () => () => undefined } },
         // The practice pages read Firestore on load.
         {
           provide: PracticeService,
@@ -56,6 +61,7 @@ describe('app routes', () => {
     });
     TestBed.overrideComponent(Practice, { set: { template: '' } });
     TestBed.overrideComponent(Profile, { set: { template: '' } });
+    TestBed.overrideComponent(AccountSetup, { set: { template: '' } });
     // The admin page would open Firestore listeners; only the routing matters here.
     TestBed.overrideComponent(Admin, {
       set: { providers: [{ provide: AdminService, useValue: {} }], template: '' },
@@ -123,6 +129,23 @@ describe('app routes', () => {
     expect(await visit('/academy/ranking')).toBe('/login?returnUrl=%2Facademy%2Franking');
     expect(await visit('/academy/calendar')).toBe('/login?returnUrl=%2Facademy%2Fcalendar');
     expect(await visit('/admin/evaluations')).toBe('/login?returnUrl=%2Fadmin%2Fevaluations');
+    expect(await visit('/account-setup')).toBe('/login?returnUrl=%2Faccount-setup');
+  });
+
+  it('sends users who have not finished setting up their account to the setup page', async () => {
+    signIn({ admin: true });
+    auth.setupStep.set('verifyEmail');
+    expect(await visit('/academy')).toBe('/account-setup?returnUrl=%2Facademy');
+    expect(await visit('/profile')).toBe('/account-setup?returnUrl=%2Fprofile');
+    expect(await visit('/academy/practice')).toBe('/account-setup?returnUrl=%2Facademy%2Fpractice');
+    expect(await visit('/admin')).toBe('/account-setup?returnUrl=%2Fadmin');
+    auth.setupStep.set('details');
+    expect(await visit('/academy/material')).toBe('/account-setup?returnUrl=%2Facademy%2Fmaterial');
+    expect(await visit('/account-setup')).toBe('/account-setup');
+
+    auth.setupStep.set(null);
+    expect(await visit('/profile')).toBe('/profile');
+    expect(await visit('/account-setup')).toBe('/academy');
   });
 
   it('keeps students without access in the academy', async () => {

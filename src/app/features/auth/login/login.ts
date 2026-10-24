@@ -18,6 +18,8 @@ export class Login {
 
   /** Bound from the `?returnUrl=` query param set by the guards. */
   readonly returnUrl = input<string>('/academy');
+  /** `?ended=1`: the user signed this browser out from another device. */
+  readonly ended = input<string>();
 
   protected readonly form = inject(FormBuilder).nonNullable.group({
     email: ['', [Validators.required, Validators.email]],

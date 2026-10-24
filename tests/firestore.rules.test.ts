@@ -49,8 +49,12 @@ beforeEach(async () => {
   });
 });
 
-const as = (uid: string | null) =>
-  (uid ? env.authenticatedContext(uid) : env.unauthenticatedContext()).firestore();
+// Every test user has confirmed their email (as Google accounts have) unless it says otherwise.
+const as = (uid: string | null, emailVerified = true) =>
+  (uid
+    ? env.authenticatedContext(uid, { email_verified: emailVerified })
+    : env.unauthenticatedContext()
+  ).firestore();
 
 describe('users', () => {
   it('lets a user create their own student profile', async () => {
@@ -146,6 +150,124 @@ describe('user profiles', () => {
     await assertFails(updateDoc(doc(as('student'), 'users/admin'), { displayName: 'x' }));
     await assertFails(deleteDoc(doc(as('student'), 'users/student')));
     await assertSucceeds(deleteDoc(doc(as('admin'), 'users/student')));
+  });
+});
+
+describe('personal details', () => {
+  const profile = (extra: Record<string, unknown> = {}) => ({
+    uid: 'new',
+    email: 'a@b.co',
+    displayName: 'Nuevo',
+    role: 'student',
+    createdAt: new Date(),
+    ...extra,
+  });
+
+  it('accepts a birth date and an optional WhatsApp number at registration', async () => {
+    await assertSucceeds(setDoc(doc(as('new'), 'users/new'), profile({ birthDate: '1995-04-30' })));
+    await assertSucceeds(
+      setDoc(
+        doc(as('other'), 'users/other'),
+        profile({ uid: 'other', birthDate: '1995-04-30', whatsapp: '+5215512345678' }),
+      ),
+    );
+  });
+
+  it('rejects badly formatted details', async () => {
+    const own = doc(as('new'), 'users/new');
+    await assertFails(setDoc(own, profile({ birthDate: '30/04/1995' })));
+    await assertFails(setDoc(own, profile({ birthDate: new Date() })));
+    await assertFails(setDoc(own, profile({ whatsapp: '5512345678' })));
+    await assertFails(setDoc(own, profile({ whatsapp: '+52 55 1234 5678' })));
+    await assertFails(setDoc(own, profile({ whatsapp: '+1234567' })));
+  });
+
+  it('lets owners add, change and remove their details later', async () => {
+    const own = doc(as('student'), 'users/student');
+    await assertSucceeds(updateDoc(own, { birthDate: '2001-12-01', whatsapp: '+56912345678' }));
+    await assertSucceeds(updateDoc(own, { whatsapp: deleteField() }));
+    await assertFails(updateDoc(own, { birthDate: 'mañana' }));
+    await assertFails(updateDoc(doc(as('admin'), 'users/student'), { whatsapp: '+56912345678' }));
+  });
+});
+
+describe('email verification', () => {
+  it('keeps academy content closed until the email is verified', async () => {
+    await assertFails(getDoc(doc(as('enrolled', false), 'materials/m1')));
+    await assertFails(getDoc(doc(as('partial', false), 'courses/forex-101/lessons/l1')));
+    await assertFails(getDoc(doc(as('admin', false), 'materials/m1')));
+    await assertSucceeds(getDoc(doc(as('enrolled'), 'materials/m1')));
+  });
+
+  it('still lets an unverified user read and complete their own profile', async () => {
+    const own = doc(as('student', false), 'users/student');
+    await assertSucceeds(getDoc(own));
+    await assertSucceeds(updateDoc(own, { birthDate: '1990-01-15' }));
+  });
+});
+
+describe('device sessions', () => {
+  const device = (extra: Record<string, unknown> = {}) => ({
+    browser: 'Chrome',
+    os: 'Windows',
+    mobile: false,
+    createdAt: serverTimestamp(),
+    lastSeen: serverTimestamp(),
+    revoked: false,
+    ...extra,
+  });
+  const path = 'users/student/sessions/s1';
+  const seed = () =>
+    env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), path), {
+        ...device(),
+        createdAt: new Date(),
+        lastSeen: new Date(),
+      }),
+    );
+
+  it('lets each browser record itself under its owner only', async () => {
+    await assertSucceeds(setDoc(doc(as('student'), path), device()));
+    await assertFails(setDoc(doc(as('admin'), 'users/student/sessions/s2'), device()));
+    await assertFails(
+      setDoc(doc(as('student'), 'users/student/sessions/s3'), device({ revoked: true })),
+    );
+    await assertFails(
+      setDoc(doc(as('student'), 'users/student/sessions/s4'), device({ createdAt: new Date(0) })),
+    );
+    await assertFails(
+      setDoc(doc(as('student'), 'users/student/sessions/s5'), device({ ip: '1.2.3.4' })),
+    );
+    await assertFails(
+      setDoc(doc(as('student'), 'users/student/sessions/s6'), device({ browser: 'x'.repeat(41) })),
+    );
+  });
+
+  it('is private to its owner', async () => {
+    await seed();
+    await assertSucceeds(getDocs(collection(as('student'), 'users/student/sessions')));
+    await assertFails(getDocs(collection(as('admin'), 'users/student/sessions')));
+    await assertFails(getDoc(doc(as('enrolled'), path)));
+    await assertFails(getDoc(doc(as(null), path)));
+  });
+
+  it('refreshes the last activity and signs a session out once', async () => {
+    await seed();
+    const own = doc(as('student'), path);
+    await assertSucceeds(updateDoc(own, { lastSeen: serverTimestamp() }));
+    await assertFails(updateDoc(own, { lastSeen: new Date(0) }));
+    await assertFails(updateDoc(own, { browser: 'Firefox' }));
+    await assertSucceeds(updateDoc(own, { revoked: true }));
+    await assertFails(updateDoc(own, { revoked: false }));
+    await assertFails(updateDoc(doc(as('enrolled'), path), { revoked: true }));
+  });
+
+  it('is deleted by its owner on sign-out, or by admins', async () => {
+    await seed();
+    await assertFails(deleteDoc(doc(as('enrolled'), path)));
+    await assertSucceeds(deleteDoc(doc(as('student'), path)));
+    await seed();
+    await assertSucceeds(deleteDoc(doc(as('admin'), path)));
   });
 });
 

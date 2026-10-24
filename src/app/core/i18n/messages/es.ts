@@ -21,6 +21,7 @@ export const es = {
     adminEvaluations: 'Evaluaciones de práctica | INDAB',
     notFound: 'Página no encontrada | INDAB',
     profile: 'Mi perfil | INDAB',
+    accountSetup: 'Activa tu cuenta | INDAB',
   },
 
   // Search engines and link previews (WhatsApp, Facebook...). Keep descriptions under ~160 characters.
@@ -230,6 +231,34 @@ export const es = {
     },
   },
 
+  // Birth date and WhatsApp: asked at registration, on the account setup page and in the profile.
+  details: {
+    birthDate: 'Fecha de nacimiento',
+    birthDateRequired: 'Ingresa tu fecha de nacimiento.',
+    birthDateInvalid: 'Revisa la fecha de nacimiento.',
+    whatsapp: 'WhatsApp (opcional)',
+    whatsappPlaceholder: '+52 55 1234 5678',
+    whatsappHint:
+      'Con el código de país. Lo usamos para avisos de clases y para ayudarte con tu cuenta.',
+    whatsappInvalid: 'Escribe el número con el código de país, por ejemplo +52 55 1234 5678.',
+  },
+
+  setup: {
+    verifyTitle: 'Confirma tu correo',
+    verifyText: (email: string) =>
+      `Te enviamos un enlace a ${email}. Ábrelo para activar tu cuenta y vuelve a esta página.`,
+    verifySpam: '¿No lo ves? Revisa la carpeta de spam o promociones.',
+    checkVerified: 'Ya lo confirmé',
+    resend: 'Reenviar correo',
+    resent: 'Te enviamos otro correo.',
+    notVerified:
+      'Todavía no vemos la confirmación. Abre el enlace del correo y vuelve a intentarlo.',
+    detailsTitle: 'Completa tus datos',
+    detailsText: 'Antes de entrar necesitamos tu fecha de nacimiento. El WhatsApp es opcional.',
+    save: 'Guardar y continuar',
+    signOut: 'Cerrar sesión',
+  },
+
   auth: {
     email: 'Correo electrónico',
     password: 'Contraseña',
@@ -243,6 +272,7 @@ export const es = {
       register: 'Crear cuenta',
       resetNeedsEmail: 'Escribe tu correo para recuperar la contraseña.',
       resetSent: 'Te enviamos un correo para restablecer tu contraseña.',
+      sessionEnded: 'Cerraste esta sesión desde otro dispositivo. Ingresa de nuevo si eras tú.',
     },
     register: {
       title: 'Crear cuenta',
@@ -739,8 +769,8 @@ export const es = {
     name: 'Nombre completo',
     nameRequired: 'Ingresa tu nombre (máximo 80 caracteres).',
     email: 'Correo electrónico',
-    saveName: 'Guardar nombre',
-    nameSaved: 'Nombre actualizado.',
+    saveDetails: 'Guardar datos',
+    detailsSaved: 'Datos actualizados.',
     preferences: 'Preferencias',
     language: 'Idioma del sitio',
     languageHint: 'Se recuerda en este dispositivo.',
@@ -764,6 +794,23 @@ export const es = {
     passwordChanged: 'Contraseña actualizada.',
     forgot: '¿No recuerdas tu contraseña actual?',
     resetSent: (email: string) => `Te enviamos un correo a ${email} para restablecerla.`,
+    openSessions: 'Sesiones abiertas',
+    sessionsIntro: 'Los navegadores donde tienes tu cuenta abierta.',
+    sessionsLoading: 'Cargando…',
+    sessionsFailed: 'No pudimos cargar tus sesiones.',
+    device: (browser: string, os: string) => `${browser} en ${os}`,
+    unknownBrowser: 'Navegador',
+    unknownSystem: 'otro sistema',
+    mobile: 'Celular o tableta',
+    computer: 'Computadora',
+    thisDevice: 'Este dispositivo',
+    lastActive: 'Última actividad',
+    signOutSession: 'Cerrar sesión',
+    signOutOthers: 'Cerrar las demás sesiones',
+    sessionSignedOut: 'Listo. Ese dispositivo se cerrará apenas se conecte.',
+    othersSignedOut: 'Listo. Los demás dispositivos se cerrarán apenas se conecten.',
+    sessionsHint:
+      'Si crees que alguien más conoce tu contraseña, cámbiala: eso cierra al instante todas las demás sesiones.',
   },
 
   stats: {
