@@ -18,27 +18,8 @@ h1 {
   color: var(--color-muted);
 }
 
-.tabs {
-  display: flex;
-  gap: 4px;
-  margin: 24px 0 16px;
-  border-bottom: 1px solid var(--color-border);
-
-  button {
-    padding: 10px 16px;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    background: none;
-    color: var(--color-muted);
-    font: inherit;
-    cursor: pointer;
-
-    &.selected {
-      border-bottom-color: var(--color-text);
-      color: var(--color-text);
-      font-weight: 600;
-    }
-  }
+.filters {
+  margin: 24px 0 8px;
 }
 
 .filters select {

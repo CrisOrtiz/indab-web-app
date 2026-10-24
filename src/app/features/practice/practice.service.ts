@@ -145,21 +145,6 @@ export class PracticeService {
     return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
   }
 
-  /** Finished free-practice sessions ended since `since`, newest first, for the ranking. */
-  async freeSessions(since: Date, max = 1000): Promise<PracticeSession[]> {
-    const snapshot = await getDocs(
-      query(
-        this.sessions,
-        where('evaluationId', '==', null),
-        where('status', '==', 'finished'),
-        where('endedAt', '>=', since),
-        orderBy('endedAt', 'desc'),
-        limit(max),
-      ),
-    );
-    return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
-  }
-
   /** Every attempt at an evaluation (staff, or anyone once its results are published). */
   async evaluationSessions(evaluationId: string): Promise<PracticeSession[]> {
     const snapshot = await getDocs(query(this.sessions, where('evaluationId', '==', evaluationId)));

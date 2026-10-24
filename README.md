@@ -178,7 +178,7 @@ The service account needs the *Firebase Admin* and *Service Usage Consumer* role
 | `materials/{id}` | users with academy access (`enrollments/{uid}.academy == true`), admins | admins |
 | `investors/{uid}` (Eleva) | owner, admins | admins |
 | `evaluations/{id}` (timed practice evaluation) | trainers, admins, assigned students | trainers and admins (shape validated) |
-| `practiceSessions/{id}` (chart replay) | owner, trainers, admins; free sessions (`evaluationId == null`) and attempts at evaluations with published results also to everyone with academy access, for the ranking | owner with academy access creates it and updates its summary until `finished`; an evaluation attempt has the id `{evaluationId}_{uid}` (one per student), must start inside the window on the evaluation's settings, and is locked 2 minutes after its time limit; admins delete |
+| `practiceSessions/{id}` (chart replay) | owner, trainers, admins; attempts at evaluations with published results also to everyone with academy access, for the ranking | owner with academy access creates it and updates its summary until `finished`; an evaluation attempt has the id `{evaluationId}_{uid}` (one per student), must start inside the window on the evaluation's settings, and is locked 2 minutes after its time limit; admins delete |
 | `practiceSessions/{id}/trades/{id}` | session owner, trainers, admins | session owner opens trades while the session is active (and, in an evaluation, before the time is up) and closes each once (entry never editable); admins delete |
 
 A user gets access to the academy and the material repository when an admin turns on
@@ -200,7 +200,7 @@ the rules are what actually protect the data. Anything not listed is denied.
 | `/profile` | signed-in users (photo, name, password, language, practice P/L; opened from the avatar menu in the header) |
 | `/academy/material` | enrolled users (learning material, opened from the academy; `/repository` redirects here) |
 | `/academy/practice` | enrolled users (chart-replay trading practice: free practice and assigned evaluations) |
-| `/academy/ranking` | enrolled users (free-practice ranking and published evaluation rankings) |
+| `/academy/ranking` | enrolled users (rankings of published evaluations) |
 | `/admin` | trainers and admins (users, roles and academy access for admins only) |
 | `/admin/practice` | trainers and admins (review students' practice sessions on the chart; admins delete them) |
 | `/admin/evaluations` | trainers and admins (set up timed evaluations, see and publish their results) |
@@ -282,9 +282,9 @@ once; a countdown runs and the attempt finishes by itself when the time is up (l
 also ends it). The rules enforce the single attempt, the window, the settings and the time limit.
 Results stay with the staff until a trainer publishes them.
 
-`/academy/ranking` ranks free practice by the total P/L of the sessions finished in the last 7,
-30 or 365 days (ties go to the better average return per session), and each published
-evaluation by the attempt's P/L (fewer trades first on a tie).
+`/academy/ranking` ranks only evaluations (Cris's choice: free practice is not ranked and stays
+private to the student and staff): each published evaluation by the attempt's P/L, fewer
+trades first on a tie.
 
 The chart is TradingView's [lightweight-charts](https://github.com/tradingview/lightweight-charts)
 (Apache-2.0; its logo on the chart is the required attribution). P/L figures are computed in the

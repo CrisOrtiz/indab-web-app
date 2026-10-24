@@ -103,13 +103,7 @@ describe('PracticeService', () => {
     );
   });
 
-  it('reads the ranking sessions and evaluation attempts', async () => {
-    const since = new Date(2026, 9, 1);
-    await service.freeSessions(since);
-    expect(where).toHaveBeenCalledWith('evaluationId', '==', null);
-    expect(where).toHaveBeenCalledWith('status', '==', 'finished');
-    expect(where).toHaveBeenCalledWith('endedAt', '>=', since);
-
+  it('reads evaluation attempts', async () => {
     expect(await service.evaluationSessions('e1')).toEqual([{ id: 's1', symbol: 'PAXGUSDT' }]);
     expect(where).toHaveBeenCalledWith('evaluationId', '==', 'e1');
 

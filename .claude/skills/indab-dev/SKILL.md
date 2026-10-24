@@ -52,7 +52,7 @@ otherwise create a feature service.
 | `materials/{id}` | academy access | admins |
 | `investors/{uid}` (Eleva) | owner, admins | admins |
 | `evaluations/{id}` | staff, assigned students | staff (shape validated) |
-| `practiceSessions/{id}` + `/trades/{id}` | owner, staff; session summaries of free practice and published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
+| `practiceSessions/{id}` + `/trades/{id}` | owner, staff; attempts at published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
 
 Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`, `isStaff()`
 (trainers and admins), `hasAcademyAccess()` (staff count as having it), `isEnrolledIn(courseId)`.
@@ -164,11 +164,10 @@ Module notes:
   `features/evaluations/evaluation.service.ts`) are set up at `/admin/evaluations`
   (`features/admin/evaluations/`). Students see theirs above the practice setup and take each
   once; the attempt is a practice session with id `{evaluationId}_{uid}`, `evaluationId` and
-  `durationMinutes`, and the page counts down and finishes it. Every new free session stores
-  `evaluationId: null`, which is what the ranking query (and its composite index) filters on;
-  sessions logged before that do not appear in the ranking. `/academy/ranking`
-  (`features/ranking/`, pure ranking maths in `standings.ts`) ranks free practice by total P/L
-  over a period and published evaluations by attempt P/L. Students see an evaluation's ranking
+  `durationMinutes`, and the page counts down and finishes it; free sessions store
+  `evaluationId: null`. `/academy/ranking` (`features/ranking/`, ranking maths in
+  `standings.ts`) ranks only evaluations, by attempt P/L: Cris does not want free practice
+  ranked, so free sessions stay private to the student and staff. Students see an evaluation's ranking
   only after staff publish it. P/L is client-computed: not a trusted grade.
 - **Eleva (`/eleva`, investor area)**: the public page stays unguarded. Investor data lives in
   `investors/{uid}` and subcollections (e.g. `investors/{uid}/statements/{month}`), admin-written,

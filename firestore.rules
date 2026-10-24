@@ -13,10 +13,10 @@ rules_version = '2';
 //                                        market, replay start, time limit, window, assigned students
 //   practiceSessions/{id}                chart-replay practice by a student with academy access;
 //                                        owner writes while active, trainers and admins read all.
-//                                        Free sessions (evaluationId null) are listed in the ranking
-//                                        for everyone with academy access; an evaluation attempt has
-//                                        the id {evaluationId}_{uid} (one per student) and is shown
-//                                        to others once its results are published
+//                                        Free sessions have evaluationId null; an evaluation attempt
+//                                        has the id {evaluationId}_{uid} (one per student) and is
+//                                        shown to academy members, for the ranking, once its
+//                                        evaluation's results are published
 //   practiceSessions/{id}/trades/{id}    simulated orders of that session: market orders open at
 //                                        once, limit/stop orders fill or are cancelled once; open
 //                                        trades close once; only SL/TP (and a pending price) move
@@ -203,8 +203,7 @@ service cloud.firestore {
       }
 
       allow read: if isOwner(resource.data.uid) || isStaff()
-        || (hasAcademyAccess()
-          && (resource.data.evaluationId == null || publishedAttempt(resource.data)));
+        || (hasAcademyAccess() && publishedAttempt(resource.data));
 
       allow create: if hasAcademyAccess()
         && request.resource.data.keys().hasOnly(['uid', 'userName', 'symbol', 'interval',

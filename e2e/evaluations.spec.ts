@@ -79,7 +79,6 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
 
   // Results stay with the staff until the trainer publishes them.
   await page.goto('/academy/ranking');
-  await page.getByRole('button', { name: 'Evaluaciones' }).click();
   await expect(
     page.getByText('Todavía no hay resultados de evaluaciones publicados.'),
   ).toBeVisible();
@@ -95,42 +94,31 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
 
   await signOut(page);
   await signIn(page, 'jose@indab.test');
-  await page.getByRole('link', { name: 'Ranking de práctica' }).click();
+  await page.getByRole('link', { name: 'Ranking de evaluaciones' }).click();
   await expect(page).toHaveURL('/academy/ranking');
-  await page.getByRole('button', { name: 'Evaluaciones' }).click();
   await expect(page.getByRole('row', { name: /José Pérez Tú/ })).toContainText('1.00');
 });
 
-test('the free-practice ranking lists every student with academy access', async ({ page }) => {
-  const luisUid = (await listDocuments('users')).find((u) => u['email'] === 'luis@indab.test')![
-    'id'
-  ];
-  const session = (uid: string, userName: string, pnl: number) => ({
-    uid,
-    userName,
+test('free practice stays out of the ranking and private', async ({ page }) => {
+  await setDocument('practiceSessions/a', {
+    uid: joseUid,
+    userName: 'José Pérez',
     symbol: 'PAXGUSDT',
     interval: '15m',
     replayStart: 1_700_000_000_000,
     startingBalance: 200,
-    balance: 200 + pnl,
-    pnl,
+    balance: 212.5,
+    pnl: 12.5,
     tradeCount: 4,
     status: 'finished',
     startedAt: new Date(),
     endedAt: new Date(),
     evaluationId: null,
   });
-  await setDocument('practiceSessions/a', session(joseUid, 'José Pérez', 12.5));
-  await setDocument('practiceSessions/b', session(luisUid as string, 'Luis Díaz', 30));
-  await setDocument('practiceSessions/c', session(joseUid, 'José Pérez', -2.5));
-
-  await signIn(page, 'jose@indab.test');
-  await page.getByRole('link', { name: 'Ranking de práctica' }).click();
-  const rows = page.locator('tbody tr');
-  await expect(rows).toHaveCount(2);
-  await expect(rows.nth(0)).toContainText('Luis Díaz');
-  await expect(rows.nth(0)).toContainText('30.00');
-  await expect(rows.nth(1)).toContainText('José Pérez');
-  await expect(rows.nth(1)).toContainText('10.00');
-  await expect(rows.nth(1)).toContainText('50%');
+  await signIn(page, 'luis@indab.test');
+  await page.getByRole('link', { name: 'Ranking de evaluaciones' }).click();
+  await expect(
+    page.getByText('Todavía no hay resultados de evaluaciones publicados.'),
+  ).toBeVisible();
+  await expect(page.getByText('José Pérez')).toHaveCount(0);
 });

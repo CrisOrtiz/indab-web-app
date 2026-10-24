@@ -6,17 +6,12 @@ import { I18n } from '../../core/i18n/i18n.service';
 import { Evaluation } from '../../core/models/evaluation';
 import { EvaluationService } from '../evaluations/evaluation.service';
 import { PracticeService } from '../practice/practice.service';
-import { EvaluationStanding, FreeStanding, evaluationStandings, freeStandings } from './standings';
-
-type Tab = 'free' | 'evaluations';
-export type Period = 7 | 30 | 365;
-export const PERIODS: Period[] = [7, 30, 365];
-const DAY = 24 * 60 * 60 * 1000;
+import { EvaluationStanding, evaluationStandings } from './standings';
 
 /**
- * Practice ranking, part of the academy: free practice ranked over a period, and the ranking
- * of each evaluation once its results are published (staff see every evaluation's).
- * Results are what the students' browsers logged, so they rank practice, not a trusted grade.
+ * Practice ranking, part of the academy: the ranking of each timed evaluation once its results
+ * are published (staff see every evaluation's). Free practice is not ranked. Results are what
+ * the students' browsers logged, so they rank practice, not a trusted grade.
  */
 @Component({
   selector: 'app-ranking',
@@ -30,33 +25,17 @@ export class Ranking {
   private readonly evaluationService = inject(EvaluationService);
   protected readonly i18n = inject(I18n);
 
-  protected readonly periods = PERIODS;
-  protected readonly tab = signal<Tab>('free');
-  protected readonly period = signal<Period>(30);
-  protected readonly free = signal<FreeStanding[] | null>(null);
   protected readonly evaluations = signal<Evaluation[] | null>(null);
   protected readonly selected = signal<string | null>(null);
   protected readonly results = signal<EvaluationStanding[] | null>(null);
   protected readonly error = signal<string | null>(null);
 
   constructor() {
-    void this.loadFree();
+    void this.loadEvaluations();
   }
 
   protected isMe(uid: string): boolean {
     return uid === this.auth.user()?.uid;
-  }
-
-  protected setPeriod(period: number): void {
-    this.period.set(period as Period);
-    void this.loadFree();
-  }
-
-  protected showEvaluations(): void {
-    this.tab.set('evaluations');
-    if (this.evaluations() === null) {
-      void this.loadEvaluations();
-    }
   }
 
   protected async select(id: string): Promise<void> {
@@ -72,18 +51,6 @@ export class Ranking {
       }
     } catch {
       this.results.set([]);
-      this.error.set(this.i18n.messages().ranking.loadFailed);
-    }
-  }
-
-  private async loadFree(): Promise<void> {
-    this.free.set(null);
-    this.error.set(null);
-    try {
-      const since = new Date(Date.now() - this.period() * DAY);
-      this.free.set(freeStandings(await this.practice.freeSessions(since)));
-    } catch {
-      this.free.set([]);
       this.error.set(this.i18n.messages().ranking.loadFailed);
     }
   }

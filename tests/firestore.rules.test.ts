@@ -391,10 +391,10 @@ describe('trading practice', () => {
     }
   });
 
-  it('shows sessions to their owner, staff and, for the ranking, academy members', async () => {
+  it('keeps free sessions private to their owner and staff', async () => {
     await assertSucceeds(getDoc(sessionRef('enrolled')));
     await assertSucceeds(getDoc(sessionRef('admin')));
-    await assertSucceeds(getDoc(sessionRef('other')));
+    await assertFails(getDoc(sessionRef('other')));
     await assertFails(getDoc(sessionRef('student')));
     await assertFails(getDoc(sessionRef('partial')));
     await assertFails(getDoc(sessionRef(null)));
@@ -405,6 +405,7 @@ describe('trading practice', () => {
         query(sessions('enrolled'), where('uid', '==', 'enrolled'), orderBy('startedAt', 'desc')),
       ),
     );
+    await assertFails(getDocs(sessions('enrolled')));
     await assertFails(getDocs(sessions('student')));
     await assertSucceeds(getDocs(query(sessions('admin'), orderBy('startedAt', 'desc'))));
   });
@@ -837,7 +838,7 @@ describe('ranking', () => {
     await seed('evaluations/e2', evaluation(false));
   });
 
-  it('lists free sessions to everyone with academy access', async () => {
+  it('never lists free sessions to other students', async () => {
     const free = (uid: string | null) =>
       getDocs(
         query(
@@ -848,12 +849,11 @@ describe('ranking', () => {
           orderBy('endedAt', 'desc'),
         ),
       );
-    await assertSucceeds(free('other'));
+    await assertFails(free('other'));
     await assertSucceeds(free('trainer'));
     await assertFails(free('student'));
-    await assertFails(free('partial'));
     await assertFails(free(null));
-    await assertSucceeds(getDoc(doc(as('other'), 'practiceSessions/f1')));
+    await assertFails(getDoc(doc(as('other'), 'practiceSessions/f1')));
   });
 
   it('shows evaluation results to others once published', async () => {
@@ -863,6 +863,7 @@ describe('ranking', () => {
     await assertFails(getDoc(doc(as('other'), 'practiceSessions/e2_enrolled')));
     await assertSucceeds(results('other', 'e1'));
     await assertFails(results('other', 'e2'));
+    await assertFails(results('student', 'e1'));
     await assertSucceeds(results('trainer', 'e2'));
     // Trades stay private either way.
     await assertFails(getDocs(collection(as('other'), 'practiceSessions/e1_enrolled/trades')));

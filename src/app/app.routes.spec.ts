@@ -45,7 +45,6 @@ describe('app routes', () => {
           useValue: {
             mySessions: async () => [],
             allSessions: async () => [],
-            freeSessions: async () => [],
           },
         },
         { provide: EvaluationService, useValue: { all: async () => [], students: async () => [] } },
