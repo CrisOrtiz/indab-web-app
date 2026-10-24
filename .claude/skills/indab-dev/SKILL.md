@@ -142,7 +142,9 @@ Module notes:
   `enrollment().courses` or full academy access. Shows the pending notice when not enrolled.
 - **Trading practice (`/academy/practice`, built)**: `features/practice/`. `Replay` (`replay.ts`)
   is the pure bar-by-bar engine (orders, fills, SL/TP, P/L); `ReplayChart` wraps
-  lightweight-charts and its draggable price/SL/TP lines (`levelMoved`; fake it in component
+  lightweight-charts and its draggable price/SL/TP lines (`levelMoved`; the order being set up
+  only appears once picked from the "+" menu (`orderAt`) or the order panel is used, and is set up
+  on its line (`draftTypeChanged`, `lotsChanged`, `levelAdded`, `draftDiscarded`); fake it in component
   specs, it needs a canvas); `MarketDataService` loads Binance public klines in the browser
   (no key; mock them with `page.route` in e2e); `PracticeService` logs `practiceSessions` and
   their `trades`. Admin review at `/admin/practice` (`features/admin/practice-review/`): reloads the session's

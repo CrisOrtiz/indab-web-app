@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
-import { Candle, PracticeTrade } from '../../core/models/practice';
+import { Candle, OrderType, PracticeTrade } from '../../core/models/practice';
 import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
 
 const lw = vi.hoisted(() => {
@@ -81,10 +81,15 @@ const position: PracticeTrade = {
     [draft]="draft()"
     [hideDates]="hide()"
     [barSeconds]="barSeconds()"
+    [trading]="trading()"
+    [lots]="0.05"
     (levelMoved)="moves.push($event)"
     (levelRemoved)="removed.push($event)"
+    (levelAdded)="added.push($event)"
     (tradeClosed)="closed.push($event)"
     (draftSubmitted)="submitted()"
+    (draftDiscarded)="discarded = discarded + 1"
+    (draftTypeChanged)="types.push($event)"
     (orderAt)="orders.push($event)"
     (lotsChanged)="lots.push($event)"
     symbol="PAXGUSDT"
@@ -96,8 +101,12 @@ class Host {
   readonly draft = signal<OrderDraft | null>(null);
   readonly hide = signal(true);
   readonly barSeconds = signal(1);
+  readonly trading = signal(true);
   readonly moves: LevelMove[] = [];
   readonly removed: LevelRemove[] = [];
+  readonly added: LevelRemove[] = [];
+  readonly types: OrderType[] = [];
+  discarded = 0;
   readonly closed: string[] = [];
   readonly orders: OrderAt[] = [];
   readonly lots: string[] = [];
@@ -190,12 +199,13 @@ describe('ReplayChart', () => {
     ]);
     expect(lw.series.createPriceLine).toHaveBeenCalledTimes(2);
     // 0.05 lots bought at 120, last close 1.5; stop loss at 110.
-    expect(labels()).toEqual(['Compra 0.05 -592.50 USD ×', 'SL 0.05 -50.00 USD ×']);
+    // The position has no take profit yet: its TP tab hangs under the label.
+    expect(labels()).toEqual(['Compra 0.05 -592.50 USD × TP', 'SL 0.05 -50.00 USD ×']);
 
     // A new candle refreshes the position's P/L.
     host.candles.update((list) => [...list, c(3, 130)]);
     await fixture.whenStable();
-    expect(labels()[0]).toBe('Compra 0.05 +50.00 USD ×');
+    expect(labels()[0]).toBe('Compra 0.05 +50.00 USD × TP');
 
     host.trades.set([]);
     await fixture.whenStable();
@@ -404,12 +414,7 @@ describe('ReplayChart', () => {
     });
     host.trades.set([position]);
     await fixture.whenStable();
-    expect(labels()).toContain('Vender Mercado');
-    const lots = el.querySelector<HTMLInputElement>('.line-label input.lots')!;
-    expect(lots.value).toBe('0.05');
-    lots.value = '0.1';
-    lots.dispatchEvent(new Event('change'));
-    expect(host.lots).toEqual(['0.1']);
+    expect(labels()).toContain('Vender 0.05 Mercado × TP SL');
     const canvas = el.querySelector('.canvas')!;
     const pointer = (type: string, clientY: number) =>
       canvas.dispatchEvent(new MouseEvent(type, { clientY, bubbles: true }));
@@ -482,9 +487,10 @@ describe('ReplayChart', () => {
     await fixture.whenStable();
     el.querySelectorAll<HTMLButtonElement>('.plus-menu button')[3].click();
     await fixture.whenStable();
+    // Nothing is placed from the menu: the page draws the order's line to adjust and place.
     expect(host.orders).toEqual([
-      { side: 'short', orderType: 'stop', price: 90, place: true },
-      { side: 'long', orderType: 'limit', price: 90, place: false },
+      { side: 'short', orderType: 'stop', price: 90 },
+      { side: 'long', orderType: 'limit', price: 90 },
     ]);
     expect(labels()).toContain('×');
 
@@ -499,5 +505,129 @@ describe('ReplayChart', () => {
     );
     await fixture.whenStable();
     expect(el.querySelector('button.plus')).toBeNull();
+
+    // On a phone a tap shows the "+", which stays when the finger lifts.
+    const touch = (type: string, target: Element) => {
+      // Away from the lines, which a tap would grab.
+      const event = new MouseEvent(type, { clientX: 50, clientY: 300, bubbles: true });
+      Object.defineProperty(event, 'pointerType', { value: 'touch' });
+      target.dispatchEvent(event);
+    };
+    touch('pointerdown', el.querySelector('.canvas')!);
+    touch('pointerleave', stage);
+    await fixture.whenStable();
+    expect(el.querySelector<HTMLElement>('button.plus')!.style.top).toBe('300px');
+
+    // A replay that is over (or the admin review) offers no "+".
+    host.trading.set(false);
+    await fixture.whenStable();
+    stage.dispatchEvent(
+      new MouseEvent('pointermove', { clientX: 50, clientY: 410, bubbles: true }),
+    );
+    await fixture.whenStable();
+    expect(el.querySelector('button.plus')).toBeNull();
+  });
+
+  it('sets up the order on its line: quantity pad, order type, warning and discard', async () => {
+    const { fixture, host, el, labels } = await render();
+    host.candles.set([c(1), c(2, 100)]);
+    host.draft.set({
+      side: 'long',
+      orderType: 'stop',
+      price: 110,
+      stopLoss: null,
+      takeProfit: null,
+      quantity: 5,
+    });
+    await fixture.whenStable();
+    expect(labels()).toEqual(['Comprar 0.05 Stop × TP SL']);
+    const query = (selector: string) => el.querySelector<HTMLElement>(selector)!;
+
+    // The lots open a quantity pad: typed, stepped or picked.
+    query('button[aria-label="Lotes de la orden: 0.05"]').click();
+    await fixture.whenStable();
+    const pad = query('[role="dialog"][aria-label="Cantidad (lotes)"]');
+    const input = pad.querySelector('input')!;
+    expect(input.value).toBe('0.05');
+    input.value = '0.2';
+    input.dispatchEvent(new Event('change'));
+    query('button[aria-label="Más lotes"]').click();
+    query('button[aria-label="Menos lotes"]').click();
+    [...pad.querySelectorAll('button')].find((b) => b.textContent?.trim() === '0.50')!.click();
+    expect(host.lots).toEqual(['0.20', '0.06', '0.04', '0.50']);
+    document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    await fixture.whenStable();
+    expect(el.querySelector('[role="dialog"]')).toBeNull();
+
+    // The order type opens a menu.
+    query('button[aria-label="Tipo de orden: Stop"]').click();
+    await fixture.whenStable();
+    const types = [...el.querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
+    expect(types.map((b) => [b.textContent!.trim(), b.getAttribute('aria-checked')])).toEqual([
+      ['Mercado', 'false'],
+      ['Límite', 'false'],
+      ['Stop', 'true'],
+    ]);
+    types[1].click();
+    await fixture.whenStable();
+    expect(host.types).toEqual(['limit']);
+    expect(el.querySelector('[role="menu"]')).toBeNull();
+
+    // An order that cannot be placed says why, and its button is off.
+    host.draft.update((d) => ({ ...d!, orderType: 'limit', error: 'Precio incorrecto' }));
+    await fixture.whenStable();
+    expect(query('[role="img"][aria-label="Precio incorrecto"]').textContent).toBe('!');
+    expect(query('.line-label button.badge').hasAttribute('disabled')).toBe(true);
+
+    // The × discards it.
+    query('button[aria-label="Descartar orden"]').click();
+    expect(host.discarded).toBe(1);
+  });
+
+  it('drags TP and SL out of their tabs, shades them, and drops them on the entry to remove', async () => {
+    const { fixture, host, el, labels } = await render();
+    host.candles.set([c(1), c(2, 100)]);
+    host.draft.set({
+      side: 'long',
+      orderType: 'limit',
+      price: 98,
+      stopLoss: null,
+      takeProfit: null,
+      quantity: 5,
+    });
+    await fixture.whenStable();
+    const canvas = el.querySelector('.canvas')!;
+    const tab = (name: string) =>
+      el.querySelector<HTMLElement>(`button.tab[aria-label="Añadir ${name}"]`)!;
+    const grab = (name: string, clientY: number) =>
+      tab(name).dispatchEvent(new MouseEvent('pointerdown', { clientY, bubbles: true }));
+    const pointer = (type: string, clientY: number) =>
+      canvas.dispatchEvent(new MouseEvent(type, { clientY, bubbles: true }));
+
+    // The entry is at 98 (y = 402). Pulling the TP tab up to 110 shows its band and P/L.
+    grab('take profit', 402);
+    pointer('pointermove', 390);
+    await fixture.whenStable();
+    expect(labels()).toContain('TP 0.05 +60.00 USD ×');
+    const zone = el.querySelector<HTMLElement>('.zone.profit')!;
+    expect([zone.style.top, zone.style.height]).toEqual(['390px', '12px']);
+    pointer('pointerup', 390);
+    // A click on the SL tab asks for it at its default distance.
+    grab('stop loss', 402);
+    pointer('pointerup', 402);
+    expect(host.moves).toEqual([{ target: 'draft', field: 'takeProfit', price: 110 }]);
+    expect(host.added).toEqual([{ target: 'draft', field: 'stopLoss' }]);
+
+    // With a stop loss at 90 (y = 410) the band is red; dragging it back onto the entry
+    // removes it.
+    host.draft.update((d) => ({ ...d!, stopLoss: 90 }));
+    await new Promise((resolve) => setTimeout(resolve));
+    await fixture.whenStable();
+    expect(el.querySelector('.zone.loss')).not.toBeNull();
+    pointer('pointerdown', 410);
+    pointer('pointermove', 403);
+    pointer('pointerup', 403);
+    expect(host.removed).toEqual([{ target: 'draft', field: 'stopLoss' }]);
+    expect(host.moves).toHaveLength(1);
   });
 });

@@ -94,6 +94,17 @@
       </button>
     }
   }
+  @for (zone of zones(); track zone.key) {
+    <div
+      class="zone"
+      [class.profit]="zone.profit"
+      [class.loss]="!zone.profit"
+      [style.top.px]="zone.top"
+      [style.height.px]="zone.height"
+      [style.right.px]="scaleWidth()"
+      aria-hidden="true"
+    ></div>
+  }
   @for (label of labels(); track label.key) {
     <div
       class="line-label"
@@ -103,6 +114,9 @@
       [style.border-color]="label.color"
       (pointerdown)="grab(label, $event)"
     >
+      @if (label.warning; as warning) {
+        <span class="warning" role="img" [attr.aria-label]="warning" [title]="warning">!</span>
+      }
       @if (label.badge; as badge) {
         @if (badge.submit) {
           <button
@@ -110,6 +124,7 @@
             class="badge"
             [class.buy]="badge.side === 'long'"
             [class.sell]="badge.side === 'short'"
+            [disabled]="!!label.warning"
             (pointerdown)="$event.stopPropagation()"
             (click)="draftSubmitted.emit()"
           >
@@ -126,18 +141,31 @@
         }
       }
       @if (label.lots !== undefined) {
-        <input
-          class="lots"
-          type="number"
-          min="0.01"
-          step="0.01"
-          [attr.aria-label]="t.orderLots"
-          [value]="label.lots"
+        <button
+          type="button"
+          class="opener lots"
+          aria-haspopup="dialog"
+          [attr.aria-expanded]="popup() === 'lots'"
+          [attr.aria-label]="t.orderLots(formatLots(label.lots))"
           (pointerdown)="$event.stopPropagation()"
-          (change)="lotsChanged.emit($any($event.target).value)"
-        />
+          (click)="togglePopup('lots')"
+        >
+          {{ formatLots(label.lots) }}
+        </button>
       }
-      @if (label.text) {
+      @if (label.typeMenu) {
+        <button
+          type="button"
+          class="opener text"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="popup() === 'type'"
+          [attr.aria-label]="t.orderTypeOf(label.text)"
+          (pointerdown)="$event.stopPropagation()"
+          (click)="togglePopup('type')"
+        >
+          {{ label.text }}
+        </button>
+      } @else if (label.text) {
         <span class="text" [style.color]="label.color">{{ label.text }}</span>
       }
       @if (label.pnl !== null) {
@@ -156,9 +184,91 @@
           ×
         </button>
       }
+      @if (label.tabs; as tabs) {
+        <span class="tabs">
+          @for (field of tabs.fields; track field) {
+            <button
+              type="button"
+              class="tab"
+              [class.tp]="field === 'takeProfit'"
+              [class.sl]="field === 'stopLoss'"
+              [attr.aria-label]="t.addLevel(i18n.messages().trading[field])"
+              (pointerdown)="grabTab(tabs, field, $event)"
+            >
+              {{ field === 'takeProfit' ? 'TP' : 'SL' }}
+            </button>
+          }
+        </span>
+      }
     </div>
   }
-  @if (hoverY(); as y) {
+  @if (draftLabel(); as label) {
+    @if (popup() === 'lots') {
+      <div
+        class="popup lots-pad"
+        role="dialog"
+        [attr.aria-label]="t.quantity"
+        [style.top.px]="below(label.y).top"
+        [style.bottom.px]="below(label.y).bottom"
+        [style.right.px]="scaleWidth() + 28"
+      >
+        <label>
+          <span>{{ t.quantity }}</span>
+          <input
+            type="number"
+            min="0.01"
+            step="0.01"
+            [value]="formatLots(label.lots ?? 0)"
+            (change)="pickLots(+$any($event.target).value)"
+          />
+        </label>
+        <div class="steps">
+          <button
+            type="button"
+            [attr.aria-label]="t.lessLots"
+            (click)="pickLots((label.lots ?? 0) - 0.01)"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            [attr.aria-label]="t.moreLots"
+            (click)="pickLots((label.lots ?? 0) + 0.01)"
+          >
+            +
+          </button>
+        </div>
+        <div class="presets">
+          @for (lots of lotPresets; track lots) {
+            <button type="button" (click)="pickLots(lots)">{{ formatLots(lots) }}</button>
+          }
+        </div>
+      </div>
+    } @else if (popup() === 'type') {
+      <div
+        class="popup type-menu"
+        role="menu"
+        [attr.aria-label]="t.orderType"
+        [style.top.px]="below(label.y).top"
+        [style.bottom.px]="below(label.y).bottom"
+        [style.right.px]="scaleWidth() + 28"
+      >
+        <p class="popup-title">{{ t.orderType }}</p>
+        @for (type of orderTypes; track type) {
+          <button
+            type="button"
+            role="menuitemradio"
+            [attr.aria-checked]="draft()?.orderType === type"
+            [class.on]="draft()?.orderType === type"
+            (click)="pickType(type)"
+          >
+            {{ i18n.messages().trading.orderTypes[type] }}
+          </button>
+        }
+      </div>
+    }
+  }
+  @if (trading() && hoverY(); as y) {
     <button
       type="button"
       class="plus"
@@ -175,11 +285,12 @@
     <div
       class="plus-menu"
       role="menu"
-      [style.top.px]="m.y + 12"
+      [style.top.px]="below(m.y).top"
+      [style.bottom.px]="below(m.y).bottom"
       [style.right.px]="scaleWidth() + 2"
     >
       @for (order of menuOrders(); track order.side) {
-        <button type="button" role="menuitem" (click)="placeAt(order.side, order.orderType)">
+        <button type="button" role="menuitem" (click)="orderFromMenu(order.side, order.orderType)">
           {{ order.text }} {{ m.price | number: priceDigits(m.price) }} {{ order.type }}
         </button>
       }

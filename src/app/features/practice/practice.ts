@@ -42,6 +42,7 @@ import {
   marginFor,
   tradeLots,
   tradePnl,
+  validateOrder,
 } from './replay';
 import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
 import { SessionStatsPanel } from './session-stats';
@@ -89,7 +90,9 @@ export function formatCountdown(ms: number): string {
  *
  * The trading screen follows TradingView: Buy/Sell prices on the chart for one-click market
  * orders, an order panel with Market/Limit/Stop tabs and take profit / stop loss checkboxes
- * that show their P/L, and Positions / Orders / History tabs under the chart.
+ * that show their P/L, and Positions / Orders / History tabs under the chart. The order being
+ * set up only shows on the chart once the student adds it from the chart's "+" menu or starts
+ * filling in the panel; it is placed with its Buy/Sell button and discarded with its ×.
  */
 @Component({
   selector: 'app-practice',
@@ -182,6 +185,8 @@ export class Practice {
   protected readonly takeProfit = signal<number | null>(null);
   protected readonly orderError = signal<string | null>(null);
   protected readonly placing = signal(false);
+  /** Whether the order being set up is on the chart. */
+  protected readonly drafting = signal(false);
 
   protected readonly instrument = computed(
     () => INSTRUMENTS.find((i) => i.symbol === this.symbol()) ?? INSTRUMENTS[0],
@@ -248,18 +253,34 @@ export class Practice {
   });
 
   /** The ticket's order, drawn on the chart as lines the student can drag. */
-  protected readonly draft = computed<OrderDraft | null>(() =>
-    this.phase() === 'playing'
-      ? {
-          side: this.side(),
-          orderType: this.orderType(),
-          price: this.orderType() === 'market' ? null : this.orderPrice(),
-          stopLoss: this.stopLoss(),
-          takeProfit: this.takeProfit(),
-          quantity: this.units(),
-        }
-      : null,
-  );
+  protected readonly draft = computed<OrderDraft | null>(() => {
+    const replay = this.replay();
+    if (this.phase() !== 'playing' || !this.drafting() || !replay) {
+      return null;
+    }
+    const input: OpenTradeInput = {
+      side: this.side(),
+      orderType: this.orderType(),
+      price: this.orderType() === 'market' ? null : this.orderPrice(),
+      lots: this.lots(),
+      stopLoss: this.stopLoss(),
+      takeProfit: this.takeProfit(),
+    };
+    return {
+      side: input.side,
+      orderType: input.orderType,
+      price: input.price,
+      stopLoss: input.stopLoss,
+      takeProfit: input.takeProfit,
+      quantity: this.units(),
+      error: validateOrder(
+        input,
+        replay.current().close,
+        replay.available(),
+        this.i18n.messages().orderErrors,
+      ),
+    };
+  });
 
   private timer?: ReturnType<typeof setInterval>;
   private clock?: ReturnType<typeof setInterval>;
@@ -349,6 +370,7 @@ export class Practice {
       this.orderError.set(null);
       this.stopLoss.set(null);
       this.takeProfit.set(null);
+      this.drafting.set(false);
       this.tab.set('positions');
       this.evaluation.set(evaluation);
       this.phase.set('playing');
@@ -460,11 +482,18 @@ export class Practice {
       takeProfit: this.takeProfit(),
     });
     if (placed) {
-      this.stopLoss.set(null);
-      this.takeProfit.set(null);
-      this.setOrderType(this.orderType());
+      this.discardDraft();
       this.tab.set(placed.status === 'pending' ? 'orders' : 'positions');
     }
+  }
+
+  /** Takes the order being set up off the chart and clears its exits. */
+  protected discardDraft(): void {
+    this.drafting.set(false);
+    this.stopLoss.set(null);
+    this.takeProfit.set(null);
+    this.orderError.set(null);
+    this.setOrderType(this.orderType());
   }
 
   /** One-click market order from the chart, with the ticket's size and no SL/TP. */
@@ -530,6 +559,7 @@ export class Practice {
   }
 
   protected setSide(side: TradeSide): void {
+    this.drafting.set(true);
     this.side.set(side);
     this.setOrderType(this.orderType());
     this.stopLoss.set(null);
@@ -539,6 +569,7 @@ export class Practice {
   /** Switches the ticket's order type, starting a limit or stop price next to the market. */
   protected setOrderType(type: OrderType): void {
     this.orderType.set(type);
+    this.orderError.set(null);
     const current = this.replay()?.current().close;
     if (type === 'market' || current === undefined) {
       this.orderPrice.set(null);
@@ -556,8 +587,28 @@ export class Practice {
     this[field].set(price);
   }
 
+  /** The ticket's order type tabs: its line shows up on the chart. */
+  protected pickOrderType(type: OrderType): void {
+    this.drafting.set(true);
+    this.setOrderType(type);
+  }
+
+  /**
+   * The order type menu on the chart's order line: a limit or stop keeps the line where it is
+   * (and says if it is on the wrong side of the market); a market order moves to the price.
+   */
+  protected changeDraftType(type: OrderType): void {
+    const price = this.orderPrice();
+    if (type === 'market' || price === null) {
+      this.setOrderType(type);
+    } else {
+      this.orderType.set(type);
+    }
+  }
+
   /** The take profit / stop loss checkboxes: on adds the level at a default distance. */
   protected toggleLevel(field: LevelField, on: boolean): void {
+    this.drafting.set(true);
     const current = this.replay()?.current().close;
     if (!on || current === undefined) {
       this[field].set(null);
@@ -697,28 +748,32 @@ export class Practice {
     }
   }
 
-  /** The × on a stop loss or take profit label. */
-  /** An order from the chart's "+" menu: placed at once, or filled into the order panel. */
-  protected async onOrderAt(order: OrderAt): Promise<void> {
-    if (!order.place) {
-      this.side.set(order.side);
-      this.orderType.set(order.orderType);
-      this.orderPrice.set(order.price);
+  /** An order from the chart's "+" menu: its line shows up, ready to adjust and place. */
+  protected onOrderAt(order: OrderAt): void {
+    this.side.set(order.side);
+    this.orderType.set(order.orderType);
+    this.orderPrice.set(order.price);
+    this.stopLoss.set(null);
+    this.takeProfit.set(null);
+    this.orderError.set(null);
+    this.drafting.set(true);
+  }
+
+  /** A TP/SL tab clicked on a chart line: adds that level at its default distance. */
+  protected onLevelAdded({ target, field }: LevelRemove): void {
+    if (target === 'draft') {
+      this.toggleLevel(field, true);
       return;
     }
-    const placed = await this.place({
-      side: order.side,
-      orderType: order.orderType,
-      price: order.price,
-      lots: this.lots(),
-      stopLoss: null,
-      takeProfit: null,
-    });
-    if (placed) {
-      this.tab.set('orders');
+    const trade = this.replay()
+      ?.trades()
+      .find((t) => t.id === target);
+    if (trade) {
+      this.addTradeLevel(trade, field);
     }
   }
 
+  /** The × on a stop loss or take profit label. */
   protected onLevelRemoved({ target, field }: LevelRemove): void {
     if (target === 'draft') {
       this.setLevel(field, null);

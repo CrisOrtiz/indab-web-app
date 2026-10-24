@@ -69,11 +69,16 @@
             [draft]="draft()"
             [hideDates]="datesHidden()"
             [barSeconds]="barSeconds()"
+            [trading]="true"
+            [lots]="lots()"
             (levelMoved)="onLevelMoved($event)"
             (levelRemoved)="onLevelRemoved($event)"
+            (levelAdded)="onLevelAdded($event)"
             (tradeClosed)="onTradeClosed($event)"
             [symbol]="symbol()"
             (draftSubmitted)="openTrade()"
+            (draftDiscarded)="discardDraft()"
+            (draftTypeChanged)="changeDraftType($event)"
             (orderAt)="onOrderAt($event)"
             (lotsChanged)="setLots($event)"
           >
@@ -110,7 +115,8 @@
             </div>
           </app-replay-chart>
 
-          <aside class="ticket" [attr.aria-label]="t.ticket">
+          <!-- Working on the order panel shows its order on the chart. -->
+          <aside class="ticket" [attr.aria-label]="t.ticket" (focusin)="drafting.set(true)">
             <div class="ticket-head">
               <strong>{{ symbol() }}</strong>
               <span class="muted">1:{{ leverage }}</span>
@@ -144,7 +150,7 @@
                   type="button"
                   [class.selected]="orderType() === type"
                   [attr.aria-pressed]="orderType() === type"
-                  (click)="setOrderType(type)"
+                  (click)="pickOrderType(type)"
                 >
                   {{ tr.orderTypes[type] }}
                 </button>
