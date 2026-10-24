@@ -6,11 +6,15 @@ export type Language = 'es-419' | 'en-US' | 'pt-BR';
 
 export const DEFAULT_LANGUAGE: Language = 'es-419';
 
-/** The languages offered in the switcher, each named in itself. */
-export const LANGUAGES: { code: Language; name: string; short: string }[] = [
-  { code: 'es-419', name: 'Español', short: 'ES' },
-  { code: 'en-US', name: 'English', short: 'EN' },
-  { code: 'pt-BR', name: 'Português', short: 'PT' },
+/**
+ * The languages offered in the switcher, each named in itself. `param` is the value of the
+ * `?lang=` link that opens the site in that language (used for search engines' language
+ * alternates and for sharing); links in the default language leave it out.
+ */
+export const LANGUAGES: { code: Language; name: string; short: string; param: string }[] = [
+  { code: 'es-419', name: 'Español', short: 'ES', param: 'es' },
+  { code: 'en-US', name: 'English', short: 'EN', param: 'en' },
+  { code: 'pt-BR', name: 'Português', short: 'PT', param: 'pt' },
 ];
 
 /** localStorage key of the visitor's choice. */
@@ -39,9 +43,13 @@ export class I18n {
   readonly language = this._language.asReadonly();
   readonly messages = computed(() => this.loaded()[this._language()] ?? es);
 
-  /** Restores the saved language. The app waits for it, so the first render is translated. */
+  /**
+   * Picks the language of a `?lang=` link, else the saved one. The app waits for it, so the
+   * first render is translated. A link's language is not remembered: it is for that visit.
+   */
   async init(): Promise<void> {
-    const saved = this.storage((s) => s.getItem(LANGUAGE_KEY));
+    const linked = this.languageFromUrl();
+    const saved = linked ?? this.storage((s) => s.getItem(LANGUAGE_KEY));
     if (isLanguage(saved) && saved !== DEFAULT_LANGUAGE) {
       await this.use(saved, false);
     } else {
@@ -64,6 +72,15 @@ export class I18n {
     this.applyToDocument(language);
     if (remember) {
       this.storage((s) => s.setItem(LANGUAGE_KEY, language));
+    }
+  }
+
+  private languageFromUrl(): Language | null {
+    try {
+      const param = new URLSearchParams(this.document.defaultView?.location.search).get('lang');
+      return LANGUAGES.find((l) => l.param === param)?.code ?? null;
+    } catch {
+      return null;
     }
   }
 

@@ -3,8 +3,8 @@ import type { Messages } from './es';
 /** Brazilian Portuguese. Same keys as `es.ts`. */
 export const pt: Messages = {
   titles: {
-    landing: 'INDAB Academy',
-    eleva: 'Eleva Inversiones',
+    landing: 'INDAB Academy | Academia de trading',
+    eleva: 'Eleva Inversiones | INDAB',
     login: 'Entrar | INDAB',
     register: 'Criar conta | INDAB',
     academy: 'Academia | INDAB',
@@ -17,6 +17,20 @@ export const pt: Messages = {
     adminEvaluations: 'Avaliações de prática | INDAB',
     notFound: 'Página não encontrada | INDAB',
     profile: 'Meu perfil | INDAB',
+  },
+
+  seo: {
+    imageAlt: 'INDAB Academy. Conhecimento. Disciplina. Estratégia. Resultados.',
+    descriptions: {
+      landing:
+        'Academia de trading INDAB: análise técnica, gestão de risco e psicologia do trader, com aulas, material de estudo e prática em gráficos reais.',
+      eleva:
+        'Eleva Inversiones, o braço de investimentos da INDAB: gere capital com a disciplina e a gestão de risco que ensinamos, com relatórios mensais.',
+      login:
+        'Entre na sua conta da INDAB Academy para ver seus cursos, o material de estudo e a prática de trading.',
+      register:
+        'Crie sua conta na INDAB Academy e comece a aprender trading com um processo claro e mensurável.',
+    },
   },
 
   loader: {

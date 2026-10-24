@@ -1,30 +1,43 @@
 import { Routes } from '@angular/router';
-import { authGuard, enrolledGuard, guestGuard, staffGuard } from './core/auth/auth.guards';
+import {
+  authGuard,
+  enrolledGuard,
+  guestGuard,
+  preloadFirestore,
+  staffGuard,
+} from './core/auth/auth.guards';
+import { SeoData } from './core/seo/seo.service';
 
-// Titles are keys of `Messages['titles']`, translated by `I18nTitleStrategy`.
+// Titles are keys of `Messages['titles']`, translated by `I18nTitleStrategy`. Public pages for
+// search engines carry `SeoData` (and are prerendered, see `app.routes.server.ts`); the rest are
+// marked noindex.
 export const routes: Routes = [
   // Public
   {
     path: '',
     pathMatch: 'full',
     title: 'landing',
+    data: { description: 'landing' } satisfies SeoData,
     loadComponent: () => import('./features/landing/landing').then((m) => m.Landing),
   },
   {
     path: 'eleva',
     title: 'eleva',
+    data: { description: 'eleva' } satisfies SeoData,
     loadComponent: () => import('./features/eleva/eleva').then((m) => m.Eleva),
   },
   {
     path: 'login',
     title: 'login',
-    canActivate: [guestGuard],
+    data: { description: 'login' } satisfies SeoData,
+    canActivate: [guestGuard, preloadFirestore],
     loadComponent: () => import('./features/auth/login/login').then((m) => m.Login),
   },
   {
     path: 'register',
     title: 'register',
-    canActivate: [guestGuard],
+    data: { description: 'register' } satisfies SeoData,
+    canActivate: [guestGuard, preloadFirestore],
     loadComponent: () => import('./features/auth/register/register').then((m) => m.Register),
   },
 

@@ -1,5 +1,7 @@
-import { inject } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import { PLATFORM_ID, inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
+import { FIRESTORE_LOADER } from '../firebase/firebase.providers';
 import { AuthService } from './auth.service';
 
 /** Allows signed-in users; sends everyone else to the login page. */
@@ -51,4 +53,17 @@ export const adminGuard: CanActivateFn = async (_route, state) => {
     return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
   }
   return auth.isAdmin() || router.createUrlTree(['/academy']);
+};
+
+/**
+ * Not a check: starts downloading the Firestore SDK while the visitor fills in the login or
+ * register form, so the academy opens quickly after signing in.
+ */
+export const preloadFirestore: CanActivateFn = () => {
+  if (isPlatformBrowser(inject(PLATFORM_ID))) {
+    inject(FIRESTORE_LOADER)
+      .load()
+      .catch(() => undefined);
+  }
+  return true;
 };

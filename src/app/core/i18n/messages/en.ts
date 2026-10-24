@@ -3,8 +3,8 @@ import type { Messages } from './es';
 /** English (United States). Same keys as `es.ts`. */
 export const en: Messages = {
   titles: {
-    landing: 'INDAB Academy',
-    eleva: 'Eleva Inversiones',
+    landing: 'INDAB Academy | Trading academy',
+    eleva: 'Eleva Inversiones | INDAB',
     login: 'Sign in | INDAB',
     register: 'Create account | INDAB',
     academy: 'Academy | INDAB',
@@ -17,6 +17,20 @@ export const en: Messages = {
     adminEvaluations: 'Practice evaluations | INDAB',
     notFound: 'Page not found | INDAB',
     profile: 'My profile | INDAB',
+  },
+
+  seo: {
+    imageAlt: 'INDAB Academy. Knowledge. Discipline. Strategy. Results.',
+    descriptions: {
+      landing:
+        'INDAB trading academy: technical analysis, risk management and trading psychology, with classes, study material and practice on real charts.',
+      eleva:
+        "Eleva Inversiones, INDAB's investment arm: it manages capital with the discipline and risk management we teach, with monthly reports.",
+      login:
+        'Sign in to your INDAB Academy account to see your courses, study material and trading practice.',
+      register:
+        'Create your INDAB Academy account and start learning to trade with a clear, measurable process.',
+    },
   },
 
   loader: {

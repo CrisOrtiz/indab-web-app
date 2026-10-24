@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The prerendered public pages (src/app/app.routes.server.ts) in each language (?lang=). -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://indab-academy.web.app/</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/" />
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://indab-academy.web.app/?lang=en</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/" />
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://indab-academy.web.app/?lang=pt</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/" />
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://indab-academy.web.app/eleva</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/eleva" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/eleva?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/eleva?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/eleva" />
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://indab-academy.web.app/eleva?lang=en</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/eleva" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/eleva?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/eleva?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/eleva" />
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://indab-academy.web.app/eleva?lang=pt</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/eleva" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/eleva?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/eleva?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/eleva" />
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://indab-academy.web.app/register</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/register" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/register?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/register?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/register" />
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://indab-academy.web.app/register?lang=en</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/register" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/register?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/register?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/register" />
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://indab-academy.web.app/register?lang=pt</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/register" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/register?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/register?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/register" />
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://indab-academy.web.app/login</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/login" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/login?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/login?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/login" />
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://indab-academy.web.app/login?lang=en</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/login" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/login?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/login?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/login" />
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://indab-academy.web.app/login?lang=pt</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/login" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/login?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/login?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/login" />
+    <priority>0.3</priority>
+  </url>
+</urlset>

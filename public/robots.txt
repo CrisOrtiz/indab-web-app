@@ -1,0 +1,7 @@
+# Public pages are open to search engines; the signed-in areas are not worth crawling.
+User-agent: *
+Disallow: /academy
+Disallow: /admin
+Disallow: /profile
+
+Sitemap: https://indab-academy.web.app/sitemap.xml

@@ -1,7 +1,7 @@
 import { effect } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
-import { FIREBASE_AUTH, FIRESTORE } from '../firebase/firebase.providers';
+import { FIREBASE_AUTH, FIRESTORE_LOADER } from '../firebase/firebase.providers';
 import { AuthService } from './auth.service';
 
 type Listener = { next: (snapshot: unknown) => void; error: (e: unknown) => void };
@@ -62,15 +62,21 @@ describe('AuthService', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: FIREBASE_AUTH, useValue: {} },
-        { provide: FIRESTORE, useValue: {} },
+        { provide: FIRESTORE_LOADER, useValue: { load: async () => ({}), instance: () => ({}) } },
       ],
     });
     service = TestBed.inject(AuthService);
   });
 
+  /** Emits an auth state and lets the lazily loaded Firestore code attach its listeners. */
+  const emit = async (value: auth.User) => {
+    fb.authCallback!(value);
+    await vi.waitFor(() => expect(fb.listeners.has(`enrollments/${value.uid}`)).toBe(true));
+  };
+
   /** Emits an auth state, then answers the profile and enrollment listeners. */
-  const signInAs = (uid: string, profile?: unknown, enrollment?: unknown) => {
-    fb.authCallback!(user(uid));
+  const signInAs = async (uid: string, profile?: unknown, enrollment?: unknown) => {
+    await emit(user(uid));
     fb.listeners.get(`users/${uid}`)!.next(snapshot(profile));
     fb.listeners.get(`enrollments/${uid}`)!.next(snapshot(enrollment));
     return service.whenReady();
@@ -93,7 +99,7 @@ describe('AuthService', () => {
   it('waits for the profile and enrollment before it is ready', async () => {
     let ready = false;
     service.whenReady().then(() => (ready = true));
-    fb.authCallback!(user('ana'));
+    await emit(user('ana'));
     fb.listeners.get('users/ana')!.next(snapshot({ role: 'student' }));
     await flush();
     expect(ready).toBe(false);
@@ -121,7 +127,7 @@ describe('AuthService', () => {
   });
 
   it('treats a denied or failed listener as missing data', async () => {
-    fb.authCallback!(user('ana'));
+    await emit(user('ana'));
     fb.listeners.get('users/ana')!.error(new Error('permission-denied'));
     fb.listeners.get('enrollments/ana')!.error(new Error('permission-denied'));
     await service.whenReady();
@@ -141,6 +147,16 @@ describe('AuthService', () => {
     expect(service.profile()).toBeNull();
     expect(service.enrollment()).toBeNull();
     expect(service.isAdmin()).toBe(false);
+  });
+
+  it('drops the data load of a user who signed out before Firestore loaded', async () => {
+    fb.authCallback!(user('ana'));
+    fb.authCallback!(null);
+    await service.whenReady();
+    await vi.dynamicImportSettled();
+    await flush();
+    expect(fb.listeners.size).toBe(0);
+    expect(service.isLoggedIn()).toBe(false);
   });
 
   it('switches listeners when another user signs in', async () => {

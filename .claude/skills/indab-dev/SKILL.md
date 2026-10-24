@@ -36,6 +36,14 @@ private readonly firestore = inject(FIRESTORE);
 Then call the modular SDK directly (`collection`, `query`, `where`, `onSnapshot`, `getDocs`, ...).
 Never call `getFirestore()`/`getAuth()` elsewhere, or the emulator wiring is skipped.
 
+The Firestore SDK is lazy (it was half of the first download): `FIRESTORE_LOADER.load()` imports
+it, and `AuthService` loads it before the guards admit a signed-in user, so services of guarded
+pages can `inject(FIRESTORE)`; `preloadFirestore` starts the download on login/register. Never
+import `firebase/firestore` values (use `import type`) in code of the main bundle
+(`app.config.ts`, `core/auth`, `shared/layout`, public pages); a public page that needs data
+awaits `inject(FIRESTORE_LOADER).load()`. Check `ng build`'s initial size (about 440 kB) after
+touching startup code.
+
 For the current user, use `AuthService` (`src/app/core/auth/auth.service.ts`):
 `user()`, `profile()`, `enrollment()`, `isLoggedIn()`, `isAdmin()`, `hasAcademyAccess()`, and
 `whenReady()` before reading them in guards. Add new per-user state there only if it is global;
@@ -96,6 +104,10 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
   `begin()`/end for listeners until their first snapshot); leave background work untracked
   (e.g. `loadCandles(..., { background: true })` for the replay's next chunk). Favicons and app
   icons in `public/` are cut from the logo's mark (the M with the arrow).
+- SEO: public pages are prerendered at build time (`outputMode: "static"`, `@angular/ssr`, no
+  hydration) and `Seo` (`core/seo`) sets meta, canonical, `hreflang` (`?lang=es|en|pt` links) and
+  Open Graph tags per route and language. Code on public pages runs once in Node at build time:
+  guard browser APIs with `isPlatformBrowser` or try/catch. See README "SEO and loading speed".
 - Formatting: Prettier (`printWidth` 100, single quotes). Run `npx prettier --write` on changed files.
 
 ## Adding a module
@@ -108,7 +120,10 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
 4. **Component(s)** in `src/app/features/<name>/`, replacing the placeholder and its
    `placeholder.scss` import.
 5. **Route** in `src/app/app.routes.ts` with `loadComponent`, a `title` key (added to `titles` in
-   the three message files) and the right guard.
+   the three message files) and the right guard. A public page for search engines also gets
+   `data: { description: '<key>' } satisfies SeoData` (texts in `seo.descriptions`), a
+   `RenderMode.Prerender` entry in `app.routes.server.ts` and its URLs in `public/sitemap.xml`;
+   everything else is `noindex` and browser-only.
    Add a header link in `src/app/shared/layout/header.html` if it is a main section.
 6. **Indexes**: composite queries need an entry in `firestore.indexes.json`.
 7. **Docs**: update the access-model and routes tables in `README.md` and this skill.

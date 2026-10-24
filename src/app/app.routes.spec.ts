@@ -4,6 +4,7 @@ import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from './app.routes';
 import { AuthService } from './core/auth/auth.service';
+import { FIRESTORE_LOADER } from './core/firebase/firebase.providers';
 import { Admin } from './features/admin/admin';
 import { AdminService } from './features/admin/admin.service';
 import { Practice } from './features/practice/practice';
@@ -26,10 +27,12 @@ describe('app routes', () => {
     whenReady: () => Promise.resolve(),
   };
 
+  const firestore = { load: vi.fn(async () => ({})), instance: () => null };
   let harness: RouterTestingHarness | undefined;
 
   beforeEach(() => {
     harness = undefined;
+    firestore.load.mockClear();
     auth.isLoggedIn.set(false);
     auth.hasAcademyAccess.set(false);
     auth.isAdmin.set(false);
@@ -38,6 +41,7 @@ describe('app routes', () => {
       providers: [
         provideRouter(routes),
         { provide: AuthService, useValue: auth },
+        { provide: FIRESTORE_LOADER, useValue: firestore },
         { provide: ProfileService, useValue: {} },
         // The practice pages read Firestore on load.
         {
@@ -96,6 +100,17 @@ describe('app routes', () => {
     expect(await visit('/login')).toBe('/login');
     expect(await visit('/register')).toBe('/register');
     expect(await visit('/no-existe')).toBe('/no-existe');
+  });
+
+  it('downloads Firestore only once a visitor heads to sign in or register', async () => {
+    await visit('/');
+    await visit('/eleva');
+    expect(firestore.load).not.toHaveBeenCalled();
+    await visit('/login');
+    expect(firestore.load).toHaveBeenCalled();
+    firestore.load.mockClear();
+    await visit('/register');
+    expect(firestore.load).toHaveBeenCalled();
   });
 
   it('sends visitors to login from private pages', async () => {

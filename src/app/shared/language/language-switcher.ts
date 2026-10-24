@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { I18n, LANGUAGES, Language } from '../../core/i18n/i18n.service';
+import { I18n, LANGUAGES } from '../../core/i18n/i18n.service';
 
 /** Language picker in the header; the choice is remembered on this device. */
 @Component({
@@ -32,5 +32,5 @@ import { I18n, LANGUAGES, Language } from '../../core/i18n/i18n.service';
 })
 export class LanguageSwitcher {
   protected readonly i18n = inject(I18n);
-  protected readonly languages: { code: Language; name: string; short: string }[] = LANGUAGES;
+  protected readonly languages = LANGUAGES;
 }

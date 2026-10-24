@@ -55,6 +55,18 @@ describe('I18n', () => {
     expect(i18n.language()).toBe('es-419');
   });
 
+  it('opens in the language of a ?lang= link without remembering it', async () => {
+    localStorage.setItem(LANGUAGE_KEY, 'pt-BR');
+    history.replaceState(null, '', '/?lang=en');
+    try {
+      await i18n.init();
+      expect(i18n.language()).toBe('en-US');
+      expect(localStorage.getItem(LANGUAGE_KEY)).toBe('pt-BR');
+    } finally {
+      history.replaceState(null, '', '/');
+    }
+  });
+
   it('has the same texts, lists and placeholders in every language', () => {
     expect(shape(en)).toEqual(shape(es));
     expect(shape(pt)).toEqual(shape(es));
