@@ -67,6 +67,47 @@ describe('Header', () => {
     expect(links()).toEqual(['/eleva', '/academy', '/admin']);
   });
 
+  it('marks the current section for the underline and screen readers', async () => {
+    const router = TestBed.inject(Router);
+    router.resetConfig([
+      { path: 'eleva', children: [] },
+      { path: 'academy', children: [] },
+    ]);
+    await as({ academy: true });
+    const nav = el().querySelector('nav')!;
+    expect(nav.classList).not.toContain('has-active');
+
+    await router.navigateByUrl('/academy');
+    await fixture.whenStable();
+    const current = el().querySelector('nav a[aria-current="page"]')!;
+    expect(current.getAttribute('href')).toBe('/academy');
+    expect(current.classList).toContain('active');
+    expect(nav.classList).toContain('has-active');
+    expect(nav.querySelector('.indicator')!.getAttribute('aria-hidden')).toBe('true');
+
+    await router.navigateByUrl('/eleva');
+    await fixture.whenStable();
+    expect(el().querySelector('nav a[aria-current="page"]')!.getAttribute('href')).toBe('/eleva');
+  });
+
+  it('gets thinner with a shadow once the page scrolls, and back at the top', async () => {
+    const scrollTo = async (y: number) => {
+      Object.defineProperty(window, 'scrollY', { value: y, configurable: true });
+      window.dispatchEvent(new Event('scroll'));
+      await fixture.whenStable();
+    };
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.classList).not.toContain('scrolled');
+    await scrollTo(20);
+    expect(host.classList).not.toContain('scrolled');
+    await scrollTo(200);
+    expect(host.classList).toContain('scrolled');
+    await scrollTo(20);
+    expect(host.classList).toContain('scrolled');
+    await scrollTo(0);
+    expect(host.classList).not.toContain('scrolled');
+  });
+
   it('shows the admin link to trainers', async () => {
     await as({ academy: true, trainer: true });
     expect(links()).toEqual(['/eleva', '/academy', '/admin']);

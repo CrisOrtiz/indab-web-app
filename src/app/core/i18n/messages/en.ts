@@ -44,6 +44,7 @@ export const en: Messages = {
     signOut: 'Sign out',
     signIn: 'Sign in',
     language: 'Language',
+    currentLanguage: (name: string) => `Language: ${name}`,
     account: 'Your account',
     profile: 'My profile',
   },

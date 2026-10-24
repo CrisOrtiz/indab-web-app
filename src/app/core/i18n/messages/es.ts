@@ -49,6 +49,7 @@ export const es = {
     signOut: 'Cerrar sesión',
     signIn: 'Ingresar',
     language: 'Idioma',
+    currentLanguage: (name: string) => `Idioma: ${name}`,
     account: 'Tu cuenta',
     profile: 'Mi perfil',
   },

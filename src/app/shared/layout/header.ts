@@ -1,4 +1,14 @@
-import { Component, ElementRef, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  afterEveryRender,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationStart, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
@@ -14,6 +24,7 @@ import { LanguageSwitcher } from '../language/language-switcher';
   host: {
     '(document:click)': 'closeOnOutsideClick($event)',
     '(document:keydown.escape)': 'closeMenu()',
+    '[class.scrolled]': 'scrolled()',
   },
 })
 export class Header {
@@ -34,6 +45,9 @@ export class Header {
       '',
   );
   protected readonly menuOpen = signal(false);
+  /** Set once the page is scrolled: the sticky header gets thinner and casts a shadow. */
+  protected readonly scrolled = signal(false);
+  private readonly nav = viewChild.required<ElementRef<HTMLElement>>('nav');
 
   constructor() {
     this.router.events.pipe(takeUntilDestroyed()).subscribe((event) => {
@@ -41,6 +55,43 @@ export class Header {
         this.closeMenu();
       }
     });
+
+    // Browser only: neither callback runs while prerendering.
+    afterEveryRender(() => this.placeIndicator());
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(() => {
+      // Different thresholds on and off, so the header shrinking near the top (which shortens
+      // the page) cannot flip it back and forth.
+      const onScroll = () =>
+        this.scrolled.set(this.scrolled() ? window.scrollY > 8 : window.scrollY > 32);
+      onScroll();
+      window.addEventListener('scroll', onScroll, { passive: true });
+      // Link widths change when the web font arrives or the window is resized.
+      const resize =
+        typeof ResizeObserver === 'undefined'
+          ? null
+          : new ResizeObserver(() => this.placeIndicator());
+      resize?.observe(this.nav().nativeElement);
+      destroyRef.onDestroy(() => {
+        window.removeEventListener('scroll', onScroll);
+        resize?.disconnect();
+      });
+    });
+  }
+
+  /**
+   * Moves the underline under the link of the current section; CSS slides it from the previous
+   * one. It shows once it has a place, so it does not slide in from the left on the first page.
+   */
+  private placeIndicator(): void {
+    const nav = this.nav().nativeElement;
+    const active = nav.querySelector<HTMLElement>('a.active');
+    nav.classList.toggle('has-active', !!active);
+    if (active) {
+      nav.style.setProperty('--indicator-x', `${active.offsetLeft}px`);
+      nav.style.setProperty('--indicator-width', `${active.offsetWidth}px`);
+      requestAnimationFrame(() => nav.classList.add('indicator-ready'));
+    }
   }
 
   protected toggleMenu(): void {

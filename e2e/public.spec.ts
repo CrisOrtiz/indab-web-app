@@ -64,9 +64,12 @@ test('visitors can switch the site to English or Portuguese, and it stays that w
 }) => {
   await page.goto('/');
   await expect(page.locator('html')).toHaveAttribute('lang', 'es-419');
-  const language = page.getByRole('combobox', { name: 'Idioma' });
-
-  await language.selectOption('en-US');
+  await page.getByRole('button', { name: 'Idioma: Español' }).click();
+  await expect(page.getByRole('menuitemradio', { name: 'Español' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await page.getByRole('menuitemradio', { name: 'English' }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en-US');
   await expect(page.getByRole('link', { name: 'Join the academy' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Programs by level' })).toBeVisible();
@@ -77,9 +80,28 @@ test('visitors can switch the site to English or Portuguese, and it stays that w
   await expect(page).toHaveTitle('Sign in | INDAB');
   await expect(page.getByLabel('Password')).toBeVisible();
 
-  await page.getByRole('combobox', { name: 'Language' }).selectOption('pt-BR');
+  await page.getByRole('button', { name: 'Language: English' }).click();
+  await page.getByRole('menuitemradio', { name: 'Português' }).click();
+  await expect(page.getByRole('button', { name: 'Idioma: Português' })).toBeVisible();
   await expect(page).toHaveTitle('Entrar | INDAB');
   await expect(page.getByLabel('Senha')).toBeVisible();
+});
+
+test('the header stays on top while scrolling and marks the current section', async ({ page }) => {
+  await page.goto('/eleva');
+  const header = page.locator('app-header');
+  await expect(page.getByRole('link', { name: 'Eleva Inversiones' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+
+  await page.goto('/');
+  await expect(header).not.toHaveClass(/scrolled/);
+  await page.mouse.wheel(0, 1200);
+  await expect(header).toHaveClass(/scrolled/);
+  const box = await header.boundingBox();
+  expect(box?.y).toBe(0);
+  await expect(page.getByRole('link', { name: 'INDAB Academy' })).toBeInViewport();
 });
 
 test('a ?lang= link opens the site in that language for the visit only', async ({ page }) => {
