@@ -39,9 +39,12 @@ export const pt: Messages = {
   },
 
   header: {
+    about: 'Sobre nós',
+    contact: 'Fale conosco',
     eleva: 'Eleva Inversiones',
     academy: 'Academia',
     admin: 'Administração',
+    adminShort: 'Admin',
     signOut: 'Sair',
     signIn: 'Entrar',
     language: 'Idioma',

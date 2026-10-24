@@ -6,17 +6,30 @@
       <span>INDAB</span>
     </a>
     <nav class="nav" #nav>
-      <a routerLink="/eleva" routerLinkActive="active" ariaCurrentWhenActive="page">{{
-        t.eleva
-      }}</a>
+      <!-- Eleva Inversiones is out of the header for now (Cris, 2026-10-24); /eleva still works. -->
+      @for (link of sectionLinks(); track link.id) {
+        <a
+          routerLink="/"
+          [fragment]="link.id"
+          [class.active]="currentSection() === link.id"
+          [attr.aria-current]="currentSection() === link.id ? 'location' : null"
+          (click)="goToSection(link.id)"
+          >{{ link.label }}</a
+        >
+      }
       @if (auth.isLoggedIn()) {
         <a routerLink="/academy" routerLinkActive="active" ariaCurrentWhenActive="page">{{
           t.academy
         }}</a>
         @if (auth.isStaff()) {
-          <a routerLink="/admin" routerLinkActive="active" ariaCurrentWhenActive="page">{{
-            t.admin
-          }}</a>
+          <a
+            routerLink="/admin"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+            [attr.aria-label]="t.admin"
+            ><span class="long">{{ t.admin }}</span
+            ><span class="short">{{ t.adminShort }}</span></a
+          >
         }
       } @else {
         <a routerLink="/login" class="btn">{{ t.signIn }}</a>

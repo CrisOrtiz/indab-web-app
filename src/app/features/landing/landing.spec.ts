@@ -1,6 +1,9 @@
 import { ApplicationRef, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
+import { vi } from 'vitest';
+import { LandingSections } from '../../shared/layout/landing-sections';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
 import { Landing } from './landing';
@@ -77,5 +80,40 @@ describe('Landing', () => {
   it('animates the sections in on scroll', async () => {
     const el = await render();
     expect(el.querySelectorAll('.reveal').length).toBeGreaterThan(10);
+  });
+
+  it('tracks the section on screen for the header and the section menu', async () => {
+    const el = await render();
+    const sections = TestBed.inject(LandingSections);
+    const tops: Record<string, number> = { nosotros: -900, programas: 100 };
+    for (const section of el.querySelectorAll<HTMLElement>('section[id]')) {
+      section.getBoundingClientRect = () => ({ top: tops[section.id] ?? 2000 }) as DOMRect;
+    }
+    window.dispatchEvent(new Event('scroll'));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await TestBed.inject(ApplicationRef).whenStable();
+    expect(sections.current()).toBe('programas');
+    const current = el.querySelector('.section-nav a[aria-current="location"]')!;
+    expect(current.getAttribute('href')).toBe('#programas');
+    expect(current.classList).toContain('active');
+    TestBed.resetTestingModule();
+    expect(sections.current()).toBeNull();
+  });
+
+  it('scrolls to the section named in the link, e.g. /#contacto from the header', async () => {
+    // jsdom has no scrollIntoView.
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([{ path: '', component: Landing }]),
+        { provide: AuthService, useValue: auth },
+      ],
+    });
+    const harness = await RouterTestingHarness.create('/#contacto');
+    await harness.fixture.whenStable();
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll.mock.contexts[0]).toBe(document.getElementById('contacto'));
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
   });
 });

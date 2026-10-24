@@ -30,7 +30,8 @@ ol {
 
 .section {
   padding: 72px 0;
-  scroll-margin-top: 16px;
+  // Clear of the sticky header (its height is published by `Header`) when a link scrolls here.
+  scroll-margin-top: calc(var(--header-height, 64px) + 8px);
 
   p {
     color: var(--color-muted);
@@ -202,8 +203,10 @@ ol {
     color: var(--color-muted);
     font-size: 0.9rem;
     text-decoration: none;
+    transition: color 0.2s ease;
 
-    &:hover {
+    &:hover,
+    &.active {
       color: var(--color-text);
     }
   }
