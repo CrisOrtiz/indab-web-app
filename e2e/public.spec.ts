@@ -88,20 +88,46 @@ test('visitors can switch the site to English or Portuguese, and it stays that w
 });
 
 test('the header stays on top while scrolling and marks the current section', async ({ page }) => {
-  await page.goto('/eleva');
-  const header = page.locator('app-header');
-  await expect(page.getByRole('link', { name: 'Eleva Inversiones' })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
-
   await page.goto('/');
+  const header = page.locator('app-header');
   await expect(header).not.toHaveClass(/scrolled/);
   await page.mouse.wheel(0, 1200);
   await expect(header).toHaveClass(/scrolled/);
   const box = await header.boundingBox();
   expect(box?.y).toBe(0);
   await expect(page.getByRole('link', { name: 'INDAB Academy' })).toBeInViewport();
+});
+
+test('the header links to the about and contact sections from any page', async ({ page }) => {
+  await page.goto('/eleva');
+  await expect(nav(page).getByRole('link', { name: 'Eleva Inversiones' })).toHaveCount(0);
+  const contact = nav(page).getByRole('link', { name: 'Contáctanos' });
+  await contact.click();
+  await expect(page).toHaveURL('/#contacto');
+  const talk = page.getByRole('heading', { name: 'Hablemos' });
+  await expect(talk).toBeInViewport();
+  await expect(contact).toHaveAttribute('aria-current', 'location');
+  // Below the sticky header, not under it.
+  const headerBox = await page.locator('app-header').boundingBox();
+  const sectionBox = await page.locator('#contacto').boundingBox();
+  expect(sectionBox!.y).toBeGreaterThanOrEqual(headerBox!.height - 1);
+
+  const about = nav(page).getByRole('link', { name: 'Nosotros' });
+  await about.click();
+  await expect(page).toHaveURL('/#nosotros');
+  await expect(page.getByRole('heading', { name: 'Formamos traders con método' })).toBeInViewport();
+  await expect(about).toHaveAttribute('aria-current', 'location');
+  await expect(contact).not.toHaveAttribute('aria-current');
+
+  // Scrolled away, the same link scrolls back although the URL already has it.
+  await page.evaluate(() => window.scrollTo({ top: 3000, behavior: 'instant' }));
+  await expect(about).not.toHaveAttribute('aria-current');
+  await about.click();
+  await expect(page.getByRole('heading', { name: 'Formamos traders con método' })).toBeInViewport();
+
+  // Eleva stays reachable from the landing.
+  await page.getByRole('link', { name: 'Conoce Eleva Inversiones' }).click();
+  await expect(page).toHaveURL('/eleva');
 });
 
 test('a ?lang= link opens the site in that language for the visit only', async ({ page }) => {

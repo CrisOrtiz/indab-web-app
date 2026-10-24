@@ -44,9 +44,12 @@ export const es = {
   },
 
   header: {
+    about: 'Nosotros',
+    contact: 'Contáctanos',
     eleva: 'Eleva Inversiones',
     academy: 'Academia',
     admin: 'Administración',
+    adminShort: 'Admin',
     signOut: 'Cerrar sesión',
     signIn: 'Ingresar',
     language: 'Idioma',

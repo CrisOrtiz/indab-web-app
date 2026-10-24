@@ -47,7 +47,12 @@
 <div class="section-nav">
   <div class="container">
     @for (s of sections(); track s.id) {
-      <a [href]="'#' + s.id">{{ s.label }}</a>
+      <a
+        [href]="'#' + s.id"
+        [class.active]="landingSections.current() === s.id"
+        [attr.aria-current]="landingSections.current() === s.id ? 'location' : null"
+        >{{ s.label }}</a
+      >
     }
   </div>
 </div>

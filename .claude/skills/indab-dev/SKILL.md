@@ -116,7 +116,11 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
   guard browser APIs with `isPlatformBrowser` or try/catch. See README "SEO and loading speed".
 - Header (`shared/layout/header`): sticky on every page (z-index 9, under the landing's progress
   bar), thinner with a shadow once scrolled; the current section's link gets `aria-current` and a
-  sliding underline (`placeIndicator`). The language picker is a flag menu (`shared/language`:
+  sliding underline (`placeIndicator`). Its links: `Nosotros` and `Contáctanos` (`/#nosotros`,
+  `/#contacto`, landing sections; `LandingSections` in `shared/layout` scrolls to them and the
+  landing reports the section on screen so the underline follows the scroll), then Academia and
+  Admin (short label on phones, so the row fits at 390 px). Eleva Inversiones is out of the header
+  for now (Cris, 2026-10-24); `/eleva` and the landing's Eleva section still link to it. The language picker is a flag menu (`shared/language`:
   Mexico = es-419, USA = en-US, Brazil = pt-BR, inline SVG because Windows has no flag emoji).
   Dropdowns use the global `dropdown-in` keyframes; respect `prefers-reduced-motion`.
 - Footer (`shared/layout/footer`): a thin strip in the app shell (`app.html`) on every page with
