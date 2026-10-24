@@ -19,6 +19,10 @@ export const en: Messages = {
     profile: 'My profile | INDAB',
   },
 
+  loader: {
+    label: 'Loading…',
+  },
+
   header: {
     eleva: 'Eleva Inversiones',
     academy: 'Academy',

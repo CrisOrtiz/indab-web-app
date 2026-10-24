@@ -331,9 +331,12 @@ src/app/
   core/auth/       AuthService (signals) and route guards
   core/models/     Firestore document types
   core/i18n/       translations (es, en, pt), I18n service, title strategy, localDate pipe
+  core/loading/    LoadingService: what the page loader waits for
   features/        landing, auth, academy, repository, eleva, admin
   shared/layout/   header
   shared/language/ language switcher
+  shared/loader/   page loader (the logo bouncing), shown on start, navigation and data loads
+public/            logo, favicons and app icons (made from the logo's mark), manifest
 src/environments/  environment.ts (indab-academy) and environment.development.ts (emulators)
 firestore.rules    security rules (tested in tests/firestore.rules.test.ts)
 e2e/               Playwright end-to-end tests and emulator seeding helpers

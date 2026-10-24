@@ -23,6 +23,10 @@ export const es = {
     profile: 'Mi perfil | INDAB',
   },
 
+  loader: {
+    label: 'Cargando…',
+  },
+
   header: {
     eleva: 'Eleva Inversiones',
     academy: 'Academia',

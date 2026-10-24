@@ -90,6 +90,12 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
   templates). Texts with values are functions. Dates go through the `localDate` pipe; numbers
   stay en-US (`1,250.00`). Route `title`s are keys of `messages.titles` (ending in `| INDAB`).
   Firestore content is not translated. Code, comments, commits in English. See README "Languages".
+- Loading: `AppLoader` (`shared/loader`) shows the logo bouncing while the app starts (static copy
+  in `index.html`, styles in `styles.scss`), while the router navigates and while
+  `LoadingService` tracks something. Wrap page reads with `loading.track(promise)` (or
+  `begin()`/end for listeners until their first snapshot); leave background work untracked
+  (e.g. `loadCandles(..., { background: true })` for the replay's next chunk). Favicons and app
+  icons in `public/` are cut from the logo's mark (the M with the arrow).
 - Formatting: Prettier (`printWidth` 100, single quotes). Run `npx prettier --write` on changed files.
 
 ## Adding a module

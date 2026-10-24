@@ -100,3 +100,91 @@ html {
     transition: none;
   }
 }
+
+// Page loader: the logo bouncing over the page. Used by the static loader in index.html (before
+// the app starts) and by `AppLoader` (src/app/shared/loader), so both look the same.
+.app-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: color-mix(in srgb, var(--color-bg) 80%, transparent);
+  backdrop-filter: blur(2px);
+  animation: app-loader-in 0.2s ease-out;
+
+  &.app-loader--boot {
+    background: var(--color-bg);
+    backdrop-filter: none;
+    animation: none;
+  }
+}
+
+.app-loader__logo {
+  display: block;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 12%);
+  animation: app-loader-bounce 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+.app-loader__shadow {
+  width: 64px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 18%);
+  filter: blur(3px);
+  animation: app-loader-shadow 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes app-loader-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes app-loader-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  45% {
+    transform: translateY(-28px) scale(1, 1);
+  }
+  // A light squash as the logo lands.
+  90% {
+    transform: translateY(0) scale(1.04, 0.96);
+  }
+}
+
+@keyframes app-loader-shadow {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  45% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-loader__logo {
+    animation: app-loader-pulse 1.6s ease-in-out infinite;
+  }
+
+  .app-loader__shadow {
+    animation: none;
+  }
+
+  @keyframes app-loader-pulse {
+    50% {
+      opacity: 0.55;
+    }
+  }
+}

@@ -3,12 +3,25 @@
   <head>
     <meta charset="utf-8" />
     <title>INDAB Academy</title>
-    <meta name="description" content="INDAB Academy: formación en trading. Conocimiento, disciplina, estrategia, resultados." />
+    <meta
+      name="description"
+      content="INDAB Academy: formación en trading. Conocimiento, disciplina, estrategia, resultados."
+    />
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="icon" href="favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#ffffff" />
   </head>
   <body>
+    <!-- Shown until the app starts; AppLoader (src/app/shared/loader) replaces it. -->
+    <div id="boot-loader" class="app-loader app-loader--boot" aria-hidden="true">
+      <img class="app-loader__logo" src="logo.jpg" alt="" width="96" height="96" />
+      <span class="app-loader__shadow"></span>
+    </div>
     <app-root></app-root>
   </body>
 </html>

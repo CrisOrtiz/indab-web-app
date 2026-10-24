@@ -1,4 +1,6 @@
+import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
+import { LoadingService } from '../../core/loading/loading.service';
 import {
   HISTORY_BARS,
   INSTRUMENTS,
@@ -58,7 +60,8 @@ describe('intervalMs', () => {
 });
 
 describe('MarketDataService', () => {
-  const service = new MarketDataService();
+  let service: MarketDataService;
+  beforeEach(() => (service = TestBed.inject(MarketDataService)));
   const rows = [[1_700_000_000_000, '1', '2', '0.5', '1.5']];
 
   afterEach(() => vi.unstubAllGlobals());
@@ -94,5 +97,25 @@ describe('MarketDataService', () => {
       vi.fn(async () => new Response('', { status: 451 })),
     );
     await expect(service.loadCandles('PAXGUSDT', '1h', 0)).rejects.toThrow('HTTP 451');
+  });
+
+  it('shows the page loader unless the candles load in the background', async () => {
+    let respond!: (response: Response) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>((resolve) => (respond = resolve))),
+    );
+    const loading = TestBed.inject(LoadingService);
+
+    const background = service.loadCandles('PAXGUSDT', '1m', 0, REPLAY_BARS, { background: true });
+    expect(loading.busy()).toBe(false);
+    respond(new Response(JSON.stringify(rows)));
+    await background;
+
+    const tracked = service.loadCandles('PAXGUSDT', '1m', 0);
+    expect(loading.busy()).toBe(true);
+    respond(new Response(JSON.stringify(rows)));
+    await tracked;
+    expect(loading.busy()).toBe(false);
   });
 });

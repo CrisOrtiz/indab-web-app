@@ -10,6 +10,7 @@ import {
 import { AuthService } from '../../core/auth/auth.service';
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
 import { I18n } from '../../core/i18n/i18n.service';
+import { LoadingService } from '../../core/loading/loading.service';
 import { Enrollment, UserProfile, UserRole } from '../../core/models/user-profile';
 import { AdminUserRow, sortUsers } from './admin-users';
 
@@ -47,15 +48,19 @@ export class AdminService {
       this._loading.set(false);
       return;
     }
+    // The page loader shows until the first list of users arrives.
+    const loaded = inject(LoadingService).begin();
     const onError = () => {
       this._error.set(this.i18n.messages().admin.loadFailed);
       this._loading.set(false);
+      loaded();
     };
     const stopUsers = onSnapshot(
       collection(this.firestore, 'users'),
       (snapshot) => {
         this._users.set(snapshot.docs.map((d) => ({ ...(d.data() as UserProfile), uid: d.id })));
         this._loading.set(false);
+        loaded();
       },
       onError,
     );
@@ -66,6 +71,7 @@ export class AdminService {
       onError,
     );
     inject(DestroyRef).onDestroy(() => {
+      loaded();
       stopUsers();
       stopEnrollments();
     });

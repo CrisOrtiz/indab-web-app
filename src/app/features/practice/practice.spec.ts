@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 import { AuthService } from '../../core/auth/auth.service';
 import { Candle, OrderType } from '../../core/models/practice';
-import { HISTORY_BARS, MarketDataService } from './market-data.service';
+import { HISTORY_BARS, MarketDataService, REPLAY_BARS } from './market-data.service';
 import { Practice, formatCountdown } from './practice';
 import { PracticeService } from './practice.service';
 import { EvaluationService } from '../evaluations/evaluation.service';
@@ -439,6 +439,8 @@ describe('Practice page', () => {
       'PAXGUSDT',
       '1m',
       (begin + 999 * 60) * 1000,
+      REPLAY_BARS,
+      { background: true },
     );
     await fixture.whenStable();
     await click('Siguiente vela');
