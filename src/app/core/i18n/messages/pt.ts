@@ -426,7 +426,7 @@ export const pt: Messages = {
     finished: 'Encerrada',
     stopLoss: 'Stop loss',
     takeProfit: 'Take profit',
-    instruments: { PAXGUSDT: 'Ouro (XAU/USD via PAXG)' },
+    instruments: { XAUUSDT: 'Ouro (XAU/USD)', PAXGUSDT: 'Ouro (XAU/USD via PAXG)' },
   },
 
   orderErrors: {

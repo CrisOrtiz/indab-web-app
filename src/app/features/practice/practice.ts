@@ -24,6 +24,7 @@ import {
   REPLAY_DAYS,
   TIMEFRAMES,
   Timeframe,
+  findInstrument,
   randomReplayStart,
   replayStartAt,
   replayWindow,
@@ -188,9 +189,7 @@ export class Practice {
   /** Whether the order being set up is on the chart. */
   protected readonly drafting = signal(false);
 
-  protected readonly instrument = computed(
-    () => INSTRUMENTS.find((i) => i.symbol === this.symbol()) ?? INSTRUMENTS[0],
-  );
+  protected readonly instrument = computed(() => findInstrument(this.symbol()) ?? INSTRUMENTS[0]);
   protected readonly instrumentLabel = computed(
     () => this.i18n.messages().trading.instruments[this.symbol()] ?? this.instrument().label,
   );
@@ -311,7 +310,7 @@ export class Practice {
   /** Starts the student's one attempt at an evaluation, after they confirm. */
   protected async startEvaluation(evaluation: Evaluation): Promise<void> {
     const t = this.i18n.messages().practice;
-    if (!INSTRUMENTS.some((i) => i.symbol === evaluation.symbol)) {
+    if (!findInstrument(evaluation.symbol)) {
       this.error.set(t.startFailed);
       return;
     }
@@ -820,18 +819,12 @@ export class Practice {
   }
 
   /** The `HISTORY_BARS` bars of a timeframe before the replay starts. */
-  private async loadHistory(
+  private loadHistory(
     symbol: string,
     timeframe: Timeframe,
     replayStart: number,
   ): Promise<Candle[]> {
-    const bars = await this.market.loadCandles(
-      symbol,
-      timeframe.interval,
-      replayStart - HISTORY_BARS * timeframe.ms,
-      HISTORY_BARS,
-    );
-    return bars.filter((c) => c.time * 1000 < replayStart);
+    return this.market.loadHistory(symbol, timeframe.interval, replayStart, HISTORY_BARS);
   }
 
   private play(): void {

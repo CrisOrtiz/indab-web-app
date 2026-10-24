@@ -18,6 +18,7 @@ class FakeChart {
 }
 
 const candle: Candle = { time: 1_620_000_000, open: 1, high: 2, low: 0.5, close: 1.5 };
+const later: Candle = { time: 1_620_604_800, open: 1.5, high: 1.6, low: 1.4, close: 1.55 };
 
 const session = (id: string, uid: string, userName: string, symbol: string, pnl: number) => ({
   id,
@@ -36,7 +37,7 @@ describe('PracticeReview', () => {
   let fixture: ComponentFixture<PracticeReview>;
   let el: HTMLElement;
   const practice = { allSessions: vi.fn(), sessionTrades: vi.fn(), deleteSession: vi.fn() };
-  const market = { loadCandles: vi.fn() };
+  const market = { loadCandles: vi.fn(), loadHistory: vi.fn() };
   const isAdmin = signal(true);
 
   const render = async () => {
@@ -61,7 +62,8 @@ describe('PracticeReview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
-    market.loadCandles.mockResolvedValue([candle]);
+    market.loadHistory.mockResolvedValue([candle]);
+    market.loadCandles.mockResolvedValue([later]);
     practice.deleteSession.mockResolvedValue(undefined);
     practice.allSessions.mockResolvedValue([
       session('s1', 'ana', 'Ana', 'PAXGUSDT', 25),
@@ -130,13 +132,11 @@ describe('PracticeReview', () => {
     button(sessionRows()[0], 'Ver práctica').click();
     await fixture.whenStable();
     expect(practice.sessionTrades).toHaveBeenCalledWith('s1');
-    // The same window the student saw: HISTORY_BARS hourly candles of history before the replay.
-    expect(market.loadCandles).toHaveBeenCalledWith(
-      'PAXGUSDT',
-      '1h',
-      Date.UTC(2021, 4, 10) - HISTORY_BARS * 3_600_000,
-    );
-    expect(chart()?.candles()).toEqual([candle]);
+    // The same window the student saw: HISTORY_BARS hourly candles before the replay, then it.
+    const replayStart = Date.UTC(2021, 4, 10);
+    expect(market.loadHistory).toHaveBeenCalledWith('PAXGUSDT', '1h', replayStart, HISTORY_BARS);
+    expect(market.loadCandles).toHaveBeenCalledWith('PAXGUSDT', '1h', replayStart);
+    expect(chart()?.candles()).toEqual([candle, later]);
     expect(chart()?.trades()).toHaveLength(2);
     expect(el.querySelector('app-session-stats')?.textContent).toContain('Drawdown máximo');
     expect(chart()?.barSeconds()).toBe(3600);

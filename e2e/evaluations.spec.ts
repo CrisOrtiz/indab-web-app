@@ -57,7 +57,7 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
   await expect(page.getByText('Evaluación: Evaluación semanal')).toBeVisible();
   await expect(page.getByLabel('Tiempo restante')).toContainText(/Quedan (19|20):\d\d/);
   await page.getByRole('spinbutton', { name: /Lotes \(tamaño/ }).fill('0.01');
-  await page.getByRole('button', { name: 'Comprar 0.01 PAXGUSDT MERCADO' }).click();
+  await page.getByRole('button', { name: 'Comprar 0.01 XAUUSDT MERCADO' }).click();
   await page.getByRole('button', { name: 'Siguiente vela' }).click();
   await expect(page.locator('.market .price')).toHaveText('101.000');
   await page.getByRole('button', { name: 'Terminar sesión' }).click();

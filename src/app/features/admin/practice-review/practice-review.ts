@@ -116,15 +116,19 @@ export class PracticeReview {
     }
   }
 
-  /** Loads the replay window again: `HISTORY_BARS` of context before `replayStart`. */
+  /** Loads the replay window again: `HISTORY_BARS` of context before `replayStart` and the replay. */
   private async loadCandles(session: PracticeSession): Promise<void> {
     const ms = intervalMs(session.interval);
     try {
       if (!ms) {
         throw new Error(`Unknown interval ${session.interval}`);
       }
-      const start = session.replayStart - HISTORY_BARS * ms;
-      const candles = await this.market.loadCandles(session.symbol, session.interval, start);
+      const { symbol, interval, replayStart } = session;
+      const [history, replay] = await Promise.all([
+        this.market.loadHistory(symbol, interval, replayStart, HISTORY_BARS),
+        this.market.loadCandles(symbol, interval, replayStart),
+      ]);
+      const candles = [...history, ...replay];
       if (this.selected() === session.id) {
         this.barSeconds.set(ms / 1000);
         this.candles.set(candles);
