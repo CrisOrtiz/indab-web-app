@@ -85,11 +85,7 @@ export const es = {
       title: 'Formamos traders con método',
       text: 'INDAB es una academia de trading enfocada en la formación práctica. Enseñamos un proceso claro y medible para que tomes decisiones con criterio, no por impulso.',
     },
-    stats: [
-      { value: '+500', label: 'Estudiantes' },
-      { value: '+40', label: 'Clases grabadas' },
-      { value: '24/7', label: 'Acceso al material' },
-    ],
+    stats: [{ value: '24/7', label: 'Acceso al material' }],
     pillars: [
       {
         title: 'Conocimiento',
@@ -135,7 +131,7 @@ export const es = {
     methodEyebrow: 'Metodología',
     methodTitle: 'Un proceso en cuatro pasos',
     steps: [
-      { title: 'Aprende', text: 'Clases en vivo y grabadas, con material descargable por módulo.' },
+      { title: 'Aprende', text: 'Material de estudio por módulo para aprender a tu ritmo.' },
       {
         title: 'Practica',
         text: 'Repite el mercado vela a vela y entrena sin arriesgar tu dinero.',
@@ -154,13 +150,13 @@ export const es = {
       },
       {
         title: 'Material de estudio',
-        text: 'Repositorio de guías, PDFs, plantillas y videos para estudiantes inscritos.',
+        text: 'Guías, documentos y plantillas que compartimos con los estudiantes inscritos.',
         soon: false,
       },
       {
         title: 'Práctica con repetición de gráficos',
         text: 'Vuelve a reproducir el mercado vela a vela, toma decisiones y mide tus resultados.',
-        soon: true,
+        soon: false,
       },
       {
         title: 'Comunidad y mentoría',
@@ -208,9 +204,9 @@ export const es = {
           'Crea tu cuenta y, cuando tu inscripción esté confirmada, se habilita tu acceso a la academia y al material de estudio.',
       },
       {
-        question: '¿Las clases quedan grabadas?',
+        question: '¿Tienen cursos grabados?',
         answer:
-          'Sí. Las clases en vivo se publican en la plataforma para que las veas cuando quieras.',
+          'Todavía no. Compartimos material de estudio con los estudiantes inscritos dentro de la academia.',
       },
       {
         question: '¿Cuánto capital necesito para empezar?',
@@ -226,8 +222,7 @@ export const es = {
     contact: {
       eyebrow: 'Contacto',
       title: 'Hablemos',
-      text: '¿Tienes preguntas sobre los programas o las inscripciones? Escríbenos y te respondemos a la brevedad.',
-      email: 'Correo',
+      text: '¿Tienes preguntas sobre los programas o las inscripciones? Síguenos en Instagram y TikTok y escríbenos por mensaje directo; te respondemos a la brevedad.',
     },
     ctaTitle: 'Empieza hoy tu camino como trader',
     ctaButton: 'Crear mi cuenta',
@@ -236,6 +231,11 @@ export const es = {
       register: 'Crear cuenta',
       disclaimer: 'Contenido educativo; no constituye asesoría financiera.',
     },
+  },
+
+  // Links to INDAB's social networks (shared/social).
+  social: {
+    followOn: (network: string) => `INDAB en ${network}`,
   },
 
   // Birth date and WhatsApp: asked at registration, on the account setup page and in the profile.
@@ -315,7 +315,7 @@ export const es = {
     cards: {
       material: {
         title: 'Material de estudio',
-        text: 'Guías, videos y lecturas para aprender a tu ritmo.',
+        text: 'Guías y lecturas para aprender a tu ritmo.',
       },
       practice: {
         title: 'Práctica de trading',

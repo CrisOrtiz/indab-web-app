@@ -343,16 +343,8 @@ blockquote {
 }
 
 // Contact
-.contact li {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--color-border);
-
-  span {
-    color: var(--color-muted);
-  }
+.contact {
+  display: block;
 }
 
 .cta {

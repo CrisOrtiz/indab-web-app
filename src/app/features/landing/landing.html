@@ -186,14 +186,7 @@
       <h2>{{ m.contact.title }}</h2>
       <p>{{ m.contact.text }}</p>
     </div>
-    <ul class="contact" [appReveal]="150">
-      <li>
-        <span>{{ m.contact.email }}</span>
-        <a href="mailto:contacto@indab.academy">contacto&#64;indab.academy</a>
-      </li>
-      <li><span>WhatsApp</span> <a href="https://wa.me/00000000000">+00 000 000 000</a></li>
-      <li><span>Instagram</span> <a href="https://instagram.com/">&#64;indab.academy</a></li>
-    </ul>
+    <app-social-links class="contact" [labels]="true" [appReveal]="150" />
   </div>
 </section>
 
@@ -220,6 +213,7 @@
       <a routerLink="/login">{{ m.footer.signIn }}</a>
       <a routerLink="/register">{{ m.footer.register }}</a>
     </div>
+    <app-social-links />
     <div class="legal">
       <p>{{ m.footer.disclaimer }}</p>
     </div>

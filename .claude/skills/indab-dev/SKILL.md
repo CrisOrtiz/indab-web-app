@@ -127,6 +127,10 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
   the copyright (`© {year} INDAB y crisortizdev`) and "Desarrollado por crisortizdev" linking
   https://crisortiz.github.io; the shell keeps it at the bottom of short pages. Do not add page
   footers with their own copyright (the landing's footer only has links and the disclaimer).
+- Social networks: `SOCIAL_LINKS` in `shared/social/social-links.ts` (Instagram @indabacademylp,
+  TikTok @indab.academy); `<app-social-links>` shows icons, `[labels]="true"` adds network and
+  handle (landing contact section). Landing stats only show figures Cris confirmed; INDAB has no
+  recorded courses yet, only study material. Email and WhatsApp are not public yet.
 - Formatting: Prettier (`printWidth` 100, single quotes). Run `npx prettier --write` on changed files.
 
 ## Adding a module
