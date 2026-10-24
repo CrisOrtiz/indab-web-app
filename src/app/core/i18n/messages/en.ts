@@ -459,7 +459,7 @@ export const en: Messages = {
     finished: 'Finished',
     stopLoss: 'Stop loss',
     takeProfit: 'Take profit',
-    instruments: { PAXGUSDT: 'Gold (XAU/USD via PAXG)' },
+    instruments: { XAUUSDT: 'Gold (XAU/USD)', PAXGUSDT: 'Gold (XAU/USD via PAXG)' },
   },
 
   orderErrors: {

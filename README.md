@@ -277,16 +277,20 @@ missing). To add a language: a new file in `messages/`, an entry in `LANGUAGES` 
 ## Trading practice (chart replay)
 
 `/academy/practice` replays real historical candles bar by bar. For now the only market is
-gold, through Binance's PAXG/USDT (a token that tracks XAU/USD), on 15m/1h/4h/1d. Candles come
-from Binance's public market-data API (`data-api.binance.vision`, falling back to
-`api.binance.com`): free, no API key, fetched by each student's browser. USD/JPY and NASDAQ
+gold, through Binance Futures' XAUUSDT perpetual (listed January 2026), which follows spot
+XAU/USD closely. Candles come from Binance's public futures market-data API
+(`fapi.binance.com/fapi/v1/klines`): free, no API key, fetched by each student's browser. Like
+TradingView's XAU/USD, the chart leaves out the hours spot gold is closed (Friday 17:00 to Sunday
+18:00 New York time and the daily 17:00-18:00 break, `market-hours.ts`) and minutes with no
+trades; replays never start while it is closed. Older sessions on PAXG/USDT (the gold token used
+before, thin and traded on weekends) still load from the spot API for review. USD/JPY and NASDAQ
 are planned but need a data source licensed for showing prices to students (Dukascopy's free
 feed is for personal use only, and free APIs don't allow display to third parties).
 
 Each session starts at a random moment or on a date the student picks (on a 4-hour boundary, at
 least 30 days before today), with the dates optionally hidden. The replay runs on one-minute candles, fetched 1000 at a time
 as it goes, and the chart builds them into bars of the timeframe the student picks: 1m, 3m, 5m,
-15m (the default), 1h or 4h, switchable at any time; each timeframe shows its 500 bars of
+15m (the default), 1h or 4h, switchable at any time; each timeframe shows its 1000 bars of
 history before the start. Every bar is the open of its first minute, the highest high, lowest
 low and close of its last, so the timeframes agree (a 3m bar is three 1m bars, a 1h bar four 15m
 bars, the bar in the making included); a test in `practice.spec.ts` checks this across all six.

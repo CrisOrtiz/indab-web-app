@@ -12,6 +12,9 @@
   // Price up / down, for charts and P/L figures only.
   --color-up: #0f7b4d;
   --color-down: #b3261e;
+  // Candle bodies, in TradingView's colors so the practice chart looks like the real one.
+  --color-candle-up: #089981;
+  --color-candle-down: #f23645;
   --radius: 8px;
   --max-width: 1120px;
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;

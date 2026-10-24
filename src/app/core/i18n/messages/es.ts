@@ -459,7 +459,10 @@ export const es = {
     stopLoss: 'Stop loss',
     takeProfit: 'Take profit',
     /** Instrument names by symbol. */
-    instruments: { PAXGUSDT: 'Oro (XAU/USD vía PAXG)' } as Record<string, string>,
+    instruments: { XAUUSDT: 'Oro (XAU/USD)', PAXGUSDT: 'Oro (XAU/USD vía PAXG)' } as Record<
+      string,
+      string
+    >,
   },
 
   /** Order checks of the replay engine. */

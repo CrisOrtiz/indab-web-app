@@ -315,7 +315,8 @@ export class ReplayChart {
         text: color('--color-text', '#111111'),
         muted: color('--color-muted', '#5f5f5f'),
       };
-      const { up, down } = this.colors;
+      const up = color('--color-candle-up', '#089981');
+      const down = color('--color-candle-down', '#f23645');
 
       this.chart = createChart(this.canvas().nativeElement, {
         autoSize: true,

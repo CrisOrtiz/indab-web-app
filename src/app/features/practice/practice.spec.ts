@@ -38,14 +38,18 @@ class FakeChart {
  * 101 + k, so each 15-minute step raises the price by 1. The start is read off the requests.
  */
 let begin = 0;
+const SECONDS: Record<string, number> = {
+  '1m': 60,
+  '3m': 180,
+  '5m': 300,
+  '15m': 900,
+  '1h': 3600,
+  '4h': 14400,
+};
 const price = (time: number) => (time < begin ? 100 : 101 + Math.floor((time - begin) / 900));
 const klines = (interval: string, from: number, limit = 1000, minutes = Infinity): Candle[] => {
-  const seconds = { '1m': 60, '15m': 900, '1h': 3600, '4h': 14400 }[interval]!;
-  if (interval === '1m') {
-    begin ||= from / 1000 + 60;
-  } else {
-    begin ||= from / 1000 + HISTORY_BARS * seconds;
-  }
+  const seconds = SECONDS[interval];
+  begin ||= from / 1000 + 60;
   const count =
     interval === '1m' ? Math.min(limit, minutes - (from / 1000 - begin + 60) / 60) : limit;
   return Array.from({ length: Math.max(0, count) }, (_, i) => {
@@ -54,11 +58,16 @@ const klines = (interval: string, from: number, limit = 1000, minutes = Infinity
     return { time, open: close, high: close, low: close, close };
   });
 };
+/** The fake's `limit` bars before `endTime`, as `loadHistory` returns them. */
+const history = async (_symbol: string, interval: string, endTime: number, limit: number) => {
+  begin ||= endTime / 1000;
+  return klines(interval, endTime - limit * SECONDS[interval] * 1000, limit);
+};
 
 describe('Practice page', () => {
   let fixture: ComponentFixture<Practice>;
   let el: HTMLElement;
-  const market = { loadCandles: vi.fn() };
+  const market = { loadCandles: vi.fn(), loadHistory: vi.fn() };
   const practice = {
     startSession: vi.fn(async () => 'session-1'),
     newTradeId: vi.fn(),
@@ -90,6 +99,7 @@ describe('Practice page', () => {
       async (_symbol: string, interval: string, from: number, limit?: number) =>
         klines(interval, from, limit),
     );
+    market.loadHistory.mockImplementation(history);
     practice.mySessions.mockResolvedValue([
       {
         id: 'old',
@@ -280,17 +290,12 @@ describe('Practice page', () => {
     await start();
     // One-minute candles from the minute before the start, and 15-minute history before it.
     expect(begin % (4 * 3600)).toBe(0);
-    expect(market.loadCandles).toHaveBeenCalledWith('PAXGUSDT', '1m', (begin - 60) * 1000);
-    expect(market.loadCandles).toHaveBeenCalledWith(
-      'PAXGUSDT',
-      '15m',
-      (begin - HISTORY_BARS * 900) * 1000,
-      HISTORY_BARS,
-    );
+    expect(market.loadCandles).toHaveBeenCalledWith('XAUUSDT', '1m', (begin - 60) * 1000);
+    expect(market.loadHistory).toHaveBeenCalledWith('XAUUSDT', '15m', begin * 1000, HISTORY_BARS);
     expect(practice.startSession).toHaveBeenCalledWith({
       uid: 'u1',
       userName: 'Ana',
-      symbol: 'PAXGUSDT',
+      symbol: 'XAUUSDT',
       interval: '15m',
       replayStart: begin * 1000,
       startingBalance: 200,
@@ -322,13 +327,13 @@ describe('Practice page', () => {
     radio.click();
     await fixture.whenStable();
     const date = el.querySelector<HTMLInputElement>('input[aria-label="Fecha de inicio"]')!;
-    expect(date.min).toBe('2020-12-23');
-    date.value = '2023-06-15';
+    expect(date.min).toBe('2026-01-16');
+    date.value = '2026-06-16';
     date.dispatchEvent(new Event('input'));
     await start();
-    expect(begin * 1000).toBe(Date.UTC(2023, 5, 15));
+    expect(begin * 1000).toBe(Date.UTC(2026, 5, 16));
     expect(practice.startSession).toHaveBeenCalledWith(
-      expect.objectContaining({ replayStart: Date.UTC(2023, 5, 15) }),
+      expect.objectContaining({ replayStart: Date.UTC(2026, 5, 16) }),
     );
   });
 
@@ -336,12 +341,7 @@ describe('Practice page', () => {
     await start();
     await click('Siguiente vela');
     await click('1h');
-    expect(market.loadCandles).toHaveBeenCalledWith(
-      'PAXGUSDT',
-      '1h',
-      (begin - HISTORY_BARS * 3600) * 1000,
-      HISTORY_BARS,
-    );
+    expect(market.loadHistory).toHaveBeenCalledWith('XAUUSDT', '1h', begin * 1000, HISTORY_BARS);
     // HISTORY_BARS hours of history and the hour being formed by the first 15 minutes.
     expect(chart().barSeconds()).toBe(3600);
     expect(chart().candles()).toHaveLength(HISTORY_BARS + 1);
@@ -354,7 +354,8 @@ describe('Practice page', () => {
 
     await click('15m');
     expect(chart().candles()).toHaveLength(HISTORY_BARS + 4);
-    expect(market.loadCandles).toHaveBeenCalledTimes(3);
+    expect(market.loadCandles).toHaveBeenCalledTimes(1);
+    expect(market.loadHistory).toHaveBeenCalledTimes(2);
   });
 
   it('builds every timeframe from the same candles, history and replay alike', async () => {
@@ -381,18 +382,24 @@ describe('Practice page', () => {
       '1h': 3600,
       '4h': 14400,
     };
+    const served = (interval: string, from: number, limit: number) => {
+      const s = seconds[interval];
+      return Array.from(
+        { length: limit },
+        (_, i) =>
+          aggregate(
+            Array.from({ length: s / 60 }, (_, k) => minute(from / 1000 + i * s + k * 60)),
+            s,
+          )[0],
+      );
+    };
     market.loadCandles.mockImplementation(
-      async (_symbol: string, interval: string, from: number, limit = 1000) => {
-        const s = seconds[interval];
-        return Array.from(
-          { length: limit },
-          (_, i) =>
-            aggregate(
-              Array.from({ length: s / 60 }, (_, k) => minute(from / 1000 + i * s + k * 60)),
-              s,
-            )[0],
-        );
-      },
+      async (_symbol: string, interval: string, from: number, limit = 1000) =>
+        served(interval, from, limit),
+    );
+    market.loadHistory.mockImplementation(
+      async (_symbol: string, interval: string, to: number, limit: number) =>
+        served(interval, to - limit * seconds[interval] * 1000, limit),
     );
 
     await start();
@@ -436,7 +443,7 @@ describe('Practice page', () => {
     await click('Siguiente vela');
     // 480 of the first 1000 minutes replayed: the next chunk starts after the last one.
     expect(market.loadCandles).toHaveBeenLastCalledWith(
-      'PAXGUSDT',
+      'XAUUSDT',
       '1m',
       (begin + 999 * 60) * 1000,
       REPLAY_BARS,
@@ -460,7 +467,7 @@ describe('Practice page', () => {
   it('opens a trade from the order panel with a stop loss, then closes it', async () => {
     await start();
     // 0.01 lots at 100 is 1 unit: 1 USD of margin.
-    expect(submitLabel()).toBe('Comprar 0.01 PAXGUSDT MERCADO');
+    expect(submitLabel()).toBe('Comprar 0.01 XAUUSDT MERCADO');
     await toggle('Stop loss');
     expect(chart().draft()).toMatchObject({ stopLoss: 99, quantity: 1 });
     expect(el.querySelector('.bracket .field')!.textContent).toContain('-1.00 USD');
@@ -511,9 +518,9 @@ describe('Practice page', () => {
 
     // 200 USD of free margin at 1 USD per 0.01 lots.
     await click('50%');
-    expect(submitLabel()).toBe('Comprar 1.00 PAXGUSDT MERCADO');
+    expect(submitLabel()).toBe('Comprar 1.00 XAUUSDT MERCADO');
     await click('Máx.');
-    expect(submitLabel()).toBe('Comprar 2.00 PAXGUSDT MERCADO');
+    expect(submitLabel()).toBe('Comprar 2.00 XAUUSDT MERCADO');
   });
 
   it('drops a trade that could not be logged', async () => {
@@ -595,7 +602,7 @@ describe('Practice page', () => {
       stopLoss: null,
       error: null,
     });
-    expect(submitLabel()).toBe('Comprar 0.01 PAXGUSDT STOP 103.000');
+    expect(submitLabel()).toBe('Comprar 0.01 XAUUSDT STOP 103.000');
 
     // As a limit it keeps its price, which is on the wrong side of the market (100).
     chart().draftTypeChanged.emit('limit');
@@ -663,7 +670,7 @@ describe('Practice page', () => {
     await fixture.whenStable();
     expect(quick.value).toBe('0.03');
     expect(chart().lots()).toBe(0.03);
-    expect(submitLabel()).toBe('Comprar 0.03 PAXGUSDT MERCADO');
+    expect(submitLabel()).toBe('Comprar 0.03 XAUUSDT MERCADO');
 
     chart().lotsChanged.emit('0.2');
     await fixture.whenStable();
@@ -695,7 +702,7 @@ describe('Practice page', () => {
     );
     await drag({ target: 'draft', field: 'price', price: 99 });
     await drag({ target: 'draft', field: 'stopLoss', price: 98 });
-    expect(submitLabel()).toBe('Comprar 0.01 PAXGUSDT LÍMITE 99.000');
+    expect(submitLabel()).toBe('Comprar 0.01 XAUUSDT LÍMITE 99.000');
     await submit();
     expect(practice.openTrade).toHaveBeenCalledWith(
       'session-1',

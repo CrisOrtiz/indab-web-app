@@ -193,7 +193,11 @@ Module notes:
   Drawings listen to DOM clicks, since the chart's `subscribeClick` drops a second click within
   500 ms. Cris chose to grow this with FX Replay's best ideas rather than clone it: session
   stats (`stats.ts`, `SessionStatsPanel`), rectangle/Fibonacci, picking the start date.
-  Cris wants exactly XAU/USD, USD/JPY and NASDAQ: only gold (PAXGUSDT) is live, the others
+  Gold is Binance Futures' XAUUSDT perpetual (PAXGUSDT, a thin token, looked nothing like the
+  market and is kept only for old sessions); `MarketDataService` drops bars while spot gold is
+  closed and empty minutes (`goldHours`), paging until it has the requested count, and
+  `loadHistory` reads backwards from the replay start. Candles use TradingView's colors.
+  Cris wants exactly XAU/USD, USD/JPY and NASDAQ: only gold (XAUUSDT) is live, the others
   wait for a data source licensed for display to students. Never bundle or serve data whose
   license is personal use only (e.g. Dukascopy). A new timeframe must also be added to the
   `interval` list in `firestore.rules`.

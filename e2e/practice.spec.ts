@@ -35,7 +35,7 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   await page.getByRole('switch', { name: 'Stop loss' }).check();
   await page.getByLabel('Precio del stop loss').fill('95');
   await expect(page.locator('.bracket .field')).toContainText('-5.00 USD');
-  await page.getByRole('button', { name: 'Comprar 0.01 PAXGUSDT MERCADO' }).click();
+  await page.getByRole('button', { name: 'Comprar 0.01 XAUUSDT MERCADO' }).click();
   await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
   await page.getByRole('button', { name: 'Siguiente vela' }).click();
   await page.keyboard.press('ArrowRight');
@@ -54,7 +54,7 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   await page.getByRole('button', { name: 'Límite' }).click();
   await expect(page.getByLabel('Precio de la orden')).toHaveValue('102.51');
   await page.getByLabel('Precio de la orden').fill('110');
-  await page.getByRole('button', { name: 'Vender 0.03 PAXGUSDT LÍMITE 110.000' }).click();
+  await page.getByRole('button', { name: 'Vender 0.03 XAUUSDT LÍMITE 110.000' }).click();
   await expect(page.getByRole('cell', { name: 'Venta límite' })).toBeVisible();
 
   // Switching to 1 hour keeps the replay where it is.
@@ -81,7 +81,7 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   expect(session).toMatchObject({
     uid: studentUid,
     userName: 'José Pérez',
-    symbol: 'PAXGUSDT',
+    symbol: 'XAUUSDT',
     interval: '15m',
     status: 'finished',
     tradeCount: 2,
@@ -96,7 +96,7 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   ]);
 
   await page.getByRole('button', { name: 'Nueva práctica' }).click();
-  await expect(page.getByRole('cell', { name: 'PAXGUSDT · 15m' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'XAUUSDT · 15m' })).toBeVisible();
 
   // An admin sees the session and its trades.
   await signOut(page);
@@ -134,7 +134,7 @@ test('a student adds an order from the chart menu and sets it up on its line', a
   await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.7);
   await page.getByRole('button', { name: 'Opciones en este precio' }).click();
   // Below the market (100) the menu offers a buy limit and a sell stop.
-  await page.getByRole('menuitem', { name: /^Comprar 0\.01 PAXGUSDT @ [\d.]+ límite$/ }).click();
+  await page.getByRole('menuitem', { name: /^Comprar 0\.01 XAUUSDT @ [\d.]+ límite$/ }).click();
   await expect(page.getByRole('button', { name: 'Comprar', exact: true })).toBeVisible();
 
   // The lots on the line open the quantity pad.
@@ -172,7 +172,7 @@ test('a student adds an order from the chart menu and sets it up on its line', a
   const top = (await stage.boundingBox())!;
   await page.mouse.move(top.x + top.width * 0.3, top.y + top.height * 0.15);
   await page.getByRole('button', { name: 'Opciones en este precio' }).click();
-  await page.getByRole('menuitem', { name: /^Vender 0\.05 PAXGUSDT @ [\d.]+ límite$/ }).click();
+  await page.getByRole('menuitem', { name: /^Vender 0\.05 XAUUSDT @ [\d.]+ límite$/ }).click();
   await page.getByRole('button', { name: 'Descartar orden' }).click();
   await expect(page.getByRole('button', { name: 'Vender', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Órdenes (1)' })).toBeVisible();
