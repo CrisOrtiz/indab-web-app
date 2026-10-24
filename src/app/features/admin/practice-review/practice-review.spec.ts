@@ -17,6 +17,7 @@ class FakeChart {
   readonly trades = input<unknown[]>([]);
   readonly barSeconds = input(0);
   readonly focusTrade = input<string | null>(null);
+  readonly startTime = input<number | null>(null);
 }
 
 const candle: Candle = { time: 1_620_000_000, open: 1, high: 2, low: 0.5, close: 1.5 };

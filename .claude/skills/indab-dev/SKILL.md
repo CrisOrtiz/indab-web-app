@@ -191,7 +191,8 @@ Module notes:
   session's candles, draws each filled trade as TradingView's long/short position box
   (`trade-boxes.ts`, `ReplayChart` `positionBoxes`; in a live practice only closed trades get one)
   and steps through them with `TradeNavigator` (previous/next, a list, details), scrolling the
-  chart to each (`focusTrade`). Admins delete a session with its trades (`PracticeService.deleteSession`).
+  chart to each (`focusTrade`, once per pick). Cris wants no navigator during a live session,
+  only the boxes. Once a replay is over, a dotted line marks where it started (`startTime`). Admins delete a session with its trades (`PracticeService.deleteSession`).
   Cris wants the trading screen to look and work like TradingView, students to start with 200
   USD and trade lots (100 oz) at 1:100 with a 50% stop out (`replay.ts` constants), and
   timeframes 1m-4h switchable mid-session, starting on 15m. The replay runs on 1m candles

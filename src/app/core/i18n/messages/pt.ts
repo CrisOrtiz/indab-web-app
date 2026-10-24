@@ -594,6 +594,7 @@ export const pt: Messages = {
   },
 
   chart: {
+    replayStart: 'Início do replay',
     tools: 'Ferramentas do gráfico',
     indicators: 'Indicadores',
     draw: 'Desenhar',

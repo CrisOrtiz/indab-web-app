@@ -23,6 +23,7 @@ class FakeChart {
   readonly trading = input(false);
   readonly lots = input(0);
   readonly focusTrade = input<string | null>(null);
+  readonly startTime = input<number | null>(null);
   readonly levelMoved = output<LevelMove>();
   readonly levelRemoved = output<LevelRemove>();
   readonly levelAdded = output<LevelRemove>();
@@ -567,6 +568,8 @@ describe('Practice page', () => {
       'Saldo de 200 a 199 USD',
     );
     expect(chart().hideDates()).toBe(false);
+    // A dotted line marks where the replay started.
+    expect(chart().startTime()).toBe(begin);
     // The navigator steps through the trades, which the chart scrolls to.
     expect(chart().focusTrade()).toBeNull();
     await click('Siguiente ›');

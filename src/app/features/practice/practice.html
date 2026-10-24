@@ -525,6 +525,7 @@
             [trades]="r.trades()"
             [barSeconds]="barSeconds()"
             [focusTrade]="focused()"
+            [startTime]="replayStart() / 1000"
           />
           @if (filledTrades().length) {
             <app-trade-navigator [trades]="filledTrades()" [(selected)]="focused" />

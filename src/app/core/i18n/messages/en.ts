@@ -597,6 +597,7 @@ export const en: Messages = {
   },
 
   chart: {
+    replayStart: 'Replay start',
     tools: 'Chart tools',
     indicators: 'Indicators',
     draw: 'Draw',

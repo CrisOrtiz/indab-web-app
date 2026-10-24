@@ -86,13 +86,17 @@
 <div class="stage" #stage>
   <div class="canvas" #canvas></div>
   <img class="watermark" src="logo.jpg" alt="" aria-hidden="true" />
-  @if (boxes().length) {
+  @if (boxes().length || startX() !== null) {
     <svg
       class="positions"
       [attr.width]="paneSize().width"
       [attr.height]="paneSize().height"
       aria-hidden="true"
     >
+      @if (startX(); as x) {
+        <line class="replay-start" [attr.x1]="x" [attr.x2]="x" y1="0" y2="100%" />
+        <text class="replay-start-text" [attr.x]="x + 5" y="14">{{ t.replayStart }}</text>
+      }
       @for (box of boxes(); track box.id) {
         <g class="position" [class.focused]="box.focused">
           @if (box.profit; as zone) {
