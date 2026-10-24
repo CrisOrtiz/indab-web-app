@@ -31,7 +31,7 @@ import { I18n } from '../../core/i18n/i18n.service';
 import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/practice';
 import { INDICATORS, RSI_LEVELS, computeIndicator } from './indicators';
 import { formatLots, priceDigits, roundPrice, signedMoney } from './practice-format';
-import { LOT_SIZE, tradeLots } from './replay';
+import { LOT_SIZE, LOT_STEP, tradeLots } from './replay';
 
 /** The order being set up in the ticket, drawn as draggable lines before it is placed. */
 export interface OrderDraft {
@@ -42,6 +42,8 @@ export interface OrderDraft {
   takeProfit: number | null;
   /** Units the order would buy or sell, to label the SL/TP lines with their P/L. */
   quantity?: number;
+  /** Why the order cannot be placed as it is; its button is then off and a "!" says why. */
+  error?: string | null;
 }
 
 export type LevelField = 'price' | 'stopLoss' | 'takeProfit';
@@ -53,23 +55,35 @@ export interface LevelMove {
   price: number;
 }
 
-/** The × of a stop loss or take profit label: on the draft or on a trade. */
+/**
+ * The × of a stop loss or take profit label, or the level dragged back onto its entry; also a
+ * click on a TP/SL tab, which asks for that level at its default distance.
+ */
 export interface LevelRemove {
   target: string;
   field: 'stopLoss' | 'takeProfit';
 }
 
+type ExitField = LevelRemove['field'];
+
 type LabelAction =
   | { kind: 'close'; tradeId: string; label: string }
   | { kind: 'remove'; level: LevelRemove; label: string }
-  | { kind: 'erase'; drawingId: number; label: string };
+  | { kind: 'erase'; drawingId: number; label: string }
+  | { kind: 'discard'; label: string };
 
 /** The box on a line, as TradingView draws it: text, P/L and a × button. */
 interface LineLabel {
   /** The side, at the start of the box; on the order being set up, a button that places it. */
   badge?: { text: string; side: TradeSide; submit: boolean };
-  /** Lots of the order being set up, editable on its line. */
+  /** Lots of the order being set up: a button that opens the quantity pad. */
   lots?: number;
+  /** The text is the order type, a button that opens the order type menu. */
+  typeMenu?: boolean;
+  /** Why the order being set up cannot be placed. */
+  warning?: string;
+  /** TP and SL tabs for the levels the line does not have yet: drag one out, or click it. */
+  tabs?: { bracket: Bracket; fields: ExitField[] };
   text: string;
   /** P/L if the price reaches the line (or, for a position, at the last close). */
   pnl: number | null;
@@ -83,13 +97,19 @@ interface Bracket {
   quantity?: number;
 }
 
-/** An order picked from the "+" menu, at the price where it was opened. */
+/** An order picked from the "+" menu, at the price where it was opened, to be set up. */
 export interface OrderAt {
   side: TradeSide;
   orderType: Exclude<OrderType, 'market'>;
   price: number;
-  /** Places it at once; otherwise it only fills in the order panel. */
-  place: boolean;
+}
+
+/** The shaded band between the entry of the order being set up and its TP or SL. */
+interface Zone {
+  key: string;
+  top: number;
+  height: number;
+  profit: boolean;
 }
 
 interface Line {
@@ -107,6 +127,8 @@ interface Line {
   bracket?: Bracket;
   /** The market order being set up, which sits on the last close. */
   atClose?: boolean;
+  /** A TP/SL line's entry: dropping the line back on it removes the level. */
+  entry?: () => number | null;
 }
 
 interface PlacedLabel extends LineLabel {
@@ -139,6 +161,9 @@ interface PlacedShape {
   levels: { ratio: number; price: number; y: number }[];
 }
 
+/** Lot shortcuts of the quantity pad. */
+export const LOT_PRESETS = [0.01, 0.05, 0.1, 0.5, 1];
+
 /** Retracement levels, as TradingView draws them by default. */
 export const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 
@@ -154,7 +179,12 @@ const RSI_PANE_HEIGHT = 110;
  * order being set up, pending orders and open positions, each with a label showing its size and
  * P/L and a × to close the position, cancel the order or remove the SL/TP. Order prices, stop
  * losses and take profits can be dragged by the line or its label; each drop emits
- * `levelMoved` and the page decides whether to accept it.
+ * `levelMoved` and the page decides whether to accept it. Dropping a TP/SL back on its entry
+ * removes it.
+ *
+ * Orders are set up as in TradingView: nothing is on the chart until the student picks an order
+ * from the "+" menu next to the price scale. The order's line then has its Buy/Sell button, a
+ * quantity pad, an order type menu, TP/SL tabs to drag out and a × to discard it.
  *
  * A toolbar adds indicators (moving averages, RSI in its own pane) and drawings (horizontal
  * and trend lines, rectangles and Fibonacci retracements). Indicators only use the candles
@@ -165,7 +195,7 @@ const RSI_PANE_HEIGHT = 110;
   imports: [DecimalPipe],
   host: {
     '(document:pointerdown)': 'closeMenu($event)',
-    '(document:keydown.escape)': 'menu.set(null)',
+    '(document:keydown.escape)': 'menu.set(null); popup.set(null)',
   },
   templateUrl: './replay-chart.html',
   styleUrl: './replay-chart.scss',
@@ -178,6 +208,8 @@ export class ReplayChart {
   readonly hideDates = input(false);
   /** Shows the indicators and drawing toolbar. */
   readonly tools = input(true);
+  /** A live practice: the "+" menu offers orders. */
+  readonly trading = input(false);
   /** Length of a bar in seconds: trade markers and drawings snap to the bar they fall in. */
   readonly barSeconds = input(0);
   readonly levelMoved = output<LevelMove>();
@@ -186,8 +218,14 @@ export class ReplayChart {
   readonly tradeClosed = output<string>();
   /** The side button on the line of the order being set up. */
   readonly draftSubmitted = output<void>();
-  /** Lots typed on the line of the order being set up. */
+  /** Lots picked on the quantity pad of the order being set up. */
   readonly lotsChanged = output<string>();
+  /** Order type picked on the line of the order being set up. */
+  readonly draftTypeChanged = output<OrderType>();
+  /** The × of the order being set up. */
+  readonly draftDiscarded = output<void>();
+  /** A TP/SL tab clicked without dragging: add that level at its default distance. */
+  readonly levelAdded = output<LevelRemove>();
   readonly orderAt = output<OrderAt>();
   /** Symbol named in the "+" menu. */
   readonly symbol = input('');
@@ -196,6 +234,9 @@ export class ReplayChart {
   protected readonly indicators = INDICATORS;
   protected readonly signed = signedMoney;
   protected readonly priceDigits = priceDigits;
+  protected readonly formatLots = formatLots;
+  protected readonly lotPresets = LOT_PRESETS;
+  protected readonly orderTypes: OrderType[] = ['market', 'limit', 'stop'];
   protected readonly active = signal<ReadonlySet<string>>(new Set());
   protected readonly tool = signal<Tool | null>(null);
   /** First point of a trend line being drawn. */
@@ -203,6 +244,11 @@ export class ReplayChart {
   protected readonly drawings = signal<Drawing[]>([]);
   protected readonly labels = signal<PlacedLabel[]>([]);
   protected readonly shapes = signal<PlacedShape[]>([]);
+  protected readonly zones = signal<Zone[]>([]);
+  /** The quantity pad or order type menu of the order being set up. */
+  protected readonly popup = signal<'lots' | 'type' | null>(null);
+  /** The label of the order being set up, where its popups open. */
+  protected readonly draftLabel = computed(() => this.labels().find((l) => l.badge?.submit));
   /** Height of the pointer over the candles, where the "+" button sits. */
   protected readonly hoverY = signal<number | null>(null);
   /** The "+" menu, open at a price. */
@@ -213,7 +259,7 @@ export class ReplayChart {
     if (!menu || close === null) {
       return [];
     }
-    const lots = formatLots((this.draft()?.quantity ?? 0) / LOT_SIZE);
+    const lots = formatLots(this.lots());
     const tr = this.i18n.messages().trading;
     const below = menu.price < close;
     return (['long', 'short'] as const).map((side) => {
@@ -226,10 +272,14 @@ export class ReplayChart {
       };
     });
   });
+  /** Lots of the order panel, which new orders from the menu start with. */
+  readonly lots = input(0.01);
   /** The last close, as a signal for the menu. */
   private readonly drawnClose = signal<number | null>(null);
   /** Width of the price scale, so labels sit just left of it. */
   protected readonly scaleWidth = signal(0);
+  /** Height of the chart, so menus near its bottom open upwards instead of being cut off. */
+  protected readonly stageHeight = signal(0);
 
   private readonly stage = viewChild.required<ElementRef<HTMLElement>>('stage');
   private readonly canvas = viewChild.required<ElementRef<HTMLElement>>('canvas');
@@ -244,6 +294,8 @@ export class ReplayChart {
     /** Set when a new TP/SL is being pulled out of the entry at `origin`. */
     bracket?: Bracket;
     origin: number;
+    /** The TP/SL tab it was pulled from: a click without moving adds that level. */
+    tab?: ExitField;
   };
   private drawn: Candle[] = [];
   private indicatorSeries = new Map<string, ISeriesApi<'Line'>>();
@@ -345,6 +397,9 @@ export class ReplayChart {
       this.tradeClosed.emit(action.tradeId);
     } else if (action.kind === 'remove') {
       this.levelRemoved.emit(action.level);
+    } else if (action.kind === 'discard') {
+      this.popup.set(null);
+      this.draftDiscarded.emit();
     } else {
       this.drawings.update((list) => list.filter((d) => d.id !== action.drawingId));
     }
@@ -361,32 +416,60 @@ export class ReplayChart {
 
   protected closeMenu(event: Event): void {
     const target = event.target;
-    if (!(target instanceof Element && target.closest('.plus, .plus-menu'))) {
+    const inside = (selector: string) => target instanceof Element && !!target.closest(selector);
+    if (!inside('.plus, .plus-menu')) {
       this.menu.set(null);
+    }
+    if (!inside('.popup, .opener')) {
+      this.popup.set(null);
     }
   }
 
-  /** A buy or sell from the "+" menu, placed at once. */
-  protected placeAt(side: TradeSide, orderType: OrderAt['orderType']): void {
+  /** A buy or sell from the "+" menu: its line appears, ready to adjust and place. */
+  protected orderFromMenu(side: TradeSide, orderType: OrderAt['orderType']): void {
     const menu = this.menu();
     this.menu.set(null);
     if (menu) {
-      this.orderAt.emit({ side, orderType, price: menu.price, place: true });
+      this.orderAt.emit({ side, orderType, price: menu.price });
     }
   }
 
   /** "Add order": the order panel's side, as a limit or stop at the menu's price. */
   protected addOrderAt(): void {
-    const menu = this.menu();
-    const order = this.menuOrders().find((o) => o.side === (this.draft()?.side ?? 'long'));
-    this.menu.set(null);
-    if (menu && order) {
-      this.orderAt.emit({
-        side: order.side,
-        orderType: order.orderType,
-        price: menu.price,
-        place: false,
-      });
+    const side = this.draft()?.side ?? 'long';
+    const order = this.menuOrders().find((o) => o.side === side);
+    if (order) {
+      this.orderFromMenu(order.side, order.orderType);
+    }
+  }
+
+  /** Where a menu opened at `y` goes: below it, or above it in the lower half of the chart. */
+  protected below(y: number): { top: number | null; bottom: number | null } {
+    const height = this.stageHeight();
+    return height && y > height / 2
+      ? { top: null, bottom: height - y + 14 }
+      : { top: y + 14, bottom: null };
+  }
+
+  protected togglePopup(popup: 'lots' | 'type'): void {
+    this.popup.update((open) => (open === popup ? null : popup));
+  }
+
+  /** Lots on the quantity pad: typed, stepped with −/+ or picked from a shortcut. */
+  protected pickLots(lots: number): void {
+    this.lotsChanged.emit(formatLots(Math.max(LOT_STEP, lots)));
+  }
+
+  protected pickType(type: OrderType): void {
+    this.popup.set(null);
+    this.draftTypeChanged.emit(type);
+  }
+
+  /** A TP/SL tab: dragging it pulls the level out of the entry; a click adds it. */
+  protected grabTab(tabs: NonNullable<LineLabel['tabs']>, field: ExitField, event: PointerEvent) {
+    const entry = this.priceLines.find((p) => p.line.label?.tabs === tabs);
+    if (entry) {
+      this.pull(entry.line.price, tabs.bracket, field, event);
     }
   }
 
@@ -515,17 +598,19 @@ export class ReplayChart {
       const lots = formatLots(tradeLots(t));
       const badge = { text: t.side === 'long' ? tr.long : tr.short, side: t.side, submit: false };
       if (t.status === 'open') {
+        const bracket = { target: t.id, side: t.side, quantity: t.quantity };
         lines.push({
           key: t.id,
           price: t.entryPrice,
           color: text,
           style: LineStyle.Solid,
           position: t,
-          bracket: { target: t.id, side: t.side, quantity: t.quantity },
+          bracket,
           label: {
             badge,
             text: lots,
             pnl: null,
+            tabs: this.tabs(bracket, t),
             action: { kind: 'close', tradeId: t.id, label: chart.closePosition },
           },
         });
@@ -541,6 +626,7 @@ export class ReplayChart {
             badge,
             text: `${lots} ${tr.orderTypes[t.orderType]}`,
             pnl: null,
+            tabs: this.tabs({ target: t.id, side: t.side, quantity: t.quantity }, t),
             action: { kind: 'close', tradeId: t.id, label: chart.cancelOrder },
           },
         });
@@ -548,17 +634,20 @@ export class ReplayChart {
       }
     }
     if (draft) {
-      const lots = formatLots((draft.quantity ?? 0) / LOT_SIZE);
-      const label = {
+      const bracket = { target: 'draft', side: draft.side, quantity: draft.quantity };
+      const label: LineLabel = {
         badge: {
           text: draft.side === 'long' ? tr.buy : tr.sell,
           side: draft.side,
           submit: true,
         },
-        lots: Number(lots),
+        lots: (draft.quantity ?? 0) / LOT_SIZE,
+        typeMenu: true,
+        warning: draft.error ?? undefined,
+        tabs: this.tabs(bracket, draft),
         text: tr.orderTypes[draft.orderType],
         pnl: null,
-        action: null,
+        action: { kind: 'discard', label: chart.discardOrder },
       };
       const market = draft.orderType === 'market';
       const close = this.lastClose;
@@ -569,7 +658,7 @@ export class ReplayChart {
           color: muted,
           style: LineStyle.Dotted,
           atClose: true,
-          bracket: { target: 'draft', side: draft.side, quantity: draft.quantity },
+          bracket,
           label,
         });
       } else if (!market && draft.price !== null) {
@@ -602,6 +691,15 @@ export class ReplayChart {
       }
     }
     return lines;
+  }
+
+  /** The TP/SL tabs of a line, for the levels it does not have yet. */
+  private tabs(
+    bracket: Bracket,
+    levels: Pick<OrderDraft, 'stopLoss' | 'takeProfit'>,
+  ): LineLabel['tabs'] {
+    const fields = (['takeProfit', 'stopLoss'] as const).filter((f) => levels[f] === null);
+    return fields.length ? { bracket, fields } : undefined;
   }
 
   /** SL and TP lines, labelled with their size and the P/L at that price. */
@@ -644,6 +742,7 @@ export class ReplayChart {
       color: stop ? this.colors.down : this.colors.up,
       style,
       drag: { target, field },
+      entry,
       pnlAt: known ? pnlAt : undefined,
       label: {
         text: `${stop ? 'SL' : 'TP'}${quantity ? ` ${formatLots(quantity / LOT_SIZE)}` : ''}`,
@@ -665,6 +764,7 @@ export class ReplayChart {
     const close = this.lastClose;
     this.drawnClose.set(close ?? null);
     const placed: PlacedLabel[] = [];
+    const zones: Zone[] = [];
     for (const { line, api } of this.priceLines) {
       // The market order being set up follows the price.
       if (line.atClose && close !== undefined && line.price !== close) {
@@ -679,6 +779,16 @@ export class ReplayChart {
       if (y === null) {
         continue;
       }
+      const from = line.drag?.target === 'draft' ? line.entry?.() : null;
+      const fromY = from ? this.series.priceToCoordinate(from) : null;
+      if (fromY !== null) {
+        zones.push({
+          key: line.key,
+          top: Math.min(y, fromY),
+          height: Math.abs(y - fromY),
+          profit: line.drag!.field === 'takeProfit',
+        });
+      }
       let { pnl } = line.label;
       if (line.position && close !== undefined) {
         const t = line.position;
@@ -689,7 +799,9 @@ export class ReplayChart {
       placed.push({ ...line.label, pnl, key: line.key, color: line.color, y, line });
     }
     this.labels.set(placed);
+    this.zones.set(zones);
     this.scaleWidth.set(this.chart.priceScale('right').width());
+    this.stageHeight.set(this.stage().nativeElement.clientHeight);
     this.shapes.set(this.placeShapes());
   }
 
@@ -886,33 +998,43 @@ export class ReplayChart {
   }
 
   private startDrag(entry: { line: Line; api: IPriceLine }, event: PointerEvent): void {
-    event.preventDefault();
-    event.stopPropagation();
     const bracket = entry.line.drag ? undefined : entry.line.bracket;
     if (bracket) {
       // Dragging away from an entry pulls out a new take profit or stop loss.
-      const price = entry.line.price;
-      const line = this.levelLine(
-        bracket.target,
-        bracket.side,
-        'takeProfit',
-        price,
-        () => price,
-        bracket.quantity,
-        LineStyle.Dashed,
-      );
-      const api = this.series!.createPriceLine({
-        price,
-        color: line.color,
-        title: '',
-        lineWidth: 2,
-        lineStyle: line.style,
-      });
-      this.priceLines.push({ line, api });
-      this.dragging = { line, api, price, bracket, origin: price };
-    } else {
-      this.dragging = { ...entry, price: entry.line.price, origin: entry.line.price };
+      this.pull(entry.line.price, bracket, undefined, event);
+      return;
     }
+    this.holdPointer(event);
+    this.dragging = { ...entry, price: entry.line.price, origin: entry.line.price };
+  }
+
+  /** Starts pulling a new TP/SL out of the entry at `price`, from the line or one of its tabs. */
+  private pull(price: number, bracket: Bracket, tab: ExitField | undefined, event: PointerEvent) {
+    this.holdPointer(event);
+    const line = this.levelLine(
+      bracket.target,
+      bracket.side,
+      tab ?? 'takeProfit',
+      price,
+      () => price,
+      bracket.quantity,
+      LineStyle.Dashed,
+    );
+    const api = this.series!.createPriceLine({
+      price,
+      color: line.color,
+      title: '',
+      lineWidth: 2,
+      lineStyle: line.style,
+    });
+    this.priceLines.push({ line, api });
+    this.dragging = { line, api, price, bracket, origin: price, tab };
+  }
+
+  /** Keeps the pointer for the drag: the chart neither pans nor zooms meanwhile. */
+  private holdPointer(event: PointerEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
     this.chart!.applyOptions({ handleScroll: false, handleScale: false });
     this.stage().nativeElement.setPointerCapture?.(event.pointerId);
   }
@@ -944,6 +1066,9 @@ export class ReplayChart {
         const hit = untracked(this.tool) ? undefined : near(event);
         if (hit) {
           this.startDrag(hit, event);
+        } else if (event.pointerType === 'touch') {
+          // A phone has no hover: a tap on the candles puts the "+" at that price.
+          this.hoverY.set(this.overCandles(event) ? y(event) : null);
         }
       },
       { capture: true },
@@ -985,6 +1110,9 @@ export class ReplayChart {
       const { target, field } = dragging.line.drag!;
       if (dragging.bracket && dragging.price === dragging.origin) {
         this.drawTrades(this.trades(), this.draft());
+        if (dragging.tab) {
+          this.levelAdded.emit({ target: dragging.bracket.target, field: dragging.tab });
+        }
         return;
       }
       if (target.startsWith('drawing:')) {
@@ -996,7 +1124,12 @@ export class ReplayChart {
         );
         return;
       }
-      this.levelMoved.emit({ target, field, price: dragging.price });
+      if (field !== 'price' && !dragging.bracket && this.onEntry(dragging.line, dragging.price)) {
+        // A TP/SL dropped back on its entry is taken off, as in TradingView.
+        this.levelRemoved.emit({ target, field });
+      } else {
+        this.levelMoved.emit({ target, field, price: dragging.price });
+      }
       // If the page rejects the move its inputs stay the same, so put the line back.
       setTimeout(() => this.drawTrades(this.trades(), this.draft()));
     };
@@ -1010,15 +1143,28 @@ export class ReplayChart {
     };
     stage.addEventListener('touchstart', holdTouch, { capture: true, passive: false });
     stage.addEventListener('touchmove', holdTouch, { capture: true, passive: false });
-    stage.addEventListener('pointerleave', () => this.hoverY.set(null));
+    // A finger leaves the stage on every lift, so a tapped "+" stays until the next tap.
+    stage.addEventListener('pointerleave', (event) => {
+      if (event.pointerType !== 'touch') {
+        this.hoverY.set(null);
+      }
+    });
     stage.addEventListener('pointerup', drop, { capture: true });
     stage.addEventListener('pointercancel', drop, { capture: true });
+  }
+
+  /** Whether a TP/SL at `price` sits on its line's entry, within grabbing distance. */
+  private onEntry(line: Line, price: number): boolean {
+    const entry = line.entry?.();
+    const at = this.series!.priceToCoordinate(price);
+    const from = entry ? this.series!.priceToCoordinate(entry) : null;
+    return at !== null && from !== null && Math.abs(at - from) <= GRAB_DISTANCE;
   }
 
   /** Whether the pointer is over the candles of a live practice, where "+" is offered. */
   private overCandles(event: PointerEvent): boolean {
     const chart = this.chart;
-    if (!chart || !untracked(this.draft) || untracked(this.tool)) {
+    if (!chart || !untracked(this.trading) || untracked(this.tool)) {
       return false;
     }
     const box = this.canvas().nativeElement.getBoundingClientRect();

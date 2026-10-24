@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 import { AuthService } from '../../core/auth/auth.service';
-import { Candle } from '../../core/models/practice';
+import { Candle, OrderType } from '../../core/models/practice';
 import { HISTORY_BARS, MarketDataService } from './market-data.service';
 import { Practice, formatCountdown } from './practice';
 import { PracticeService } from './practice.service';
@@ -19,8 +19,13 @@ class FakeChart {
   readonly hideDates = input(false);
   readonly barSeconds = input(0);
   readonly draft = input<OrderDraft | null>(null);
+  readonly trading = input(false);
+  readonly lots = input(0);
   readonly levelMoved = output<LevelMove>();
   readonly levelRemoved = output<LevelRemove>();
+  readonly levelAdded = output<LevelRemove>();
+  readonly draftDiscarded = output<void>();
+  readonly draftTypeChanged = output<OrderType>();
   readonly tradeClosed = output<string>();
   readonly symbol = input('');
   readonly draftSubmitted = output<void>();
@@ -470,8 +475,11 @@ describe('Practice page', () => {
       'u1',
       expect.objectContaining({ side: 'long', entryPrice: 100, stopLoss: 90, quantity: 1 }),
     );
-    // The ticket is ready for the next order.
+    // The order leaves the chart and the ticket is ready for the next one.
+    expect(chart().draft()).toBeNull();
+    await toggle('Take profit');
     expect(chart().draft()?.stopLoss).toBeNull();
+    await toggle('Take profit');
     expect(el.textContent).toContain('Posiciones (1)');
 
     await click('Siguiente vela');
@@ -568,28 +576,80 @@ describe('Practice page', () => {
     await fixture.whenStable();
   };
 
-  it('trades from the chart: its order line button and its "+" menu', async () => {
+  it('sets orders up from the chart\'s "+" menu and places them with their line\'s button', async () => {
     await start();
-    // "+" → "Buy 0.01 @ 99 limit" places it at once.
-    chart().orderAt.emit({ side: 'long', orderType: 'limit', price: 99, place: true });
-    await fixture.whenStable();
-    expect(practice.openTrade).toHaveBeenLastCalledWith(
-      'session-1',
-      'u1',
-      expect.objectContaining({ side: 'long', orderType: 'limit', orderPrice: 99 }),
-    );
-    expect(el.textContent).toContain('Compra límite');
+    // Nothing is on the chart until an order is added.
+    expect(chart().trading()).toBe(true);
+    expect(chart().draft()).toBeNull();
 
-    // "+" → "Add order at 103" fills in the panel; the line's button places it.
-    chart().orderAt.emit({ side: 'short', orderType: 'limit', price: 103, place: false });
+    // "+" → "Buy 0.01 @ 103 stop" draws the order, but places nothing yet.
+    chart().orderAt.emit({ side: 'long', orderType: 'stop', price: 103 });
     await fixture.whenStable();
-    expect(submitLabel()).toBe('Vender 0.01 PAXGUSDT LÍMITE 103.000');
+    expect(practice.openTrade).not.toHaveBeenCalled();
+    expect(chart().draft()).toMatchObject({
+      side: 'long',
+      orderType: 'stop',
+      price: 103,
+      stopLoss: null,
+      error: null,
+    });
+    expect(submitLabel()).toBe('Comprar 0.01 PAXGUSDT STOP 103.000');
+
+    // As a limit it keeps its price, which is on the wrong side of the market (100).
+    chart().draftTypeChanged.emit('limit');
+    await fixture.whenStable();
+    expect(chart().draft()).toMatchObject({
+      orderType: 'limit',
+      price: 103,
+      error: 'Una compra límite debe tener su precio por debajo del precio actual.',
+    });
+    // Dragged below the market it is fine; its SL tab adds a stop loss 1% away.
+    await drag({ target: 'draft', field: 'price', price: 99 });
+    chart().levelAdded.emit({ target: 'draft', field: 'stopLoss' });
+    await fixture.whenStable();
+    expect(chart().draft()).toMatchObject({ price: 99, stopLoss: 98.01, error: null });
+
     chart().draftSubmitted.emit();
     await fixture.whenStable();
     expect(practice.openTrade).toHaveBeenLastCalledWith(
       'session-1',
       'u1',
-      expect.objectContaining({ side: 'short', orderType: 'limit', orderPrice: 103 }),
+      expect.objectContaining({
+        side: 'long',
+        orderType: 'limit',
+        orderPrice: 99,
+        stopLoss: 98.01,
+      }),
+    );
+    expect(el.textContent).toContain('Compra límite');
+    // Once placed, the order being set up leaves the chart.
+    expect(chart().draft()).toBeNull();
+
+    // A market order sits on the price; its × discards it with its exits.
+    chart().orderAt.emit({ side: 'short', orderType: 'limit', price: 103 });
+    await fixture.whenStable();
+    chart().draftTypeChanged.emit('market');
+    chart().levelAdded.emit({ target: 'draft', field: 'takeProfit' });
+    await fixture.whenStable();
+    expect(chart().draft()).toMatchObject({ orderType: 'market', price: null, takeProfit: 98 });
+    chart().draftDiscarded.emit();
+    await fixture.whenStable();
+    expect(chart().draft()).toBeNull();
+    expect(practice.openTrade).toHaveBeenCalledTimes(1);
+
+    // Working on the order panel brings the order back on the chart, without the old exits.
+    await pressed('.side.sell');
+    expect(chart().draft()).toMatchObject({ side: 'short', takeProfit: null });
+  });
+
+  it('adds a take profit to a position from its TP tab on the chart', async () => {
+    await start();
+    await pressed('.quick-buy');
+    chart().levelAdded.emit({ target: 't1', field: 'takeProfit' });
+    await fixture.whenStable();
+    expect(practice.updateLevels).toHaveBeenLastCalledWith(
+      'session-1',
+      expect.objectContaining({ id: 't1', takeProfit: 102 }),
     );
   });
 
@@ -600,7 +660,7 @@ describe('Practice page', () => {
     quick.dispatchEvent(new Event('change'));
     await fixture.whenStable();
     expect(quick.value).toBe('0.03');
-    expect(chart().draft()?.quantity).toBe(3);
+    expect(chart().lots()).toBe(0.03);
     expect(submitLabel()).toBe('Comprar 0.03 PAXGUSDT MERCADO');
 
     chart().lotsChanged.emit('0.2');

@@ -118,3 +118,79 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   expect(await listDocuments('practiceSessions')).toEqual([]);
   expect(await listDocuments(`practiceSessions/${session['id']}/trades`)).toEqual([]);
 });
+
+test('a student adds an order from the chart menu and sets it up on its line', async ({ page }) => {
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+  await expect(page.locator('.market .price')).toHaveText('100.000');
+
+  // Nothing is on the chart until an order is added from the "+" next to the price scale.
+  const stage = page.locator('.workspace app-replay-chart .stage');
+  await expect(stage.locator('.line-label')).toHaveCount(0);
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await stage.scrollIntoViewIfNeeded();
+  const box = (await stage.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.7);
+  await page.getByRole('button', { name: 'Opciones en este precio' }).click();
+  // Below the market (100) the menu offers a buy limit and a sell stop.
+  await page.getByRole('menuitem', { name: /^Comprar 0\.01 PAXGUSDT @ [\d.]+ límite$/ }).click();
+  await expect(page.getByRole('button', { name: 'Comprar', exact: true })).toBeVisible();
+
+  // The lots on the line open the quantity pad.
+  await page.getByRole('button', { name: 'Lotes de la orden: 0.01' }).click();
+  await page
+    .getByRole('dialog', { name: 'Cantidad (lotes)' })
+    .getByRole('button', { name: '0.05' })
+    .click();
+  await expect(page.getByRole('button', { name: 'Lotes de la orden: 0.05' })).toBeVisible();
+
+  // The order type menu: as a stop below the market it cannot be placed, as a limit it can.
+  await page.getByRole('button', { name: 'Tipo de orden: Límite' }).click();
+  await page.getByRole('menuitemradio', { name: 'Stop' }).click();
+  await expect(
+    page.getByRole('img', { name: /compra stop debe tener su precio por encima/ }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Comprar', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Tipo de orden: Stop' }).click();
+  await page.getByRole('menuitemradio', { name: 'Límite' }).click();
+  await expect(page.getByRole('button', { name: 'Comprar', exact: true })).toBeEnabled();
+
+  // A click on the TP tab adds a take profit, shaded from the entry, to drag where wanted.
+  await page.getByRole('button', { name: 'Añadir take profit' }).click();
+  await expect(stage.locator('.line-label', { hasText: 'TP 0.05' })).toBeVisible();
+  await expect(stage.locator('.zone.profit')).toBeVisible();
+  await page.screenshot({ path: 'test-results/order-line.png' });
+
+  // Its Buy button places it as a pending order, and the line leaves the chart.
+  await page.getByRole('button', { name: 'Comprar', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Órdenes (1)' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Compra límite' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Descartar orden' })).toHaveCount(0);
+
+  // An order added and then discarded with its × places nothing.
+  const top = (await stage.boundingBox())!;
+  await page.mouse.move(top.x + top.width * 0.3, top.y + top.height * 0.15);
+  await page.getByRole('button', { name: 'Opciones en este precio' }).click();
+  await page.getByRole('menuitem', { name: /^Vender 0\.05 PAXGUSDT @ [\d.]+ límite$/ }).click();
+  await page.getByRole('button', { name: 'Descartar orden' }).click();
+  await expect(page.getByRole('button', { name: 'Vender', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Órdenes (1)' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
+  await expect
+    .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
+    .toBe('finished');
+  const [session] = await listDocuments('practiceSessions');
+  const trades = await listDocuments(`practiceSessions/${session['id']}/trades`);
+  expect(trades).toHaveLength(1);
+  expect(trades[0]).toMatchObject({
+    side: 'long',
+    orderType: 'limit',
+    quantity: 5,
+    stopLoss: null,
+    status: 'cancelled',
+  });
+  expect(trades[0]['takeProfit']).toEqual(expect.any(Number));
+});

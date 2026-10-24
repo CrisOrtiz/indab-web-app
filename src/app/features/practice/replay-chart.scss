@@ -155,15 +155,55 @@
     touch-action: none;
   }
 
-  .lots {
-    width: 4.5em;
-    padding: 0 4px;
+  .opener {
     border: 0;
     border-radius: 0;
     background: none;
     color: inherit;
     font: inherit;
-    text-align: right;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--color-surface);
+    }
+  }
+
+  .warning {
+    background: var(--color-down);
+    color: #ffffff;
+    font-weight: 700;
+    cursor: help;
+  }
+
+  // TP and SL tabs hang outside the box, as in TradingView, ready to be dragged out.
+  .tabs {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    display: flex;
+    gap: 4px;
+    padding: 2px 0 0;
+    border: 0;
+  }
+
+  .tab {
+    padding: 0 6px;
+    border: 1px solid;
+    border-radius: 2px;
+    background: var(--color-bg);
+    font: inherit;
+    font-size: 0.7rem;
+    line-height: 1.5;
+    cursor: ns-resize;
+    touch-action: none;
+
+    &.tp {
+      color: var(--color-up);
+    }
+
+    &.sl {
+      color: var(--color-down);
+    }
   }
 
   > * {
@@ -202,8 +242,102 @@
 button.badge {
   cursor: pointer;
 
-  &:hover {
+  &:hover:not(:disabled) {
     filter: brightness(1.1);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+/* The band from the entry of the order being set up to its take profit or stop loss. */
+.zone {
+  position: absolute;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+
+  &.profit {
+    background: color-mix(in srgb, var(--color-up) 14%, transparent);
+  }
+
+  &.loss {
+    background: color-mix(in srgb, var(--color-down) 14%, transparent);
+  }
+}
+
+/* The quantity pad and order type menu of the order being set up. */
+.popup {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
+  font-size: 0.85rem;
+
+  button {
+    padding: 6px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: none;
+    color: var(--color-text);
+    font: inherit;
+    cursor: pointer;
+
+    &:hover,
+    &.on {
+      background: var(--color-surface);
+    }
+  }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  input {
+    width: 100%;
+    padding: 6px;
+    font: inherit;
+  }
+}
+
+.lots-pad {
+  width: 180px;
+
+  .steps,
+  .presets {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+  }
+
+  .presets {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.type-menu {
+  min-width: 160px;
+
+  .popup-title {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+  }
+
+  button {
+    border: 0;
+    text-align: left;
   }
 }
 
