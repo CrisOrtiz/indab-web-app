@@ -112,7 +112,8 @@ describe('PracticeReview', () => {
       '6',
     ]);
     expect(sessionRows()).toHaveLength(3);
-    expect(el.textContent).toContain('10 May 2021');
+    // Dates follow the site's language (Spanish by default).
+    expect(el.textContent).toContain('10 may 2021');
 
     const search = el.querySelector<HTMLInputElement>('input[type=search]')!;
     search.value = 'luis';

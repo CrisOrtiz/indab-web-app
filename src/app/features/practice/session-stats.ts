@@ -1,5 +1,6 @@
 import { DecimalPipe, PercentPipe } from '@angular/common';
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
+import { I18n } from '../../core/i18n/i18n.service';
 import { PracticeTrade } from '../../core/models/practice';
 import { signedMoney } from './practice-format';
 import { sessionStats } from './stats';
@@ -22,6 +23,7 @@ export class SessionStatsPanel {
   readonly trades = input.required<PracticeTrade[]>();
   readonly startingBalance = input.required<number>();
 
+  protected readonly i18n = inject(I18n);
   protected readonly signed = signedMoney;
   protected readonly width = WIDTH;
   protected readonly height = HEIGHT;

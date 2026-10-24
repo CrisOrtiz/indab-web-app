@@ -1,34 +1,35 @@
+@let a = i18n.messages().auth;
 <section class="auth">
   <div class="card">
-    <h1>Crear cuenta</h1>
+    <h1>{{ a.register.title }}</h1>
     <form [formGroup]="form" (ngSubmit)="submit()">
       <label>
-        Nombre completo
+        {{ a.register.name }}
         <input type="text" formControlName="displayName" autocomplete="name" />
       </label>
       @if (form.controls.displayName.touched && form.controls.displayName.invalid) {
-        <p class="error">Ingresa tu nombre.</p>
+        <p class="error">{{ a.register.nameRequired }}</p>
       }
       <label>
-        Correo electrónico
+        {{ a.email }}
         <input type="email" formControlName="email" autocomplete="email" />
       </label>
       @if (form.controls.email.touched && form.controls.email.invalid) {
-        <p class="error">Ingresa un correo válido.</p>
+        <p class="error">{{ a.invalidEmail }}</p>
       }
       <label>
-        Contraseña
+        {{ a.password }}
         <input type="password" formControlName="password" autocomplete="new-password" />
       </label>
-      <p class="hint">Mínimo 6 caracteres.</p>
+      <p class="hint">{{ a.register.passwordHint }}</p>
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
       }
-      <button type="submit" class="btn" [disabled]="loading()">Crear cuenta</button>
+      <button type="submit" class="btn" [disabled]="loading()">{{ a.register.submit }}</button>
     </form>
     <div class="links">
-      <span>¿Ya tienes cuenta?</span>
-      <a routerLink="/login">Ingresar</a>
+      <span>{{ a.register.haveAccount }}</span>
+      <a routerLink="/login">{{ a.register.signIn }}</a>
     </div>
   </div>
 </section>

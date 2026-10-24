@@ -1,34 +1,32 @@
+@let t = i18n.messages().review;
+@let tr = i18n.messages().trading;
 <section class="container">
   <header class="page-header">
-    <a routerLink="/admin" class="back">← Administración</a>
-    <h1>Prácticas de trading</h1>
-    <p>
-      Sesiones de práctica con replay de los estudiantes y cada operación que abrieron, sobre el
-      gráfico que practicaron. Las fechas del periodo se muestran aquí aunque el estudiante las haya
-      practicado ocultas.
-    </p>
+    <a routerLink="/admin" class="back">{{ i18n.messages().admin.back }}</a>
+    <h1>{{ t.title }}</h1>
+    <p>{{ t.intro }}</p>
   </header>
 
   <div class="stats">
     <div class="stat">
       <strong>{{ stats().sessions }}</strong
-      ><span>Sesiones</span>
+      ><span>{{ t.sessions }}</span>
     </div>
     <div class="stat">
       <strong>{{ stats().students }}</strong
-      ><span>Estudiantes</span>
+      ><span>{{ t.students }}</span>
     </div>
     <div class="stat">
       <strong>{{ stats().trades }}</strong
-      ><span>Operaciones</span>
+      ><span>{{ t.trades }}</span>
     </div>
   </div>
 
   <div class="filters">
     <input
       type="search"
-      placeholder="Buscar por estudiante o mercado"
-      aria-label="Buscar prácticas"
+      [placeholder]="t.search"
+      [attr.aria-label]="t.searchLabel"
       [value]="search()"
       (input)="search.set($any($event.target).value)"
     />
@@ -39,33 +37,37 @@
   }
 
   @if (loading()) {
-    <p class="muted">Cargando prácticas…</p>
+    <p class="muted">{{ t.loading }}</p>
   } @else {
     <table class="users sessions">
       <thead>
         <tr>
-          <th>Estudiante</th>
-          <th>Inicio</th>
-          <th>Mercado</th>
-          <th>Periodo practicado</th>
-          <th>Operaciones</th>
-          <th>Ganancia / pérdida</th>
-          <th>Estado</th>
+          <th>{{ t.student }}</th>
+          <th>{{ t.started }}</th>
+          <th>{{ t.market }}</th>
+          <th>{{ t.period }}</th>
+          <th>{{ t.trades }}</th>
+          <th>{{ t.pnl }}</th>
+          <th>{{ t.status }}</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
         @for (s of visible(); track s.id) {
           <tr>
-            <td data-label="Estudiante" class="name">{{ s.userName }}</td>
-            <td data-label="Inicio">{{ s.startedAt?.toDate() | date: 'd MMM y, HH:mm' }}</td>
-            <td data-label="Mercado">{{ s.symbol }} · {{ s.interval }}</td>
-            <td data-label="Periodo practicado">{{ s.replayStart | date: 'd MMM y' }}</td>
-            <td data-label="Operaciones">{{ s.tradeCount }}</td>
-            <td data-label="Ganancia / pérdida" [class.up]="s.pnl > 0" [class.down]="s.pnl < 0">
+            <td [attr.data-label]="t.student" class="name">{{ s.userName }}</td>
+            <td [attr.data-label]="t.started">
+              {{ s.startedAt?.toDate() | localDate: 'd MMM y, HH:mm' }}
+            </td>
+            <td [attr.data-label]="t.market">{{ s.symbol }} · {{ s.interval }}</td>
+            <td [attr.data-label]="t.period">{{ s.replayStart | localDate: 'd MMM y' }}</td>
+            <td [attr.data-label]="t.trades">{{ s.tradeCount }}</td>
+            <td [attr.data-label]="t.pnl" [class.up]="s.pnl > 0" [class.down]="s.pnl < 0">
               {{ s.pnl | number: '1.2-2' }}
             </td>
-            <td data-label="Estado">{{ s.status === 'active' ? 'En curso' : 'Terminada' }}</td>
+            <td [attr.data-label]="t.status">
+              {{ s.status === 'active' ? tr.active : tr.finished }}
+            </td>
             <td class="actions">
               <button
                 type="button"
@@ -73,16 +75,16 @@
                 [attr.aria-expanded]="selected() === s.id"
                 (click)="toggle(s)"
               >
-                {{ selected() === s.id ? 'Ocultar' : 'Ver práctica' }}
+                {{ selected() === s.id ? t.hide : t.show }}
               </button>
               <button
                 type="button"
                 class="btn btn-outline small delete"
                 [disabled]="deleting() === s.id"
-                [attr.aria-label]="'Eliminar práctica de ' + s.userName"
+                [attr.aria-label]="t.deleteLabel(s.userName)"
                 (click)="remove(s)"
               >
-                {{ deleting() === s.id ? 'Eliminando…' : 'Eliminar' }}
+                {{ deleting() === s.id ? t.deleting : t.delete }}
               </button>
             </td>
           </tr>
@@ -97,62 +99,66 @@
                       [barSeconds]="barSeconds()"
                     />
                   } @else {
-                    <p class="muted">No se pudo cargar el gráfico del mercado.</p>
+                    <p class="muted">{{ t.chartFailed }}</p>
                   }
                 } @else {
-                  <p class="muted">Cargando gráfico…</p>
+                  <p class="muted">{{ t.loadingChart }}</p>
                 }
                 @if (trades(); as list) {
                   <app-session-stats [trades]="list" [startingBalance]="s.startingBalance" />
                   <table class="trades">
                     <thead>
                       <tr>
-                        <th>Operación</th>
-                        <th>Apertura</th>
-                        <th>Entrada</th>
-                        <th>Lotes</th>
+                        <th>{{ t.trade }}</th>
+                        <th>{{ t.opened }}</th>
+                        <th>{{ t.entry }}</th>
+                        <th>{{ t.lots }}</th>
                         <th>SL / TP</th>
-                        <th>Cierre</th>
-                        <th>Salida</th>
-                        <th>Motivo</th>
+                        <th>{{ t.closed }}</th>
+                        <th>{{ t.exit }}</th>
+                        <th>{{ t.reason }}</th>
                         <th>P/L</th>
                       </tr>
                     </thead>
                     <tbody>
-                      @for (t of list; track t.id) {
+                      @for (trade of list; track trade.id) {
                         <tr>
-                          <td>{{ orderLabel(t) }}</td>
-                          <td>{{ t.entryTime * 1000 | date: 'd MMM y, HH:mm' : 'UTC' }}</td>
-                          <td>{{ t.entryPrice | number: priceDigits(t.entryPrice) }}</td>
-                          <td>{{ t.quantity / lotSize | number: '1.2-4' }}</td>
-                          <td>{{ t.stopLoss ?? '—' }} / {{ t.takeProfit ?? '—' }}</td>
-                          @if (t.status === 'closed') {
-                            <td>{{ t.exitTime! * 1000 | date: 'd MMM y, HH:mm' : 'UTC' }}</td>
-                            <td>{{ t.exitPrice | number: priceDigits(t.exitPrice!) }}</td>
-                            <td>{{ exitReasons[t.exitReason!] }}</td>
-                            <td [class.up]="t.pnl! > 0" [class.down]="t.pnl! < 0">
-                              {{ t.pnl | number: '1.2-2' }}
+                          <td>{{ tr.orderLabel(trade.side, trade.orderType) }}</td>
+                          <td>
+                            {{ trade.entryTime * 1000 | localDate: 'd MMM y, HH:mm' : 'UTC' }}
+                          </td>
+                          <td>{{ trade.entryPrice | number: priceDigits(trade.entryPrice) }}</td>
+                          <td>{{ trade.quantity / lotSize | number: '1.2-4' }}</td>
+                          <td>{{ trade.stopLoss ?? '—' }} / {{ trade.takeProfit ?? '—' }}</td>
+                          @if (trade.status === 'closed') {
+                            <td>
+                              {{ trade.exitTime! * 1000 | localDate: 'd MMM y, HH:mm' : 'UTC' }}
+                            </td>
+                            <td>{{ trade.exitPrice | number: priceDigits(trade.exitPrice!) }}</td>
+                            <td>{{ tr.exitReasons[trade.exitReason!] }}</td>
+                            <td [class.up]="trade.pnl! > 0" [class.down]="trade.pnl! < 0">
+                              {{ trade.pnl | number: '1.2-2' }}
                             </td>
                           } @else {
-                            <td colspan="4" class="muted">{{ statusLabels[t.status] }}</td>
+                            <td colspan="4" class="muted">{{ tr.statuses[trade.status] }}</td>
                           }
                         </tr>
                       } @empty {
                         <tr>
-                          <td colspan="9" class="muted empty">Sin operaciones en esta sesión.</td>
+                          <td colspan="9" class="muted empty">{{ t.noTrades }}</td>
                         </tr>
                       }
                     </tbody>
                   </table>
                 } @else {
-                  <p class="muted">Cargando operaciones…</p>
+                  <p class="muted">{{ t.loadingTrades }}</p>
                 }
               </td>
             </tr>
           }
         } @empty {
           <tr>
-            <td colspan="8" class="muted empty">No hay prácticas registradas.</td>
+            <td colspan="8" class="muted empty">{{ t.empty }}</td>
           </tr>
         }
       </tbody>

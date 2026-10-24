@@ -1,54 +1,54 @@
 @let s = stats();
+@let t = i18n.messages().stats;
 <div class="grid">
   <div class="item">
-    <span>Operaciones cerradas</span><strong>{{ s.trades }}</strong>
+    <span>{{ t.closedTrades }}</span
+    ><strong>{{ s.trades }}</strong>
   </div>
   <div class="item">
-    <span>Acierto</span>
+    <span>{{ t.winRate }}</span>
     <strong>{{ s.winRate === null ? '—' : (s.winRate | percent) }}</strong>
-    <small>{{ s.wins }} ganadas · {{ s.losses }} perdidas</small>
+    <small>{{ t.winsLosses(s.wins, s.losses) }}</small>
   </div>
   <div class="item">
-    <span>Factor de beneficio</span>
+    <span>{{ t.profitFactor }}</span>
     <strong>{{ s.profitFactor === null ? '—' : (s.profitFactor | number: '1.2-2') }}</strong>
   </div>
   <div class="item">
-    <span>Promedio por operación</span>
+    <span>{{ t.expectancy }}</span>
     <strong [class.up]="(s.expectancy ?? 0) > 0" [class.down]="(s.expectancy ?? 0) < 0">
       {{ s.expectancy === null ? '—' : signed(s.expectancy) }}
     </strong>
   </div>
   <div class="item">
-    <span>Ganancia media</span>
+    <span>{{ t.avgWin }}</span>
     <strong class="up">{{ s.avgWin === null ? '—' : signed(s.avgWin) }}</strong>
   </div>
   <div class="item">
-    <span>Pérdida media</span>
+    <span>{{ t.avgLoss }}</span>
     <strong class="down">{{ s.avgLoss === null ? '—' : signed(s.avgLoss) }}</strong>
   </div>
   <div class="item">
-    <span>Mejor / peor</span>
+    <span>{{ t.bestWorst }}</span>
     <strong>
       {{ s.best === null ? '—' : signed(s.best) }} / {{ s.worst === null ? '—' : signed(s.worst) }}
     </strong>
   </div>
   <div class="item">
-    <span>Drawdown máximo</span>
+    <span>{{ t.maxDrawdown }}</span>
     <strong [class.down]="s.maxDrawdown > 0">{{ s.maxDrawdown | number: '1.2-2' }} USD</strong>
-    <small>{{ s.maxDrawdownPct | percent: '1.0-1' }} desde el máximo</small>
+    <small>{{ t.fromPeak((s.maxDrawdownPct | percent: '1.0-1') ?? '') }}</small>
   </div>
 </div>
 
 <figure class="curve">
-  <figcaption>Curva de capital</figcaption>
+  <figcaption>{{ t.curve }}</figcaption>
   @if (s.equity.length > 1) {
     <svg
       [attr.viewBox]="'0 0 ' + width + ' ' + height"
       preserveAspectRatio="none"
       role="img"
-      [attr.aria-label]="
-        'Saldo de ' + startingBalance() + ' a ' + s.equity.at(-1)!.balance + ' USD'
-      "
+      [attr.aria-label]="t.curveLabel(startingBalance(), s.equity.at(-1)!.balance)"
     >
       <line
         class="baseline"
@@ -60,6 +60,6 @@
       <polyline [class.up]="curve().up" [class.down]="!curve().up" [attr.points]="curve().points" />
     </svg>
   } @else {
-    <p class="empty">Cierra operaciones para ver cómo evoluciona tu saldo.</p>
+    <p class="empty">{{ t.curveEmpty }}</p>
   }
 </figure>

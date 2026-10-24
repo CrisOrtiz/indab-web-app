@@ -8,6 +8,9 @@ import { Admin } from './features/admin/admin';
 import { AdminService } from './features/admin/admin.service';
 import { Practice } from './features/practice/practice';
 import { PracticeService } from './features/practice/practice.service';
+import { en } from './core/i18n/messages/en';
+import { es } from './core/i18n/messages/es';
+import { pt } from './core/i18n/messages/pt';
 
 describe('app routes', () => {
   const auth = {
@@ -59,9 +62,12 @@ describe('app routes', () => {
 
   const pages = routes.filter((route) => !route.redirectTo);
 
-  it('gives every route a Spanish title for the browser tab', () => {
+  it('gives every route a translated title for the browser tab', () => {
     for (const route of pages) {
-      expect(route.title, route.path).toMatch(/INDAB|Eleva/);
+      const key = route.title as keyof typeof es.titles;
+      expect(es.titles[key], route.path).toMatch(/INDAB|Eleva/);
+      expect(en.titles[key], route.path).toMatch(/INDAB|Eleva/);
+      expect(pt.titles[key], route.path).toMatch(/INDAB|Eleva/);
     }
     expect(routes.at(-1)?.path).toBe('**');
   });

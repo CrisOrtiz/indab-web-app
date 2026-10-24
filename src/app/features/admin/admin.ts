@@ -1,14 +1,15 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { I18n } from '../../core/i18n/i18n.service';
+import { LocalDatePipe } from '../../core/i18n/local-date.pipe';
 import { UserRole } from '../../core/models/user-profile';
 import { AdminService } from './admin.service';
 import { AdminUserFilter, AdminUserRow, filterUsers, hasAcademyAccess } from './admin-users';
 
 @Component({
   selector: 'app-admin',
-  imports: [DatePipe, RouterLink],
+  imports: [LocalDatePipe, RouterLink],
   providers: [AdminService],
   templateUrl: './admin.html',
   styleUrl: './admin.scss',
@@ -16,6 +17,7 @@ import { AdminUserFilter, AdminUserRow, filterUsers, hasAcademyAccess } from './
 export class Admin {
   protected readonly admin = inject(AdminService);
   private readonly auth = inject(AuthService);
+  protected readonly i18n = inject(I18n);
 
   protected readonly filter = signal<AdminUserFilter>({ search: '', role: 'all', access: 'all' });
   protected readonly visible = computed(() => filterUsers(this.admin.users(), this.filter()));
@@ -48,15 +50,15 @@ export class Admin {
 
   protected async changeRole(row: AdminUserRow, select: HTMLSelectElement): Promise<void> {
     const role = select.value as UserRole;
-    if (role === 'admin' && !confirm(`¿Dar permisos de administrador a ${this.label(row)}?`)) {
+    const t = this.i18n.messages().admin;
+    if (role === 'admin' && !confirm(t.confirmAdmin(this.label(row)))) {
       select.value = row.profile.role;
       return;
     }
-    const roleName = role === 'admin' ? 'administrador' : 'estudiante';
     const ok = await this.save(
       row,
       () => this.admin.setRole(row.profile.uid, role),
-      `${this.label(row)} ahora es ${roleName}.`,
+      t.roleChanged(this.label(row), role === 'admin'),
     );
     if (!ok) {
       select.value = row.profile.role;
@@ -65,9 +67,8 @@ export class Admin {
 
   protected async toggleAccess(row: AdminUserRow, input: HTMLInputElement): Promise<void> {
     const academy = input.checked;
-    const text = academy
-      ? `${this.label(row)} ahora tiene acceso a la academia.`
-      : `Se quitó el acceso a la academia a ${this.label(row)}.`;
+    const t = this.i18n.messages().admin;
+    const text = academy ? t.accessGranted(this.label(row)) : t.accessRemoved(this.label(row));
     const ok = await this.save(
       row,
       () => this.admin.setAcademyAccess(row.profile.uid, academy),
@@ -92,7 +93,7 @@ export class Admin {
     } catch {
       this.message.set({
         kind: 'error',
-        text: `No se pudo guardar el cambio para ${this.label(row)}. Intenta de nuevo.`,
+        text: this.i18n.messages().admin.saveFailed(this.label(row)),
       });
       return false;
     } finally {

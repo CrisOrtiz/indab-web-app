@@ -1,7 +1,9 @@
-import { DatePipe, DecimalPipe, PercentPipe, formatNumber } from '@angular/common';
+import { DecimalPipe, PercentPipe, formatNumber } from '@angular/common';
 import { Component, DestroyRef, LOCALE_ID, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { I18n } from '../../core/i18n/i18n.service';
+import { LocalDatePipe } from '../../core/i18n/local-date.pipe';
 import {
   Candle,
   OrderType,
@@ -24,15 +26,7 @@ import {
   replayStartAt,
   replayWindow,
 } from './market-data.service';
-import {
-  EXIT_REASONS,
-  ORDER_TYPES,
-  formatLots,
-  orderLabel,
-  priceDigits,
-  roundPrice,
-  signedMoney,
-} from './practice-format';
+import { formatLots, priceDigits, roundPrice, signedMoney } from './practice-format';
 import { PracticeService } from './practice.service';
 import {
   LEVERAGE,
@@ -77,7 +71,7 @@ const PREFETCH_MINUTES = 600;
  */
 @Component({
   selector: 'app-practice',
-  imports: [RouterLink, DatePipe, DecimalPipe, PercentPipe, ReplayChart, SessionStatsPanel],
+  imports: [RouterLink, LocalDatePipe, DecimalPipe, PercentPipe, ReplayChart, SessionStatsPanel],
   templateUrl: './practice.html',
   styleUrls: ['./practice.scss', './trading-panel.scss', './trading-account.scss'],
   host: { '(window:keydown)': 'onKey($event)' },
@@ -87,15 +81,14 @@ export class Practice {
   private readonly market = inject(MarketDataService);
   private readonly practice = inject(PracticeService);
   private readonly locale = inject(LOCALE_ID);
+  protected readonly i18n = inject(I18n);
 
   protected readonly instruments = INSTRUMENTS;
   protected readonly timeframes = TIMEFRAMES;
   protected readonly speeds = SPEEDS;
-  protected readonly exitReasons = EXIT_REASONS;
   protected readonly startingBalance = STARTING_BALANCE;
   protected readonly priceDigits = priceDigits;
-  protected readonly orderLabel = orderLabel;
-  protected readonly orderTypes = Object.entries(ORDER_TYPES) as [OrderType, string][];
+  protected readonly orderTypes: OrderType[] = ['market', 'limit', 'stop'];
   protected readonly signed = signedMoney;
   protected readonly leverage = LEVERAGE;
   protected readonly lotSize = LOT_SIZE;
@@ -105,9 +98,9 @@ export class Practice {
   /** Size shortcuts, as parts of the largest order the free margin allows. */
   protected readonly fractions = [0.25, 0.5, 1];
   /** Stop loss and take profit, in the order of the position columns. */
-  protected readonly levels: { field: LevelField; label: string; short: string }[] = [
-    { field: 'stopLoss', label: 'Stop loss', short: 'SL' },
-    { field: 'takeProfit', label: 'Take profit', short: 'TP' },
+  protected readonly levels: { field: LevelField; short: string }[] = [
+    { field: 'stopLoss', short: 'SL' },
+    { field: 'takeProfit', short: 'TP' },
   ];
   /** The order panel lists the take profit above the stop loss, as TradingView does. */
   protected readonly ticketLevels = [...this.levels].reverse();
@@ -159,7 +152,9 @@ export class Practice {
   protected readonly instrument = computed(
     () => INSTRUMENTS.find((i) => i.symbol === this.symbol()) ?? INSTRUMENTS[0],
   );
-  protected readonly instrumentLabel = computed(() => this.instrument().label);
+  protected readonly instrumentLabel = computed(
+    () => this.i18n.messages().trading.instruments[this.symbol()] ?? this.instrument().label,
+  );
   /** The history bars plus the replayed minutes built into bars of the chart's timeframe. */
   protected readonly visibleCandles = computed(() => {
     const replay = this.replay();
@@ -213,8 +208,8 @@ export class Practice {
     const price = this.orderPrice();
     const where =
       type === 'market' || price === null
-        ? 'MERCADO'
-        : `${ORDER_TYPES[type].toUpperCase()} ${formatNumber(price, this.locale, priceDigits(price))}`;
+        ? this.i18n.messages().practice.marketCaps
+        : `${this.i18n.messages().trading.orderTypes[type].toUpperCase()} ${formatNumber(price, this.locale, priceDigits(price))}`;
     return `${formatLots(this.lots())} ${this.symbol()} ${where}`;
   });
 
@@ -292,9 +287,7 @@ export class Practice {
       this.tab.set('positions');
       this.phase.set('playing');
     } catch {
-      this.error.set(
-        'No se pudieron cargar los datos del mercado o iniciar la sesión. Intenta de nuevo.',
-      );
+      this.error.set(this.i18n.messages().practice.startFailed);
       this.phase.set('setup');
     }
   }
@@ -308,7 +301,7 @@ export class Practice {
         const history = await this.loadHistory(this.symbol(), timeframe, this.replayStart());
         this.histories.update((all) => ({ ...all, [interval]: history }));
       } catch {
-        this.error.set('No se pudo cargar esa temporalidad. Intenta de nuevo.');
+        this.error.set(this.i18n.messages().practice.timeframeFailed);
         return;
       } finally {
         this.switching.set(null);
@@ -414,7 +407,11 @@ export class Practice {
     }
     let trade: PracticeTrade;
     try {
-      trade = replay.open(this.practice.newTradeId(sessionId), input);
+      trade = replay.open(
+        this.practice.newTradeId(sessionId),
+        input,
+        this.i18n.messages().orderErrors,
+      );
     } catch (e) {
       this.orderError.set((e as Error).message);
       return null;
@@ -426,7 +423,7 @@ export class Practice {
       return trade;
     } catch {
       replay.discard(trade.id);
-      this.orderError.set('No se pudo registrar la operación. Intenta de nuevo.');
+      this.orderError.set(this.i18n.messages().practice.saveTradeFailed);
       return null;
     } finally {
       this.placing.set(false);
@@ -553,7 +550,7 @@ export class Practice {
       return;
     }
     try {
-      const updated = replay.modify(trade.id, levels);
+      const updated = replay.modify(trade.id, levels, this.i18n.messages().orderErrors);
       this.persist((id) => this.practice.updateLevels(id, updated), trade);
       this.orderError.set(null);
     } catch (e) {
@@ -578,7 +575,7 @@ export class Practice {
       ]);
       await this.practice.finishSession(sessionId, this.summary(replay));
     } catch {
-      this.error.set('No se pudo guardar el cierre de la sesión.');
+      this.error.set(this.i18n.messages().practice.finishFailed);
     }
     this.loadSessions();
   }
@@ -669,7 +666,7 @@ export class Practice {
       replay.extend(within, more.length < REPLAY_BARS || within.length < more.length);
     } catch {
       this.pause();
-      this.error.set('No se pudieron cargar más velas del mercado. Revisa tu conexión.');
+      this.error.set(this.i18n.messages().practice.moreBarsFailed);
     } finally {
       this.loadingMinutes = false;
     }
@@ -709,7 +706,7 @@ export class Practice {
     Promise.all([
       this.practice.closeTrade(sessionId, trade),
       this.practice.updateSummary(sessionId, this.summary(replay)),
-    ]).catch(() => this.error.set('No se pudo registrar el cierre de una operación.'));
+    ]).catch(() => this.error.set(this.i18n.messages().practice.closeFailed));
   }
 
   /**
@@ -725,7 +722,7 @@ export class Practice {
       if (previous) {
         this.replay()?.restore(previous);
       }
-      this.error.set('No se pudo registrar un cambio en tus operaciones.');
+      this.error.set(this.i18n.messages().practice.changeFailed);
     });
   }
 

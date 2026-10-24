@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { I18n } from '../../core/i18n/i18n.service';
 
 // Placeholder: the learning-material repository is built in its own module later.
 // It lives inside the academy area (/academy/material), not in the main navigation.
@@ -8,9 +9,9 @@ import { RouterLink } from '@angular/router';
   imports: [RouterLink],
   template: `
     <section class="container">
-      <a routerLink="/academy" class="back">← Academia</a>
-      <h1>Material de estudio</h1>
-      <p>Aquí estará el repositorio de material de la academia.</p>
+      <a routerLink="/academy" class="back">{{ i18n.messages().academy.back }}</a>
+      <h1>{{ i18n.messages().material.title }}</h1>
+      <p>{{ i18n.messages().material.soon }}</p>
     </section>
   `,
   styleUrl: '../placeholder.scss',
@@ -22,4 +23,6 @@ import { RouterLink } from '@angular/router';
     }
   `,
 })
-export class Repository {}
+export class Repository {
+  protected readonly i18n = inject(I18n);
+}

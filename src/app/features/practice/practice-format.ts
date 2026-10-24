@@ -1,30 +1,9 @@
-import { OrderType, PracticeTrade, TradeExitReason } from '../../core/models/practice';
-
-export const EXIT_REASONS: Record<TradeExitReason, string> = {
-  manual: 'Manual',
-  stopLoss: 'Stop loss',
-  takeProfit: 'Take profit',
-  stopOut: 'Stop out (margen)',
-  sessionEnd: 'Fin de sesión',
-};
-
-export const ORDER_TYPES: Record<OrderType, string> = {
-  market: 'Mercado',
-  limit: 'Límite',
-  stop: 'Stop',
-};
+// Names of order types, sides and exit reasons are translated: see `trading` in
+// core/i18n/messages.
 
 /** Lots with two decimals, as brokers size gold orders: "0.05". */
 export function formatLots(lots: number): string {
   return lots.toFixed(2);
-}
-
-/** "Compra", "Venta límite", "Compra stop"... */
-export function orderLabel(trade: Pick<PracticeTrade, 'side' | 'orderType'>): string {
-  const side = trade.side === 'long' ? 'Compra' : 'Venta';
-  return trade.orderType === 'market'
-    ? side
-    : `${side} ${ORDER_TYPES[trade.orderType].toLowerCase()}`;
 }
 
 /** Decimals that make sense for a price of this size. */

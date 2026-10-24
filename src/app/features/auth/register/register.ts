@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
+import { I18n } from '../../../core/i18n/i18n.service';
 import { authErrorMessage } from '../auth-errors';
 
 @Component({
@@ -13,6 +14,7 @@ import { authErrorMessage } from '../auth-errors';
 export class Register {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  protected readonly i18n = inject(I18n);
 
   protected readonly form = inject(FormBuilder).nonNullable.group({
     displayName: ['', [Validators.required, Validators.maxLength(80)]],
@@ -34,7 +36,7 @@ export class Register {
       await this.auth.registerWithEmail(displayName.trim(), email, password);
       await this.router.navigateByUrl('/academy');
     } catch (e) {
-      this.error.set(authErrorMessage(e));
+      this.error.set(authErrorMessage(e, this.i18n.messages().auth.errors));
     } finally {
       this.loading.set(false);
     }

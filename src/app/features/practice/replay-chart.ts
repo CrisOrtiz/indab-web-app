@@ -27,9 +27,10 @@ import {
   createChart,
   createSeriesMarkers,
 } from 'lightweight-charts';
+import { I18n } from '../../core/i18n/i18n.service';
 import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/practice';
 import { INDICATORS, RSI_LEVELS, computeIndicator } from './indicators';
-import { ORDER_TYPES, formatLots, priceDigits, roundPrice, signedMoney } from './practice-format';
+import { formatLots, priceDigits, roundPrice, signedMoney } from './practice-format';
 import { LOT_SIZE, tradeLots } from './replay';
 
 /** The order being set up in the ticket, drawn as draggable lines before it is placed. */
@@ -191,6 +192,7 @@ export class ReplayChart {
   /** Symbol named in the "+" menu. */
   readonly symbol = input('');
 
+  protected readonly i18n = inject(I18n);
   protected readonly indicators = INDICATORS;
   protected readonly signed = signedMoney;
   protected readonly priceDigits = priceDigits;
@@ -212,25 +214,20 @@ export class ReplayChart {
       return [];
     }
     const lots = formatLots((this.draft()?.quantity ?? 0) / LOT_SIZE);
+    const tr = this.i18n.messages().trading;
     const below = menu.price < close;
     return (['long', 'short'] as const).map((side) => {
       const orderType: OrderAt['orderType'] = (side === 'long') === below ? 'limit' : 'stop';
       return {
         side,
         orderType,
-        text: `${side === 'long' ? 'Comprar' : 'Vender'} ${lots} ${this.symbol()} @`,
-        type: orderType === 'limit' ? 'límite' : 'stop',
+        text: `${side === 'long' ? tr.buy : tr.sell} ${lots} ${this.symbol()} @`,
+        type: tr.orderTypes[orderType].toLowerCase(),
       };
     });
   });
   /** The last close, as a signal for the menu. */
   private readonly drawnClose = signal<number | null>(null);
-  protected readonly toolHints: Record<Tool, [string, string]> = {
-    hline: ['Haz clic en el gráfico para poner la línea.', ''],
-    trend: ['Haz clic en el primer punto de la línea.', 'Haz clic en el segundo punto.'],
-    rect: ['Haz clic en una esquina del rectángulo.', 'Haz clic en la esquina opuesta.'],
-    fib: ['Haz clic en el inicio del movimiento.', 'Haz clic en el final del movimiento.'],
-  };
   /** Width of the price scale, so labels sit just left of it. */
   protected readonly scaleWidth = signal(0);
 
@@ -310,7 +307,11 @@ export class ReplayChart {
 
     effect(() => this.draw(this.candles()));
     effect(() => this.applyDates(this.hideDates()));
-    effect(() => this.drawTrades(this.trades(), this.draft(), this.drawings()));
+    effect(() => {
+      // Labels and markers are drawn in the current language.
+      this.i18n.messages();
+      this.drawTrades(this.trades(), this.draft(), this.drawings());
+    });
     effect(() => this.drawIndicators(this.candles(), this.active()));
     effect(() => this.drawTrends(this.drawings(), this.barSeconds()));
     inject(DestroyRef).onDestroy(() => this.chart?.remove());
@@ -464,6 +465,7 @@ export class ReplayChart {
       return;
     }
     const { up, down, muted } = this.colors;
+    const tr = untracked(this.i18n.messages).trading;
     const bar = this.snap(this.barSeconds());
     const markers: SeriesMarker<Time>[] = [];
     for (const t of trades) {
@@ -476,7 +478,7 @@ export class ReplayChart {
         position: long ? 'belowBar' : 'aboveBar',
         shape: long ? 'arrowUp' : 'arrowDown',
         color: long ? up : down,
-        text: long ? 'Compra' : 'Venta',
+        text: long ? tr.long : tr.short,
       });
       if (t.status === 'closed' && t.exitTime !== undefined) {
         markers.push({
@@ -507,10 +509,11 @@ export class ReplayChart {
 
   private lines(trades: PracticeTrade[], draft: OrderDraft | null, drawings: Drawing[]): Line[] {
     const { text, muted } = this.colors;
+    const { chart, trading: tr } = untracked(this.i18n.messages);
     const lines: Line[] = [];
     for (const t of trades) {
       const lots = formatLots(tradeLots(t));
-      const badge = { text: t.side === 'long' ? 'Compra' : 'Venta', side: t.side, submit: false };
+      const badge = { text: t.side === 'long' ? tr.long : tr.short, side: t.side, submit: false };
       if (t.status === 'open') {
         lines.push({
           key: t.id,
@@ -523,7 +526,7 @@ export class ReplayChart {
             badge,
             text: lots,
             pnl: null,
-            action: { kind: 'close', tradeId: t.id, label: 'Cerrar posición' },
+            action: { kind: 'close', tradeId: t.id, label: chart.closePosition },
           },
         });
         lines.push(...this.stops(t.id, t, () => t.entryPrice, t.quantity, LineStyle.Dashed));
@@ -536,9 +539,9 @@ export class ReplayChart {
           drag: { target: t.id, field: 'price' },
           label: {
             badge,
-            text: `${lots} ${ORDER_TYPES[t.orderType]}`,
+            text: `${lots} ${tr.orderTypes[t.orderType]}`,
             pnl: null,
-            action: { kind: 'close', tradeId: t.id, label: 'Cancelar orden' },
+            action: { kind: 'close', tradeId: t.id, label: chart.cancelOrder },
           },
         });
         lines.push(...this.stops(t.id, t, () => t.orderPrice, t.quantity, LineStyle.Dashed));
@@ -548,12 +551,12 @@ export class ReplayChart {
       const lots = formatLots((draft.quantity ?? 0) / LOT_SIZE);
       const label = {
         badge: {
-          text: draft.side === 'long' ? 'Comprar' : 'Vender',
+          text: draft.side === 'long' ? tr.buy : tr.sell,
           side: draft.side,
           submit: true,
         },
         lots: Number(lots),
-        text: ORDER_TYPES[draft.orderType],
+        text: tr.orderTypes[draft.orderType],
         pnl: null,
         action: null,
       };
@@ -593,7 +596,7 @@ export class ReplayChart {
           label: {
             text: '',
             pnl: null,
-            action: { kind: 'erase', drawingId: d.id, label: 'Borrar línea' },
+            action: { kind: 'erase', drawingId: d.id, label: chart.eraseLine },
           },
         });
       }
@@ -629,6 +632,7 @@ export class ReplayChart {
     style: LineStyle,
   ): Line {
     const stop = field === 'stopLoss';
+    const { chart, trading } = untracked(this.i18n.messages);
     const pnlAt = (at: number) => {
       const from = entry();
       return from === null || !quantity ? 0 : (side === 'long' ? at - from : from - at) * quantity;
@@ -647,7 +651,7 @@ export class ReplayChart {
         action: {
           kind: 'remove',
           level: { target, field },
-          label: `Quitar ${stop ? 'stop loss' : 'take profit'}`,
+          label: chart.removeLevel(trading[field]),
         },
       },
     };

@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { AuthService } from '../../core/auth/auth.service';
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
+import { I18n } from '../../core/i18n/i18n.service';
 import { Enrollment, UserProfile, UserRole } from '../../core/models/user-profile';
 import { AdminUserRow, sortUsers } from './admin-users';
 
@@ -21,6 +22,7 @@ import { AdminUserRow, sortUsers } from './admin-users';
 export class AdminService {
   private readonly firestore = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
+  private readonly i18n = inject(I18n);
 
   private readonly _users = signal<UserProfile[]>([]);
   private readonly _enrollments = signal<ReadonlyMap<string, Enrollment>>(new Map());
@@ -41,9 +43,7 @@ export class AdminService {
 
   constructor() {
     const onError = () => {
-      this._error.set(
-        'No se pudo cargar la lista de usuarios. Verifica que tu cuenta sea administradora.',
-      );
+      this._error.set(this.i18n.messages().admin.loadFailed);
       this._loading.set(false);
     };
     const stopUsers = onSnapshot(

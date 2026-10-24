@@ -1,104 +1,105 @@
+@let t = i18n.messages().admin;
 <section class="container">
   <header class="page-header">
-    <h1>Administración</h1>
-    <p>Gestiona los usuarios de INDAB: asigna roles y da o quita el acceso a la academia.</p>
-    <a routerLink="/admin/practice" class="btn btn-outline">Revisar prácticas de trading</a>
+    <h1>{{ t.title }}</h1>
+    <p>{{ t.intro }}</p>
+    <a routerLink="/admin/practice" class="btn btn-outline">{{ t.reviewPractice }}</a>
   </header>
 
   <div class="stats">
     <div class="stat">
       <strong>{{ stats().total }}</strong
-      ><span>Usuarios</span>
+      ><span>{{ t.users }}</span>
     </div>
     <div class="stat">
       <strong>{{ stats().granted }}</strong
-      ><span>Con acceso a la academia</span>
+      ><span>{{ t.withAccess }}</span>
     </div>
     <div class="stat">
       <strong>{{ stats().admins }}</strong
-      ><span>Administradores</span>
+      ><span>{{ t.admins }}</span>
     </div>
   </div>
 
   <div class="filters">
     <input
       type="search"
-      placeholder="Buscar por nombre o correo"
-      aria-label="Buscar usuarios"
+      [placeholder]="t.search"
+      [attr.aria-label]="t.searchLabel"
       [value]="filter().search"
       (input)="updateFilter({ search: $any($event.target).value })"
     />
     <select
-      aria-label="Filtrar por rol"
+      [attr.aria-label]="t.roleFilter"
       (change)="updateFilter({ role: $any($event.target).value })"
     >
-      <option value="all">Todos los roles</option>
-      <option value="student">Estudiantes</option>
-      <option value="admin">Administradores</option>
+      <option value="all">{{ t.allRoles }}</option>
+      <option value="student">{{ t.students }}</option>
+      <option value="admin">{{ t.admins }}</option>
     </select>
     <select
-      aria-label="Filtrar por acceso"
+      [attr.aria-label]="t.accessFilter"
       (change)="updateFilter({ access: $any($event.target).value })"
     >
-      <option value="all">Todo acceso</option>
-      <option value="granted">Con acceso</option>
-      <option value="pending">Pendientes</option>
+      <option value="all">{{ t.allAccess }}</option>
+      <option value="granted">{{ t.granted }}</option>
+      <option value="pending">{{ t.pendingFilter }}</option>
     </select>
   </div>
 
   @if (message(); as msg) {
     <p class="message" [class.error]="msg.kind === 'error'" role="status">
       {{ msg.text }}
-      <button type="button" class="dismiss" aria-label="Cerrar" (click)="message.set(null)">
+      <button type="button" class="dismiss" [attr.aria-label]="t.close" (click)="message.set(null)">
         ×
       </button>
     </p>
   }
 
   @if (admin.loading()) {
-    <p class="muted">Cargando usuarios…</p>
+    <p class="muted">{{ t.loading }}</p>
   } @else if (admin.error(); as error) {
     <p class="message error">{{ error }}</p>
   } @else {
-    <p class="muted count">{{ visible().length }} de {{ stats().total }} usuarios</p>
+    <p class="muted count">{{ t.count(visible().length, stats().total) }}</p>
     <table class="users">
       <thead>
         <tr>
-          <th>Usuario</th>
-          <th>Registro</th>
-          <th>Rol</th>
-          <th>Acceso a la academia</th>
+          <th>{{ t.user }}</th>
+          <th>{{ t.joined }}</th>
+          <th>{{ t.role }}</th>
+          <th>{{ t.access }}</th>
         </tr>
       </thead>
       <tbody>
         @for (row of visible(); track row.profile.uid) {
           <tr>
-            <td data-label="Usuario">
+            <td [attr.data-label]="t.user">
               <div class="name">
-                {{ row.profile.displayName || 'Sin nombre' }}
+                {{ row.profile.displayName || t.noName }}
                 @if (isSelf(row)) {
-                  <span class="badge">Tú</span>
+                  <span class="badge">{{ t.you }}</span>
                 }
               </div>
               <div class="muted email">{{ row.profile.email }}</div>
             </td>
-            <td data-label="Registro">
-              {{ row.profile.createdAt?.toDate() | date: 'd MMM y' }}
+            <td [attr.data-label]="t.joined">
+              {{ row.profile.createdAt?.toDate() | localDate: 'd MMM y' }}
             </td>
-            <td data-label="Rol">
+            <td [attr.data-label]="t.role">
               <select
                 #roleSelect
-                [attr.aria-label]="'Rol de ' + label(row)"
+                [attr.aria-label]="t.roleOf(label(row))"
                 [value]="row.profile.role"
                 [disabled]="isSelf(row) || saving().has(row.profile.uid)"
-                [title]="isSelf(row) ? 'No puedes quitarte tu propio rol de administrador' : ''"
+                [title]="isSelf(row) ? t.ownRole : ''"
                 (change)="changeRole(row, roleSelect)"
               >
-                <option value="student">Estudiante</option>
-                <option value="admin">Administrador</option>
+                <option value="student">{{ t.student }}</option>
+                <option value="admin">{{ t.admin }}</option>
               </select>
             </td>
-            <td data-label="Acceso a la academia">
+            <td [attr.data-label]="t.access">
               <label class="switch">
                 <input
                   #accessInput
@@ -107,16 +108,16 @@
                   [disabled]="saving().has(row.profile.uid)"
                   (change)="toggleAccess(row, accessInput)"
                 />
-                <span>{{ hasAcademyAccess(row) ? 'Habilitado' : 'Pendiente' }}</span>
+                <span>{{ hasAcademyAccess(row) ? t.enabled : t.pending }}</span>
               </label>
               @if (row.profile.role === 'admin' && !hasAcademyAccess(row)) {
-                <div class="muted hint">Los administradores ya tienen acceso.</div>
+                <div class="muted hint">{{ t.adminsHaveAccess }}</div>
               }
             </td>
           </tr>
         } @empty {
           <tr>
-            <td colspan="4" class="muted empty">No hay usuarios que coincidan con la búsqueda.</td>
+            <td colspan="4" class="muted empty">{{ t.noMatches }}</td>
           </tr>
         }
       </tbody>
