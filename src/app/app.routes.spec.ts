@@ -106,6 +106,7 @@ describe('app routes', () => {
     expect(await visit('/academy/practice')).toBe('/login?returnUrl=%2Facademy%2Fpractice');
     expect(await visit('/admin/practice')).toBe('/login?returnUrl=%2Fadmin%2Fpractice');
     expect(await visit('/academy/ranking')).toBe('/login?returnUrl=%2Facademy%2Franking');
+    expect(await visit('/academy/calendar')).toBe('/login?returnUrl=%2Facademy%2Fcalendar');
     expect(await visit('/admin/evaluations')).toBe('/login?returnUrl=%2Fadmin%2Fevaluations');
   });
 
@@ -116,6 +117,7 @@ describe('app routes', () => {
     expect(await visit('/academy/material')).toBe('/academy');
     expect(await visit('/academy/practice')).toBe('/academy');
     expect(await visit('/academy/ranking')).toBe('/academy');
+    expect(await visit('/academy/calendar')).toBe('/academy');
     expect(await visit('/admin')).toBe('/academy');
     expect(await visit('/login')).toBe('/academy');
     expect(await visit('/register')).toBe('/academy');
@@ -126,6 +128,7 @@ describe('app routes', () => {
     expect(await visit('/academy/material')).toBe('/academy/material');
     expect(await visit('/repository')).toBe('/academy/material');
     expect(await visit('/academy/practice')).toBe('/academy/practice');
+    expect(await visit('/academy/calendar')).toBe('/academy/calendar');
     expect(await visit('/academy/ranking')).toBe('/academy/ranking');
     expect(await visit('/admin')).toBe('/academy');
     expect(await visit('/admin/practice')).toBe('/academy');

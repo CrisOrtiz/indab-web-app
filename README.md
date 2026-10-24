@@ -201,6 +201,7 @@ the rules are what actually protect the data. Anything not listed is denied.
 | `/academy/material` | enrolled users (learning material, opened from the academy; `/repository` redirects here) |
 | `/academy/practice` | enrolled users (chart-replay trading practice: free practice and assigned evaluations) |
 | `/academy/ranking` | enrolled users (rankings of published evaluations) |
+| `/academy/calendar` | enrolled users (live economic calendar, TradingView's free widget) |
 | `/admin` | trainers and admins (users, roles and academy access for admins only) |
 | `/admin/practice` | trainers and admins (review students' practice sessions on the chart; admins delete them) |
 | `/admin/evaluations` | trainers and admins (set up timed evaluations, see and publish their results) |
@@ -285,6 +286,14 @@ Results stay with the staff until a trainer publishes them.
 `/academy/ranking` ranks only evaluations (Cris's choice: free practice is not ranked and stays
 private to the student and staff): each published evaluation by the attempt's P/L, fewer
 trades first on a tie.
+
+`/academy/calendar` embeds TradingView's free
+[economic calendar widget](https://www.tradingview.com/widget-docs/widgets/calendars/economic-calendar/):
+the scheduled news with forecast, previous and actual figures, updated live by TradingView, in
+the site's language. Students filter it by economy (US and Japan by default) and impact. Cris
+wanted this at no cost, so there is no API, key or Blaze plan behind it; keep TradingView's
+credit link under the widget. Paid APIs (Financial Modeling Prep, Trading Economics) were
+weighed and left for later; their data needs an extra display license to show to students.
 
 The chart is TradingView's [lightweight-charts](https://github.com/tradingview/lightweight-charts)
 (Apache-2.0; its logo on the chart is the required attribution). P/L figures are computed in the

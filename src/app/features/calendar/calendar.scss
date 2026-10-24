@@ -1,0 +1,129 @@
+:host {
+  display: block;
+  padding: 48px 0;
+}
+
+h1 {
+  margin-top: 0;
+}
+
+h2 {
+  margin-top: 40px;
+}
+
+.page-header p,
+.muted {
+  color: var(--color-muted);
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: var(--color-muted);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px 24px;
+  margin: 24px 0 16px;
+}
+
+fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+legend {
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  cursor: pointer;
+
+  &:has(input:checked) {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    color: var(--color-accent-contrast);
+  }
+}
+
+.importance {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+
+  select {
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font: inherit;
+    font-weight: normal;
+  }
+}
+
+.widget {
+  min-height: 640px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.notice {
+  padding: 16px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-muted);
+}
+
+.guide {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+
+  article {
+    padding: 16px 20px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+
+  h3 {
+    margin: 0 0 8px;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  li + li {
+    margin-top: 4px;
+  }
+}
+
+.tip {
+  margin-top: 24px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-surface);
+}

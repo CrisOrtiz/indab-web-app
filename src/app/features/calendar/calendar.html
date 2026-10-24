@@ -1,0 +1,54 @@
+@let t = i18n.messages().calendar;
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/academy" class="back">{{ i18n.messages().academy.back }}</a>
+    <h1>{{ t.title }}</h1>
+    <p>{{ t.intro }}</p>
+  </header>
+
+  <div class="filters">
+    <fieldset>
+      <legend>{{ t.countries }}</legend>
+      @for (country of countries; track country) {
+        <label class="chip">
+          <input
+            type="checkbox"
+            [checked]="selected().includes(country)"
+            (change)="toggle(country)"
+          />
+          {{ t.country[country] }}
+        </label>
+      }
+    </fieldset>
+    <label class="importance">
+      {{ t.importance }}
+      <select [value]="importance()" (change)="importance.set($any($event.target).value)">
+        <option value="high">{{ t.highOnly }}</option>
+        <option value="medium">{{ t.mediumAndHigh }}</option>
+      </select>
+    </label>
+  </div>
+
+  @if (selected().length) {
+    <div #widget class="widget"></div>
+    <p class="muted small">{{ t.source }}</p>
+  } @else {
+    <p class="notice" role="status">{{ t.pickCountry }}</p>
+  }
+
+  <h2>{{ t.guideTitle }}</h2>
+  <p class="muted">{{ t.guideIntro }}</p>
+  <div class="guide">
+    @for (market of t.markets; track market.name) {
+      <article>
+        <h3>{{ market.name }}</h3>
+        <ul>
+          @for (event of market.events; track event) {
+            <li>{{ event }}</li>
+          }
+        </ul>
+      </article>
+    }
+  </div>
+  <p class="tip">{{ t.tip }}</p>
+</section>
