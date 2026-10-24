@@ -14,6 +14,7 @@ class FakeChart {
   readonly trades = input<PracticeTrade[]>([]);
   readonly barSeconds = input(0);
   readonly focusTrade = input<string | null>(null);
+  readonly startTime = input<number | null>(null);
 }
 
 @Component({

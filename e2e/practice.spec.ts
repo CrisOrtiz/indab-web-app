@@ -76,6 +76,7 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   await expect(page.getByRole('img', { name: 'Saldo de 200 a 199 USD' })).toBeVisible();
   // Both filled trades are boxes on the chart, and the navigator steps through them.
   await expect(page.locator('.result .positions .position')).toHaveCount(2);
+  await expect(page.locator('.result .replay-start-text')).toHaveText('Inicio del replay');
   const steps = page.getByRole('navigation', { name: 'Recorrer operaciones' });
   await steps.getByRole('button', { name: 'Siguiente ›' }).click();
   await expect(steps).toContainText('Operación 1 de 2');

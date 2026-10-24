@@ -10,6 +10,7 @@
       [trades]="trades() ?? []"
       [barSeconds]="barSeconds()"
       [focusTrade]="selected()"
+      [startTime]="session().replayStart / 1000"
     />
   } @else {
     <p class="muted">{{ t.chartFailed }}</p>

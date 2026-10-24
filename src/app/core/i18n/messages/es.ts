@@ -612,6 +612,7 @@ export const es = {
   },
 
   chart: {
+    replayStart: 'Inicio del replay',
     tools: 'Herramientas del gráfico',
     indicators: 'Indicadores',
     draw: 'Dibujar',
