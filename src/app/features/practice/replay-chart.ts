@@ -289,6 +289,8 @@ export class ReplayChart {
   readonly positionBoxes = input(true);
   /** A trade to scroll to, fit in the price scale and highlight. */
   readonly focusTrade = input<string | null>(null);
+  /** Time (seconds) the replay started at, marked with a dotted line once it is over. */
+  readonly startTime = input<number | null>(null);
   readonly levelMoved = output<LevelMove>();
   readonly levelRemoved = output<LevelRemove>();
   /** The × of a position (close it) or pending order (cancel it). */
@@ -348,6 +350,8 @@ export class ReplayChart {
   });
   protected readonly zones = signal<Zone[]>([]);
   protected readonly boxes = signal<PlacedBox[]>([]);
+  /** X of the replay start line, between the last bar of history and the first replayed. */
+  protected readonly startX = signal<number | null>(null);
   /** Size of the candles' pane, which clips the position boxes. */
   protected readonly paneSize = signal({ width: 0, height: 0 });
   /** The quantity pad or order type menu of the order being set up. */
@@ -409,6 +413,8 @@ export class ReplayChart {
   private colors = { up: '', down: '', text: '', muted: '' };
   /** Prices of the focused trade, kept inside the price scale. */
   private focusLevels: number[] = [];
+  /** The trade the chart last scrolled to, so it scrolls once per pick, not on every bar. */
+  private shown: string | null = null;
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
 
@@ -472,6 +478,7 @@ export class ReplayChart {
     effect(() => {
       const id = this.focusTrade();
       this.positionBoxes();
+      this.startTime();
       this.trades();
       this.candles();
       untracked(() => {
@@ -708,6 +715,8 @@ export class ReplayChart {
       // student had dragged the price scale, and shows the latest bar.
       this.chart?.priceScale('right').applyOptions({ autoScale: true });
       this.chart?.timeScale().scrollToRealTime();
+      // Other bars: the focused trade is scrolled to again.
+      this.shown = null;
     }
     this.drawn = candles;
     this.layoutLabels();
@@ -987,6 +996,7 @@ export class ReplayChart {
     this.labels.set(placed);
     this.zones.set(zones);
     this.boxes.set(this.placeBoxes());
+    this.startX.set(this.placeStart());
     this.paneSize.set(this.pane()!);
     this.scaleWidth.set(this.chart.priceScale('right').width());
     this.stageHeight.set(this.stage().nativeElement.clientHeight);
@@ -1038,6 +1048,17 @@ export class ReplayChart {
     return boxes;
   }
 
+  /** The replay start line's x, half a bar before the first replayed bar. */
+  private placeStart(): number | null {
+    const start = untracked(this.startTime);
+    const last = this.drawn.at(-1);
+    if (start === null || !last || start > last.time || start <= this.drawn[0].time) {
+      return null;
+    }
+    const x = this.timeToX(start);
+    return x === null ? null : x - this.chart!.timeScale().options().barSpacing / 2;
+  }
+
   /** Scrolls to a trade, from a little before its entry to a little after its exit. */
   private showTrade(id: string | null): void {
     const trade = id ? untracked(this.trades).find((t) => t.id === id) : undefined;
@@ -1047,8 +1068,13 @@ export class ReplayChart {
         )
       : [];
     if (!this.chart || !trade || !this.drawn.length) {
+      this.shown = null;
       return;
     }
+    if (this.shown === id) {
+      return;
+    }
+    this.shown = trade.id;
     const from = this.indexAt(trade.entryTime);
     const to =
       trade.status === 'closed' && trade.exitTime !== undefined

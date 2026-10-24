@@ -85,6 +85,7 @@ const position: PracticeTrade = {
     [barSeconds]="barSeconds()"
     [trading]="trading()"
     [focusTrade]="focus()"
+    [startTime]="start()"
     [lots]="0.05"
     (levelMoved)="moves.push($event)"
     (levelRemoved)="removed.push($event)"
@@ -106,6 +107,7 @@ class Host {
   readonly barSeconds = signal(1);
   readonly trading = signal(true);
   readonly focus = signal<string | null>(null);
+  readonly start = signal<number | null>(null);
   readonly moves: LevelMove[] = [];
   readonly removed: LevelRemove[] = [];
   readonly added: LevelRemove[] = [];
@@ -881,5 +883,33 @@ describe('ReplayChart', () => {
       expect(boxes(el).map((b) => b.focused)).toEqual([true, false]);
       expect(boxes(el)[0].result).toBe('+100.00 USD');
     });
+
+    it('scrolls to a trade once, not again on every new bar', async () => {
+      const { fixture, host } = await render();
+      host.candles.set(candles.slice(0, 19));
+      host.trades.set([won]);
+      host.focus.set('won');
+      await fixture.whenStable();
+      expect(lw.timeScale.setVisibleLogicalRange).toHaveBeenCalledTimes(1);
+      host.candles.set(candles);
+      await fixture.whenStable();
+      expect(lw.timeScale.setVisibleLogicalRange).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('marks the replay start with a dotted line half a bar before its first bar', async () => {
+    const { fixture, el, host } = await render();
+    host.candles.set(Array.from({ length: 10 }, (_, i) => c(i + 1)));
+    await fixture.whenStable();
+    expect(el.querySelector('.replay-start')).toBeNull();
+    // Bar 5 sits at x = 40 and bars are 10 px apart.
+    host.start.set(5);
+    await fixture.whenStable();
+    expect(el.querySelector('.replay-start')!.getAttribute('x1')).toBe('35');
+    expect(el.querySelector('.replay-start-text')!.textContent).toContain('Inicio del replay');
+    // Not while it is outside the bars drawn.
+    host.start.set(20);
+    await fixture.whenStable();
+    expect(el.querySelector('.replay-start')).toBeNull();
   });
 });
