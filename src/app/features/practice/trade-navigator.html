@@ -1,0 +1,103 @@
+@let t = i18n.messages().review;
+@let tr = i18n.messages().trading;
+<nav class="trade-nav" [attr.aria-label]="t.navigator">
+  <div class="bar">
+    <button
+      type="button"
+      class="btn btn-outline small"
+      [disabled]="index() <= 0"
+      (click)="step(-1)"
+    >
+      ‹ {{ t.previous }}
+    </button>
+    <select [attr.aria-label]="t.jumpTo" (change)="selected.set($any($event.target).value)">
+      @if (!current()) {
+        <option value="" selected disabled>{{ t.jumpTo }}</option>
+      }
+      @for (trade of trades(); track trade.id; let i = $index) {
+        <option [value]="trade.id" [selected]="trade.id === selected()">
+          #{{ i + 1 }} · {{ tr.orderLabel(trade.side, trade.orderType) }} · {{ lots(trade) }} ·
+          {{ trade.status === 'closed' ? signed(trade.pnl ?? 0) : t.stillOpen }}
+        </option>
+      }
+    </select>
+    <button
+      type="button"
+      class="btn btn-outline small"
+      [disabled]="index() >= trades().length - 1"
+      (click)="step(1)"
+    >
+      {{ t.next }} ›
+    </button>
+    @if (current()) {
+      <span class="counter" aria-live="polite">{{
+        t.tradeCounter(index() + 1, trades().length)
+      }}</span>
+    }
+  </div>
+  @if (current(); as trade) {
+    <dl class="details">
+      <div>
+        <dt>{{ t.trade }}</dt>
+        <dd>
+          <span
+            class="side"
+            [class.buy]="trade.side === 'long'"
+            [class.sell]="trade.side === 'short'"
+          >
+            {{ tr.orderLabel(trade.side, trade.orderType) }}
+          </span>
+        </dd>
+      </div>
+      <div>
+        <dt>{{ t.lots }}</dt>
+        <dd>{{ lots(trade) }}</dd>
+      </div>
+      <div>
+        <dt>{{ t.entry }}</dt>
+        <dd>
+          {{ trade.entryPrice | number: priceDigits(trade.entryPrice) }}
+          <small>{{ trade.entryTime * 1000 | localDate: 'd MMM y, HH:mm' : 'UTC' }}</small>
+        </dd>
+      </div>
+      <div>
+        <dt>SL / TP</dt>
+        <dd>
+          <span class="down">{{
+            trade.stopLoss === null ? '—' : (trade.stopLoss | number: priceDigits(trade.stopLoss))
+          }}</span>
+          /
+          <span class="up">{{
+            trade.takeProfit === null
+              ? '—'
+              : (trade.takeProfit | number: priceDigits(trade.takeProfit))
+          }}</span>
+        </dd>
+      </div>
+      @if (trade.status === 'closed') {
+        <div>
+          <dt>{{ t.exit }}</dt>
+          <dd>
+            {{ trade.exitPrice | number: priceDigits(trade.exitPrice!) }}
+            <small>{{ trade.exitTime! * 1000 | localDate: 'd MMM y, HH:mm' : 'UTC' }}</small>
+          </dd>
+        </div>
+        <div>
+          <dt>{{ t.reason }}</dt>
+          <dd>{{ tr.exitReasons[trade.exitReason!] }}</dd>
+        </div>
+        <div>
+          <dt>{{ t.result }}</dt>
+          <dd class="result" [class.up]="trade.pnl! > 0" [class.down]="trade.pnl! < 0">
+            {{ signed(trade.pnl ?? 0) }} USD
+          </dd>
+        </div>
+      } @else {
+        <div>
+          <dt>{{ t.exit }}</dt>
+          <dd>{{ t.stillOpen }}</dd>
+        </div>
+      }
+    </dl>
+  }
+</nav>

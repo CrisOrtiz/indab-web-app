@@ -218,7 +218,20 @@ label {
     text-align: center;
   }
 
+  .detail > td {
+    padding: 0;
+    background: var(--color-surface);
+  }
+
+  app-session-review {
+    padding: 12px;
+  }
+
   @media (max-width: 640px) {
+    .detail > td {
+      display: block;
+    }
+
     thead {
       display: none;
     }

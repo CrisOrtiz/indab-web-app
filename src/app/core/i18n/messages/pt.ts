@@ -429,6 +429,14 @@ export const pt: Messages = {
     loadFailed: 'Não foi possível carregar as práticas. Verifique se sua conta é de administrador.',
     deleteFailed: 'Não foi possível excluir a prática.',
     tradesFailed: 'Não foi possível carregar as operações da sessão.',
+    navigator: 'Percorrer operações',
+    tradeCounter: (n: number, total: number) => `Operação ${n} de ${total}`,
+    previous: 'Anterior',
+    next: 'Próxima',
+    jumpTo: 'Ir para a operação',
+    noFilled: 'Nenhuma ordem desta sessão foi executada.',
+    result: 'Resultado',
+    stillOpen: 'Ainda aberta',
   },
 
   trading: {

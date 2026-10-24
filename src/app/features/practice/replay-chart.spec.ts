@@ -24,6 +24,8 @@ const lw = vi.hoisted(() => {
     logicalToCoordinate: vi.fn((index: number) => index * 10),
     coordinateToLogical: vi.fn((x: number) => x / 10),
     width: () => 700,
+    options: () => ({ barSpacing: 10 }),
+    setVisibleLogicalRange: vi.fn(),
   };
   const pane = { setHeight: vi.fn(), getHeight: () => 420 };
   const priceScale = { width: () => 60, applyOptions: vi.fn() };
@@ -45,7 +47,7 @@ const lw = vi.hoisted(() => {
     remove: vi.fn(),
   };
   const markers = { setMarkers: vi.fn() };
-  return { series, lines, chart, markers, pane, priceScale };
+  return { series, lines, chart, markers, pane, priceScale, timeScale };
 });
 
 vi.mock('lightweight-charts', () => ({
@@ -82,6 +84,7 @@ const position: PracticeTrade = {
     [hideDates]="hide()"
     [barSeconds]="barSeconds()"
     [trading]="trading()"
+    [focusTrade]="focus()"
     [lots]="0.05"
     (levelMoved)="moves.push($event)"
     (levelRemoved)="removed.push($event)"
@@ -102,6 +105,7 @@ class Host {
   readonly hide = signal(true);
   readonly barSeconds = signal(1);
   readonly trading = signal(true);
+  readonly focus = signal<string | null>(null);
   readonly moves: LevelMove[] = [];
   readonly removed: LevelRemove[] = [];
   readonly added: LevelRemove[] = [];
@@ -777,5 +781,105 @@ describe('ReplayChart', () => {
     pointer('pointerup', 403);
     expect(host.removed).toEqual([{ target: 'draft', field: 'stopLoss' }]);
     expect(host.moves).toHaveLength(1);
+  });
+
+  describe('position boxes', () => {
+    // Bars 1..20; bar i sits at x = 10 * (i - 1).
+    const candles = Array.from({ length: 20 }, (_, i) => c(i + 1));
+    const won: PracticeTrade = {
+      ...position,
+      id: 'won',
+      entryTime: 3,
+      entryPrice: 120,
+      stopLoss: 110,
+      takeProfit: 140,
+      status: 'closed',
+      exitPrice: 140,
+      exitTime: 8,
+      exitReason: 'takeProfit',
+      pnl: 100,
+    };
+    // A short without TP or SL that lost: only a red zone, from the entry to the exit.
+    const lost: PracticeTrade = {
+      ...position,
+      id: 'lost',
+      side: 'short',
+      entryTime: 10,
+      entryPrice: 100,
+      stopLoss: null,
+      takeProfit: null,
+      status: 'closed',
+      exitPrice: 105,
+      exitTime: 10,
+      exitReason: 'manual',
+      pnl: -25,
+    };
+    const open: PracticeTrade = { ...position, id: 'open', entryTime: 15 };
+
+    const boxes = (el: HTMLElement) =>
+      [...el.querySelectorAll('.positions .position')].map((g) => ({
+        focused: g.classList.contains('focused'),
+        profit: [...g.querySelectorAll('rect.profit')].map((r) =>
+          ['x', 'y', 'width', 'height'].map((a) => Number(r.getAttribute(a))),
+        ),
+        loss: [...g.querySelectorAll('rect.loss')].map((r) =>
+          ['x', 'y', 'width', 'height'].map((a) => Number(r.getAttribute(a))),
+        ),
+        exit: !!g.querySelector('.exit'),
+        result: g.querySelector('.result')?.textContent?.trim(),
+      }));
+
+    it('draws filled trades from entry to exit, green to the target and red to the stop', async () => {
+      const { fixture, el, host } = await render();
+      host.trading.set(false);
+      host.candles.set(candles);
+      host.trades.set([open, lost, won, { ...position, id: 'p', status: 'pending' }]);
+      await fixture.whenStable();
+      expect(boxes(el)).toEqual([
+        // In order of entry; y = 500 - price.
+        {
+          focused: false,
+          profit: [[20, 360, 50, 20]],
+          loss: [[20, 380, 50, 10]],
+          exit: true,
+          result: undefined,
+        },
+        // Opened and closed in the same bar: one bar wide.
+        { focused: false, profit: [], loss: [[90, 395, 10, 5]], exit: true, result: undefined },
+        // Still open: it runs to the last bar and has no exit.
+        { focused: false, profit: [], loss: [[140, 380, 50, 10]], exit: false, result: undefined },
+      ]);
+    });
+
+    it('shows only closed trades as boxes while trading', async () => {
+      const { fixture, el, host } = await render();
+      host.candles.set(candles);
+      host.trades.set([won, open]);
+      await fixture.whenStable();
+      expect(boxes(el)).toHaveLength(1);
+      expect(boxes(el)[0].profit).toEqual([[20, 360, 50, 20]]);
+    });
+
+    it('scrolls to the focused trade and fits its levels in the price scale', async () => {
+      const { fixture, el, host } = await render();
+      host.trading.set(false);
+      host.candles.set(candles);
+      host.trades.set([won, lost]);
+      await fixture.whenStable();
+      const options = (lw.chart.addSeries.mock.calls[0] as unknown[])[1] as {
+        autoscaleInfoProvider: (base: () => unknown) => unknown;
+      };
+      const provider = options.autoscaleInfoProvider;
+      const base = () => ({ priceRange: { minValue: 115, maxValue: 130 } });
+      expect(provider(base)).toEqual(base());
+
+      host.focus.set('won');
+      await fixture.whenStable();
+      // Bars 3..8 are indexes 2..7, with 20 bars of room before and 10 after.
+      expect(lw.timeScale.setVisibleLogicalRange).toHaveBeenLastCalledWith({ from: -18, to: 17 });
+      expect(provider(base)).toEqual({ priceRange: { minValue: 110, maxValue: 140 } });
+      expect(boxes(el).map((b) => b.focused)).toEqual([true, false]);
+      expect(boxes(el)[0].result).toBe('+100.00 USD');
+    });
   });
 });

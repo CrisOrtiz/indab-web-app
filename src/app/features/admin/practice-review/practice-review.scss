@@ -30,32 +30,13 @@
   border-color: currentColor;
 }
 
-app-replay-chart {
-  margin: 12px 0;
-}
-
 .detail > td {
-  padding: 0 0 16px;
+  padding: 0 12px;
   background: var(--color-surface);
 }
 
-.trades {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-
-  th,
-  td {
-    padding: 8px;
-    border-bottom: 1px solid var(--color-border);
-    text-align: left;
+@media (max-width: 720px) {
+  .users .detail > td {
+    display: block;
   }
-
-  th {
-    color: var(--color-muted);
-  }
-}
-
-.detail {
-  overflow-x: auto;
 }

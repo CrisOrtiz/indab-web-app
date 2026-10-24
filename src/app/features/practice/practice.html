@@ -524,7 +524,11 @@
             [candles]="visibleCandles()"
             [trades]="r.trades()"
             [barSeconds]="barSeconds()"
+            [focusTrade]="focused()"
           />
+          @if (filledTrades().length) {
+            <app-trade-navigator [trades]="filledTrades()" [(selected)]="focused" />
+          }
           <h3>{{ t.stats }}</h3>
           <app-session-stats [trades]="r.trades()" [startingBalance]="startingBalance" />
           <button type="button" class="btn" (click)="reset()">{{ t.newSession }}</button>
@@ -649,6 +653,7 @@
             <th>{{ t.trades }}</th>
             <th>{{ t.pnl }}</th>
             <th>{{ t.status }}</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -670,10 +675,27 @@
               <td [attr.data-label]="t.status">
                 {{ s.status === 'active' ? tr.active : tr.finished }}
               </td>
+              <td class="actions">
+                <button
+                  type="button"
+                  class="btn btn-outline small"
+                  [attr.aria-expanded]="reviewing() === s.id"
+                  (click)="reviewing.set(reviewing() === s.id ? null : s.id)"
+                >
+                  {{
+                    reviewing() === s.id ? i18n.messages().review.hide : i18n.messages().review.show
+                  }}
+                </button>
+              </td>
             </tr>
+            @if (reviewing() === s.id) {
+              <tr class="detail">
+                <td colspan="6"><app-session-review [session]="s" /></td>
+              </tr>
+            }
           } @empty {
             <tr>
-              <td colspan="5" class="muted empty">{{ t.noSessions }}</td>
+              <td colspan="6" class="muted empty">{{ t.noSessions }}</td>
             </tr>
           }
         </tbody>

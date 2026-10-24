@@ -14,6 +14,7 @@ import {
   viewChild,
 } from '@angular/core';
 import {
+  AutoscaleInfo,
   CandlestickSeries,
   IChartApi,
   IPriceLine,
@@ -32,6 +33,7 @@ import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/p
 import { INDICATORS, RSI_LEVELS, computeIndicator } from './indicators';
 import { formatLots, priceDigits, roundPrice, signedMoney } from './practice-format';
 import { LOT_SIZE, LOT_STEP, tradeLots } from './replay';
+import { filledTrades, tradeBox } from './trade-boxes';
 
 /** The order being set up in the ticket, drawn as draggable lines before it is placed. */
 export interface OrderDraft {
@@ -185,6 +187,20 @@ interface PlacedShape {
   handles: Handle[];
 }
 
+/** A trade drawn as TradingView's long/short position box, in pixels of the candles' pane. */
+interface PlacedBox {
+  id: string;
+  left: number;
+  right: number;
+  entryY: number;
+  profit: { top: number; height: number } | null;
+  loss: { top: number; height: number } | null;
+  /** Where the trade closed, joined to the entry by a dashed line; null while open. */
+  exit: Pixel | null;
+  focused: boolean;
+  pnl: number | null;
+}
+
 /** A press on the chart that is about drawings: placing a point, editing one, or a tap. */
 interface Gesture {
   pointerId: number;
@@ -265,6 +281,14 @@ export class ReplayChart {
   readonly trading = input(false);
   /** Length of a bar in seconds: trade markers and drawings snap to the bar they fall in. */
   readonly barSeconds = input(0);
+  /**
+   * Draws each filled trade as TradingView's long/short position box (entry to TP in green,
+   * entry to SL in red, from the entry bar to the exit bar). In a live practice only closed
+   * trades get one: open positions have their lines.
+   */
+  readonly positionBoxes = input(true);
+  /** A trade to scroll to, fit in the price scale and highlight. */
+  readonly focusTrade = input<string | null>(null);
   readonly levelMoved = output<LevelMove>();
   readonly levelRemoved = output<LevelRemove>();
   /** The × of a position (close it) or pending order (cancel it). */
@@ -323,6 +347,9 @@ export class ReplayChart {
     return price ? roundPrice(price) : null;
   });
   protected readonly zones = signal<Zone[]>([]);
+  protected readonly boxes = signal<PlacedBox[]>([]);
+  /** Size of the candles' pane, which clips the position boxes. */
+  protected readonly paneSize = signal({ width: 0, height: 0 });
   /** The quantity pad or order type menu of the order being set up. */
   protected readonly popup = signal<'lots' | 'type' | null>(null);
   /** The label of the order being set up, where its popups open. */
@@ -380,6 +407,8 @@ export class ReplayChart {
   private indicatorSeries = new Map<string, ISeriesApi<'Line'>>();
   private nextDrawingId = PREVIEW_ID + 1;
   private colors = { up: '', down: '', text: '', muted: '' };
+  /** Prices of the focused trade, kept inside the price scale. */
+  private focusLevels: number[] = [];
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
 
@@ -416,12 +445,14 @@ export class ReplayChart {
         borderDownColor: down,
         wickUpColor: up,
         wickDownColor: down,
+        autoscaleInfoProvider: (base: () => AutoscaleInfo | null) => this.autoscale(base()),
       });
       this.markers = createSeriesMarkers(this.series, []);
       this.draw(untracked(this.candles));
       this.applyDates(untracked(this.hideDates));
       this.drawTrades(untracked(this.trades), untracked(this.draft));
       this.drawIndicators(untracked(this.candles), untracked(this.active));
+      this.showTrade(untracked(this.focusTrade));
       this.listen();
       // Labels follow their lines when the chart scrolls, zooms or resizes.
       const relayout = () => this.layoutLabels();
@@ -438,6 +469,16 @@ export class ReplayChart {
       this.drawTrades(this.trades(), this.draft(), this.drawings());
     });
     effect(() => this.drawIndicators(this.candles(), this.active()));
+    effect(() => {
+      const id = this.focusTrade();
+      this.positionBoxes();
+      this.trades();
+      this.candles();
+      untracked(() => {
+        this.showTrade(id);
+        this.layoutLabels();
+      });
+    });
     effect(() => {
       this.drawings();
       this.anchor();
@@ -945,9 +986,95 @@ export class ReplayChart {
     }
     this.labels.set(placed);
     this.zones.set(zones);
+    this.boxes.set(this.placeBoxes());
+    this.paneSize.set(this.pane()!);
     this.scaleWidth.set(this.chart.priceScale('right').width());
     this.stageHeight.set(this.stage().nativeElement.clientHeight);
     this.shapes.set(this.placeShapes());
+  }
+
+  /** The position boxes of the filled trades, in pixels. */
+  private placeBoxes(): PlacedBox[] {
+    const series = this.series!;
+    const last = this.drawn.at(-1);
+    if (!untracked(this.positionBoxes) || !last) {
+      return [];
+    }
+    const focus = untracked(this.focusTrade);
+    // A trade opened and closed in the same bar still gets a bar's width.
+    const spacing = this.chart!.timeScale().options().barSpacing;
+    const band = (from: number, to: number | null) => {
+      const a = series.priceToCoordinate(from);
+      const b = to === null ? null : series.priceToCoordinate(to);
+      return a === null || b === null ? null : { top: Math.min(a, b), height: Math.abs(a - b) };
+    };
+    const boxes: PlacedBox[] = [];
+    const live = untracked(this.trading);
+    for (const trade of filledTrades(untracked(this.trades))) {
+      if (live && trade.status !== 'closed') {
+        continue;
+      }
+      const box = tradeBox(trade, last.time);
+      const left = this.timeToX(box.start);
+      const end = this.timeToX(box.end);
+      const entryY = series.priceToCoordinate(box.entry);
+      if (left === null || end === null || entryY === null) {
+        continue;
+      }
+      const right = Math.max(end, left + spacing);
+      const exitY = box.exit === null ? null : series.priceToCoordinate(box.exit);
+      boxes.push({
+        id: box.id,
+        left,
+        right,
+        entryY,
+        profit: band(box.entry, box.profit),
+        loss: band(box.entry, box.loss),
+        exit: exitY === null ? null : { x: right, y: exitY },
+        focused: box.id === focus,
+        pnl: box.pnl,
+      });
+    }
+    return boxes;
+  }
+
+  /** Scrolls to a trade, from a little before its entry to a little after its exit. */
+  private showTrade(id: string | null): void {
+    const trade = id ? untracked(this.trades).find((t) => t.id === id) : undefined;
+    this.focusLevels = trade
+      ? [trade.entryPrice, trade.stopLoss, trade.takeProfit, trade.exitPrice].filter(
+          (p): p is number => typeof p === 'number',
+        )
+      : [];
+    if (!this.chart || !trade || !this.drawn.length) {
+      return;
+    }
+    const from = this.indexAt(trade.entryTime);
+    const to =
+      trade.status === 'closed' && trade.exitTime !== undefined
+        ? this.indexAt(trade.exitTime)
+        : this.drawn.length - 1;
+    const pad = Math.max(20, to - from);
+    this.chart.timeScale().setVisibleLogicalRange({ from: from - pad, to: to + pad / 2 });
+    this.chart.priceScale('right').applyOptions({ autoScale: true });
+    // The price scale refits on the chart's next frame; the boxes follow it then.
+    requestAnimationFrame(() => requestAnimationFrame(() => this.layoutLabels()));
+  }
+
+  /** The candles' price range, stretched to the focused trade's entry, exit, SL and TP. */
+  private autoscale(info: AutoscaleInfo | null): AutoscaleInfo | null {
+    const levels = this.focusLevels;
+    if (!info?.priceRange || !levels.length) {
+      return info;
+    }
+    const { minValue, maxValue } = info.priceRange;
+    return {
+      ...info,
+      priceRange: {
+        minValue: Math.min(minValue, ...levels),
+        maxValue: Math.max(maxValue, ...levels),
+      },
+    };
   }
 
   /** Trend lines, rectangles and Fibonacci retracements in pixels, for the overlay. */
@@ -1065,10 +1192,15 @@ export class ReplayChart {
 
   /** X of the bar a time falls in; times outside the candles stick to the first or last. */
   private timeToX(time: number): number | null {
-    const candles = this.drawn;
-    if (!candles.length || !this.chart) {
+    if (!this.drawn.length || !this.chart) {
       return null;
     }
+    return this.chart.timeScale().logicalToCoordinate(this.indexAt(time) as Logical);
+  }
+
+  /** Index of the bar a time falls in; times outside the candles stick to the first or last. */
+  private indexAt(time: number): number {
+    const candles = this.drawn;
     let low = 0;
     let high = candles.length - 1;
     while (low < high) {
@@ -1079,7 +1211,7 @@ export class ReplayChart {
         high = mid - 1;
       }
     }
-    return this.chart.timeScale().logicalToCoordinate(low as Logical);
+    return low;
   }
 
   private drawIndicators(candles: Candle[], active: ReadonlySet<string>): void {

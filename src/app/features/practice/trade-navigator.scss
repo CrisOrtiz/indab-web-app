@@ -1,0 +1,85 @@
+:host {
+  display: block;
+}
+
+.trade-nav {
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+
+  select {
+    flex: 1 1 220px;
+    min-width: 0;
+    padding: 6px 8px;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.btn.small {
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.counter {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px 16px;
+  margin: 12px 0 0;
+  font-variant-numeric: tabular-nums;
+
+  dt {
+    color: var(--color-muted);
+    font-size: 0.8rem;
+  }
+
+  dd {
+    margin: 2px 0 0;
+  }
+
+  small {
+    display: block;
+    color: var(--color-muted);
+  }
+}
+
+.side {
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.85rem;
+
+  &.buy {
+    background: #2962ff;
+  }
+
+  &.sell {
+    background: var(--color-candle-down);
+  }
+}
+
+.result {
+  font-weight: 600;
+}
+
+.up {
+  color: var(--color-up);
+}
+
+.down {
+  color: var(--color-down);
+}

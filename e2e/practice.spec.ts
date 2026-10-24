@@ -44,6 +44,8 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
   await page.getByRole('button', { name: 'Historial (1)' }).click();
   await expect(page.getByRole('cell', { name: 'Manual' })).toBeVisible();
+  // The closed trade is drawn as a position box on the live chart.
+  await expect(page.locator('.workspace .positions .position')).toHaveCount(1);
 
   // Sell 0.03 lots in one click from the chart and leave it open until the session ends.
   await lots.fill('0.03');
@@ -72,6 +74,12 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
   await expect(page.locator('.stat strong').first()).toHaveText('199.00');
   await expect(page.getByRole('img', { name: 'Saldo de 200 a 199 USD' })).toBeVisible();
+  // Both filled trades are boxes on the chart, and the navigator steps through them.
+  await expect(page.locator('.result .positions .position')).toHaveCount(2);
+  const steps = page.getByRole('navigation', { name: 'Recorrer operaciones' });
+  await steps.getByRole('button', { name: 'Siguiente ›' }).click();
+  await expect(steps).toContainText('Operación 1 de 2');
+  await expect(page.locator('.result .positions .position.focused')).toHaveCount(1);
 
   // Everything is logged under the student's account.
   await expect(page.getByRole('alert')).toHaveCount(0);
@@ -98,6 +106,10 @@ test('a student practises on a replay and an admin reviews the trades', async ({
 
   await page.getByRole('button', { name: 'Nueva práctica' }).click();
   await expect(page.getByRole('cell', { name: 'XAUUSDT · 15m' })).toBeVisible();
+  // The student reviews the session again from the list.
+  await page.getByRole('button', { name: 'Ver práctica' }).click();
+  await expect(steps).toContainText('Operación 1 de 2');
+  await expect(page.locator('app-session-review .positions .position')).toHaveCount(2);
 
   // An admin sees the session and its trades.
   await signOut(page);
@@ -111,6 +123,14 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   await expect(page.locator('.detail app-session-stats')).toContainText('Acierto');
   await expect(page.getByRole('cell', { name: 'Fin de sesión', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: 'Manual', exact: true })).toBeVisible();
+  // The trades are position boxes, stepped through with the navigator.
+  await expect(page.locator('.detail .positions .position')).toHaveCount(2);
+  await expect(steps).toContainText('Operación 1 de 2');
+  await expect(steps).toContainText('Manual');
+  await steps.getByRole('button', { name: 'Siguiente ›' }).click();
+  await expect(steps).toContainText('Operación 2 de 2');
+  await expect(steps).toContainText('Fin de sesión');
+  await expect(steps).toContainText('-3.00 USD');
 
   // ...and can delete it with its trades.
   page.once('dialog', (dialog) => dialog.accept());

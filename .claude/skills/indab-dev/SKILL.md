@@ -186,8 +186,12 @@ Module notes:
   on its line (`draftTypeChanged`, `lotsChanged`, `levelAdded`, `draftDiscarded`); fake it in component
   specs, it needs a canvas); `MarketDataService` loads Binance public klines in the browser
   (no key; mock them with `page.route` in e2e); `PracticeService` logs `practiceSessions` and
-  their `trades`. Admin review at `/admin/practice` (`features/admin/practice-review/`): reloads the session's
-  candles to draw its trades, and deletes a session with its trades (`PracticeService.deleteSession`).
+  their `trades`. Admin review at `/admin/practice` (`features/admin/practice-review/`) and the
+  student's "Your sessions" list open a `SessionReview` (`session-review.ts`): it reloads the
+  session's candles, draws each filled trade as TradingView's long/short position box
+  (`trade-boxes.ts`, `ReplayChart` `positionBoxes`; in a live practice only closed trades get one)
+  and steps through them with `TradeNavigator` (previous/next, a list, details), scrolling the
+  chart to each (`focusTrade`). Admins delete a session with its trades (`PracticeService.deleteSession`).
   Cris wants the trading screen to look and work like TradingView, students to start with 200
   USD and trade lots (100 oz) at 1:100 with a 50% stop out (`replay.ts` constants), and
   timeframes 1m-4h switchable mid-session, starting on 15m. The replay runs on 1m candles

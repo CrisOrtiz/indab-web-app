@@ -29,8 +29,11 @@ export function mockMarket(page: Page): Promise<void> {
       replayStart ||= to;
       from = Math.ceil(to / seconds) * seconds - limit * seconds;
     } else {
-      from = Number(params.get('startTime')) / 1000;
-      replayStart ||= from + 60;
+      // Like Binance, the first bar is the one opening at or after the start: the next page of a
+      // load asks from a millisecond after the last bar it got.
+      const start = Number(params.get('startTime')) / 1000;
+      from = Math.ceil(start / seconds) * seconds;
+      replayStart ||= start + 60;
     }
     const json = Array.from({ length: limit }, (_, i) => {
       const time = from + i * seconds;

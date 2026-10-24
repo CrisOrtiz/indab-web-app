@@ -431,6 +431,14 @@ export const es = {
     loadFailed: 'No se pudieron cargar las prácticas. Verifica que tu cuenta sea administradora.',
     deleteFailed: 'No se pudo eliminar la práctica.',
     tradesFailed: 'No se pudieron cargar las operaciones de la sesión.',
+    navigator: 'Recorrer operaciones',
+    tradeCounter: (n: number, total: number) => `Operación ${n} de ${total}`,
+    previous: 'Anterior',
+    next: 'Siguiente',
+    jumpTo: 'Ir a la operación',
+    noFilled: 'Ninguna orden de esta sesión llegó a ejecutarse.',
+    result: 'Resultado',
+    stillOpen: 'Sigue abierta',
   },
 
   /** Trading words shared by the practice, its chart and the admin review. */

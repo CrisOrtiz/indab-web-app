@@ -10,6 +10,7 @@ import { PracticeService } from './practice.service';
 import { EvaluationService } from '../evaluations/evaluation.service';
 import { Evaluation } from '../../core/models/evaluation';
 import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
+import { SessionReview } from './session-review';
 
 // The real chart needs a canvas; the page only passes it data.
 @Component({ selector: 'app-replay-chart', template: '<ng-content />' })
@@ -21,6 +22,7 @@ class FakeChart {
   readonly draft = input<OrderDraft | null>(null);
   readonly trading = input(false);
   readonly lots = input(0);
+  readonly focusTrade = input<string | null>(null);
   readonly levelMoved = output<LevelMove>();
   readonly levelRemoved = output<LevelRemove>();
   readonly levelAdded = output<LevelRemove>();
@@ -80,6 +82,7 @@ describe('Practice page', () => {
     finishSession: vi.fn(async () => undefined),
     mySessions: vi.fn(async () => [] as unknown[]),
     myAttempts: vi.fn(async () => [] as unknown[]),
+    sessionTrades: vi.fn(async () => [] as unknown[]),
   };
   const evaluations = { assignedTo: vi.fn(async () => [] as Evaluation[]) };
   const auth = {
@@ -122,6 +125,10 @@ describe('Practice page', () => {
       ],
     });
     TestBed.overrideComponent(Practice, {
+      remove: { imports: [ReplayChart] },
+      add: { imports: [FakeChart] },
+    });
+    TestBed.overrideComponent(SessionReview, {
       remove: { imports: [ReplayChart] },
       add: { imports: [FakeChart] },
     });
@@ -560,9 +567,41 @@ describe('Practice page', () => {
       'Saldo de 200 a 199 USD',
     );
     expect(chart().hideDates()).toBe(false);
+    // The navigator steps through the trades, which the chart scrolls to.
+    expect(chart().focusTrade()).toBeNull();
+    await click('Siguiente ›');
+    expect(chart().focusTrade()).toBe('t1');
+    expect(el.querySelector('app-trade-navigator')!.textContent).toContain('Fin de sesión');
 
     await click('Nueva práctica');
     expect(el.querySelector('form')).not.toBeNull();
+  });
+
+  it('opens a past session for review', async () => {
+    practice.sessionTrades.mockResolvedValue([
+      {
+        id: 'x',
+        side: 'long',
+        orderType: 'market',
+        quantity: 1,
+        entryPrice: 2000,
+        entryTime: 1_000,
+        placedTime: 1_000,
+        stopLoss: null,
+        takeProfit: null,
+        status: 'closed',
+        exitPrice: 1990,
+        exitTime: 2_000,
+        exitReason: 'manual',
+        pnl: -10,
+      },
+    ]);
+    await click('Ver práctica');
+    expect(practice.sessionTrades).toHaveBeenCalledWith('old');
+    expect(chart().focusTrade()).toBe('x');
+    expect(el.querySelector('app-session-review')!.textContent).toContain('Operación 1 de 1');
+    await click('Ocultar');
+    expect(el.querySelector('app-session-review')).toBeNull();
   });
 
   it('adds and removes the stop loss of an open position', async () => {
