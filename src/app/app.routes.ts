@@ -35,6 +35,12 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./features/academy/academy').then((m) => m.Academy),
   },
+  {
+    path: 'profile',
+    title: 'profile',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/profile/profile').then((m) => m.Profile),
+  },
 
   // Enrolled users only
   {

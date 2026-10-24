@@ -20,7 +20,9 @@ export class AuthService {
   private readonly auth = inject(FIREBASE_AUTH);
   private readonly firestore = inject(FIRESTORE);
 
-  private readonly _user = signal<User | null>(null);
+  // Firebase updates the same `User` object in place (name, linked providers), so every set
+  // notifies, and `refreshUser()` can publish those changes.
+  private readonly _user = signal<User | null>(null, { equal: () => false });
   private readonly _profile = signal<UserProfile | null>(null);
   private readonly _enrollment = signal<Enrollment | null>(null);
   private unsubscribeData: (() => void)[] = [];
@@ -77,6 +79,11 @@ export class AuthService {
 
   signOut(): Promise<void> {
     return signOut(this.auth);
+  }
+
+  /** Republishes the current user after it changed in place (e.g. a password was linked). */
+  refreshUser(): void {
+    this._user.set(this.auth.currentUser);
   }
 
   /** Creates `users/{uid}` on first sign-in. New users always start as students. */

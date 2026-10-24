@@ -12,11 +12,38 @@
         @if (auth.isStaff()) {
           <a routerLink="/admin" routerLinkActive="active">{{ t.admin }}</a>
         }
-        <button type="button" class="btn btn-outline" (click)="signOut()">{{ t.signOut }}</button>
       } @else {
         <a routerLink="/login" class="btn">{{ t.signIn }}</a>
       }
     </nav>
     <app-language-switcher class="language" />
+    @if (auth.isLoggedIn()) {
+      <div class="account">
+        <button
+          type="button"
+          class="avatar-button"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="menuOpen()"
+          aria-controls="account-menu"
+          [attr.aria-label]="t.account"
+          [title]="name()"
+          (click)="toggleMenu()"
+        >
+          <app-avatar [photo]="photo()" [name]="name()" [size]="36" />
+        </button>
+        @if (menuOpen()) {
+          <div class="menu" id="account-menu" role="menu" [attr.aria-label]="t.account">
+            <div class="who">
+              <strong>{{ name() }}</strong>
+              @if (auth.user()?.email; as email) {
+                <span>{{ email }}</span>
+              }
+            </div>
+            <a role="menuitem" routerLink="/profile">{{ t.profile }}</a>
+            <button role="menuitem" type="button" (click)="signOut()">{{ t.signOut }}</button>
+          </div>
+        }
+      </div>
+    }
   </div>
 </header>

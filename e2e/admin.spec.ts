@@ -21,6 +21,7 @@ const openAdmin = async (page: Page) => {
 
 test('students cannot open the admin area', async ({ page }) => {
   await signIn(page, 'luis@indab.test');
+  await expect(page).toHaveURL('/academy');
   await expect(nav(page).getByRole('link', { name: 'Administración' })).toHaveCount(0);
   await page.goto('/admin');
   await expect(page).toHaveURL('/academy');

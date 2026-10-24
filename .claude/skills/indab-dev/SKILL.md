@@ -43,16 +43,16 @@ otherwise create a feature service.
 
 ## Access model
 
-| Collection                                                       | Read                                                                                                   | Write                                                                                                                                                     |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `users/{uid}`                                                    | owner, staff                                                                                           | owner creates as `student`, edits `displayName`; admins change `role` (`student`/`trainer`/`admin`) of others only                                        |
-| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, staff                                                                                           | admins (shape validated)                                                                                                                                  |
-| `courses/{id}`                                                   | everyone if `published`, admins                                                                        | admins                                                                                                                                                    |
-| `courses/{id}/lessons/{id}`                                      | enrolled in course or academy access                                                                   | admins                                                                                                                                                    |
-| `materials/{id}`                                                 | academy access                                                                                         | admins                                                                                                                                                    |
-| `investors/{uid}` (Eleva)                                        | owner, admins                                                                                          | admins                                                                                                                                                    |
-| `evaluations/{id}`                                               | staff, assigned students                                                                               | staff (shape validated)                                                                                                                                   |
-| `practiceSessions/{id}` + `/trades/{id}`                         | owner, staff; session summaries of free practice and published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
+| Collection | Read | Write |
+| --- | --- | --- |
+| `users/{uid}` | owner, staff | owner creates as `student`, edits `displayName` and `photoURL`; admins change `role` (`student`/`trainer`/`admin`) of others only |
+| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, staff | admins (shape validated) |
+| `courses/{id}` | everyone if `published`, admins | admins |
+| `courses/{id}/lessons/{id}` | enrolled in course or academy access | admins |
+| `materials/{id}` | academy access | admins |
+| `investors/{uid}` (Eleva) | owner, admins | admins |
+| `evaluations/{id}` | staff, assigned students | staff (shape validated) |
+| `practiceSessions/{id}` + `/trades/{id}` | owner, staff; session summaries of free practice and published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
 
 Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`, `isStaff()`
 (trainers and admins), `hasAcademyAccess()` (staff count as having it), `isEnrolledIn(courseId)`.
@@ -173,6 +173,14 @@ Module notes:
 - **Eleva (`/eleva`, investor area)**: the public page stays unguarded. Investor data lives in
   `investors/{uid}` and subcollections (e.g. `investors/{uid}/statements/{month}`), admin-written,
   owner-read. Financial figures are never computed or written by the client.
+- **Profile (`/profile`, built)**: `features/profile/`, opened from the avatar menu in the header
+  (`shared/layout/header`, avatar in `shared/avatar`). The photo is resized in the browser
+  (`resizeImage`, 192 px JPEG) and stored inline as `users/{uid}.photoURL`, so no Cloud Storage
+  bucket (Blaze plan) is needed; the header falls back to the Google photo, then initials.
+  `ProfileService` links an email/password credential for Google-only users (re-asking Google on
+  `auth/requires-recent-login`) and changes passwords after reauthentication. The practice P/L
+  summary reads the latest 50 `practiceSessions`. Linking from Google is unit-tested only: the
+  emulator's Google window needs internet.
 - **Admin (`/admin`, built)**: `features/admin/`. `AdminService` is provided by the `Admin`
   component (live `users` + `enrollments` listeners that stop on leave); search/filter is
   client-side in `admin-users.ts` (fine for hundreds of users; move to a paged query if it grows).
