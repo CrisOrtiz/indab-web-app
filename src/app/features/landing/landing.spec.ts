@@ -66,13 +66,12 @@ describe('Landing', () => {
     expect(el.querySelector('#eleva .disclaimer')?.textContent).toContain('Aviso de riesgo');
   });
 
-  it('credits INDAB and crisortizdev in the footer', async () => {
+  it('closes with links and the disclaimer, leaving the copyright to the site footer', async () => {
     const el = await render();
     const footer = el.querySelector('footer')!;
-    expect(footer.textContent).toContain('INDAB y crisortizdev. Todos los derechos reservados.');
-    const credit = footer.querySelector<HTMLAnchorElement>('a[href="https://crisortiz.github.io"]');
-    expect(credit?.textContent).toContain('crisortizdev');
-    expect(credit?.target).toBe('_blank');
+    expect(footer.querySelector('a[href="/register"]')).not.toBeNull();
+    expect(footer.textContent).toContain('no constituye asesoría financiera');
+    expect(footer.textContent).not.toContain('crisortizdev');
   });
 
   it('animates the sections in on scroll', async () => {

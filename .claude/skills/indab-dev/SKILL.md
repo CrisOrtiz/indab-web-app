@@ -119,6 +119,10 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
   sliding underline (`placeIndicator`). The language picker is a flag menu (`shared/language`:
   Mexico = es-419, USA = en-US, Brazil = pt-BR, inline SVG because Windows has no flag emoji).
   Dropdowns use the global `dropdown-in` keyframes; respect `prefers-reduced-motion`.
+- Footer (`shared/layout/footer`): a thin strip in the app shell (`app.html`) on every page with
+  the copyright (`© {year} INDAB y crisortizdev`) and "Desarrollado por crisortizdev" linking
+  https://crisortiz.github.io; the shell keeps it at the bottom of short pages. Do not add page
+  footers with their own copyright (the landing's footer only has links and the disclaimer).
 - Formatting: Prettier (`printWidth` 100, single quotes). Run `npx prettier --write` on changed files.
 
 ## Adding a module

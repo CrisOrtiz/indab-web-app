@@ -28,6 +28,7 @@ test('a student practises on a replay and an admin reviews the trades', async ({
 
   await page.getByRole('button', { name: 'Comenzar práctica' }).click();
   await expect(page.locator('.market .price')).toHaveText('100.000');
+  await expect(page.getByRole('contentinfo')).toContainText('Desarrollado por crisortizdev');
 
   // Buy 0.01 lots (1 oz) at 100 with a stop loss, then let two 15-minute candles pass.
   const lots = page.getByRole('spinbutton', { name: /Lotes \(tamaño/ });

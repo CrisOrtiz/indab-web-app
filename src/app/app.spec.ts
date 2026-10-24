@@ -34,4 +34,12 @@ describe('App', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('a[href="/login"]')?.textContent).toContain('Ingresar');
   });
+
+  it('shows the copyright footer on every page', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    const footer = (fixture.nativeElement as HTMLElement).querySelector('app-footer');
+    expect(footer?.textContent).toContain('INDAB y crisortizdev');
+    expect(footer?.querySelector('a[href="https://crisortiz.github.io"]')).not.toBeNull();
+  });
 });
