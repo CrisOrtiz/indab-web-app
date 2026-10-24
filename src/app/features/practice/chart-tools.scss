@@ -1,0 +1,288 @@
+/* The toolbar menus and drawings of the replay chart. */
+.menu-trigger {
+  .count {
+    min-width: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--color-text);
+    color: var(--color-bg);
+    font-size: 0.7rem;
+    text-align: center;
+  }
+
+  .caret {
+    color: var(--color-muted);
+    font-size: 0.7rem;
+  }
+}
+
+.icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.swatch {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+/* The indicators and drawings menus, below their buttons. */
+.tool-menu {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
+  animation: dropdown-in 0.12s ease-out;
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: var(--radius);
+    background: none;
+    color: var(--color-text);
+    font: inherit;
+    font-size: 0.9rem;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover:not(:disabled),
+    &.on {
+      background: var(--color-surface);
+    }
+
+    &.on {
+      font-weight: 600;
+    }
+
+    &:disabled {
+      color: var(--color-muted);
+      cursor: default;
+    }
+  }
+
+  .check {
+    margin-left: auto;
+  }
+
+  hr {
+    width: 100%;
+    margin: 4px 0;
+    border: 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* Drawings over the chart: trend lines, rectangles and Fibonacci retracements. */
+.shapes {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+
+  .rect {
+    fill-opacity: 0.12;
+    stroke-width: 1;
+  }
+
+  .trend {
+    stroke-width: 2;
+  }
+
+  .fib {
+    stroke-width: 1;
+  }
+
+  .fib-move {
+    stroke-dasharray: 4 4;
+    stroke-opacity: 0.6;
+  }
+
+  .fib-text {
+    stroke: var(--color-bg);
+    stroke-width: 3px;
+    font-size: 10px;
+    paint-order: stroke;
+  }
+
+  .anchor-dot {
+    fill: var(--color-bg);
+    stroke-width: 2;
+  }
+
+  // The crosshair a finger drags to place a point, as in TradingView's app.
+  .crosshair {
+    stroke: var(--color-text);
+    stroke-dasharray: 4 4;
+    stroke-width: 1;
+  }
+
+  .crosshair-dot {
+    fill: var(--color-text);
+  }
+}
+
+.cursor-price {
+  position: absolute;
+  right: 0;
+  z-index: 2;
+  padding: 2px 0;
+  transform: translateY(-50%);
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Handles of the selected drawing: a ring to see, a finger-sized area to grab. */
+.handle {
+  position: absolute;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  border: 0 solid;
+  cursor: grab;
+  touch-action: none;
+
+  &::after {
+    position: absolute;
+    inset: 7px;
+    border: 2px solid;
+    border-color: inherit;
+    border-radius: 50%;
+    background: var(--color-bg);
+    content: '';
+  }
+
+  @media (pointer: fine) {
+    width: 16px;
+    height: 16px;
+
+    &::after {
+      inset: 2px;
+    }
+  }
+}
+
+/* Colors and delete for the selected drawing, low on the chart, clear of the Buy/Sell box. */
+.drawing-bar {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  transform: translateX(-50%);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+
+  .color {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 2px solid var(--color-bg);
+    border-radius: 50%;
+    outline: 1px solid var(--color-border);
+    cursor: pointer;
+
+    &[aria-pressed='true'] {
+      outline: 2px solid var(--color-text);
+    }
+  }
+
+  .sep {
+    width: 1px;
+    height: 20px;
+    background: var(--color-border);
+  }
+
+  .erase {
+    display: inline-flex;
+    padding: 4px;
+    border: 0;
+    border-radius: var(--radius);
+    background: none;
+    color: var(--color-down, #b3261e);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--color-surface);
+    }
+  }
+}
+
+:host(.drawing) .canvas {
+  touch-action: none;
+}
+
+.tool-hint {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 4px 4px 4px 10px;
+  transform: translateX(-50%);
+  border-radius: var(--radius);
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: 0.8rem;
+
+  p {
+    margin: 0;
+  }
+
+  .touch-only {
+    display: none;
+    opacity: 0.8;
+
+    @media (pointer: coarse) {
+      display: inline;
+    }
+  }
+
+  button {
+    flex: none;
+    padding: 4px 8px;
+    border: 1px solid currentcolor;
+    border-radius: var(--radius);
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+}

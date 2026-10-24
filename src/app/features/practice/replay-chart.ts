@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import {
   Component,
   DestroyRef,
@@ -138,27 +138,65 @@ interface PlacedLabel extends LineLabel {
   line: Line;
 }
 
-type Tool = 'hline' | 'trend' | 'rect' | 'fib';
+export type Tool = 'hline' | 'trend' | 'rect' | 'fib';
 /** Drawings made of two points: a trend line, a rectangle or a Fibonacci retracement. */
 type TwoPointKind = 'trend' | 'rect' | 'fib';
-type Drawing =
-  | { id: number; kind: 'hline'; price: number }
-  | { id: number; kind: TwoPointKind; points: [ChartPoint, ChartPoint] };
+interface TwoPointDrawing {
+  id: number;
+  kind: TwoPointKind;
+  points: [ChartPoint, ChartPoint];
+  color: string;
+}
+type Drawing = { id: number; kind: 'hline'; price: number } | TwoPointDrawing;
 interface ChartPoint {
   time: number;
   price: number;
 }
+interface Pixel {
+  x: number;
+  y: number;
+}
 
-/** A rectangle or Fibonacci retracement placed on the chart, in pixels. */
+/**
+ * A dot on the selected drawing. Dragging it moves the time (x) of point `timeOf` and the price
+ * (y) of point `priceOf`: both for the ends of a line, one of them for a rectangle's sides.
+ */
+interface Handle {
+  key: string;
+  x: number;
+  y: number;
+  timeOf: 0 | 1 | null;
+  priceOf: 0 | 1 | null;
+}
+
+/** A trend line, rectangle or Fibonacci retracement placed on the chart, in pixels. */
 interface PlacedShape {
   id: number;
-  kind: 'rect' | 'fib';
+  kind: TwoPointKind;
+  color: string;
+  a: Pixel;
+  b: Pixel;
   left: number;
   right: number;
   top: number;
   bottom: number;
   /** Fibonacci levels: their ratio, price and height. */
   levels: { ratio: number; price: number; y: number }[];
+  handles: Handle[];
+}
+
+/** A press on the chart that is about drawings: placing a point, editing one, or a tap. */
+interface Gesture {
+  pointerId: number;
+  start: Pixel;
+  touch: boolean;
+  moved: boolean;
+  /** Placing a point: where the cursor was as the press started; whether a point was set. */
+  place?: { from: Pixel; anchored: boolean };
+  /** Moving a drawing by one of its handles, or whole when there is none. */
+  edit?: { drawing: TwoPointDrawing; from: [Pixel, Pixel]; handle: Handle | null };
+  /** A tap selects this drawing, or none. */
+  select?: number | null;
 }
 
 /** Lot shortcuts of the quantity pad. */
@@ -170,8 +208,16 @@ export const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 /** How close (px) the pointer must be to a line to grab it; a finger needs more room. */
 const GRAB_DISTANCE = 6;
 const TOUCH_GRAB_DISTANCE = 16;
-const DRAWING_COLOR = '#2962ff';
+/** How far (px) a press moves before it is a drag rather than a tap. */
+const TAP_SLOP = 4;
+const TOUCH_TAP_SLOP = 8;
+/** Colors offered for drawings, the first one by default (TradingView's palette). */
+export const DRAWING_COLORS = ['#2962ff', '#f23645', '#089981', '#ff9800', '#9c27b0'];
+const DRAWING_COLOR = DRAWING_COLORS[0];
+/** Id of the drawing shown while its second point is being placed. */
+const PREVIEW_ID = 0;
 const RSI_PANE_HEIGHT = 110;
+const TOOLS: Tool[] = ['hline', 'trend', 'rect', 'fib'];
 
 /**
  * Candlestick chart for the replay (TradingView lightweight-charts, Apache-2.0), laid out like
@@ -186,19 +232,26 @@ const RSI_PANE_HEIGHT = 110;
  * from the "+" menu next to the price scale. The order's line then has its Buy/Sell button, a
  * quantity pad, an order type menu, TP/SL tabs to drag out and a × to discard it.
  *
- * A toolbar adds indicators (moving averages, RSI in its own pane) and drawings (horizontal
+ * A toolbar on top (content marked `chartToolbar`, such as the timeframes, goes first) has a
+ * menu of indicators (moving averages, RSI in its own pane) and one of drawings (horizontal
  * and trend lines, rectangles and Fibonacci retracements). Indicators only use the candles
  * shown, so they never peek ahead.
+ *
+ * Drawings work as in TradingView's app: a click or tap puts each point, and on a phone the
+ * finger can also drag a crosshair to the point and let go, so it does not hide the spot. A
+ * drawing being placed follows the cursor. A tap selects a drawing: its handles adjust it, a
+ * drag moves it, and a bar recolors or deletes it.
  */
 @Component({
   selector: 'app-replay-chart',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, NgTemplateOutlet],
   host: {
+    '[class.drawing]': '!!tool()',
     '(document:pointerdown)': 'closeMenu($event)',
-    '(document:keydown.escape)': 'menu.set(null); popup.set(null)',
+    '(document:keydown)': 'onKey($event)',
   },
   templateUrl: './replay-chart.html',
-  styleUrl: './replay-chart.scss',
+  styleUrls: ['./replay-chart.scss', './chart-tools.scss'],
 })
 export class ReplayChart {
   readonly candles = input.required<Candle[]>();
@@ -238,12 +291,37 @@ export class ReplayChart {
   protected readonly lotPresets = LOT_PRESETS;
   protected readonly orderTypes: OrderType[] = ['market', 'limit', 'stop'];
   protected readonly active = signal<ReadonlySet<string>>(new Set());
+  protected readonly toolList = TOOLS;
+  protected readonly drawingColors = DRAWING_COLORS;
   protected readonly tool = signal<Tool | null>(null);
-  /** First point of a trend line being drawn. */
+  /** First point of a drawing being placed. */
   protected readonly anchor = signal<ChartPoint | null>(null);
+  /** Where the next point goes while a tool is on; `touch` shows it as a crosshair. */
+  protected readonly cursor = signal<(Pixel & { touch: boolean }) | null>(null);
   protected readonly drawings = signal<Drawing[]>([]);
+  /** The drawing whose handles and bar are shown. */
+  protected readonly selected = signal<number | null>(null);
+  /** The selected drawing while it is being dragged, until it is dropped. */
+  private readonly editing = signal<TwoPointDrawing | null>(null);
+  /** The indicators or drawings menu of the toolbar, open below its button. */
+  protected readonly toolMenu = signal<{
+    kind: 'indicators' | 'drawings';
+    left: number | null;
+    right: number | null;
+    top: number;
+  } | null>(null);
   protected readonly labels = signal<PlacedLabel[]>([]);
   protected readonly shapes = signal<PlacedShape[]>([]);
+  protected readonly selectedShape = computed(() =>
+    this.shapes().find((s) => s.id === this.selected() && s.id !== PREVIEW_ID),
+  );
+  /** Price at the touch crosshair, for its tag on the price scale. */
+  protected readonly cursorPrice = computed(() => {
+    const cursor = this.cursor();
+    this.shapes();
+    const price = cursor?.touch ? this.series?.coordinateToPrice(cursor.y) : null;
+    return price ? roundPrice(price) : null;
+  });
   protected readonly zones = signal<Zone[]>([]);
   /** The quantity pad or order type menu of the order being set up. */
   protected readonly popup = signal<'lots' | 'type' | null>(null);
@@ -297,16 +375,17 @@ export class ReplayChart {
     /** The TP/SL tab it was pulled from: a click without moving adds that level. */
     tab?: ExitField;
   };
+  private gesture?: Gesture;
   private drawn: Candle[] = [];
   private indicatorSeries = new Map<string, ISeriesApi<'Line'>>();
-  private trendSeries = new Map<number, ISeriesApi<'Line'>>();
-  private nextDrawingId = 1;
+  private nextDrawingId = PREVIEW_ID + 1;
   private colors = { up: '', down: '', text: '', muted: '' };
 
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+
   constructor() {
-    const host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
     afterNextRender(() => {
-      const css = getComputedStyle(host);
+      const css = getComputedStyle(this.host);
       const color = (name: string, fallback: string) =>
         css.getPropertyValue(name).trim() || fallback;
       this.colors = {
@@ -349,13 +428,6 @@ export class ReplayChart {
       this.chart.timeScale().subscribeVisibleLogicalRangeChange(relayout);
       this.chart.timeScale().subscribeSizeChange(relayout);
       this.chart.subscribeCrosshairMove(relayout);
-      // The chart's own click event drops a second click within half a second (it waits for a
-      // double click), so drawings listen to the DOM.
-      const canvas = this.canvas().nativeElement;
-      canvas.addEventListener('click', (event) => {
-        const box = canvas.getBoundingClientRect();
-        this.onChartClick(event.clientX - box.left, event.clientY - box.top);
-      });
     });
 
     effect(() => this.draw(this.candles()));
@@ -366,7 +438,19 @@ export class ReplayChart {
       this.drawTrades(this.trades(), this.draft(), this.drawings());
     });
     effect(() => this.drawIndicators(this.candles(), this.active()));
-    effect(() => this.drawTrends(this.drawings(), this.barSeconds()));
+    effect(() => {
+      this.drawings();
+      this.anchor();
+      this.cursor();
+      this.editing();
+      this.barSeconds();
+      untracked(() => this.series && this.shapes.set(this.placeShapes()));
+    });
+    effect(() => {
+      // While a tool is on, the chart stays still so presses place points.
+      const still = !!this.tool();
+      untracked(() => this.chart?.applyOptions({ handleScroll: !still, handleScale: !still }));
+    });
     inject(DestroyRef).onDestroy(() => this.chart?.remove());
   }
 
@@ -380,16 +464,73 @@ export class ReplayChart {
     });
   }
 
-  /** Picks a drawing tool; picking it again puts it down. */
-  protected pick(tool: Tool): void {
+  /** Opens the indicators or drawings menu below its button, or closes it. */
+  protected toggleToolMenu(kind: 'indicators' | 'drawings', event: MouseEvent): void {
+    if (this.toolMenu()?.kind === kind) {
+      this.toolMenu.set(null);
+      return;
+    }
+    const host = this.host.getBoundingClientRect();
+    const button = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    // Menus are up to about 250 px wide: near the right edge they open leftwards.
+    const left = button.left - host.left;
+    const fits = left + 250 <= host.width;
+    this.toolMenu.set({
+      kind,
+      left: fits ? left : null,
+      right: fits ? null : Math.max(4, host.right - button.right),
+      top: button.bottom - host.top + 4,
+    });
+  }
+
+  /** Picks a drawing tool from the menu; picking the one that is on puts it down. */
+  protected pick(tool: Tool | null): void {
+    this.toolMenu.set(null);
     this.tool.update((current) => (current === tool ? null : tool));
     this.anchor.set(null);
+    this.cursor.set(null);
+    this.selected.set(null);
   }
 
   protected clearDrawings(): void {
+    this.toolMenu.set(null);
     this.drawings.set([]);
-    this.tool.set(null);
-    this.anchor.set(null);
+    this.pick(null);
+  }
+
+  /** The bar of the selected drawing: its color. */
+  protected recolor(color: string): void {
+    const id = this.selected();
+    this.drawings.update((list) =>
+      list.map((d) => (d.id === id && d.kind !== 'hline' ? { ...d, color } : d)),
+    );
+  }
+
+  protected eraseSelected(): void {
+    const id = this.selected();
+    this.selected.set(null);
+    this.drawings.update((list) => list.filter((d) => d.id !== id));
+  }
+
+  /** Escape puts down the tool and closes menus; Delete erases the selected drawing. */
+  protected onKey(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      this.menu.set(null);
+      this.popup.set(null);
+      this.toolMenu.set(null);
+      this.pick(null);
+    } else if (
+      (event.key === 'Delete' || event.key === 'Backspace') &&
+      this.selected() !== null &&
+      !(event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement)
+    ) {
+      this.eraseSelected();
+    }
+  }
+
+  /** A handle of the selected drawing: dragging it reshapes the drawing. */
+  protected grabHandle(shape: PlacedShape, handle: Handle, event: PointerEvent): void {
+    this.startEdit(shape, handle, event);
   }
 
   /** The × of a label. */
@@ -423,6 +564,9 @@ export class ReplayChart {
     }
     if (!inside('.popup, .opener')) {
       this.popup.set(null);
+    }
+    if (!inside('.tool-menu, .menu-trigger')) {
+      this.toolMenu.set(null);
     }
   }
 
@@ -806,41 +950,107 @@ export class ReplayChart {
     this.shapes.set(this.placeShapes());
   }
 
-  /** Rectangles and Fibonacci retracements in pixels, for the overlay. */
+  /** Trend lines, rectangles and Fibonacci retracements in pixels, for the overlay. */
   private placeShapes(): PlacedShape[] {
     const series = this.series!;
+    const editing = untracked(this.editing);
+    const list = untracked(this.drawings).map((d) => (editing?.id === d.id ? editing : d));
+    const preview = this.preview();
+    if (preview) {
+      list.push(preview);
+    }
     const shapes: PlacedShape[] = [];
-    for (const d of untracked(this.drawings)) {
-      if (d.kind !== 'rect' && d.kind !== 'fib') {
+    for (const d of list) {
+      if (d.kind === 'hline') {
         continue;
       }
-      const [a, b] = d.points;
-      const xa = this.timeToX(a.time);
-      const xb = this.timeToX(b.time);
-      const ya = series.priceToCoordinate(a.price);
-      const yb = series.priceToCoordinate(b.price);
-      if (xa === null || xb === null || ya === null || yb === null) {
+      const [pa, pb] = d.points;
+      const a = this.toPixel(pa);
+      const b = this.toPixel(pb);
+      if (!a || !b) {
         continue;
       }
       // A retracement runs from the end of the move (0) back to its start (1).
       const levels =
         d.kind === 'fib'
           ? FIB_LEVELS.map((ratio) => {
-              const price = roundPrice(b.price + (a.price - b.price) * ratio);
+              const price = roundPrice(pb.price + (pa.price - pb.price) * ratio);
               return { ratio, price, y: series.priceToCoordinate(price) ?? 0 };
             })
           : [];
+      const box = {
+        left: Math.min(a.x, b.x),
+        right: Math.max(a.x, b.x),
+        top: Math.min(a.y, b.y),
+        bottom: Math.max(a.y, b.y),
+      };
       shapes.push({
         id: d.id,
         kind: d.kind,
-        left: Math.min(xa, xb),
-        right: Math.max(xa, xb),
-        top: Math.min(ya, yb),
-        bottom: Math.max(ya, yb),
+        color: d.color,
+        a,
+        b,
+        ...box,
         levels,
+        handles:
+          d.kind === 'rect'
+            ? this.rectHandles(a, b, box)
+            : [
+                { key: 'a', ...a, timeOf: 0, priceOf: 0 },
+                { key: 'b', ...b, timeOf: 1, priceOf: 1 },
+              ],
       });
     }
     return shapes;
+  }
+
+  /** A rectangle's corners and the middle of its sides, each moving what it sits on. */
+  private rectHandles(
+    a: Pixel,
+    b: Pixel,
+    box: Pick<PlacedShape, 'left' | 'right' | 'top' | 'bottom'>,
+  ): Handle[] {
+    const left = a.x <= b.x ? 0 : 1;
+    const top = a.y <= b.y ? 0 : 1;
+    const right = left === 0 ? 1 : 0;
+    const bottom = top === 0 ? 1 : 0;
+    const midX = (box.left + box.right) / 2;
+    const midY = (box.top + box.bottom) / 2;
+    return [
+      { key: 'tl', x: box.left, y: box.top, timeOf: left, priceOf: top },
+      { key: 't', x: midX, y: box.top, timeOf: null, priceOf: top },
+      { key: 'tr', x: box.right, y: box.top, timeOf: right, priceOf: top },
+      { key: 'r', x: box.right, y: midY, timeOf: right, priceOf: null },
+      { key: 'br', x: box.right, y: box.bottom, timeOf: right, priceOf: bottom },
+      { key: 'b', x: midX, y: box.bottom, timeOf: null, priceOf: bottom },
+      { key: 'bl', x: box.left, y: box.bottom, timeOf: left, priceOf: bottom },
+      { key: 'l', x: box.left, y: midY, timeOf: left, priceOf: null },
+    ];
+  }
+
+  /** The drawing being placed, from its first point to the cursor. */
+  private preview(): TwoPointDrawing | null {
+    const tool = untracked(this.tool);
+    const anchor = untracked(this.anchor);
+    const cursor = untracked(this.cursor);
+    const point = cursor && this.toPoint(cursor);
+    if (!anchor || !point || !tool || tool === 'hline') {
+      return null;
+    }
+    return { id: PREVIEW_ID, kind: tool, points: [anchor, point], color: DRAWING_COLOR };
+  }
+
+  private toPixel(point: ChartPoint): Pixel | null {
+    const x = this.timeToX(point.time);
+    const y = this.series!.priceToCoordinate(point.price);
+    return x === null || y === null ? null : { x, y };
+  }
+
+  /** The bar and price at a pixel of the candles' pane. */
+  private toPoint(pixel: Pixel): ChartPoint | null {
+    const time = this.xToTime(pixel.x);
+    const price = this.series?.coordinateToPrice(pixel.y);
+    return time === null || !price || price <= 0 ? null : { time, price: roundPrice(price) };
   }
 
   /** Time of the bar at x; past either end of the candles, the first or last one. */
@@ -920,82 +1130,190 @@ export class ReplayChart {
     }
   }
 
-  /** Redraws the trend lines, their ends snapped to the bars of the current timeframe. */
-  private drawTrends(drawings: Drawing[], barSeconds: number): void {
-    const chart = this.chart;
-    if (!chart) {
-      return;
-    }
-    this.trendSeries.forEach((series) => chart.removeSeries(series));
-    this.trendSeries.clear();
-    const bar = this.snap(barSeconds);
-    for (const d of drawings) {
-      if (d.kind !== 'trend' || bar(d.points[0].time) === bar(d.points[1].time)) {
-        continue;
-      }
-      const series = chart.addSeries(LineSeries, {
-        color: DRAWING_COLOR,
-        lineWidth: 2,
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: false,
-        autoscaleInfoProvider: () => null,
-      });
-      series.setData(d.points.map((p) => ({ time: bar(p.time) as Time, value: p.price })));
-      this.trendSeries.set(d.id, series);
-    }
-  }
-
   /** Maps a time to the start of its bar. */
   private snap(barSeconds: number): (time: number) => number {
     return (time) => (barSeconds > 0 ? Math.floor(time / barSeconds) * barSeconds : time);
   }
 
-  /** Places a horizontal line, or the two points of a trend line, where the student clicks. */
-  private onChartClick(x: number, y: number): void {
-    const tool = untracked(this.tool);
+  /** The candles' pane, in pixels of the stage: drawings live there. */
+  private pane(): { width: number; height: number } | null {
     const chart = this.chart;
-    // Only clicks on the candles' pane count, not on the scales or the RSI pane.
-    if (
-      !tool ||
-      !this.series ||
-      !chart ||
-      x > chart.timeScale().width() ||
-      y > chart.panes()[0].getHeight()
-    ) {
+    return chart
+      ? { width: chart.timeScale().width(), height: chart.panes()[0].getHeight() }
+      : null;
+  }
+
+  private inPane(p: Pixel): boolean {
+    const pane = this.pane();
+    return !!pane && p.x >= 0 && p.x <= pane.width && p.y >= 0 && p.y <= pane.height;
+  }
+
+  private clampToPane(p: Pixel): Pixel {
+    const pane = this.pane() ?? { width: 0, height: 0 };
+    return {
+      x: Math.min(pane.width, Math.max(0, p.x)),
+      y: Math.min(pane.height, Math.max(0, p.y)),
+    };
+  }
+
+  /** The drawing under the pointer, the selected one first, then the newest. */
+  private shapeAt(p: Pixel, touch: boolean): PlacedShape | undefined {
+    const reach = touch ? TOUCH_GRAB_DISTANCE : GRAB_DISTANCE;
+    const selected = untracked(this.selected);
+    const shapes = untracked(this.shapes)
+      .filter((s) => s.id !== PREVIEW_ID)
+      .reverse()
+      .sort((s, t) => Number(t.id === selected) - Number(s.id === selected));
+    return shapes.find((s) => {
+      if (s.kind === 'trend') {
+        return distanceToSegment(p, s.a, s.b) <= reach;
+      }
+      const ys = s.kind === 'fib' ? s.levels.map((l) => l.y) : [s.top, s.bottom];
+      return (
+        p.x >= s.left - reach &&
+        p.x <= s.right + reach &&
+        p.y >= Math.min(...ys) - reach &&
+        p.y <= Math.max(...ys) + reach
+      );
+    });
+  }
+
+  /** Starts placing a point of the drawing of the current tool. */
+  private startPlacing(p: Pixel, event: PointerEvent): void {
+    const tool = untracked(this.tool)!;
+    const touch = event.pointerType === 'touch';
+    this.holdPointer(event);
+    // With a mouse, the press puts the first point (a drag then draws the whole shape); on a
+    // phone it waits for the finger to lift, from where the crosshair was.
+    const anchored = !!untracked(this.anchor);
+    if (!touch && !anchored && tool !== 'hline') {
+      const point = this.toPoint(p);
+      if (point) {
+        this.anchor.set(point);
+      }
+    }
+    const cursor = untracked(this.cursor);
+    const from = touch && cursor ? { x: cursor.x, y: cursor.y } : p;
+    this.gesture = {
+      pointerId: event.pointerId,
+      start: p,
+      touch,
+      moved: false,
+      place: { from, anchored },
+    };
+    this.cursor.set({ ...from, touch });
+  }
+
+  /** Starts dragging the selected drawing, by a handle or whole. */
+  private startEdit(shape: PlacedShape, handle: Handle | null, event: PointerEvent): void {
+    const drawing = untracked(this.drawings).find((d) => d.id === shape.id);
+    if (!drawing || drawing.kind === 'hline') {
       return;
     }
-    const raw = this.series.coordinateToPrice(y);
-    if (raw === null || raw <= 0) {
+    this.holdPointer(event);
+    const box = this.stage().nativeElement.getBoundingClientRect();
+    this.gesture = {
+      pointerId: event.pointerId,
+      start: { x: event.clientX - box.left, y: event.clientY - box.top },
+      touch: event.pointerType === 'touch',
+      moved: false,
+      edit: { drawing, from: [shape.a, shape.b], handle },
+    };
+  }
+
+  /** Follows a press about drawings; true when the chart should not see the move. */
+  private moveGesture(gesture: Gesture, p: Pixel): boolean {
+    const dx = p.x - gesture.start.x;
+    const dy = p.y - gesture.start.y;
+    if (!gesture.moved && Math.hypot(dx, dy) >= (gesture.touch ? TOUCH_TAP_SLOP : TAP_SLOP)) {
+      gesture.moved = true;
+    }
+    if (gesture.place) {
+      // A finger moves the crosshair by as much as it moves, from where it was.
+      const { from } = gesture.place;
+      const at = gesture.touch ? { x: from.x + dx, y: from.y + dy } : p;
+      this.cursor.set({ ...this.clampToPane(at), touch: gesture.touch });
+      return true;
+    }
+    if (gesture.edit && gesture.moved) {
+      this.editing.set(this.reshape(gesture.edit, dx, dy));
+    }
+    return !!gesture.edit;
+  }
+
+  /** Ends a press about drawings. */
+  private endGesture(gesture: Gesture, p: Pixel): void {
+    if (gesture.place) {
+      this.release();
+      // A tap puts the point where it lands; a drag where the crosshair ends.
+      const cursor = untracked(this.cursor);
+      const at = gesture.touch && gesture.moved && cursor ? cursor : this.clampToPane(p);
+      this.placePoint(gesture, at);
+    } else if (gesture.edit) {
+      this.release();
+      const edited = untracked(this.editing);
+      this.editing.set(null);
+      if (edited) {
+        this.drawings.update((list) => list.map((d) => (d.id === edited.id ? edited : d)));
+      }
+    } else if (!gesture.moved) {
+      this.selected.set(gesture.select ?? null);
+    }
+  }
+
+  /** Puts a point of the drawing of the current tool at `at`. */
+  private placePoint(gesture: Gesture, at: Pixel): void {
+    const tool = untracked(this.tool);
+    const point = this.toPoint(at);
+    if (!tool || !point) {
       return;
     }
-    const price = roundPrice(raw);
-    const id = this.nextDrawingId++;
     if (tool === 'hline') {
-      this.drawings.update((list) => [...list, { id, kind: 'hline', price }]);
-      this.tool.set(null);
+      const id = this.nextDrawingId++;
+      this.drawings.update((list) => [...list, { id, kind: 'hline', price: point.price }]);
+      this.pick(null);
       return;
     }
-    const time = this.xToTime(x);
-    if (time === null) {
-      return;
-    }
-    const point = { time, price };
     const anchor = untracked(this.anchor);
     if (!anchor) {
+      // A finger lifted on the first point: the crosshair stays there for the second one.
       this.anchor.set(point);
+      this.cursor.set({ ...at, touch: gesture.touch });
       return;
     }
-    if (anchor.time === point.time && tool === 'trend') {
+    if (!gesture.touch && !gesture.place!.anchored && !gesture.moved) {
+      // The click that put the first point: the second one comes with the next click.
+      return;
+    }
+    if (anchor.time === point.time && (tool === 'trend' || anchor.price === point.price)) {
       return;
     }
     // A retracement keeps the order of the move; the other drawings go left to right.
     const points = (
       tool === 'fib' ? [anchor, point] : [anchor, point].sort((a, b) => a.time - b.time)
     ) as [ChartPoint, ChartPoint];
-    this.drawings.update((list) => [...list, { id, kind: tool, points }]);
-    this.anchor.set(null);
-    this.tool.set(null);
+    const id = this.nextDrawingId++;
+    this.drawings.update((list) => [...list, { id, kind: tool, points, color: DRAWING_COLOR }]);
+    this.pick(null);
+    this.selected.set(id);
+  }
+
+  /** The drawing being edited, moved by (dx, dy) pixels: one handle's coordinates, or all. */
+  private reshape(edit: NonNullable<Gesture['edit']>, dx: number, dy: number): TwoPointDrawing {
+    const { drawing, from, handle } = edit;
+    const points = drawing.points.map((point, i) => {
+      const moveX = !handle || handle.timeOf === i;
+      const moveY = !handle || handle.priceOf === i;
+      const next = this.toPoint({
+        x: from[i].x + (moveX ? dx : 0),
+        y: from[i].y + (moveY ? dy : 0),
+      });
+      return {
+        time: moveX && next ? next.time : point.time,
+        price: moveY && next ? next.price : point.price,
+      };
+    }) as [ChartPoint, ChartPoint];
+    return { ...drawing, points };
   }
 
   private startDrag(entry: { line: Line; api: IPriceLine }, event: PointerEvent): void {
@@ -1040,7 +1358,16 @@ export class ReplayChart {
     this.stage().nativeElement.setPointerCapture?.(event.pointerId);
   }
 
-  /** Lets the pointer grab draggable lines; the chart pans and zooms as usual elsewhere. */
+  /** Gives the chart its panning and zooming back, unless a drawing tool is on. */
+  private release(): void {
+    const still = !!untracked(this.tool);
+    this.chart!.applyOptions({ handleScroll: !still, handleScale: !still });
+  }
+
+  /**
+   * Lets the pointer grab draggable lines, place drawings and select them; the chart pans and
+   * zooms as usual elsewhere.
+   */
   private listen(): void {
     const stage = this.stage().nativeElement;
     const y = (event: PointerEvent) => event.clientY - stage.getBoundingClientRect().top;
@@ -1060,14 +1387,42 @@ export class ReplayChart {
       return best;
     };
 
+    const at = (event: PointerEvent): Pixel => {
+      const box = stage.getBoundingClientRect();
+      return { x: event.clientX - box.left, y: event.clientY - box.top };
+    };
+
     // Capture phase, so a grab never reaches the chart's own pan handling.
     this.canvas().nativeElement.addEventListener(
       'pointerdown',
       (event) => {
-        const hit = untracked(this.tool) ? undefined : near(event);
+        const p = at(event);
+        if (untracked(this.tool)) {
+          // Only the candles' pane takes drawings, not the scales or the RSI pane.
+          if (this.inPane(p)) {
+            this.startPlacing(p, event);
+          }
+          return;
+        }
+        const touch = event.pointerType === 'touch';
+        const shape = this.inPane(p) ? this.shapeAt(p, touch) : undefined;
+        if (shape && shape.id === untracked(this.selected)) {
+          this.startEdit(shape, null, event);
+          return;
+        }
+        // A tap selects the drawing under it, or puts the selection down; a drag pans.
+        this.gesture = {
+          pointerId: event.pointerId,
+          start: p,
+          touch,
+          moved: false,
+          select: shape?.id ?? null,
+        };
+        const hit = shape ? undefined : near(event);
         if (hit) {
+          this.gesture = undefined;
           this.startDrag(hit, event);
-        } else if (event.pointerType === 'touch') {
+        } else if (touch && !shape) {
           // A phone has no hover: a tap on the candles puts the "+" at that price.
           this.hoverY.set(this.overCandles(event) ? y(event) : null);
         }
@@ -1077,8 +1432,27 @@ export class ReplayChart {
     stage.addEventListener(
       'pointermove',
       (event) => {
+        const gesture = this.gesture;
+        if (gesture && this.moveGesture(gesture, at(event))) {
+          event.stopPropagation();
+          return;
+        }
         if (!this.dragging) {
-          stage.style.cursor = untracked(this.tool) ? 'crosshair' : near(event) ? 'ns-resize' : '';
+          const tool = untracked(this.tool);
+          if (tool && event.pointerType !== 'touch') {
+            // A mouse leads the drawing being placed.
+            this.cursor.set({ ...this.clampToPane(at(event)), touch: false });
+          }
+          const shape = tool ? undefined : this.shapeAt(at(event), false);
+          stage.style.cursor = tool
+            ? 'crosshair'
+            : shape?.id === untracked(this.selected) && shape
+              ? 'move'
+              : shape
+                ? 'pointer'
+                : near(event)
+                  ? 'ns-resize'
+                  : '';
           const onPlus = event.target instanceof Element && event.target.closest('.plus');
           if (!onPlus) {
             this.hoverY.set(this.overCandles(event) ? y(event) : null);
@@ -1101,13 +1475,27 @@ export class ReplayChart {
       { capture: true },
     );
     const drop = (event: PointerEvent) => {
+      const gesture = this.gesture;
+      if (gesture) {
+        this.gesture = undefined;
+        if (gesture.place || gesture.edit) {
+          event.stopPropagation();
+        }
+        if (event.type === 'pointercancel') {
+          this.editing.set(null);
+          this.release();
+        } else {
+          this.endGesture(gesture, at(event));
+        }
+        return;
+      }
       const dragging = this.dragging;
       if (!dragging) {
         return;
       }
       event.stopPropagation();
       this.dragging = undefined;
-      this.chart!.applyOptions({ handleScroll: true, handleScale: true });
+      this.release();
       const { target, field } = dragging.line.drag!;
       if (dragging.bracket && dragging.price === dragging.origin) {
         this.drawTrades(this.trades(), this.draft());
@@ -1137,7 +1525,7 @@ export class ReplayChart {
     // On a touch screen a drag would also scroll the page and pan the chart: the pointerdown
     // that grabbed a line comes first, so its touches are kept from both.
     const holdTouch = (event: TouchEvent) => {
-      if (this.dragging) {
+      if (this.dragging || this.gesture?.place || this.gesture?.edit || untracked(this.tool)) {
         event.preventDefault();
         event.stopPropagation();
       }
@@ -1194,4 +1582,13 @@ export class ReplayChart {
   private point(candle: Candle) {
     return { ...candle, time: candle.time as Time };
   }
+}
+
+/** Distance from `p` to the segment from `a` to `b`, in pixels. */
+function distanceToSegment(p: Pixel, a: Pixel, b: Pixel): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = dx * dx + dy * dy;
+  const t = length ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / length)) : 0;
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }

@@ -190,8 +190,12 @@ Module notes:
   loaded in chunks; `BarBuilder` (`bars.ts`) builds the chart's bars. TradingView's own
   indicators/drawings are not available to us (Advanced Charts is for public sites only), so
   chart tools (`indicators.ts`, drawings in `ReplayChart`) are built on lightweight-charts.
-  Drawings listen to DOM clicks, since the chart's `subscribeClick` drops a second click within
-  500 ms. Cris chose to grow this with FX Replay's best ideas rather than clone it: session
+  Drawings follow pointer events on the DOM (the chart's `subscribeClick` drops a second click
+  within 500 ms) and are an SVG overlay, as in TradingView's app (Cris sent a recording): a tap
+  or click puts each point, a finger can drag a crosshair and let go, a tap selects a drawing
+  (handles reshape it, a drag moves it, a bar recolors or deletes it). The chart's top bar holds
+  the timeframes (projected with `chartToolbar`) and one menu each for indicators and drawings.
+  Cris chose to grow this with FX Replay's best ideas rather than clone it: session
   stats (`stats.ts`, `SessionStatsPanel`), rectangle/Fibonacci, picking the start date.
   Gold is Binance Futures' XAUUSDT perpetual (PAXGUSDT, a thin token, looked nothing like the
   market and is kept only for old sessions); `MarketDataService` drops bars while spot gold is

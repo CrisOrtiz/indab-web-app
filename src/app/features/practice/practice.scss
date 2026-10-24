@@ -119,10 +119,14 @@ label {
   font-size: 0.85rem;
 }
 
-/* Timeframe buttons, as in TradingView's top bar. */
+/* Timeframe buttons, first in the chart's top bar as in TradingView. */
 .timeframes {
   display: flex;
+  flex: none;
   gap: 2px;
+  margin-right: 4px;
+  padding-right: 8px;
+  border-right: 1px solid var(--color-border);
 
   button {
     padding: 6px 8px;
@@ -141,6 +145,11 @@ label {
 
     &:disabled {
       cursor: wait;
+    }
+
+    @media (max-width: 600px) {
+      padding: 6px;
+      font-size: 0.85rem;
     }
   }
 }
