@@ -12,7 +12,7 @@
       <ul class="facts">
         <li>
           <span>{{ t.role }}</span
-          ><strong>{{ auth.isAdmin() ? t.roles.admin : t.roles.student }}</strong>
+          ><strong>{{ t.roles[auth.profile()?.role ?? 'student'] }}</strong>
         </li>
         <li>
           <span>{{ t.access }}</span

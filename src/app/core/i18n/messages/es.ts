@@ -658,7 +658,7 @@ export const es = {
   profile: {
     title: 'Mi perfil',
     role: 'Rol',
-    roles: { student: 'Estudiante', admin: 'Administrador' },
+    roles: { student: 'Estudiante', trainer: 'Entrenador', admin: 'Administrador' },
     access: 'Acceso a la academia',
     accessStatus: {
       admin: 'Incluido (administrador)',

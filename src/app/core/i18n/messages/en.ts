@@ -645,7 +645,7 @@ export const en: Messages = {
   profile: {
     title: 'My profile',
     role: 'Role',
-    roles: { student: 'Student', admin: 'Admin' },
+    roles: { student: 'Student', trainer: 'Trainer', admin: 'Admin' },
     access: 'Academy access',
     accessStatus: {
       admin: 'Included (admin)',
