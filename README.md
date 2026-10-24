@@ -210,8 +210,9 @@ the rules are what actually protect the data. Anything not listed is denied.
 ## Languages
 
 The site speaks Spanish (Latin America, `es-419`, the default), English (`en-US`) and Brazilian
-Portuguese (`pt-BR`). Visitors pick the language in the header; the choice is saved in the browser
-(`localStorage`, key `indab.language`) and the page switches without reloading.
+Portuguese (`pt-BR`). Visitors pick the language from the flag menu in the header (Mexico, USA,
+Brazil); the choice is saved in the browser (`localStorage`, key `indab.language`) and the page
+switches without reloading.
 
 Translation happens at runtime, not with Angular's build-time `@angular/localize`: that would build
 one copy of the site per language under `/es/`, `/en/`, `/pt/` and need a full reload to switch,
@@ -362,7 +363,7 @@ src/app/
   core/loading/    LoadingService: what the page loader waits for
   features/        landing, auth, academy, repository, eleva, admin
   shared/layout/   header
-  shared/language/ language switcher
+  shared/language/ language switcher (flag menu) and flags
   shared/loader/   page loader (the logo bouncing), shown on start, navigation and data loads
 public/            logo, favicons and app icons (made from the logo's mark), manifest
 src/environments/  environment.ts (indab-academy) and environment.development.ts (emulators)

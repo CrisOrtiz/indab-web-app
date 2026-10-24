@@ -5,16 +5,23 @@
       <img src="logo.jpg" alt="INDAB Academy" width="40" height="40" />
       <span>INDAB</span>
     </a>
-    <nav class="nav">
-      <a routerLink="/eleva" routerLinkActive="active">{{ t.eleva }}</a>
+    <nav class="nav" #nav>
+      <a routerLink="/eleva" routerLinkActive="active" ariaCurrentWhenActive="page">{{
+        t.eleva
+      }}</a>
       @if (auth.isLoggedIn()) {
-        <a routerLink="/academy" routerLinkActive="active">{{ t.academy }}</a>
+        <a routerLink="/academy" routerLinkActive="active" ariaCurrentWhenActive="page">{{
+          t.academy
+        }}</a>
         @if (auth.isStaff()) {
-          <a routerLink="/admin" routerLinkActive="active">{{ t.admin }}</a>
+          <a routerLink="/admin" routerLinkActive="active" ariaCurrentWhenActive="page">{{
+            t.admin
+          }}</a>
         }
       } @else {
         <a routerLink="/login" class="btn">{{ t.signIn }}</a>
       }
+      <span class="indicator" aria-hidden="true"></span>
     </nav>
     <app-language-switcher class="language" />
     @if (auth.isLoggedIn()) {

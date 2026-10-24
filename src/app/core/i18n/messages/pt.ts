@@ -44,6 +44,7 @@ export const pt: Messages = {
     signOut: 'Sair',
     signIn: 'Entrar',
     language: 'Idioma',
+    currentLanguage: (name: string) => `Idioma: ${name}`,
     account: 'Sua conta',
     profile: 'Meu perfil',
   },

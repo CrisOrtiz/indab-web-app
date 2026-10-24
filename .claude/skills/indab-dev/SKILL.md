@@ -108,6 +108,11 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
   hydration) and `Seo` (`core/seo`) sets meta, canonical, `hreflang` (`?lang=es|en|pt` links) and
   Open Graph tags per route and language. Code on public pages runs once in Node at build time:
   guard browser APIs with `isPlatformBrowser` or try/catch. See README "SEO and loading speed".
+- Header (`shared/layout/header`): sticky on every page (z-index 9, under the landing's progress
+  bar), thinner with a shadow once scrolled; the current section's link gets `aria-current` and a
+  sliding underline (`placeIndicator`). The language picker is a flag menu (`shared/language`:
+  Mexico = es-419, USA = en-US, Brazil = pt-BR, inline SVG because Windows has no flag emoji).
+  Dropdowns use the global `dropdown-in` keyframes; respect `prefers-reduced-motion`.
 - Formatting: Prettier (`printWidth` 100, single quotes). Run `npx prettier --write` on changed files.
 
 ## Adding a module
