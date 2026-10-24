@@ -7,8 +7,8 @@ import { OrderType, TradeSide } from '../../models/practice';
  */
 export const es = {
   titles: {
-    landing: 'INDAB Academy',
-    eleva: 'Eleva Inversiones',
+    landing: 'INDAB Academy | Academia de trading',
+    eleva: 'Eleva Inversiones | INDAB',
     login: 'Ingresar | INDAB',
     register: 'Crear cuenta | INDAB',
     academy: 'Academia | INDAB',
@@ -21,6 +21,21 @@ export const es = {
     adminEvaluations: 'Evaluaciones de práctica | INDAB',
     notFound: 'Página no encontrada | INDAB',
     profile: 'Mi perfil | INDAB',
+  },
+
+  // Search engines and link previews (WhatsApp, Facebook...). Keep descriptions under ~160 characters.
+  seo: {
+    imageAlt: 'INDAB Academy. Conocimiento. Disciplina. Estrategia. Resultados.',
+    descriptions: {
+      landing:
+        'Academia de trading INDAB: análisis técnico, gestión de riesgo y psicología del trader, con clases, material de estudio y práctica en gráficos reales.',
+      eleva:
+        'Eleva Inversiones, el brazo de inversión de INDAB: gestiona capital con la disciplina y la gestión de riesgo que enseñamos, con reportes mensuales.',
+      login:
+        'Ingresa a tu cuenta de INDAB Academy para ver tus cursos, el material de estudio y la práctica de trading.',
+      register:
+        'Crea tu cuenta en INDAB Academy y empieza a formarte en trading con un proceso claro y medible.',
+    },
   },
 
   loader: {

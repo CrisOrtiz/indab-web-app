@@ -10,15 +10,15 @@ import {
   signOut,
   updateProfile,
 } from 'firebase/auth';
-import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
-import { FIREBASE_AUTH, FIRESTORE } from '../firebase/firebase.providers';
+import type { Firestore } from 'firebase/firestore';
+import { FIREBASE_AUTH, FIRESTORE_LOADER } from '../firebase/firebase.providers';
 import { I18n } from '../i18n/i18n.service';
 import { Enrollment, UserProfile } from '../models/user-profile';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly auth = inject(FIREBASE_AUTH);
-  private readonly firestore = inject(FIRESTORE);
+  private readonly firestore = inject(FIRESTORE_LOADER);
 
   // Firebase updates the same `User` object in place (name, linked providers), so every set
   // notifies, and `refreshUser()` can publish those changes.
@@ -26,6 +26,8 @@ export class AuthService {
   private readonly _profile = signal<UserProfile | null>(null);
   private readonly _enrollment = signal<Enrollment | null>(null);
   private unsubscribeData: (() => void)[] = [];
+  /** Bumped on every auth change, so a slow load for a previous user is dropped. */
+  private generation = 0;
 
   readonly user = this._user.asReadonly();
   readonly profile = this._profile.asReadonly();
@@ -88,48 +90,42 @@ export class AuthService {
 
   /** Creates `users/{uid}` on first sign-in. New users always start as students. */
   private async ensureProfile(user: User, displayName: string): Promise<void> {
-    const ref = doc(this.firestore, 'users', user.uid);
-    if ((await getDoc(ref)).exists()) {
-      return;
-    }
-    await setDoc(ref, {
-      uid: user.uid,
-      email: user.email ?? '',
-      displayName,
-      role: 'student',
-      createdAt: serverTimestamp(),
-    });
+    const [data, firestore] = await Promise.all([import('./user-data'), this.firestore.load()]);
+    await data.ensureProfile(firestore, user, displayName);
   }
 
-  /** Subscribes to the signed-in user's profile and enrollment; resolves after the first load. */
-  private watchUserData(user: User | null): Promise<void> {
+  /**
+   * Subscribes to the signed-in user's profile and enrollment; resolves after the first load.
+   * Loads Firestore first, so it is ready before the guards let the user into a page that uses it.
+   */
+  private async watchUserData(user: User | null): Promise<void> {
+    const generation = ++this.generation;
     this.unsubscribeData.forEach((unsubscribe) => unsubscribe());
     this.unsubscribeData = [];
     this._profile.set(null);
     this._enrollment.set(null);
     if (!user) {
-      return Promise.resolve();
+      return;
     }
 
-    const watch = <T>(path: string, target: (value: T | null) => void) =>
-      new Promise<void>((resolve) => {
-        const unsubscribe = onSnapshot(
-          doc(this.firestore, path, user.uid),
-          (snapshot) => {
-            target(snapshot.exists() ? (snapshot.data() as T) : null);
-            resolve();
-          },
-          () => {
-            target(null);
-            resolve();
-          },
-        );
-        this.unsubscribeData.push(unsubscribe);
-      });
-
-    return Promise.all([
-      watch<UserProfile>('users', (value) => this._profile.set(value)),
-      watch<Enrollment>('enrollments', (value) => this._enrollment.set(value)),
-    ]).then(() => undefined);
+    let data: typeof import('./user-data');
+    let firestore: Firestore;
+    try {
+      [data, firestore] = await Promise.all([import('./user-data'), this.firestore.load()]);
+    } catch {
+      // Offline or a stale deploy: carry on without the profile, as if it were missing.
+      return;
+    }
+    if (generation !== this.generation) {
+      return;
+    }
+    const { ready, unsubscribe } = data.watchUserData(
+      firestore,
+      user.uid,
+      (profile) => this._profile.set(profile),
+      (enrollment) => this._enrollment.set(enrollment),
+    );
+    this.unsubscribeData = unsubscribe;
+    await ready;
   }
 }

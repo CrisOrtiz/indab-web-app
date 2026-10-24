@@ -10,13 +10,17 @@ import { routes } from './app.routes';
 import { provideFirebase } from './core/firebase/firebase.providers';
 import { I18n } from './core/i18n/i18n.service';
 import { I18nTitleStrategy } from './core/i18n/title-strategy';
+import { Seo } from './core/seo/seo.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withComponentInputBinding()),
     { provide: TitleStrategy, useClass: I18nTitleStrategy },
-    provideAppInitializer(() => inject(I18n).init()),
+    provideAppInitializer(() => {
+      inject(Seo);
+      return inject(I18n).init();
+    }),
     provideFirebase({ options: environment.firebase, useEmulators: environment.useEmulators }),
   ],
 };

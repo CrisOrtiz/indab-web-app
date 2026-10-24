@@ -6,7 +6,7 @@ test.beforeEach(resetEmulators);
 
 test('the landing page invites visitors to join', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle('INDAB Academy');
+  await expect(page).toHaveTitle('INDAB Academy | Academia de trading');
   await expect(page.getByRole('heading', { name: 'INDAB Academy' })).toBeVisible();
   await expect(
     page.getByText('Conocimiento. Disciplina. Estrategia. Resultados.').first(),
@@ -38,7 +38,7 @@ test('the landing page shows its sections and links to Eleva', async ({ page }) 
 
 test('visitors see Eleva and the login link, not private sections', async ({ page }) => {
   await page.goto('/eleva');
-  await expect(page).toHaveTitle('Eleva Inversiones');
+  await expect(page).toHaveTitle('Eleva Inversiones | INDAB');
   await expect(nav(page).getByRole('link', { name: 'Ingresar' })).toBeVisible();
   await expect(nav(page).getByRole('link', { name: 'Academia' })).toHaveCount(0);
   await expect(nav(page).getByRole('link', { name: 'Administración' })).toHaveCount(0);
@@ -80,4 +80,51 @@ test('visitors can switch the site to English or Portuguese, and it stays that w
   await page.getByRole('combobox', { name: 'Language' }).selectOption('pt-BR');
   await expect(page).toHaveTitle('Entrar | INDAB');
   await expect(page.getByLabel('Senha')).toBeVisible();
+});
+
+test('a ?lang= link opens the site in that language for the visit only', async ({ page }) => {
+  await page.goto('/?lang=pt');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
+  await expect(page).toHaveTitle('INDAB Academy | Academia de trading');
+  await expect(page.getByRole('link', { name: 'Entre na academia' })).toBeVisible();
+
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'es-419');
+});
+
+test('public pages describe themselves to search engines; private ones are noindex', async ({
+  page,
+}) => {
+  const head = page.locator('head');
+  await page.goto('/eleva?lang=en');
+  await expect(head.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
+  await expect(head.locator('meta[name="description"]')).toHaveAttribute(
+    'content',
+    /INDAB's investment arm/,
+  );
+  await expect(head.locator('link[rel="canonical"]')).toHaveAttribute(
+    'href',
+    'https://indab-academy.web.app/eleva?lang=en',
+  );
+  await expect(head.locator('meta[property="og:locale"]')).toHaveAttribute('content', 'en_US');
+  await expect(head.locator('link[hreflang="pt-BR"]')).toHaveAttribute(
+    'href',
+    'https://indab-academy.web.app/eleva?lang=pt',
+  );
+
+  await page.goto('/no-existe');
+  await expect(page.getByRole('heading', { name: 'Página no encontrada' })).toBeVisible();
+  await expect(head.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
+  await expect(head.locator('link[hreflang]')).toHaveCount(0);
+});
+
+test('robots.txt points crawlers to the sitemap of public pages', async ({ request }) => {
+  const robots = await (await request.get('/robots.txt')).text();
+  expect(robots).toContain('Sitemap: https://indab-academy.web.app/sitemap.xml');
+  expect(robots).toContain('Disallow: /admin');
+  // Keep in sync with the prerendered routes in src/app/app.routes.server.ts.
+  const sitemap = await (await request.get('/sitemap.xml')).text();
+  for (const path of ['/', '/eleva', '/login', '/register']) {
+    expect(sitemap).toContain(`<loc>https://indab-academy.web.app${path}</loc>`);
+  }
 });

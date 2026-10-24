@@ -17,5 +17,7 @@ Essentials:
   `tests/firestore.rules.test.ts`; route guards only mirror the rules.
 - Node `^24.15.0` (or `^22.22.3`) is required by Angular 22. Check with `npm run test:ci`,
   `npm run test:rules` and `npm run test:e2e` (both need Java) and `npm run build`.
+- Public pages are prerendered at build time and the Firestore SDK loads only after sign-in; keep
+  browser-only code guarded and `firebase/firestore` out of the main bundle (see the skill).
 - New components and services get a `.spec.ts`; main user flows get a Playwright test in `e2e/`.
 - Never commit service account keys or `.env` files.

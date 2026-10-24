@@ -104,9 +104,10 @@ npm run deploy              # production build + deploy to Firebase Hosting
 ### Hosting
 
 The site is served from Firebase Hosting at **https://indab-academy.web.app** (also
-`indab-academy.firebaseapp.com`). `firebase.json` serves `dist/indab-web-app/browser`, rewrites every
-route to `index.html` (so deep links like `/academy` work) and caches hashed JS/CSS for a year
-while `index.html` is always revalidated. Manual deploy from your machine:
+`indab-academy.firebaseapp.com`). `firebase.json` serves `dist/indab-web-app/browser`: the
+prerendered public pages (`index.html`, `eleva/index.html`, ...; see [SEO](#seo-and-loading-speed))
+as they are, and every other route through `index.csr.html` (so deep links like `/academy` work).
+Hashed JS/CSS are cached for a year; HTML is always revalidated. Manual deploy from your machine:
 
 ```bash
 npx firebase login   # once per machine, opens the browser
@@ -227,11 +228,38 @@ which complicates the single Firebase Hosting site and its rewrites. No i18n lib
 - Dates use the `localDate` pipe, which follows the language. Numbers and prices keep the
   `1,250.00` format traders expect in every language.
 - `<html lang>` and Firebase Auth emails (password reset) follow the language too.
+- A `?lang=en` (or `es`, `pt`) link opens the site in that language without saving it; search
+  engines use these links (see [SEO](#seo-and-loading-speed)).
 - Content stored in Firestore (course and material titles, students' names) is not translated.
 
 To add a text: add it to `es.ts`, then to `en.ts` and `pt.ts` (the build tells you if one is
 missing). To add a language: a new file in `messages/`, an entry in `LANGUAGES` and `loaders` in
 `i18n.service.ts`, and its Angular locale data in `local-date.pipe.ts`.
+
+## SEO and loading speed
+
+- **Prerendering**: `ng build` renders the public pages (`/`, `/eleva`, `/login`, `/register`,
+  listed in `src/app/app.routes.server.ts`) to static HTML in Spanish (`outputMode: "static"`,
+  `@angular/ssr`, no server needed, so it works on the free Spark plan). Search engines and link
+  previews (WhatsApp, Facebook, LinkedIn) read their text and tags without running JavaScript.
+  The browser then starts the app over that HTML (no hydration, because the visitor's language
+  may differ). Code that touches `window`, `localStorage` or `IntersectionObserver` must cope
+  with running at build time (`isPlatformBrowser`, or try/catch like `I18n`).
+- **Meta tags**: `Seo` (`src/app/core/seo/seo.service.ts`) sets the description, robots,
+  canonical link, `hreflang` alternates and Open Graph / Twitter tags for each route and language.
+  Public routes carry `data: { description: '<key>' } satisfies SeoData` (texts in
+  `messages.seo.descriptions`); every other route is `noindex`. Share image: `public/og-image.png`.
+- **Language links**: `?lang=es|en|pt` opens the site in that language for the visit (not saved);
+  search engines get those links as the English and Portuguese versions of each public page.
+- **Crawler files**: `public/robots.txt` (keeps crawlers out of the signed-in areas) and
+  `public/sitemap.xml` (public pages in the three languages). The JSON-LD organization data is in
+  `src/index.html`. Add a new public page to `app.routes.server.ts` and the sitemap.
+- **Lazy loading**: every page is a lazy route; the chart library, English/Portuguese texts and
+  `@angular/forms` load only where used. The Firestore SDK (about 470 kB of the old 918 kB
+  first download) loads only once someone signs in or opens login/register: `FIRESTORE_LOADER`
+  loads it, and `AuthService` awaits it before the guards let a signed-in user in, so the
+  services of signed-in pages can still `inject(FIRESTORE)`. A public page that needs Firestore
+  must `await inject(FIRESTORE_LOADER).load()` instead.
 
 ## Trading practice (chart replay)
 
