@@ -30,6 +30,4 @@ export class Landing {
       { id: 'contacto', label: label.contact },
     ];
   });
-
-  protected readonly year = new Date().getFullYear();
 }

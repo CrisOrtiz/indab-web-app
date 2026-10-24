@@ -1,0 +1,33 @@
+// One thin strip, so pages like the practice chart keep their space.
+:host {
+  display: block;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+a {
+  color: var(--color-text);
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+@media (max-width: 600px) {
+  footer {
+    justify-content: center;
+    text-align: center;
+  }
+}

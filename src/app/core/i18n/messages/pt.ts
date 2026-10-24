@@ -50,6 +50,12 @@ export const pt: Messages = {
     profile: 'Meu perfil',
   },
 
+  // Copyright strip at the bottom of every page.
+  footer: {
+    rights: (year: number) => `© ${year} INDAB e crisortizdev. Todos os direitos reservados.`,
+    builtBy: 'Desenvolvido por',
+  },
+
   landing: {
     eyebrow: 'Academia de trading',
     tagline: 'Conhecimento. Disciplina. Estratégia. Resultados.',
@@ -223,8 +229,6 @@ export const pt: Messages = {
     footer: {
       signIn: 'Entrar',
       register: 'Criar conta',
-      rights: (year: number) => `© ${year} INDAB e crisortizdev. Todos os direitos reservados.`,
-      builtBy: 'Desenvolvido por',
       disclaimer: 'Conteúdo educacional; não constitui recomendação de investimento.',
     },
   },

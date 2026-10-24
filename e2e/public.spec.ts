@@ -150,3 +150,16 @@ test('robots.txt points crawlers to the sitemap of public pages', async ({ reque
     expect(sitemap).toContain(`<loc>https://indab-academy.web.app${path}</loc>`);
   }
 });
+
+test('every page ends with the copyright and the developer credit', async ({ page }) => {
+  const year = new Date().getFullYear();
+  for (const path of ['/', '/eleva', '/login', '/no-existe']) {
+    await page.goto(path);
+    const footer = page.getByRole('contentinfo');
+    await expect(footer).toContainText(`© ${year} INDAB y crisortizdev`);
+    await expect(footer.getByRole('link', { name: 'crisortizdev' })).toHaveAttribute(
+      'href',
+      'https://crisortiz.github.io',
+    );
+  }
+});
