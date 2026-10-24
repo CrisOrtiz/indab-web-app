@@ -11,12 +11,13 @@ import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
 import { LandingSections } from '../../shared/layout/landing-sections';
 import { Reveal } from '../../shared/reveal/reveal';
+import { SocialLinks } from '../../shared/social/social-links';
 
 // Public landing page. Draft: its copy (`landing` in core/i18n/messages) is placeholder content
 // for Cris to review.
 @Component({
   selector: 'app-landing',
-  imports: [RouterLink, Reveal],
+  imports: [RouterLink, Reveal, SocialLinks],
   templateUrl: './landing.html',
   styleUrl: './landing.scss',
 })

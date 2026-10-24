@@ -69,6 +69,28 @@ describe('Landing', () => {
     expect(el.querySelector('#eleva .disclaimer')?.textContent).toContain('Aviso de riesgo');
   });
 
+  it('only shows figures INDAB has confirmed', async () => {
+    const el = await render();
+    const stats = [...el.querySelectorAll('.stats li')].map((li) => [
+      li.querySelector('strong')?.textContent,
+      li.querySelector('span')?.textContent,
+    ]);
+    expect(stats).toEqual([['24/7', 'Acceso al material']]);
+    expect(el.textContent).not.toContain('Clases grabadas');
+  });
+
+  it("lists INDAB's real social networks in the contact section and the footer", async () => {
+    const el = await render();
+    for (const selector of ['#contacto', 'footer']) {
+      const area = el.querySelector(selector)!;
+      expect(
+        area.querySelector('a[href="https://www.instagram.com/indabacademylp/"]'),
+      ).not.toBeNull();
+      expect(area.querySelector('a[href="https://www.tiktok.com/@indab.academy"]')).not.toBeNull();
+    }
+    expect(el.querySelector('#contacto')?.textContent).not.toContain('000 000');
+  });
+
   it('closes with links and the disclaimer, leaving the copyright to the site footer', async () => {
     const el = await render();
     const footer = el.querySelector('footer')!;

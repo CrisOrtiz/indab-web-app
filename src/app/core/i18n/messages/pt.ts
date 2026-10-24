@@ -80,11 +80,7 @@ export const pt: Messages = {
       title: 'Formamos traders com método',
       text: 'A INDAB é uma academia de trading focada na formação prática. Ensinamos um processo claro e mensurável para que você tome decisões com critério, não por impulso.',
     },
-    stats: [
-      { value: '+500', label: 'Alunos' },
-      { value: '+40', label: 'Aulas gravadas' },
-      { value: '24/7', label: 'Acesso ao material' },
-    ],
+    stats: [{ value: '24/7', label: 'Acesso ao material' }],
     pillars: [
       {
         title: 'Conhecimento',
@@ -132,7 +128,7 @@ export const pt: Messages = {
     steps: [
       {
         title: 'Aprenda',
-        text: 'Aulas ao vivo e gravadas, com material para baixar em cada módulo.',
+        text: 'Material de estudo por módulo para aprender no seu ritmo.',
       },
       {
         title: 'Pratique',
@@ -152,13 +148,13 @@ export const pt: Messages = {
       },
       {
         title: 'Material de estudo',
-        text: 'Repositório de guias, PDFs, modelos e vídeos para alunos matriculados.',
+        text: 'Guias, documentos e modelos que compartilhamos com os alunos matriculados.',
         soon: false,
       },
       {
         title: 'Prática com replay de gráficos',
         text: 'Reproduza o mercado candle a candle, tome decisões e meça seus resultados.',
-        soon: true,
+        soon: false,
       },
       {
         title: 'Comunidade e mentoria',
@@ -206,9 +202,9 @@ export const pt: Messages = {
           'Crie sua conta e, quando sua matrícula for confirmada, seu acesso à academia e ao material de estudo é liberado.',
       },
       {
-        question: 'As aulas ficam gravadas?',
+        question: 'Vocês têm cursos gravados?',
         answer:
-          'Sim. As aulas ao vivo são publicadas na plataforma para você assistir quando quiser.',
+          'Ainda não. Compartilhamos material de estudo com os alunos matriculados dentro da academia.',
       },
       {
         question: 'Quanto capital preciso para começar?',
@@ -224,8 +220,7 @@ export const pt: Messages = {
     contact: {
       eyebrow: 'Contato',
       title: 'Vamos conversar',
-      text: 'Tem dúvidas sobre os programas ou as matrículas? Escreva para nós e responderemos o quanto antes.',
-      email: 'E-mail',
+      text: 'Tem dúvidas sobre os programas ou as matrículas? Siga-nos no Instagram e no TikTok e envie uma mensagem direta; responderemos o quanto antes.',
     },
     ctaTitle: 'Comece hoje seu caminho como trader',
     ctaButton: 'Criar minha conta',
@@ -234,6 +229,11 @@ export const pt: Messages = {
       register: 'Criar conta',
       disclaimer: 'Conteúdo educacional; não constitui recomendação de investimento.',
     },
+  },
+
+  // Links to INDAB's social networks (shared/social).
+  social: {
+    followOn: (network: string) => `INDAB no ${network}`,
   },
 
   // Birth date and WhatsApp: asked at registration, on the account setup page and in the profile.
@@ -311,7 +311,7 @@ export const pt: Messages = {
     cards: {
       material: {
         title: 'Material de estudo',
-        text: 'Guias, vídeos e leituras para aprender no seu ritmo.',
+        text: 'Guias e leituras para aprender no seu ritmo.',
       },
       practice: {
         title: 'Prática de trading',

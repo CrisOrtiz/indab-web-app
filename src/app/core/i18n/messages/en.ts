@@ -80,11 +80,7 @@ export const en: Messages = {
       title: 'We train traders with a method',
       text: 'INDAB is a trading academy focused on hands-on training. We teach a clear, measurable process so you make decisions with judgment, not on impulse.',
     },
-    stats: [
-      { value: '+500', label: 'Students' },
-      { value: '+40', label: 'Recorded classes' },
-      { value: '24/7', label: 'Access to the material' },
-    ],
+    stats: [{ value: '24/7', label: 'Access to the material' }],
     pillars: [
       {
         title: 'Knowledge',
@@ -132,7 +128,7 @@ export const en: Messages = {
     steps: [
       {
         title: 'Learn',
-        text: 'Live and recorded classes, with downloadable material for each module.',
+        text: 'Study material for each module so you can learn at your own pace.',
       },
       {
         title: 'Practice',
@@ -155,13 +151,13 @@ export const en: Messages = {
       },
       {
         title: 'Study material',
-        text: 'A library of guides, PDFs, templates and videos for enrolled students.',
+        text: 'Guides, documents and templates we share with enrolled students.',
         soon: false,
       },
       {
         title: 'Chart replay practice',
         text: 'Replay the market bar by bar, make decisions and measure your results.',
-        soon: true,
+        soon: false,
       },
       {
         title: 'Community and mentoring',
@@ -210,9 +206,8 @@ export const en: Messages = {
           'Create your account and, once your enrollment is confirmed, you get access to the academy and the study material.',
       },
       {
-        question: 'Are the classes recorded?',
-        answer:
-          'Yes. Live classes are published on the platform so you can watch them whenever you want.',
+        question: 'Do you have recorded courses?',
+        answer: 'Not yet. We share study material with enrolled students inside the academy.',
       },
       {
         question: 'How much capital do I need to start?',
@@ -228,8 +223,7 @@ export const en: Messages = {
     contact: {
       eyebrow: 'Contact',
       title: "Let's talk",
-      text: 'Do you have questions about the programs or enrollment? Write to us and we will get back to you shortly.',
-      email: 'Email',
+      text: 'Do you have questions about the programs or enrollment? Follow us on Instagram and TikTok and send us a direct message; we will get back to you shortly.',
     },
     ctaTitle: 'Start your path as a trader today',
     ctaButton: 'Create my account',
@@ -238,6 +232,11 @@ export const en: Messages = {
       register: 'Create account',
       disclaimer: 'Educational content; it is not financial advice.',
     },
+  },
+
+  // Links to INDAB's social networks (shared/social).
+  social: {
+    followOn: (network: string) => `INDAB on ${network}`,
   },
 
   // Birth date and WhatsApp: asked at registration, on the account setup page and in the profile.
@@ -317,7 +316,7 @@ export const en: Messages = {
     cards: {
       material: {
         title: 'Study material',
-        text: 'Guides, videos and readings to learn at your own pace.',
+        text: 'Guides and readings to learn at your own pace.',
       },
       practice: {
         title: 'Trading practice',
