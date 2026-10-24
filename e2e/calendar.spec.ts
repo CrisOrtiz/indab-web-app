@@ -19,14 +19,16 @@ test('students open the economic calendar from the academy and filter it', async
   await page.getByRole('link', { name: 'Calendario económico' }).click();
   await expect(page).toHaveURL('/academy/calendar');
   await expect(page.getByRole('heading', { name: 'Calendario económico', level: 1 })).toBeVisible();
-  expect(await widgetSettings(page)).toMatchObject({ countryFilter: 'us,jp', locale: 'es' });
+  await expect
+    .poll(() => widgetSettings(page))
+    .toMatchObject({ countryFilter: 'us,jp', locale: 'es' });
 
   await page.getByLabel('China').check();
   await page.getByLabel('Impacto').selectOption({ label: 'Medio y alto' });
-  expect(await widgetSettings(page)).toMatchObject({
-    countryFilter: 'us,jp,cn',
-    importanceFilter: '0,1',
-  });
+  // The widget is rebuilt on the next render, not during the click.
+  await expect
+    .poll(() => widgetSettings(page))
+    .toMatchObject({ countryFilter: 'us,jp,cn', importanceFilter: '0,1' });
   await expect(page.getByRole('heading', { name: 'USD/JPY' })).toBeVisible();
 });
 
