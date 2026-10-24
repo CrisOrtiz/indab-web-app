@@ -7,6 +7,7 @@ import {
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -115,6 +116,26 @@ describe('user profiles', () => {
     await assertFails(updateDoc(own, { email: 'otro@b.co' }));
     await assertFails(updateDoc(own, { uid: 'admin' }));
     await assertFails(updateDoc(own, { displayName: 'Ana', role: 'admin' }));
+  });
+
+  it('lets owners set, replace and remove a small inline photo', async () => {
+    const own = doc(as('student'), 'users/student');
+    const photo = 'data:image/jpeg;base64,' + 'A'.repeat(40000);
+    await assertSucceeds(updateDoc(own, { photoURL: photo }));
+    await assertSucceeds(updateDoc(own, { photoURL: 'data:image/png;base64,iVBORw0KGgo=' }));
+    await assertSucceeds(updateDoc(own, { displayName: 'Ana M.' }));
+    await assertSucceeds(updateDoc(own, { photoURL: deleteField() }));
+  });
+
+  it('rejects photos that are too big, not images or not inline', async () => {
+    const own = doc(as('student'), 'users/student');
+    await assertFails(updateDoc(own, { photoURL: 'data:image/jpeg;base64,' + 'A'.repeat(100000) }));
+    await assertFails(updateDoc(own, { photoURL: 'https://evil.example/tracker.png' }));
+    await assertFails(updateDoc(own, { photoURL: 'data:text/html;base64,PHNjcmlwdD4=' }));
+    await assertFails(updateDoc(own, { photoURL: 42 }));
+    await assertFails(
+      updateDoc(doc(as('admin'), 'users/student'), { photoURL: 'data:image/png;base64,AAAA' }),
+    );
   });
 
   it('keeps profiles private and only admins delete them', async () => {

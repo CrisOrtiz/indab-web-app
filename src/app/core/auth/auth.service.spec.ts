@@ -1,3 +1,4 @@
+import { effect } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { FIREBASE_AUTH, FIRESTORE } from '../firebase/firebase.providers';
@@ -196,6 +197,20 @@ describe('AuthService', () => {
     expect(auth.sendPasswordResetEmail).toHaveBeenCalledWith({}, 'a@indab.co');
     await service.signOut();
     expect(auth.signOut).toHaveBeenCalled();
+  });
+
+  it('republishes the current user after it changed in place', async () => {
+    const current = user('u1', { displayName: 'Ana' });
+    await signInAs('u1');
+    const seen: unknown[] = [];
+    const watcher = TestBed.runInInjectionContext(() => effect(() => seen.push(service.user())));
+    TestBed.tick();
+    Object.assign(TestBed.inject(FIREBASE_AUTH), { currentUser: current });
+    service.refreshUser();
+    TestBed.tick();
+    expect(seen.at(-1)).toBe(current);
+    expect(seen.length).toBe(2);
+    watcher.destroy();
   });
 
   it('propagates sign-in errors to the caller', async () => {

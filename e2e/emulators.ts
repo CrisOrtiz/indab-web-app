@@ -31,7 +31,9 @@ const toField = (value: Value): object => {
   if (Array.isArray(value)) return { arrayValue: { values: value.map(toField) } };
   if (value instanceof Date) return { timestampValue: value.toISOString() };
   if (typeof value === 'boolean') return { booleanValue: value };
-  if (typeof value === 'number') return { integerValue: String(value) };
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  }
   return { stringValue: value };
 };
 

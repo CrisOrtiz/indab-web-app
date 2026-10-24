@@ -45,7 +45,7 @@ otherwise create a feature service.
 
 | Collection | Read | Write |
 | --- | --- | --- |
-| `users/{uid}` | owner, admins | owner creates as `student`, edits `displayName`; admins change `role` of others only |
+| `users/{uid}` | owner, admins | owner creates as `student`, edits `displayName` and `photoURL`; admins change `role` of others only |
 | `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, admins | admins (shape validated) |
 | `courses/{id}` | everyone if `published`, admins | admins |
 | `courses/{id}/lessons/{id}` | enrolled in course or academy access | admins |
@@ -159,6 +159,14 @@ Module notes:
 - **Eleva (`/eleva`, investor area)**: the public page stays unguarded. Investor data lives in
   `investors/{uid}` and subcollections (e.g. `investors/{uid}/statements/{month}`), admin-written,
   owner-read. Financial figures are never computed or written by the client.
+- **Profile (`/profile`, built)**: `features/profile/`, opened from the avatar menu in the header
+  (`shared/layout/header`, avatar in `shared/avatar`). The photo is resized in the browser
+  (`resizeImage`, 192 px JPEG) and stored inline as `users/{uid}.photoURL`, so no Cloud Storage
+  bucket (Blaze plan) is needed; the header falls back to the Google photo, then initials.
+  `ProfileService` links an email/password credential for Google-only users (re-asking Google on
+  `auth/requires-recent-login`) and changes passwords after reauthentication. The practice P/L
+  summary reads the latest 50 `practiceSessions`. Linking from Google is unit-tested only: the
+  emulator's Google window needs internet.
 - **Admin (`/admin`, built)**: `features/admin/`. `AdminService` is provided by the `Admin`
   component (live `users` + `enrollments` listeners that stop on leave); search/filter is
   client-side in `admin-users.ts` (fine for hundreds of users; move to a paged query if it grows).

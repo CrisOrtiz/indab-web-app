@@ -16,6 +16,18 @@ describe('authErrorMessage', () => {
     );
   });
 
+  it('explains password-linking errors on the profile page', () => {
+    expect(authErrorMessage(new FirebaseError('auth/requires-recent-login', ''))).toBe(
+      'Por seguridad, vuelve a ingresar e inténtalo de nuevo.',
+    );
+    expect(authErrorMessage(new FirebaseError('auth/credential-already-in-use', ''))).toBe(
+      'Ese correo ya está vinculado a otra cuenta.',
+    );
+    expect(authErrorMessage(new FirebaseError('auth/provider-already-linked', ''))).toBe(
+      'Tu cuenta ya tiene una contraseña.',
+    );
+  });
+
   it('falls back to a generic message for anything else', () => {
     const generic = 'Ocurrió un error inesperado. Intenta de nuevo.';
     expect(authErrorMessage(new FirebaseError('auth/unknown-code', ''))).toBe(generic);
