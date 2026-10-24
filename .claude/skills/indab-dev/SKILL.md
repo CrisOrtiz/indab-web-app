@@ -140,6 +140,9 @@ Module notes:
   (add a `FIREBASE_STORAGE` token and emulator wiring in `firebase.providers.ts`).
 - **Academy (`/academy`)**: published `courses` and their `lessons`, filtered by
   `enrollment().courses` or full academy access. Shows the pending notice when not enrolled.
+  Its home is a grid of illustrated cards, one per section (`cards` in `academy.ts`, inline SVG
+  art in `academy.html`); without academy access the same cards show locked. Add a card there
+  (and to `academy.cards` in the three message files) for each new academy section.
 - **Trading practice (`/academy/practice`, built)**: `features/practice/`. `Replay` (`replay.ts`)
   is the pure bar-by-bar engine (orders, fills, SL/TP, P/L); `ReplayChart` wraps
   lightweight-charts and its draggable price/SL/TP lines (`levelMoved`; the order being set up
