@@ -18,6 +18,7 @@ describe('Admin page', () => {
   let fixture: ComponentFixture<Admin>;
   let el: HTMLElement;
   const rows = signal<AdminUserRow[]>([]);
+  const isAdmin = signal(true);
   const fake = {
     users: computed(() => rows()),
     loading: signal(false),
@@ -29,18 +30,20 @@ describe('Admin page', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
+    isAdmin.set(true);
     fake.loading.set(false);
     fake.error.set(null);
     rows.set([
       row('boss', 'Ana Admin', 'admin'),
       row('jose', 'José Pérez', 'student', true),
       row('luis', 'Luis Díaz', 'student'),
+      row('marta', 'Marta Ruiz', 'trainer', true),
     ]);
     TestBed.configureTestingModule({
       imports: [Admin],
       providers: [
         provideRouter([]),
-        { provide: AuthService, useValue: { user: signal({ uid: 'boss' }) } },
+        { provide: AuthService, useValue: { user: signal({ uid: 'boss' }), isAdmin } },
       ],
     });
     TestBed.overrideComponent(Admin, {
@@ -69,9 +72,24 @@ describe('Admin page', () => {
 
   it('shows the totals and every user', () => {
     const stats = [...el.querySelectorAll('.stat strong')].map((s) => s.textContent);
-    expect(stats).toEqual(['3', '1', '1']);
-    expect(names()).toEqual(['Ana Admin Tú', 'José Pérez', 'Luis Díaz']);
-    expect(el.textContent).toContain('3 de 3 usuarios');
+    expect(stats).toEqual(['4', '2', '1', '1']);
+    expect(names()).toEqual(['Ana Admin Tú', 'José Pérez', 'Luis Díaz', 'Marta Ruiz']);
+    expect(el.textContent).toContain('4 de 4 usuarios');
+  });
+
+  it('shows trainers the evaluations and practice review, not the users', async () => {
+    isAdmin.set(false);
+    await fixture.whenStable();
+    expect(el.querySelector('table')).toBeNull();
+    expect(el.textContent).toContain('Como entrenador puedes crear evaluaciones');
+    const links = [...el.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(links).toEqual(['/admin/evaluations', '/admin/practice']);
+  });
+
+  it('appoints trainers', async () => {
+    await change(roleSelect('Luis Díaz'), 'trainer');
+    expect(fake.setRole).toHaveBeenCalledWith('luis', 'trainer');
+    expect(message()).toContain('Luis Díaz ahora es entrenador.');
   });
 
   it('shows the loading and error states', async () => {
@@ -91,7 +109,7 @@ describe('Admin page', () => {
     search.dispatchEvent(new Event('input'));
     await fixture.whenStable();
     expect(names()).toEqual(['José Pérez']);
-    expect(el.textContent).toContain('1 de 3 usuarios');
+    expect(el.textContent).toContain('1 de 4 usuarios');
 
     search.value = 'nadie';
     search.dispatchEvent(new Event('input'));
@@ -102,6 +120,8 @@ describe('Admin page', () => {
     search.dispatchEvent(new Event('input'));
     await change(el.querySelector<HTMLSelectElement>('[aria-label="Filtrar por rol"]')!, 'admin');
     expect(names()).toEqual(['Ana Admin Tú']);
+    await change(el.querySelector<HTMLSelectElement>('[aria-label="Filtrar por rol"]')!, 'trainer');
+    expect(names()).toEqual(['Marta Ruiz']);
     await change(el.querySelector<HTMLSelectElement>('[aria-label="Filtrar por rol"]')!, 'all');
     await change(
       el.querySelector<HTMLSelectElement>('[aria-label="Filtrar por acceso"]')!,

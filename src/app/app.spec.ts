@@ -16,6 +16,7 @@ describe('App', () => {
             isLoggedIn: signal(false),
             hasAcademyAccess: signal(false),
             isAdmin: signal(false),
+            isStaff: signal(false),
           },
         },
       ],

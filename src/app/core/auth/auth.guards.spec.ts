@@ -8,12 +8,13 @@ import {
 } from '@angular/router';
 import { signal } from '@angular/core';
 import { AuthService } from './auth.service';
-import { adminGuard, authGuard, enrolledGuard, guestGuard } from './auth.guards';
+import { adminGuard, authGuard, enrolledGuard, guestGuard, staffGuard } from './auth.guards';
 
 describe('auth guards', () => {
   const isLoggedIn = signal(false);
   const hasAcademyAccess = signal(false);
   const isAdmin = signal(false);
+  const isStaff = signal(false);
   const state = { url: '/repository' } as RouterStateSnapshot;
   const route = {} as ActivatedRouteSnapshot;
 
@@ -21,12 +22,19 @@ describe('auth guards', () => {
     isLoggedIn.set(false);
     hasAcademyAccess.set(false);
     isAdmin.set(false);
+    isStaff.set(false);
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
         {
           provide: AuthService,
-          useValue: { isLoggedIn, hasAcademyAccess, isAdmin, whenReady: () => Promise.resolve() },
+          useValue: {
+            isLoggedIn,
+            hasAcademyAccess,
+            isAdmin,
+            isStaff,
+            whenReady: () => Promise.resolve(),
+          },
         },
       ],
     });
@@ -60,7 +68,18 @@ describe('auth guards', () => {
     isLoggedIn.set(true);
     hasAcademyAccess.set(true);
     expect(url(await run(adminGuard))).toBe('/academy');
+    isStaff.set(true);
+    expect(url(await run(adminGuard))).toBe('/academy');
     isAdmin.set(true);
     expect(await run(adminGuard)).toBe(true);
+  });
+
+  it('staffGuard lets in trainers and admins', async () => {
+    expect(url(await run(staffGuard))).toBe('/login?returnUrl=%2Frepository');
+    isLoggedIn.set(true);
+    hasAcademyAccess.set(true);
+    expect(url(await run(staffGuard))).toBe('/academy');
+    isStaff.set(true);
+    expect(await run(staffGuard)).toBe(true);
   });
 });

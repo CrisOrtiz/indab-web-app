@@ -13,6 +13,7 @@ describe('Header', () => {
     isLoggedIn: signal(false),
     hasAcademyAccess: signal(false),
     isAdmin: signal(false),
+    isStaff: signal(false),
     signOut: vi.fn(async () => undefined),
   };
 
@@ -22,6 +23,7 @@ describe('Header', () => {
     auth.isLoggedIn.set(false);
     auth.hasAcademyAccess.set(false);
     auth.isAdmin.set(false);
+    auth.isStaff.set(false);
     TestBed.configureTestingModule({
       imports: [Header],
       providers: [provideRouter([]), { provide: AuthService, useValue: auth }],
@@ -34,12 +36,13 @@ describe('Header', () => {
   const links = () => [...el().querySelectorAll('nav a')].map((a) => a.getAttribute('href'));
   const avatarButton = () => el().querySelector<HTMLButtonElement>('.avatar-button');
   const menu = () => el().querySelector('[role="menu"]');
-  const as = async (state: { academy?: boolean; admin?: boolean } = {}) => {
+  const as = async (state: { academy?: boolean; admin?: boolean; trainer?: boolean } = {}) => {
     auth.isLoggedIn.set(true);
     auth.user.set({ email: 'ana@indab.co' });
     auth.profile.set({ displayName: 'Ana Pérez' });
     auth.hasAcademyAccess.set(!!state.academy);
     auth.isAdmin.set(!!state.admin);
+    auth.isStaff.set(!!state.admin || !!state.trainer);
     await fixture.whenStable();
   };
   const openMenu = async () => {
@@ -61,6 +64,11 @@ describe('Header', () => {
 
   it('shows the admin link to admins', async () => {
     await as({ academy: true, admin: true });
+    expect(links()).toEqual(['/eleva', '/academy', '/admin']);
+  });
+
+  it('shows the admin link to trainers', async () => {
+    await as({ academy: true, trainer: true });
     expect(links()).toEqual(['/eleva', '/academy', '/admin']);
   });
 

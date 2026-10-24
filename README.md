@@ -171,20 +171,23 @@ The service account needs the *Firebase Admin* and *Service Usage Consumer* role
 
 | Collection | Who can read | Who can write |
 | --- | --- | --- |
-| `users/{uid}` | owner, admins | owner creates as `student` and edits `displayName` and `photoURL` (an inline JPEG/PNG/WebP `data:` URL up to 100,000 characters); admins change `role` (not their own) |
-| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, admins | admins |
+| `users/{uid}` | owner, trainers, admins | owner creates as `student` and edits `displayName` and `photoURL` (an inline JPEG/PNG/WebP `data:` URL up to 100,000 characters); admins change `role` to `student`, `trainer` or `admin` (not their own) |
+| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, trainers, admins | admins |
 | `courses/{id}` | everyone if `published`, admins | admins |
 | `courses/{id}/lessons/{id}` | users enrolled in that course or with academy access | admins |
 | `materials/{id}` | users with academy access (`enrollments/{uid}.academy == true`), admins | admins |
 | `investors/{uid}` (Eleva) | owner, admins | admins |
-| `practiceSessions/{id}` (chart replay) | owner, admins | owner with academy access creates it and updates its summary until `finished`; admins delete |
-| `practiceSessions/{id}/trades/{id}` | session owner, admins | session owner opens trades while the session is active and closes each once (entry never editable); admins delete |
+| `evaluations/{id}` (timed practice evaluation) | trainers, admins, assigned students | trainers and admins (shape validated) |
+| `practiceSessions/{id}` (chart replay) | owner, trainers, admins; attempts at evaluations with published results also to everyone with academy access, for the ranking | owner with academy access creates it and updates its summary until `finished`; an evaluation attempt has the id `{evaluationId}_{uid}` (one per student), must start inside the window on the evaluation's settings, and is locked 2 minutes after its time limit; admins delete |
+| `practiceSessions/{id}/trades/{id}` | session owner, trainers, admins | session owner opens trades while the session is active (and, in an evaluation, before the time is up) and closes each once (entry never editable); admins delete |
 
 A user gets access to the academy and the material repository when an admin turns on
 "Acceso a la academia" for them in `/admin` (which writes `enrollments/{uid}` with
 `academy: true`). Admins also promote or demote other users there. The first admin has to be
 set by hand: in the Firebase console, open `users/{uid}` for that account and change `role` to
-`admin`. Admins cannot remove their own admin role, so there is always at least one. The route guards mirror these checks in the UI, but
+`admin`. Admins cannot remove their own admin role, so there is always at least one.
+Trainers (role `trainer`, appointed by an admin) have academy access, set up practice evaluations
+and review practice, but cannot change roles, academy access or delete practice sessions. The route guards mirror these checks in the UI, but
 the rules are what actually protect the data. Anything not listed is denied.
 
 ## Routes
@@ -196,9 +199,11 @@ the rules are what actually protect the data. Anything not listed is denied.
 | `/academy` | signed-in users (shows "pending" until enrolled) |
 | `/profile` | signed-in users (photo, name, password, language, practice P/L; opened from the avatar menu in the header) |
 | `/academy/material` | enrolled users (learning material, opened from the academy; `/repository` redirects here) |
-| `/academy/practice` | enrolled users (chart-replay trading practice) |
-| `/admin` | admins (users, roles, academy access) |
-| `/admin/practice` | admins (review students' practice sessions on the chart, delete them) |
+| `/academy/practice` | enrolled users (chart-replay trading practice: free practice and assigned evaluations) |
+| `/academy/ranking` | enrolled users (rankings of published evaluations) |
+| `/admin` | trainers and admins (users, roles and academy access for admins only) |
+| `/admin/practice` | trainers and admins (review students' practice sessions on the chart; admins delete them) |
+| `/admin/evaluations` | trainers and admins (set up timed evaluations, see and publish their results) |
 
 ## Languages
 
@@ -267,9 +272,26 @@ Sessions and orders are written to Firestore as they happen; admins review them 
 `/admin/practice`, where each session's trades are drawn on its candles (fetched again from
 Binance) and a session can be deleted with its trades.
 
+### Evaluations and ranking
+
+Free practice is open at any time and builds each student's record. Trainers and admins also set
+up **evaluations** at `/admin/evaluations`: a market and replay start shared by every student,
+whether dates are hidden, a time limit (5 to 600 minutes), a window to start in, and the
+assigned students. A student sees their evaluations above the practice setup and takes each one
+once; a countdown runs and the attempt finishes by itself when the time is up (leaving the page
+also ends it). The rules enforce the single attempt, the window, the settings and the time limit.
+Results stay with the staff until a trainer publishes them.
+
+`/academy/ranking` ranks only evaluations (Cris's choice: free practice is not ranked and stays
+private to the student and staff): each published evaluation by the attempt's P/L, fewer
+trades first on a tie.
+
 The chart is TradingView's [lightweight-charts](https://github.com/tradingview/lightweight-charts)
 (Apache-2.0; its logo on the chart is the required attribution). P/L figures are computed in the
-student's browser, so treat them as practice data, not as graded results.
+student's browser, so treat them as practice data, not as graded results. This also holds for
+evaluations and the ranking: a determined student could write a made-up P/L from the browser's
+developer tools, or look up the replay's dates; grading that cannot be gamed needs the replay
+and P/L to run on a server (Cloud Functions, which need the Blaze plan).
 
 ## Scripts
 

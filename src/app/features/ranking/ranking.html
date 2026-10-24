@@ -1,0 +1,76 @@
+@let t = i18n.messages().ranking;
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/academy" class="back">{{ i18n.messages().academy.back }}</a>
+    <h1>{{ t.title }}</h1>
+    <p>{{ t.intro }}</p>
+  </header>
+
+  @if (error(); as message) {
+    <p class="message error" role="alert">{{ message }}</p>
+  }
+
+  @if (evaluations(); as list) {
+    @if (list.length) {
+      <div class="filters">
+        <select
+          [attr.aria-label]="t.evaluation"
+          [value]="selected() ?? ''"
+          (change)="select($any($event.target).value)"
+        >
+          @for (ev of list; track ev.id) {
+            <option [value]="ev.id">{{ ev.title }}</option>
+          }
+        </select>
+      </div>
+      <p class="muted">{{ t.evaluationHow }}</p>
+      @if (results(); as rows) {
+        <table class="ranking">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>{{ t.student }}</th>
+              <th>{{ t.pnl }}</th>
+              <th>{{ t.return }}</th>
+              <th>{{ t.balance }}</th>
+              <th>{{ t.trades }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows; track row.uid) {
+              <tr [class.me]="isMe(row.uid)">
+                <td data-label="#">{{ row.rank }}</td>
+                <td [attr.data-label]="t.student" class="name">
+                  {{ row.name }}
+                  @if (isMe(row.uid)) {
+                    <span class="badge">{{ t.you }}</span>
+                  }
+                </td>
+                <td
+                  [attr.data-label]="t.pnl"
+                  [class.up]="(row.pnl ?? 0) > 0"
+                  [class.down]="(row.pnl ?? 0) < 0"
+                >
+                  {{ row.pnl | number: '1.2-2' }}
+                </td>
+                <td [attr.data-label]="t.return">{{ row.return | percent: '1.1-1' }}</td>
+                <td [attr.data-label]="t.balance">{{ row.balance | number: '1.2-2' }}</td>
+                <td [attr.data-label]="t.trades">{{ row.trades }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="muted empty">{{ t.noAttempts }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p class="muted">{{ t.loading }}</p>
+      }
+    } @else {
+      <p class="muted">{{ t.noEvaluations }}</p>
+    }
+  } @else {
+    <p class="muted">{{ t.loading }}</p>
+  }
+</section>

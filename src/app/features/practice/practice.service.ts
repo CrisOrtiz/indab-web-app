@@ -13,6 +13,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
+import { Evaluation, attemptId } from '../../core/models/evaluation';
 import { PracticeSession, PracticeTrade } from '../../core/models/practice';
 
 export type NewPracticeSession = Pick<
@@ -41,8 +42,17 @@ export class PracticeService {
     return doc(this.trades(sessionId)).id;
   }
 
-  async startSession(session: NewPracticeSession): Promise<string> {
-    const ref = doc(this.sessions);
+  /**
+   * Starts free practice, or the student's one attempt at `evaluation` (rules check it is
+   * assigned to them, open, and on the evaluation's market, start and time limit).
+   */
+  async startSession(
+    session: NewPracticeSession,
+    evaluation?: Pick<Evaluation, 'id' | 'durationMinutes'>,
+  ): Promise<string> {
+    const ref = evaluation
+      ? doc(this.sessions, attemptId(evaluation.id, session.uid))
+      : doc(this.sessions);
     await setDoc(ref, {
       ...session,
       balance: session.startingBalance,
@@ -50,6 +60,8 @@ export class PracticeService {
       tradeCount: 0,
       status: 'active',
       startedAt: serverTimestamp(),
+      evaluationId: evaluation?.id ?? null,
+      ...(evaluation ? { durationMinutes: evaluation.durationMinutes } : {}),
     });
     return ref.id;
   }
@@ -133,7 +145,30 @@ export class PracticeService {
     return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
   }
 
-  /** Every student's most recent sessions (admins only). */
+  /** Every attempt at an evaluation (staff, or anyone once its results are published). */
+  async evaluationSessions(evaluationId: string): Promise<PracticeSession[]> {
+    const snapshot = await getDocs(query(this.sessions, where('evaluationId', '==', evaluationId)));
+    return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
+  }
+
+  /** The student's attempts at these evaluations. */
+  async myAttempts(uid: string, evaluationIds: string[]): Promise<PracticeSession[]> {
+    const chunks: string[][] = [];
+    // An `in` filter takes at most 30 values.
+    for (let i = 0; i < evaluationIds.length; i += 30) {
+      chunks.push(evaluationIds.slice(i, i + 30));
+    }
+    const snapshots = await Promise.all(
+      chunks.map((ids) =>
+        getDocs(query(this.sessions, where('uid', '==', uid), where('evaluationId', 'in', ids))),
+      ),
+    );
+    return snapshots.flatMap((s) =>
+      s.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id })),
+    );
+  }
+
+  /** Every student's most recent sessions (trainers and admins). */
   async allSessions(max = 200): Promise<PracticeSession[]> {
     const snapshot = await getDocs(query(this.sessions, orderBy('startedAt', 'desc'), limit(max)));
     return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));

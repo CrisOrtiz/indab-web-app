@@ -79,8 +79,40 @@ describe('PracticeService', () => {
         tradeCount: 0,
         status: 'active',
         startedAt: 'SERVER_TIMESTAMP',
+        evaluationId: null,
       },
     );
+  });
+
+  it("starts an evaluation attempt as the student's one session for it", async () => {
+    const id = await service.startSession(
+      {
+        uid: 'u1',
+        userName: 'Ana',
+        symbol: 'PAXGUSDT',
+        interval: '15m',
+        replayStart: 1000,
+        startingBalance: 200,
+      },
+      { id: 'e1', durationMinutes: 30 },
+    );
+    expect(id).toBe('e1_u1');
+    expect(setDoc).toHaveBeenCalledWith(
+      { path: 'practiceSessions/e1_u1', id: 'e1_u1' },
+      expect.objectContaining({ evaluationId: 'e1', durationMinutes: 30, status: 'active' }),
+    );
+  });
+
+  it('reads evaluation attempts', async () => {
+    expect(await service.evaluationSessions('e1')).toEqual([{ id: 's1', symbol: 'PAXGUSDT' }]);
+    expect(where).toHaveBeenCalledWith('evaluationId', '==', 'e1');
+
+    vi.mocked(getDocs).mockClear();
+    const ids = Array.from({ length: 31 }, (_, i) => `e${i}`);
+    await service.myAttempts('u1', ids);
+    // An `in` filter takes at most 30 values.
+    expect(getDocs).toHaveBeenCalledTimes(2);
+    expect(where).toHaveBeenCalledWith('evaluationId', 'in', ids.slice(30));
   });
 
   it('logs a trade as open with only its entry fields, then closes it', async () => {

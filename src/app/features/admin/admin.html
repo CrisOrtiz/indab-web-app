@@ -3,124 +3,142 @@
   <header class="page-header">
     <h1>{{ t.title }}</h1>
     <p>{{ t.intro }}</p>
-    <a routerLink="/admin/practice" class="btn btn-outline">{{ t.reviewPractice }}</a>
+    <div class="links">
+      <a routerLink="/admin/evaluations" class="btn">{{ t.evaluations }}</a>
+      <a routerLink="/admin/practice" class="btn btn-outline">{{ t.reviewPractice }}</a>
+    </div>
   </header>
 
-  <div class="stats">
-    <div class="stat">
-      <strong>{{ stats().total }}</strong
-      ><span>{{ t.users }}</span>
-    </div>
-    <div class="stat">
-      <strong>{{ stats().granted }}</strong
-      ><span>{{ t.withAccess }}</span>
-    </div>
-    <div class="stat">
-      <strong>{{ stats().admins }}</strong
-      ><span>{{ t.admins }}</span>
-    </div>
-  </div>
-
-  <div class="filters">
-    <input
-      type="search"
-      [placeholder]="t.search"
-      [attr.aria-label]="t.searchLabel"
-      [value]="filter().search"
-      (input)="updateFilter({ search: $any($event.target).value })"
-    />
-    <select
-      [attr.aria-label]="t.roleFilter"
-      (change)="updateFilter({ role: $any($event.target).value })"
-    >
-      <option value="all">{{ t.allRoles }}</option>
-      <option value="student">{{ t.students }}</option>
-      <option value="admin">{{ t.admins }}</option>
-    </select>
-    <select
-      [attr.aria-label]="t.accessFilter"
-      (change)="updateFilter({ access: $any($event.target).value })"
-    >
-      <option value="all">{{ t.allAccess }}</option>
-      <option value="granted">{{ t.granted }}</option>
-      <option value="pending">{{ t.pendingFilter }}</option>
-    </select>
-  </div>
-
-  @if (message(); as msg) {
-    <p class="message" [class.error]="msg.kind === 'error'" role="status">
-      {{ msg.text }}
-      <button type="button" class="dismiss" [attr.aria-label]="t.close" (click)="message.set(null)">
-        ×
-      </button>
-    </p>
-  }
-
-  @if (admin.loading()) {
-    <p class="muted">{{ t.loading }}</p>
-  } @else if (admin.error(); as error) {
-    <p class="message error">{{ error }}</p>
+  @if (!auth.isAdmin()) {
+    <p class="muted">{{ t.trainerNote }}</p>
   } @else {
-    <p class="muted count">{{ t.count(visible().length, stats().total) }}</p>
-    <table class="users">
-      <thead>
-        <tr>
-          <th>{{ t.user }}</th>
-          <th>{{ t.joined }}</th>
-          <th>{{ t.role }}</th>
-          <th>{{ t.access }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (row of visible(); track row.profile.uid) {
+    <div class="stats">
+      <div class="stat">
+        <strong>{{ stats().total }}</strong
+        ><span>{{ t.users }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ stats().granted }}</strong
+        ><span>{{ t.withAccess }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ stats().trainers }}</strong
+        ><span>{{ t.trainers }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ stats().admins }}</strong
+        ><span>{{ t.admins }}</span>
+      </div>
+    </div>
+
+    <div class="filters">
+      <input
+        type="search"
+        [placeholder]="t.search"
+        [attr.aria-label]="t.searchLabel"
+        [value]="filter().search"
+        (input)="updateFilter({ search: $any($event.target).value })"
+      />
+      <select
+        [attr.aria-label]="t.roleFilter"
+        (change)="updateFilter({ role: $any($event.target).value })"
+      >
+        <option value="all">{{ t.allRoles }}</option>
+        <option value="student">{{ t.students }}</option>
+        <option value="trainer">{{ t.trainers }}</option>
+        <option value="admin">{{ t.admins }}</option>
+      </select>
+      <select
+        [attr.aria-label]="t.accessFilter"
+        (change)="updateFilter({ access: $any($event.target).value })"
+      >
+        <option value="all">{{ t.allAccess }}</option>
+        <option value="granted">{{ t.granted }}</option>
+        <option value="pending">{{ t.pendingFilter }}</option>
+      </select>
+    </div>
+
+    @if (message(); as msg) {
+      <p class="message" [class.error]="msg.kind === 'error'" role="status">
+        {{ msg.text }}
+        <button
+          type="button"
+          class="dismiss"
+          [attr.aria-label]="t.close"
+          (click)="message.set(null)"
+        >
+          ×
+        </button>
+      </p>
+    }
+
+    @if (admin.loading()) {
+      <p class="muted">{{ t.loading }}</p>
+    } @else if (admin.error(); as error) {
+      <p class="message error">{{ error }}</p>
+    } @else {
+      <p class="muted count">{{ t.count(visible().length, stats().total) }}</p>
+      <table class="users">
+        <thead>
           <tr>
-            <td [attr.data-label]="t.user">
-              <div class="name">
-                {{ row.profile.displayName || t.noName }}
-                @if (isSelf(row)) {
-                  <span class="badge">{{ t.you }}</span>
+            <th>{{ t.user }}</th>
+            <th>{{ t.joined }}</th>
+            <th>{{ t.role }}</th>
+            <th>{{ t.access }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of visible(); track row.profile.uid) {
+            <tr>
+              <td [attr.data-label]="t.user">
+                <div class="name">
+                  {{ row.profile.displayName || t.noName }}
+                  @if (isSelf(row)) {
+                    <span class="badge">{{ t.you }}</span>
+                  }
+                </div>
+                <div class="muted email">{{ row.profile.email }}</div>
+              </td>
+              <td [attr.data-label]="t.joined">
+                {{ row.profile.createdAt?.toDate() | localDate: 'd MMM y' }}
+              </td>
+              <td [attr.data-label]="t.role">
+                <select
+                  #roleSelect
+                  [attr.aria-label]="t.roleOf(label(row))"
+                  [value]="row.profile.role"
+                  [disabled]="isSelf(row) || saving().has(row.profile.uid)"
+                  [title]="isSelf(row) ? t.ownRole : ''"
+                  (change)="changeRole(row, roleSelect)"
+                >
+                  <option value="student">{{ t.roles.student }}</option>
+                  <option value="trainer">{{ t.roles.trainer }}</option>
+                  <option value="admin">{{ t.roles.admin }}</option>
+                </select>
+              </td>
+              <td [attr.data-label]="t.access">
+                <label class="switch">
+                  <input
+                    #accessInput
+                    type="checkbox"
+                    [checked]="hasAcademyAccess(row)"
+                    [disabled]="saving().has(row.profile.uid)"
+                    (change)="toggleAccess(row, accessInput)"
+                  />
+                  <span>{{ hasAcademyAccess(row) ? t.enabled : t.pending }}</span>
+                </label>
+                @if (row.profile.role === 'admin' && !hasAcademyAccess(row)) {
+                  <div class="muted hint">{{ t.adminsHaveAccess }}</div>
                 }
-              </div>
-              <div class="muted email">{{ row.profile.email }}</div>
-            </td>
-            <td [attr.data-label]="t.joined">
-              {{ row.profile.createdAt?.toDate() | localDate: 'd MMM y' }}
-            </td>
-            <td [attr.data-label]="t.role">
-              <select
-                #roleSelect
-                [attr.aria-label]="t.roleOf(label(row))"
-                [value]="row.profile.role"
-                [disabled]="isSelf(row) || saving().has(row.profile.uid)"
-                [title]="isSelf(row) ? t.ownRole : ''"
-                (change)="changeRole(row, roleSelect)"
-              >
-                <option value="student">{{ t.student }}</option>
-                <option value="admin">{{ t.admin }}</option>
-              </select>
-            </td>
-            <td [attr.data-label]="t.access">
-              <label class="switch">
-                <input
-                  #accessInput
-                  type="checkbox"
-                  [checked]="hasAcademyAccess(row)"
-                  [disabled]="saving().has(row.profile.uid)"
-                  (change)="toggleAccess(row, accessInput)"
-                />
-                <span>{{ hasAcademyAccess(row) ? t.enabled : t.pending }}</span>
-              </label>
-              @if (row.profile.role === 'admin' && !hasAcademyAccess(row)) {
-                <div class="muted hint">{{ t.adminsHaveAccess }}</div>
-              }
-            </td>
-          </tr>
-        } @empty {
-          <tr>
-            <td colspan="4" class="muted empty">{{ t.noMatches }}</td>
-          </tr>
-        }
-      </tbody>
-    </table>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="4" class="muted empty">{{ t.noMatches }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
   }
 </section>

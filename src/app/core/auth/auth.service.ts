@@ -32,8 +32,10 @@ export class AuthService {
   readonly enrollment = this._enrollment.asReadonly();
   readonly isLoggedIn = computed(() => this._user() !== null);
   readonly isAdmin = computed(() => this._profile()?.role === 'admin');
+  /** Trainers and admins: they run evaluations and review practice. */
+  readonly isStaff = computed(() => this.isAdmin() || this._profile()?.role === 'trainer');
   readonly hasAcademyAccess = computed(
-    () => this.isAdmin() || this._enrollment()?.academy === true,
+    () => this.isStaff() || this._enrollment()?.academy === true,
   );
 
   private settled: Promise<void>;

@@ -8,6 +8,7 @@ import { Admin } from './features/admin/admin';
 import { AdminService } from './features/admin/admin.service';
 import { Practice } from './features/practice/practice';
 import { PracticeService } from './features/practice/practice.service';
+import { EvaluationService } from './features/evaluations/evaluation.service';
 import { Profile } from './features/profile/profile';
 import { ProfileService } from './features/profile/profile.service';
 import { en } from './core/i18n/messages/en';
@@ -21,6 +22,7 @@ describe('app routes', () => {
     isLoggedIn: signal(false),
     hasAcademyAccess: signal(false),
     isAdmin: signal(false),
+    isStaff: signal(false),
     whenReady: () => Promise.resolve(),
   };
 
@@ -31,6 +33,7 @@ describe('app routes', () => {
     auth.isLoggedIn.set(false);
     auth.hasAcademyAccess.set(false);
     auth.isAdmin.set(false);
+    auth.isStaff.set(false);
     TestBed.configureTestingModule({
       providers: [
         provideRouter(routes),
@@ -39,8 +42,12 @@ describe('app routes', () => {
         // The practice pages read Firestore on load.
         {
           provide: PracticeService,
-          useValue: { mySessions: async () => [], allSessions: async () => [] },
+          useValue: {
+            mySessions: async () => [],
+            allSessions: async () => [],
+          },
         },
+        { provide: EvaluationService, useValue: { all: async () => [], students: async () => [] } },
       ],
     });
     TestBed.overrideComponent(Practice, { set: { template: '' } });
@@ -57,11 +64,12 @@ describe('app routes', () => {
     await harness.navigateByUrl(url);
     return TestBed.inject(Router).url;
   };
-  const signIn = (state: { academy?: boolean; admin?: boolean } = {}) => {
+  const signIn = (state: { academy?: boolean; admin?: boolean; trainer?: boolean } = {}) => {
     auth.isLoggedIn.set(true);
     auth.user.set({ uid: 'u1', email: 'u1@indab.co' });
-    auth.hasAcademyAccess.set(!!state.academy || !!state.admin);
+    auth.hasAcademyAccess.set(!!state.academy || !!state.admin || !!state.trainer);
     auth.isAdmin.set(!!state.admin);
+    auth.isStaff.set(!!state.admin || !!state.trainer);
   };
 
   const pages = routes.filter((route) => !route.redirectTo);
@@ -97,6 +105,8 @@ describe('app routes', () => {
     expect(await visit('/admin')).toBe('/login?returnUrl=%2Fadmin');
     expect(await visit('/academy/practice')).toBe('/login?returnUrl=%2Facademy%2Fpractice');
     expect(await visit('/admin/practice')).toBe('/login?returnUrl=%2Fadmin%2Fpractice');
+    expect(await visit('/academy/ranking')).toBe('/login?returnUrl=%2Facademy%2Franking');
+    expect(await visit('/admin/evaluations')).toBe('/login?returnUrl=%2Fadmin%2Fevaluations');
   });
 
   it('keeps students without access in the academy', async () => {
@@ -105,6 +115,7 @@ describe('app routes', () => {
     expect(await visit('/profile')).toBe('/profile');
     expect(await visit('/academy/material')).toBe('/academy');
     expect(await visit('/academy/practice')).toBe('/academy');
+    expect(await visit('/academy/ranking')).toBe('/academy');
     expect(await visit('/admin')).toBe('/academy');
     expect(await visit('/login')).toBe('/academy');
     expect(await visit('/register')).toBe('/academy');
@@ -115,8 +126,18 @@ describe('app routes', () => {
     expect(await visit('/academy/material')).toBe('/academy/material');
     expect(await visit('/repository')).toBe('/academy/material');
     expect(await visit('/academy/practice')).toBe('/academy/practice');
+    expect(await visit('/academy/ranking')).toBe('/academy/ranking');
     expect(await visit('/admin')).toBe('/academy');
     expect(await visit('/admin/practice')).toBe('/academy');
+    expect(await visit('/admin/evaluations')).toBe('/academy');
+  });
+
+  it('opens the admin area and evaluations to trainers', async () => {
+    signIn({ trainer: true });
+    expect(await visit('/admin')).toBe('/admin');
+    expect(await visit('/admin/practice')).toBe('/admin/practice');
+    expect(await visit('/admin/evaluations')).toBe('/admin/evaluations');
+    expect(await visit('/academy/practice')).toBe('/academy/practice');
   });
 
   it('opens the admin area to admins', async () => {

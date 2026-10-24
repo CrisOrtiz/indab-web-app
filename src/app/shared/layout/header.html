@@ -9,7 +9,7 @@
       <a routerLink="/eleva" routerLinkActive="active">{{ t.eleva }}</a>
       @if (auth.isLoggedIn()) {
         <a routerLink="/academy" routerLinkActive="active">{{ t.academy }}</a>
-        @if (auth.isAdmin()) {
+        @if (auth.isStaff()) {
           <a routerLink="/admin" routerLinkActive="active">{{ t.admin }}</a>
         }
       } @else {

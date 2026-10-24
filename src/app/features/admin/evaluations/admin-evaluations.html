@@ -1,0 +1,267 @@
+@let t = i18n.messages().evaluations;
+@let tr = i18n.messages().trading;
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/admin" class="back">{{ i18n.messages().admin.back }}</a>
+    <h1>{{ t.title }}</h1>
+    <p>{{ t.intro }}</p>
+    @if (!form()) {
+      <button type="button" class="btn" (click)="create()">{{ t.new }}</button>
+    }
+  </header>
+
+  @if (message(); as msg) {
+    <p class="message" [class.error]="msg.kind === 'error'" role="status">
+      {{ msg.text }}
+      <button
+        type="button"
+        class="dismiss"
+        [attr.aria-label]="i18n.messages().admin.close"
+        (click)="message.set(null)"
+      >
+        ×
+      </button>
+    </p>
+  }
+
+  @if (form(); as f) {
+    <form class="evaluation-form" (submit)="$event.preventDefault(); save()">
+      <h2>{{ editing() ? t.editTitle : t.newTitle }}</h2>
+      <label>
+        {{ t.name }}
+        <input
+          type="text"
+          maxlength="120"
+          required
+          [value]="f.title"
+          (input)="patch({ title: $any($event.target).value })"
+        />
+      </label>
+      <label>
+        {{ t.description }}
+        <textarea
+          rows="3"
+          maxlength="2000"
+          [value]="f.description"
+          (input)="patch({ description: $any($event.target).value })"
+        ></textarea>
+      </label>
+      <div class="row">
+        <label>
+          {{ t.market }}
+          <select [value]="f.symbol" (change)="patch({ symbol: $any($event.target).value })">
+            @for (i of instruments; track i.symbol) {
+              <option [value]="i.symbol">{{ tr.instruments[i.symbol] ?? i.label }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          {{ t.duration }}
+          <input
+            type="number"
+            [min]="minDuration"
+            [max]="maxDuration"
+            step="1"
+            required
+            [value]="f.durationMinutes"
+            (input)="patch({ durationMinutes: +$any($event.target).value })"
+          />
+        </label>
+      </div>
+      <fieldset>
+        <legend>{{ t.start }}</legend>
+        <label class="check">
+          <input
+            type="radio"
+            name="start"
+            [checked]="f.randomStart"
+            (change)="patch({ randomStart: true })"
+          />
+          {{ t.randomStart }}
+        </label>
+        <label class="check">
+          <input
+            type="radio"
+            name="start"
+            [checked]="!f.randomStart"
+            (change)="patch({ randomStart: false })"
+          />
+          {{ t.pickStart }}
+        </label>
+        @if (!f.randomStart) {
+          <input
+            type="date"
+            [attr.aria-label]="t.startDate"
+            [min]="dateRange().min"
+            [max]="dateRange().max"
+            [value]="f.startDate"
+            (input)="patch({ startDate: $any($event.target).value })"
+          />
+        }
+        <span class="muted">{{ t.sameStart }}</span>
+      </fieldset>
+      <label class="check">
+        <input
+          type="checkbox"
+          [checked]="f.hideDates"
+          (change)="patch({ hideDates: $any($event.target).checked })"
+        />
+        {{ t.hideDates }}
+      </label>
+      <div class="row">
+        <label>
+          {{ t.opensAt }}
+          <input
+            type="datetime-local"
+            required
+            [value]="f.opensAt"
+            (input)="patch({ opensAt: $any($event.target).value })"
+          />
+        </label>
+        <label>
+          {{ t.closesAt }}
+          <input
+            type="datetime-local"
+            required
+            [value]="f.closesAt"
+            (input)="patch({ closesAt: $any($event.target).value })"
+          />
+        </label>
+      </div>
+      <span class="muted">{{ t.windowHint }}</span>
+      <fieldset>
+        <legend>{{ t.students(f.studentIds.length) }}</legend>
+        <div class="row">
+          <input
+            type="search"
+            [placeholder]="t.searchStudents"
+            [attr.aria-label]="t.searchStudents"
+            [value]="studentSearch()"
+            (input)="studentSearch.set($any($event.target).value)"
+          />
+          <button type="button" class="btn btn-outline" (click)="selectAll()">
+            {{ t.selectAll }}
+          </button>
+        </div>
+        <div class="student-list">
+          @for (s of visibleStudents(); track s.uid) {
+            <label class="check">
+              <input
+                type="checkbox"
+                [checked]="f.studentIds.includes(s.uid)"
+                (change)="toggleStudent(s.uid, $any($event.target).checked)"
+              />
+              {{ s.name }} <span class="muted">{{ s.email }}</span>
+            </label>
+          } @empty {
+            <span class="muted">{{ t.noStudents }}</span>
+          }
+        </div>
+      </fieldset>
+      <div class="actions">
+        <button type="submit" class="btn" [disabled]="saving()">
+          {{ saving() ? t.saving : t.save }}
+        </button>
+        <button type="button" class="btn btn-outline" (click)="cancel()">{{ t.cancel }}</button>
+      </div>
+    </form>
+  }
+
+  @if (loading()) {
+    <p class="muted">{{ t.loading }}</p>
+  } @else {
+    <ul class="cards">
+      @for (ev of evaluations(); track ev.id) {
+        @let state = windowOf(ev);
+        <li class="card">
+          <h3>
+            {{ ev.title }}
+            <span class="badge">{{ t.states[state] }}</span>
+            @if (ev.resultsPublished) {
+              <span class="badge">{{ t.resultsPublished }}</span>
+            }
+          </h3>
+          @if (ev.description) {
+            <p class="muted">{{ ev.description }}</p>
+          }
+          <p class="muted">
+            {{ tr.instruments[ev.symbol] ?? ev.symbol }} ·
+            {{ ev.replayStart | localDate: 'd MMM y, HH:mm' }} ·
+            {{ t.minutes(ev.durationMinutes) }} ·
+            {{ t.studentCount(ev.studentIds.length) }}
+          </p>
+          <p class="muted">
+            {{
+              t.window(
+                (ev.opensAt.toDate() | localDate: 'd MMM y, HH:mm') ?? '',
+                (ev.closesAt.toDate() | localDate: 'd MMM y, HH:mm') ?? ''
+              )
+            }}
+          </p>
+          <div class="actions">
+            <button type="button" class="btn btn-outline" (click)="toggleResults(ev)">
+              {{ selected() === ev.id ? t.hideResults : t.showResults }}
+            </button>
+            <button type="button" class="btn btn-outline" (click)="togglePublished(ev)">
+              {{ ev.resultsPublished ? t.unpublish : t.publish }}
+            </button>
+            <button type="button" class="btn btn-outline" (click)="edit(ev)">{{ t.edit }}</button>
+            <button
+              type="button"
+              class="btn btn-outline"
+              [attr.aria-label]="t.deleteLabel(ev.title)"
+              (click)="remove(ev)"
+            >
+              {{ t.delete }}
+            </button>
+          </div>
+
+          @if (selected() === ev.id) {
+            @if (standings(); as rows) {
+              <table class="users results">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>{{ t.student }}</th>
+                    <th>{{ t.status }}</th>
+                    <th>{{ t.pnl }}</th>
+                    <th>{{ t.return }}</th>
+                    <th>{{ t.trades }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of rows; track row.uid) {
+                    <tr>
+                      <td data-label="#">{{ row.rank ?? '—' }}</td>
+                      <td [attr.data-label]="t.student" class="name">{{ row.name }}</td>
+                      <td [attr.data-label]="t.status">{{ t.attemptStates[row.status] }}</td>
+                      <td
+                        [attr.data-label]="t.pnl"
+                        [class.up]="(row.pnl ?? 0) > 0"
+                        [class.down]="(row.pnl ?? 0) < 0"
+                      >
+                        {{ row.pnl === null ? '—' : (row.pnl | number: '1.2-2') }}
+                      </td>
+                      <td [attr.data-label]="t.return">
+                        {{ row.return === null ? '—' : (row.return | percent: '1.1-1') }}
+                      </td>
+                      <td [attr.data-label]="t.trades">{{ row.trades ?? '—' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="6" class="muted empty">{{ t.noAttempts }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @else {
+              <p class="muted">{{ t.loadingResults }}</p>
+            }
+          }
+        </li>
+      } @empty {
+        <li class="muted">{{ t.empty }}</li>
+      }
+    </ul>
+  }
+</section>

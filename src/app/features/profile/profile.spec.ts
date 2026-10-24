@@ -102,6 +102,13 @@ describe('Profile', () => {
     [...el.querySelectorAll('button, label.btn')].find((b) => b.textContent?.trim() === text) as
       HTMLElement | undefined;
 
+  it('shows the trainer role and academy access', async () => {
+    auth.profile.update((profile) => ({ ...profile, role: 'trainer' }));
+    const { el } = await render();
+    expect(el.textContent).toContain('Entrenador');
+    expect(el.textContent).toContain('Habilitado');
+  });
+
   it('shows who the user is, their role, access and join date', async () => {
     const { el } = await render();
     expect(el.querySelector('h1')?.textContent).toBe('Mi perfil');
@@ -125,6 +132,7 @@ describe('Profile', () => {
       'La práctica de trading se habilita cuando el equipo de INDAB activa tu acceso a la academia.',
     );
     auth.isAdmin.set(true);
+    auth.profile.update((profile) => ({ ...profile, role: 'admin' }));
     auth.hasAcademyAccess.set(true);
     await stable();
     expect(el.textContent).toContain('Administrador');

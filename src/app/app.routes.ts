@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { adminGuard, authGuard, enrolledGuard, guestGuard } from './core/auth/auth.guards';
+import { authGuard, enrolledGuard, guestGuard, staffGuard } from './core/auth/auth.guards';
 
 // Titles are keys of `Messages['titles']`, translated by `I18nTitleStrategy`.
 export const routes: Routes = [
@@ -50,6 +50,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/practice/practice').then((m) => m.Practice),
   },
   {
+    path: 'academy/ranking',
+    title: 'ranking',
+    canActivate: [enrolledGuard],
+    loadComponent: () => import('./features/ranking/ranking').then((m) => m.Ranking),
+  },
+  {
     path: 'academy/material',
     title: 'material',
     canActivate: [enrolledGuard],
@@ -58,19 +64,26 @@ export const routes: Routes = [
   // The material used to be its own section; keep old links working.
   { path: 'repository', redirectTo: 'academy/material' },
 
-  // Admins only
+  // Trainers and admins; user management inside /admin is for admins only.
   {
     path: 'admin',
     title: 'admin',
-    canActivate: [adminGuard],
+    canActivate: [staffGuard],
     loadComponent: () => import('./features/admin/admin').then((m) => m.Admin),
   },
   {
     path: 'admin/practice',
     title: 'adminPractice',
-    canActivate: [adminGuard],
+    canActivate: [staffGuard],
     loadComponent: () =>
       import('./features/admin/practice-review/practice-review').then((m) => m.PracticeReview),
+  },
+  {
+    path: 'admin/evaluations',
+    title: 'adminEvaluations',
+    canActivate: [staffGuard],
+    loadComponent: () =>
+      import('./features/admin/evaluations/admin-evaluations').then((m) => m.AdminEvaluations),
   },
 
   {

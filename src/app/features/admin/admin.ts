@@ -16,7 +16,7 @@ import { AdminUserFilter, AdminUserRow, filterUsers, hasAcademyAccess } from './
 })
 export class Admin {
   protected readonly admin = inject(AdminService);
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   protected readonly i18n = inject(I18n);
 
   protected readonly filter = signal<AdminUserFilter>({ search: '', role: 'all', access: 'all' });
@@ -27,6 +27,7 @@ export class Admin {
       total: users.length,
       granted: users.filter(hasAcademyAccess).length,
       admins: users.filter((row) => row.profile.role === 'admin').length,
+      trainers: users.filter((row) => row.profile.role === 'trainer').length,
     };
   });
 
@@ -58,7 +59,7 @@ export class Admin {
     const ok = await this.save(
       row,
       () => this.admin.setRole(row.profile.uid, role),
-      t.roleChanged(this.label(row), role === 'admin'),
+      t.roleChanged(this.label(row), t.roles[role]),
     );
     if (!ok) {
       select.value = row.profile.role;

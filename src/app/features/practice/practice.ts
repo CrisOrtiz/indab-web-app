@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../core/i18n/local-date.pipe';
+import { Evaluation, EvaluationWindow, evaluationWindow } from '../../core/models/evaluation';
 import {
   Candle,
   OrderType,
@@ -11,6 +12,7 @@ import {
   PracticeTrade,
   TradeSide,
 } from '../../core/models/practice';
+import { EvaluationService } from '../evaluations/evaluation.service';
 import { BarBuilder, formatElapsed, nextBarEnd } from './bars';
 import {
   DEFAULT_TIMEFRAME,
@@ -60,10 +62,30 @@ const MIN_REPLAY_MINUTES = 60;
 /** Fetch the next chunk of minutes when fewer than this are left to replay. */
 const PREFETCH_MINUTES = 600;
 
+/** An evaluation assigned to the student, with their attempt if they took it. */
+export interface EvaluationCard {
+  evaluation: Evaluation;
+  window: EvaluationWindow;
+  attempt: PracticeSession | null;
+}
+
+/** Remaining time as m:ss, or h:mm:ss from an hour up. */
+export function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const ss = String(total % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
 /**
  * Chart-replay trading practice: the student picks a market, gets a random stretch of real
  * history with the future hidden, steps through it bar by bar and opens simulated trades.
  * Every session and trade is logged to Firestore for instructors to review.
+ *
+ * Free practice can be started at any time. Evaluations set up by a trainer are listed above
+ * the setup: each one is taken once, inside its window, on the evaluation's market and replay
+ * start, and ends by itself when its time limit runs out.
  *
  * The trading screen follows TradingView: Buy/Sell prices on the chart for one-click market
  * orders, an order panel with Market/Limit/Stop tabs and take profit / stop loss checkboxes
@@ -80,6 +102,7 @@ export class Practice {
   private readonly auth = inject(AuthService);
   private readonly market = inject(MarketDataService);
   private readonly practice = inject(PracticeService);
+  private readonly evaluationService = inject(EvaluationService);
   private readonly locale = inject(LOCALE_ID);
   protected readonly i18n = inject(I18n);
 
@@ -126,6 +149,17 @@ export class Practice {
   protected readonly playing = signal(false);
   protected readonly speed = signal(SPEEDS[1]);
   protected readonly history = signal<PracticeSession[]>([]);
+  /** The student's assigned evaluations. */
+  protected readonly evaluations = signal<EvaluationCard[]>([]);
+  /** The evaluation being taken, if this session is an attempt. */
+  protected readonly evaluation = signal<Evaluation | null>(null);
+  /** When the attempt's time runs out (ms), by this device's clock. */
+  protected readonly deadline = signal<number | null>(null);
+  protected readonly now = signal(Date.now());
+  protected readonly remaining = computed(() => {
+    const deadline = this.deadline();
+    return deadline === null ? null : formatCountdown(deadline - this.now());
+  });
   protected readonly tab = signal<Tab>('positions');
   /** Timeframe on the chart; the replay itself moves minute by minute. */
   protected readonly timeframe = signal<Timeframe>(DEFAULT_TIMEFRAME);
@@ -228,11 +262,14 @@ export class Practice {
   );
 
   private timer?: ReturnType<typeof setInterval>;
+  private clock?: ReturnType<typeof setInterval>;
 
   constructor() {
     this.loadSessions();
+    this.loadEvaluations();
     inject(DestroyRef).onDestroy(() => {
       this.pause();
+      clearInterval(this.clock);
       // Leaving mid-replay ends the session, so open trades are not left dangling.
       if (this.phase() === 'playing') {
         void this.finish();
@@ -240,9 +277,33 @@ export class Practice {
     });
   }
 
-  protected async start(): Promise<void> {
+  /** Starts free practice at a random start or the date the student picked. */
+  protected start(): Promise<void> {
     const instrument = this.instrument();
-    const { symbol } = instrument;
+    const replayStart =
+      this.randomStart() || !this.startDate()
+        ? randomReplayStart(instrument)
+        : replayStartAt(instrument, Date.parse(`${this.startDate()}T00:00:00Z`));
+    return this.begin(replayStart, null);
+  }
+
+  /** Starts the student's one attempt at an evaluation, after they confirm. */
+  protected async startEvaluation(evaluation: Evaluation): Promise<void> {
+    const t = this.i18n.messages().practice;
+    if (!INSTRUMENTS.some((i) => i.symbol === evaluation.symbol)) {
+      this.error.set(t.startFailed);
+      return;
+    }
+    if (!confirm(t.confirmEvaluation(evaluation.title, evaluation.durationMinutes))) {
+      return;
+    }
+    this.symbol.set(evaluation.symbol);
+    this.hideDates.set(evaluation.hideDates);
+    await this.begin(evaluation.replayStart, evaluation);
+  }
+
+  private async begin(replayStart: number, evaluation: Evaluation | null): Promise<void> {
+    const { symbol } = this.instrument();
     const timeframe = DEFAULT_TIMEFRAME;
     const user = this.auth.user();
     if (!user) {
@@ -251,10 +312,6 @@ export class Practice {
     this.error.set(null);
     this.phase.set('loading');
     try {
-      const replayStart =
-        this.randomStart() || !this.startDate()
-          ? randomReplayStart(instrument)
-          : replayStartAt(instrument, Date.parse(`${this.startDate()}T00:00:00Z`));
       // The minute before the start is the replay's history: its close is the first price.
       const [minutes, history] = await Promise.all([
         this.market.loadCandles(symbol, '1m', replayStart - MINUTE),
@@ -263,18 +320,26 @@ export class Practice {
       if (minutes.length < MIN_REPLAY_MINUTES) {
         throw new Error('Not enough data');
       }
-      const replay = new Replay(minutes, 1, STARTING_BALANCE, true);
+      const balance = evaluation?.startingBalance ?? STARTING_BALANCE;
+      const replay = new Replay(minutes, 1, balance, true);
       if (minutes.length < REPLAY_BARS) {
         replay.extend([], true);
       }
-      const sessionId = await this.practice.startSession({
+      const session = {
         uid: user.uid,
         userName: this.auth.profile()?.displayName || user.email || user.uid,
         symbol,
         interval: timeframe.interval,
         replayStart,
         startingBalance: replay.startingBalance,
-      });
+      };
+      // Taken before the write, so the countdown never runs past the server's limit.
+      const startedAt = Date.now();
+      const sessionId = evaluation
+        ? await this.practice.startSession(session, evaluation).catch(() => {
+            throw new Error(this.i18n.messages().practice.evaluationStartFailed);
+          })
+        : await this.practice.startSession(session);
       this.builders = new Map();
       this.histories.set({ [timeframe.interval]: history });
       this.timeframe.set(timeframe);
@@ -285,11 +350,30 @@ export class Practice {
       this.stopLoss.set(null);
       this.takeProfit.set(null);
       this.tab.set('positions');
+      this.evaluation.set(evaluation);
       this.phase.set('playing');
-    } catch {
-      this.error.set(this.i18n.messages().practice.startFailed);
+      if (evaluation) {
+        this.startClock(startedAt + evaluation.durationMinutes * MINUTE);
+      }
+    } catch (e) {
+      const t = this.i18n.messages().practice;
+      const message = (e as Error).message;
+      this.error.set(message === t.evaluationStartFailed ? message : t.startFailed);
       this.phase.set('setup');
     }
+  }
+
+  /** Counts the attempt's time down and finishes it when it runs out. */
+  private startClock(deadline: number): void {
+    this.deadline.set(deadline);
+    this.now.set(Date.now());
+    clearInterval(this.clock);
+    this.clock = setInterval(() => {
+      this.now.set(Date.now());
+      if (this.now() >= deadline) {
+        void this.finish();
+      }
+    }, 1000);
   }
 
   /** Switches the chart's timeframe, loading its history the first time. */
@@ -566,6 +650,8 @@ export class Practice {
       return;
     }
     this.pause();
+    clearInterval(this.clock);
+    this.deadline.set(null);
     this.phase.set('finished');
     const { cancelled, closed } = replay.closeAll('sessionEnd');
     try {
@@ -578,9 +664,13 @@ export class Practice {
       this.error.set(this.i18n.messages().practice.finishFailed);
     }
     this.loadSessions();
+    if (this.evaluation()) {
+      this.loadEvaluations();
+    }
   }
 
   protected reset(): void {
+    this.evaluation.set(null);
     this.replay.set(null);
     this.sessionId.set(null);
     this.error.set(null);
@@ -732,6 +822,33 @@ export class Practice {
       pnl: replay.realized(),
       tradeCount: replay.filledCount(),
     };
+  }
+
+  /** The evaluations assigned to the student and whether they took each one. */
+  private async loadEvaluations(): Promise<void> {
+    const uid = this.auth.user()?.uid;
+    if (!uid) {
+      return;
+    }
+    try {
+      const evaluations = await this.evaluationService.assignedTo(uid);
+      const attempts = evaluations.length
+        ? await this.practice.myAttempts(
+            uid,
+            evaluations.map((e) => e.id),
+          )
+        : [];
+      const now = Date.now();
+      this.evaluations.set(
+        evaluations.map((evaluation) => ({
+          evaluation,
+          window: evaluationWindow(evaluation, now),
+          attempt: attempts.find((a) => a.evaluationId === evaluation.id) ?? null,
+        })),
+      );
+    } catch {
+      this.evaluations.set([]);
+    }
   }
 
   private loadSessions(): void {

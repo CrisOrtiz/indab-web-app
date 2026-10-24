@@ -25,9 +25,10 @@ export async function resetEmulators(): Promise<void> {
   );
 }
 
-type Value = string | boolean | number | Date | Value[];
+type Value = string | boolean | number | Date | null | Value[];
 
 const toField = (value: Value): object => {
+  if (value === null) return { nullValue: null };
   if (Array.isArray(value)) return { arrayValue: { values: value.map(toField) } };
   if (value instanceof Date) return { timestampValue: value.toISOString() };
   if (typeof value === 'boolean') return { booleanValue: value };
@@ -89,7 +90,7 @@ export async function uidOf(email: string): Promise<string> {
 export async function createUser(
   displayName: string,
   email: string,
-  options: { role?: 'student' | 'admin'; academy?: boolean } = {},
+  options: { role?: 'student' | 'trainer' | 'admin'; academy?: boolean } = {},
 ): Promise<string> {
   const { localId: uid } = await request(
     `${authUrl}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-api-key`,

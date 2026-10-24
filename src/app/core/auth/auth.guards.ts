@@ -31,6 +31,17 @@ export const enrolledGuard: CanActivateFn = async (_route, state) => {
   return auth.hasAcademyAccess() || router.createUrlTree(['/academy']);
 };
 
+/** Allows trainers and admins. Firestore rules enforce the same check on the data. */
+export const staffGuard: CanActivateFn = async (_route, state) => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  await auth.whenReady();
+  if (!auth.isLoggedIn()) {
+    return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+  }
+  return auth.isStaff() || router.createUrlTree(['/academy']);
+};
+
 /** Allows admins only. Firestore rules enforce the same check on the data. */
 export const adminGuard: CanActivateFn = async (_route, state) => {
   const auth = inject(AuthService);
