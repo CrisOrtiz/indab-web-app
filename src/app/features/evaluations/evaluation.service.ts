@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { AuthService } from '../../core/auth/auth.service';
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
+import { LoadingService } from '../../core/loading/loading.service';
 import { Evaluation } from '../../core/models/evaluation';
 import { Enrollment, UserProfile } from '../../core/models/user-profile';
 
@@ -37,18 +38,19 @@ export interface StudentOption {
 export class EvaluationService {
   private readonly firestore = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
+  private readonly loading = inject(LoadingService);
 
   private readonly evaluations = collection(this.firestore, 'evaluations');
 
   /** Every evaluation, newest window first (trainers and admins). */
   async all(): Promise<Evaluation[]> {
-    return sortByWindow(this.read(await getDocs(this.evaluations)));
+    return sortByWindow(this.read(await this.loading.track(getDocs(this.evaluations))));
   }
 
   /** The evaluations assigned to a student, newest window first. */
   async assignedTo(uid: string): Promise<Evaluation[]> {
-    const snapshot = await getDocs(
-      query(this.evaluations, where('studentIds', 'array-contains', uid)),
+    const snapshot = await this.loading.track(
+      getDocs(query(this.evaluations, where('studentIds', 'array-contains', uid))),
     );
     return sortByWindow(this.read(snapshot));
   }
@@ -79,10 +81,12 @@ export class EvaluationService {
 
   /** Students that can be assigned, by name, with their academy access. */
   async students(): Promise<StudentOption[]> {
-    const [users, enrollments] = await Promise.all([
-      getDocs(collection(this.firestore, 'users')),
-      getDocs(collection(this.firestore, 'enrollments')),
-    ]);
+    const [users, enrollments] = await this.loading.track(
+      Promise.all([
+        getDocs(collection(this.firestore, 'users')),
+        getDocs(collection(this.firestore, 'enrollments')),
+      ]),
+    );
     const access = new Map(
       enrollments.docs.map((d) => [d.id, (d.data() as Enrollment).academy === true]),
     );

@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { LoadingService } from '../../core/loading/loading.service';
 import { Candle } from '../../core/models/practice';
 
 export interface Instrument {
@@ -100,11 +101,28 @@ export function parseKlines(rows: unknown[][]): Candle[] {
 /** Loads historical candles for the replay straight from the browser. */
 @Injectable({ providedIn: 'root' })
 export class MarketDataService {
-  async loadCandles(
+  private readonly loading = inject(LoadingService);
+
+  /**
+   * Shows the page loader while the candles load, unless `background` (the replay fetching
+   * its next chunk while the student trades).
+   */
+  loadCandles(
     symbol: string,
     interval: string,
     startTime: number,
     limit = REPLAY_BARS,
+    { background = false } = {},
+  ): Promise<Candle[]> {
+    const work = this.fetchCandles(symbol, interval, startTime, limit);
+    return background ? work : this.loading.track(work);
+  }
+
+  private async fetchCandles(
+    symbol: string,
+    interval: string,
+    startTime: number,
+    limit: number,
   ): Promise<Candle[]> {
     const params = new URLSearchParams({
       symbol,

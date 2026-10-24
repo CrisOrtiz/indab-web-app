@@ -13,6 +13,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
+import { LoadingService } from '../../core/loading/loading.service';
 import { Evaluation, attemptId } from '../../core/models/evaluation';
 import { PracticeSession, PracticeTrade } from '../../core/models/practice';
 
@@ -31,6 +32,7 @@ export type SessionSummary = Pick<PracticeSession, 'balance' | 'pnl' | 'tradeCou
 @Injectable({ providedIn: 'root' })
 export class PracticeService {
   private readonly firestore = inject(FIRESTORE);
+  private readonly loading = inject(LoadingService);
 
   private readonly sessions = collection(this.firestore, 'practiceSessions');
   private trades(sessionId: string) {
@@ -139,15 +141,19 @@ export class PracticeService {
 
   /** The student's most recent sessions. */
   async mySessions(uid: string, max = 20): Promise<PracticeSession[]> {
-    const snapshot = await getDocs(
-      query(this.sessions, where('uid', '==', uid), orderBy('startedAt', 'desc'), limit(max)),
+    const snapshot = await this.loading.track(
+      getDocs(
+        query(this.sessions, where('uid', '==', uid), orderBy('startedAt', 'desc'), limit(max)),
+      ),
     );
     return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
   }
 
   /** Every attempt at an evaluation (staff, or anyone once its results are published). */
   async evaluationSessions(evaluationId: string): Promise<PracticeSession[]> {
-    const snapshot = await getDocs(query(this.sessions, where('evaluationId', '==', evaluationId)));
+    const snapshot = await this.loading.track(
+      getDocs(query(this.sessions, where('evaluationId', '==', evaluationId))),
+    );
     return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
   }
 
@@ -158,9 +164,11 @@ export class PracticeService {
     for (let i = 0; i < evaluationIds.length; i += 30) {
       chunks.push(evaluationIds.slice(i, i + 30));
     }
-    const snapshots = await Promise.all(
-      chunks.map((ids) =>
-        getDocs(query(this.sessions, where('uid', '==', uid), where('evaluationId', 'in', ids))),
+    const snapshots = await this.loading.track(
+      Promise.all(
+        chunks.map((ids) =>
+          getDocs(query(this.sessions, where('uid', '==', uid), where('evaluationId', 'in', ids))),
+        ),
       ),
     );
     return snapshots.flatMap((s) =>
@@ -170,7 +178,9 @@ export class PracticeService {
 
   /** Every student's most recent sessions (trainers and admins). */
   async allSessions(max = 200): Promise<PracticeSession[]> {
-    const snapshot = await getDocs(query(this.sessions, orderBy('startedAt', 'desc'), limit(max)));
+    const snapshot = await this.loading.track(
+      getDocs(query(this.sessions, orderBy('startedAt', 'desc'), limit(max))),
+    );
     return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
   }
 
@@ -187,7 +197,9 @@ export class PracticeService {
   }
 
   async sessionTrades(sessionId: string): Promise<PracticeTrade[]> {
-    const snapshot = await getDocs(query(this.trades(sessionId), orderBy('entryTime')));
+    const snapshot = await this.loading.track(
+      getDocs(query(this.trades(sessionId), orderBy('entryTime'))),
+    );
     // Trades logged before order types existed were market orders.
     return snapshot.docs.map(
       (d) => ({ orderType: 'market', orderPrice: null, ...d.data(), id: d.id }) as PracticeTrade,

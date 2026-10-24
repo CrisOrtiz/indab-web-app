@@ -806,7 +806,9 @@ export class Practice {
     try {
       const from = (replay.candles.at(-1)!.time + 60) * 1000;
       const limit = this.replayStart() + REPLAY_DAYS * 24 * 60 * MINUTE;
-      const more = await this.market.loadCandles(this.symbol(), '1m', from);
+      const more = await this.market.loadCandles(this.symbol(), '1m', from, REPLAY_BARS, {
+        background: true,
+      });
       const within = more.filter((c) => c.time * 1000 < limit);
       replay.extend(within, more.length < REPLAY_BARS || within.length < more.length);
     } catch {
