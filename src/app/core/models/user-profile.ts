@@ -1,6 +1,7 @@
 import { Timestamp } from 'firebase/firestore';
 
-export type UserRole = 'student' | 'admin';
+/** Trainers run practice evaluations and review practice; admins also manage users. */
+export type UserRole = 'student' | 'trainer' | 'admin';
 
 /** Stored at `users/{uid}`. Users create their own profile; only admins can change `role`. */
 export interface UserProfile {

@@ -15,12 +15,12 @@ Spanish (default), English and Brazilian Portuguese; see [Languages](#languages)
 
 ## Requirements
 
-| Tool | Version | Why |
-| --- | --- | --- |
+| Tool    | Version                                        | Why                                                                                                                      |
+| ------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Node.js | `^24.15.0` (recommended), `^22.22.3` or `>=26` | Angular 22 CLI refuses older versions (e.g. Node 22.13 fails with an `EBADENGINE` / "unsupported Node.js version" error) |
-| npm | 11 (ships with Node 24) | |
-| Java | 21+ | Firebase emulators (Auth + Firestore) |
-| Git | any recent | |
+| npm     | 11 (ships with Node 24)                        |                                                                                                                          |
+| Java    | 21+                                            | Firebase emulators (Auth + Firestore)                                                                                    |
+| Git     | any recent                                     |                                                                                                                          |
 
 Check with `node -v`, `npm -v` and `java -version`. On Windows, install Node 24 LTS from
 [nodejs.org](https://nodejs.org/) (or `nvm-windows`: `nvm install 24` then `nvm use 24`) and a JDK
@@ -74,11 +74,11 @@ npm run test:e2e     # browser tests (Playwright); starts the emulators and ng s
 npm run test:all     # all three, as CI runs them
 ```
 
-| Suite | Where | What it covers |
-| --- | --- | --- |
-| Unit | `src/**/*.spec.ts` | `AuthService`, guards, routes, login/register forms, admin page and service, header. Firebase is faked with `vi.mock`, no emulator needed. |
-| Rules | `tests/firestore.rules.test.ts` | every collection in `firestore.rules`, allowed and denied, for visitor, student, enrolled, owner and admin |
-| End-to-end | `e2e/*.spec.ts` | the real app in Chromium against the Auth + Firestore emulators: register, login, guards, sign-out, admin grants access and promotes users, a practice replay is logged, reviewed and deleted (market data mocked) |
+| Suite      | Where                           | What it covers                                                                                                                                                                                                     |
+| ---------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unit       | `src/**/*.spec.ts`              | `AuthService`, guards, routes, login/register forms, admin page and service, header. Firebase is faked with `vi.mock`, no emulator needed.                                                                         |
+| Rules      | `tests/firestore.rules.test.ts` | every collection in `firestore.rules`, allowed and denied, for visitor, student, enrolled, owner and admin                                                                                                         |
+| End-to-end | `e2e/*.spec.ts`                 | the real app in Chromium against the Auth + Firestore emulators: register, login, guards, sign-out, admin grants access and promotes users, a practice replay is logged, reviewed and deleted (market data mocked) |
 
 Before the first `npm run test:e2e`, install the browser once with `npx playwright install chromium`.
 The e2e tests wipe the emulator data on every test, so stop `npm run emulators` before running them.
@@ -165,39 +165,44 @@ account > set `role` to `admin`.
 Never commit service account keys (`*-firebase-adminsdk-*.json`, `service-account*.json`) or
 `.env` files; they are git-ignored. For CI or automated deploys, pass the key through an
 environment variable / secret and point `GOOGLE_APPLICATION_CREDENTIALS` at a temporary file.
-The service account needs the *Firebase Admin* and *Service Usage Consumer* roles for `firebase deploy`.
+The service account needs the _Firebase Admin_ and _Service Usage Consumer_ roles for `firebase deploy`.
 
 ## Access model
 
-| Collection | Who can read | Who can write |
-| --- | --- | --- |
-| `users/{uid}` | owner, admins | owner creates as `student` and edits `displayName`; admins change `role` (not their own) |
-| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, admins | admins |
-| `courses/{id}` | everyone if `published`, admins | admins |
-| `courses/{id}/lessons/{id}` | users enrolled in that course or with academy access | admins |
-| `materials/{id}` | users with academy access (`enrollments/{uid}.academy == true`), admins | admins |
-| `investors/{uid}` (Eleva) | owner, admins | admins |
-| `practiceSessions/{id}` (chart replay) | owner, admins | owner with academy access creates it and updates its summary until `finished`; admins delete |
-| `practiceSessions/{id}/trades/{id}` | session owner, admins | session owner opens trades while the session is active and closes each once (entry never editable); admins delete |
+| Collection                                                       | Who can read                                                                                                                                                             | Who can write                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users/{uid}`                                                    | owner, trainers, admins                                                                                                                                                  | owner creates as `student` and edits `displayName`; admins change `role` to `student`, `trainer` or `admin` (not their own)                                                                                                                                                      |
+| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, trainers, admins                                                                                                                                                  | admins                                                                                                                                                                                                                                                                           |
+| `courses/{id}`                                                   | everyone if `published`, admins                                                                                                                                          | admins                                                                                                                                                                                                                                                                           |
+| `courses/{id}/lessons/{id}`                                      | users enrolled in that course or with academy access                                                                                                                     | admins                                                                                                                                                                                                                                                                           |
+| `materials/{id}`                                                 | users with academy access (`enrollments/{uid}.academy == true`), admins                                                                                                  | admins                                                                                                                                                                                                                                                                           |
+| `investors/{uid}` (Eleva)                                        | owner, admins                                                                                                                                                            | admins                                                                                                                                                                                                                                                                           |
+| `evaluations/{id}` (timed practice evaluation)                   | trainers, admins, assigned students                                                                                                                                      | trainers and admins (shape validated)                                                                                                                                                                                                                                            |
+| `practiceSessions/{id}` (chart replay)                           | owner, trainers, admins; free sessions (`evaluationId == null`) and attempts at evaluations with published results also to everyone with academy access, for the ranking | owner with academy access creates it and updates its summary until `finished`; an evaluation attempt has the id `{evaluationId}_{uid}` (one per student), must start inside the window on the evaluation's settings, and is locked 2 minutes after its time limit; admins delete |
+| `practiceSessions/{id}/trades/{id}`                              | session owner, trainers, admins                                                                                                                                          | session owner opens trades while the session is active (and, in an evaluation, before the time is up) and closes each once (entry never editable); admins delete                                                                                                                 |
 
 A user gets access to the academy and the material repository when an admin turns on
 "Acceso a la academia" for them in `/admin` (which writes `enrollments/{uid}` with
 `academy: true`). Admins also promote or demote other users there. The first admin has to be
 set by hand: in the Firebase console, open `users/{uid}` for that account and change `role` to
-`admin`. Admins cannot remove their own admin role, so there is always at least one. The route guards mirror these checks in the UI, but
+`admin`. Admins cannot remove their own admin role, so there is always at least one.
+Trainers (role `trainer`, appointed by an admin) have academy access, set up practice evaluations
+and review practice, but cannot change roles, academy access or delete practice sessions. The route guards mirror these checks in the UI, but
 the rules are what actually protect the data. Anything not listed is denied.
 
 ## Routes
 
-| Path | Access |
-| --- | --- |
-| `/` landing, `/eleva` | public |
-| `/login`, `/register` | signed-out visitors |
-| `/academy` | signed-in users (shows "pending" until enrolled) |
-| `/academy/material` | enrolled users (learning material, opened from the academy; `/repository` redirects here) |
-| `/academy/practice` | enrolled users (chart-replay trading practice) |
-| `/admin` | admins (users, roles, academy access) |
-| `/admin/practice` | admins (review students' practice sessions on the chart, delete them) |
+| Path                  | Access                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------- |
+| `/` landing, `/eleva` | public                                                                                    |
+| `/login`, `/register` | signed-out visitors                                                                       |
+| `/academy`            | signed-in users (shows "pending" until enrolled)                                          |
+| `/academy/material`   | enrolled users (learning material, opened from the academy; `/repository` redirects here) |
+| `/academy/practice`   | enrolled users (chart-replay trading practice: free practice and assigned evaluations)    |
+| `/academy/ranking`    | enrolled users (free-practice ranking and published evaluation rankings)                  |
+| `/admin`              | trainers and admins (users, roles and academy access for admins only)                     |
+| `/admin/practice`     | trainers and admins (review students' practice sessions on the chart; admins delete them) |
+| `/admin/evaluations`  | trainers and admins (set up timed evaluations, see and publish their results)             |
 
 ## Languages
 
@@ -266,25 +271,42 @@ Sessions and orders are written to Firestore as they happen; admins review them 
 `/admin/practice`, where each session's trades are drawn on its candles (fetched again from
 Binance) and a session can be deleted with its trades.
 
+### Evaluations and ranking
+
+Free practice is open at any time and builds each student's record. Trainers and admins also set
+up **evaluations** at `/admin/evaluations`: a market and replay start shared by every student,
+whether dates are hidden, a time limit (5 to 600 minutes), a window to start in, and the
+assigned students. A student sees their evaluations above the practice setup and takes each one
+once; a countdown runs and the attempt finishes by itself when the time is up (leaving the page
+also ends it). The rules enforce the single attempt, the window, the settings and the time limit.
+Results stay with the staff until a trainer publishes them.
+
+`/academy/ranking` ranks free practice by the total P/L of the sessions finished in the last 7,
+30 or 365 days (ties go to the better average return per session), and each published
+evaluation by the attempt's P/L (fewer trades first on a tie).
+
 The chart is TradingView's [lightweight-charts](https://github.com/tradingview/lightweight-charts)
 (Apache-2.0; its logo on the chart is the required attribution). P/L figures are computed in the
-student's browser, so treat them as practice data, not as graded results.
+student's browser, so treat them as practice data, not as graded results. This also holds for
+evaluations and the ranking: a determined student could write a made-up P/L from the browser's
+developer tools, or look up the replay's dates; grading that cannot be gamed needs the replay
+and P/L to run on a server (Cloud Functions, which need the Blaze plan).
 
 ## Scripts
 
-| Command | What it does |
-| --- | --- |
-| `npm start` | dev server (`ng serve`) at http://localhost:4200 |
-| `npm run emulators` | Auth + Firestore emulators with the Emulator UI |
-| `npm run build` | production build to `dist/indab-web-app/browser` |
-| `npm run watch` | development build in watch mode |
-| `npm test` | unit tests (Vitest), watch mode |
-| `npm run test:ci` | unit tests once, with coverage |
-| `npm run test:rules` | Firestore security rules tests against the emulator |
-| `npm run test:e2e` | end-to-end browser tests (Playwright) against the emulators |
-| `npm run test:all` | all test suites |
-| `npm run deploy:rules` | deploy Firestore rules and indexes |
-| `npm run deploy` | build and deploy to Firebase Hosting |
+| Command                | What it does                                                |
+| ---------------------- | ----------------------------------------------------------- |
+| `npm start`            | dev server (`ng serve`) at http://localhost:4200            |
+| `npm run emulators`    | Auth + Firestore emulators with the Emulator UI             |
+| `npm run build`        | production build to `dist/indab-web-app/browser`            |
+| `npm run watch`        | development build in watch mode                             |
+| `npm test`             | unit tests (Vitest), watch mode                             |
+| `npm run test:ci`      | unit tests once, with coverage                              |
+| `npm run test:rules`   | Firestore security rules tests against the emulator         |
+| `npm run test:e2e`     | end-to-end browser tests (Playwright) against the emulators |
+| `npm run test:all`     | all test suites                                             |
+| `npm run deploy:rules` | deploy Firestore rules and indexes                          |
+| `npm run deploy`       | build and deploy to Firebase Hosting                        |
 
 ## Project structure
 

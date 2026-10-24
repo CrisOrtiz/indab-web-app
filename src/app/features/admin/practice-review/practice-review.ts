@@ -1,6 +1,7 @@
 import { DecimalPipe, formatDate } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { AuthService } from '../../../core/auth/auth.service';
 import { I18n } from '../../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../../core/i18n/local-date.pipe';
 import { Candle, PracticeSession, PracticeTrade } from '../../../core/models/practice';
@@ -12,7 +13,7 @@ import { ReplayChart } from '../../practice/replay-chart';
 import { SessionStatsPanel } from '../../practice/session-stats';
 
 /**
- * Admin view of every student's chart-replay sessions: the trades logged in each, drawn on the
+ * Trainer and admin view of every student's chart-replay sessions: the trades logged in each, drawn on the
  * same candles the student practised on, and a way to delete a session.
  */
 @Component({
@@ -26,6 +27,8 @@ export class PracticeReview {
   private readonly market = inject(MarketDataService);
 
   protected readonly i18n = inject(I18n);
+  /** Trainers review; only admins delete. */
+  protected readonly auth = inject(AuthService);
 
   protected readonly priceDigits = priceDigits;
   protected readonly lotSize = LOT_SIZE;

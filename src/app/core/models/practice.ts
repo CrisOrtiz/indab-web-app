@@ -36,6 +36,13 @@ export interface PracticeSession {
   status: 'active' | 'finished';
   startedAt: Timestamp;
   endedAt?: Timestamp;
+  /**
+   * The evaluation this session is an attempt at (its id is `{evaluationId}_{uid}`), or null
+   * for free practice. Sessions logged before evaluations existed have no value.
+   */
+  evaluationId?: string | null;
+  /** An evaluation attempt's time limit, copied from the evaluation. */
+  durationMinutes?: number;
 }
 
 /**

@@ -43,21 +43,25 @@ otherwise create a feature service.
 
 ## Access model
 
-| Collection | Read | Write |
-| --- | --- | --- |
-| `users/{uid}` | owner, admins | owner creates as `student`, edits `displayName`; admins change `role` of others only |
-| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, admins | admins (shape validated) |
-| `courses/{id}` | everyone if `published`, admins | admins |
-| `courses/{id}/lessons/{id}` | enrolled in course or academy access | admins |
-| `materials/{id}` | academy access | admins |
-| `investors/{uid}` (Eleva) | owner, admins | admins |
-| `practiceSessions/{id}` + `/trades/{id}` | owner, admins | owner (academy access) while active; trades closed once; admins delete |
+| Collection                                                       | Read                                                                                                   | Write                                                                                                                                                     |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users/{uid}`                                                    | owner, staff                                                                                           | owner creates as `student`, edits `displayName`; admins change `role` (`student`/`trainer`/`admin`) of others only                                        |
+| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, staff                                                                                           | admins (shape validated)                                                                                                                                  |
+| `courses/{id}`                                                   | everyone if `published`, admins                                                                        | admins                                                                                                                                                    |
+| `courses/{id}/lessons/{id}`                                      | enrolled in course or academy access                                                                   | admins                                                                                                                                                    |
+| `materials/{id}`                                                 | academy access                                                                                         | admins                                                                                                                                                    |
+| `investors/{uid}` (Eleva)                                        | owner, admins                                                                                          | admins                                                                                                                                                    |
+| `evaluations/{id}`                                               | staff, assigned students                                                                               | staff (shape validated)                                                                                                                                   |
+| `practiceSessions/{id}` + `/trades/{id}`                         | owner, staff; session summaries of free practice and published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
 
-Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`,
-`hasAcademyAccess()`, `isEnrolledIn(courseId)`. Everything not matched is denied.
+Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`, `isStaff()`
+(trainers and admins), `hasAcademyAccess()` (staff count as having it), `isEnrolledIn(courseId)`.
+Everything not matched is denied. Trainers run evaluations and review practice; anything about
+users, access or deleting practice stays admin-only.
 
 Guards in `src/app/core/auth/auth.guards.ts`: `authGuard` (signed in), `guestGuard`
-(signed out), `enrolledGuard` (academy access), `adminGuard` (admin role). Guards are UX only; the rules are the security.
+(signed out), `enrolledGuard` (academy access), `staffGuard` (trainer or admin), `adminGuard` (admin role).
+`AuthService.isStaff()` mirrors `isStaff()`. Guards are UX only; the rules are the security.
 Users can never grant themselves a role, enrollment or investor data from the client.
 
 ## Layout and conventions
@@ -156,6 +160,16 @@ Module notes:
   wait for a data source licensed for display to students. Never bundle or serve data whose
   license is personal use only (e.g. Dukascopy). A new timeframe must also be added to the
   `interval` list in `firestore.rules`.
+- **Evaluations and ranking (built)**: `evaluations/{id}` (`core/models/evaluation.ts`,
+  `features/evaluations/evaluation.service.ts`) are set up at `/admin/evaluations`
+  (`features/admin/evaluations/`). Students see theirs above the practice setup and take each
+  once; the attempt is a practice session with id `{evaluationId}_{uid}`, `evaluationId` and
+  `durationMinutes`, and the page counts down and finishes it. Every new free session stores
+  `evaluationId: null`, which is what the ranking query (and its composite index) filters on;
+  sessions logged before that do not appear in the ranking. `/academy/ranking`
+  (`features/ranking/`, pure ranking maths in `standings.ts`) ranks free practice by total P/L
+  over a period and published evaluations by attempt P/L. Students see an evaluation's ranking
+  only after staff publish it. P/L is client-computed: not a trusted grade.
 - **Eleva (`/eleva`, investor area)**: the public page stays unguarded. Investor data lives in
   `investors/{uid}` and subcollections (e.g. `investors/{uid}/statements/{month}`), admin-written,
   owner-read. Financial figures are never computed or written by the client.
@@ -163,6 +177,8 @@ Module notes:
   component (live `users` + `enrollments` listeners that stop on leave); search/filter is
   client-side in `admin-users.ts` (fine for hundreds of users; move to a paged query if it grows).
   Admins change roles (rules block changing their own) and toggle `enrollments/{uid}.academy`.
+  Trainers open `/admin` too but only see links to evaluations and the practice review
+  (`AdminService` opens no listeners for them).
   New admin tools (courses, materials, investors) can be added as sections of this page.
   Any admin UI must still rely on rules (`isAdmin()`); never trust a client flag.
 

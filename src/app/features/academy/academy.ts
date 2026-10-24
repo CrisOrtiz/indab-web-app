@@ -16,6 +16,7 @@ import { I18n } from '../../core/i18n/i18n.service';
         <div class="actions">
           <a routerLink="/academy/material" class="btn">{{ t.material }}</a>
           <a routerLink="/academy/practice" class="btn btn-outline">{{ t.practice }}</a>
+          <a routerLink="/academy/ranking" class="btn btn-outline">{{ t.ranking }}</a>
         </div>
       } @else {
         <p>{{ t.pending }}</p>

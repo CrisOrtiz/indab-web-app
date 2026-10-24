@@ -1,0 +1,136 @@
+import { Page, expect, test } from '@playwright/test';
+import { createUser, listDocuments, resetEmulators, setDocument } from './emulators';
+import { nav, signIn, signOut } from './helpers';
+import { mockMarket } from './market';
+
+let joseUid: string;
+
+test.beforeEach(async ({ page }) => {
+  await resetEmulators();
+  await createUser('Tomás Trainer', 'trainer@indab.test', { role: 'trainer' });
+  joseUid = await createUser('José Pérez', 'jose@indab.test', { academy: true });
+  await createUser('Luis Díaz', 'luis@indab.test', { academy: true });
+  await mockMarket(page);
+});
+
+const openEvaluations = async (page: Page) => {
+  await signIn(page, 'trainer@indab.test');
+  await nav(page).getByRole('link', { name: 'Administración' }).click();
+  await page.getByRole('link', { name: 'Evaluaciones de práctica' }).click();
+  await expect(page).toHaveURL('/admin/evaluations');
+};
+
+test('a trainer runs an evaluation and the student takes it once, on the clock', async ({
+  page,
+}) => {
+  // Trainers see the evaluations and the practice review, never the user management.
+  await openEvaluations(page);
+  await page.goBack();
+  await expect(page.getByText('Como entrenador puedes crear evaluaciones')).toBeVisible();
+  await expect(page.getByRole('table')).toHaveCount(0);
+  await page.getByRole('link', { name: 'Evaluaciones de práctica' }).click();
+
+  await page.getByRole('button', { name: 'Nueva evaluación' }).click();
+  await page.getByLabel('Nombre').fill('Evaluación semanal');
+  await page.getByLabel('Tiempo límite (minutos)').fill('20');
+  await page.getByRole('checkbox', { name: /José Pérez/ }).check();
+  await page.getByRole('button', { name: 'Guardar evaluación' }).click();
+  await expect(page.getByRole('status')).toContainText('Se guardó la evaluación');
+  await expect(page.getByRole('heading', { name: /Evaluación semanal/ })).toContainText('Abierta');
+  const [evaluation] = await listDocuments('evaluations');
+  expect(evaluation).toMatchObject({ durationMinutes: 20, studentIds: [joseUid] });
+
+  // Luis is not assigned: he sees no evaluation.
+  await signOut(page);
+  await signIn(page, 'luis@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await expect(page.getByRole('heading', { name: 'Comenzar práctica' })).toHaveCount(0);
+  await expect(page.getByText('Tus evaluaciones')).toHaveCount(0);
+
+  // José takes it: one attempt, with the time counting down.
+  await signOut(page);
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await expect(page.getByText('Tus evaluaciones')).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Comenzar evaluación' }).click();
+  await expect(page.getByText('Evaluación: Evaluación semanal')).toBeVisible();
+  await expect(page.getByLabel('Tiempo restante')).toContainText(/Quedan (19|20):\d\d/);
+  await page.getByRole('spinbutton', { name: /Lotes \(tamaño/ }).fill('0.01');
+  await page.getByRole('button', { name: 'Comprar 0.01 PAXGUSDT MERCADO' }).click();
+  await page.getByRole('button', { name: 'Siguiente vela' }).click();
+  await expect(page.locator('.market .price')).toHaveText('101.000');
+  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
+  await page.getByRole('button', { name: 'Nueva práctica' }).click();
+  await expect(page.locator('.evaluation')).toContainText('Presentada');
+  await expect(page.getByRole('button', { name: 'Comenzar evaluación' })).toHaveCount(0);
+
+  const sessions = await listDocuments('practiceSessions');
+  expect(sessions).toEqual([
+    expect.objectContaining({
+      id: `${evaluation['id']}_${joseUid}`,
+      evaluationId: evaluation['id'],
+      durationMinutes: 20,
+      status: 'finished',
+      pnl: 1,
+    }),
+  ]);
+
+  // Results stay with the staff until the trainer publishes them.
+  await page.goto('/academy/ranking');
+  await page.getByRole('button', { name: 'Evaluaciones' }).click();
+  await expect(
+    page.getByText('Todavía no hay resultados de evaluaciones publicados.'),
+  ).toBeVisible();
+
+  await signOut(page);
+  await openEvaluations(page);
+  await page.getByRole('button', { name: 'Ver resultados' }).click();
+  const row = page.locator('.results tbody tr').first();
+  await expect(row).toContainText('José Pérez');
+  await expect(row).toContainText('1.00');
+  await page.getByRole('button', { name: 'Publicar resultados' }).click();
+  await expect(page.getByRole('status')).toContainText('Los estudiantes ya ven el ranking');
+
+  await signOut(page);
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Ranking de práctica' }).click();
+  await expect(page).toHaveURL('/academy/ranking');
+  await page.getByRole('button', { name: 'Evaluaciones' }).click();
+  await expect(page.getByRole('row', { name: /José Pérez Tú/ })).toContainText('1.00');
+});
+
+test('the free-practice ranking lists every student with academy access', async ({ page }) => {
+  const luisUid = (await listDocuments('users')).find((u) => u['email'] === 'luis@indab.test')![
+    'id'
+  ];
+  const session = (uid: string, userName: string, pnl: number) => ({
+    uid,
+    userName,
+    symbol: 'PAXGUSDT',
+    interval: '15m',
+    replayStart: 1_700_000_000_000,
+    startingBalance: 200,
+    balance: 200 + pnl,
+    pnl,
+    tradeCount: 4,
+    status: 'finished',
+    startedAt: new Date(),
+    endedAt: new Date(),
+    evaluationId: null,
+  });
+  await setDocument('practiceSessions/a', session(joseUid, 'José Pérez', 12.5));
+  await setDocument('practiceSessions/b', session(luisUid as string, 'Luis Díaz', 30));
+  await setDocument('practiceSessions/c', session(joseUid, 'José Pérez', -2.5));
+
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Ranking de práctica' }).click();
+  const rows = page.locator('tbody tr');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText('Luis Díaz');
+  await expect(rows.nth(0)).toContainText('30.00');
+  await expect(rows.nth(1)).toContainText('José Pérez');
+  await expect(rows.nth(1)).toContainText('10.00');
+  await expect(rows.nth(1)).toContainText('50%');
+});

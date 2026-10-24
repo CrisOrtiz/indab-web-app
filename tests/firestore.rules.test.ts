@@ -36,6 +36,7 @@ beforeEach(async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await setDoc(doc(db, 'users/admin'), { uid: 'admin', role: 'admin' });
+    await setDoc(doc(db, 'users/trainer'), { uid: 'trainer', role: 'trainer' });
     await setDoc(doc(db, 'users/student'), { uid: 'student', role: 'student', displayName: 'Ana' });
     await setDoc(doc(db, 'enrollments/enrolled'), { academy: true, courses: [] });
     await setDoc(doc(db, 'enrollments/partial'), { academy: false, courses: ['forex-101'] });
@@ -278,6 +279,7 @@ describe('trading practice', () => {
     tradeCount: 0,
     status: 'active',
     startedAt: serverTimestamp(),
+    evaluationId: null,
     ...extra,
   });
   const trade = (uid: string, extra: Record<string, unknown> = {}) => ({
@@ -368,10 +370,12 @@ describe('trading practice', () => {
     }
   });
 
-  it('keeps sessions private to their owner and admins', async () => {
+  it('shows sessions to their owner, staff and, for the ranking, academy members', async () => {
     await assertSucceeds(getDoc(sessionRef('enrolled')));
     await assertSucceeds(getDoc(sessionRef('admin')));
-    await assertFails(getDoc(sessionRef('other')));
+    await assertSucceeds(getDoc(sessionRef('other')));
+    await assertFails(getDoc(sessionRef('student')));
+    await assertFails(getDoc(sessionRef('partial')));
     await assertFails(getDoc(sessionRef(null)));
 
     const sessions = (uid: string) => collection(as(uid), 'practiceSessions');
@@ -380,7 +384,7 @@ describe('trading practice', () => {
         query(sessions('enrolled'), where('uid', '==', 'enrolled'), orderBy('startedAt', 'desc')),
       ),
     );
-    await assertFails(getDocs(sessions('enrolled')));
+    await assertFails(getDocs(sessions('student')));
     await assertSucceeds(getDocs(query(sessions('admin'), orderBy('startedAt', 'desc'))));
   });
 
@@ -521,6 +525,326 @@ describe('trading practice', () => {
   it('closes a trade on a margin stop out', async () => {
     await assertSucceeds(setDoc(tradeRef('enrolled', 't2'), trade('enrolled')));
     await assertSucceeds(updateDoc(tradeRef('enrolled', 't2'), close({ exitReason: 'stopOut' })));
+  });
+});
+
+describe('trainers', () => {
+  it('can be appointed by admins only', async () => {
+    await assertSucceeds(updateDoc(doc(as('admin'), 'users/student'), { role: 'trainer' }));
+    await assertFails(updateDoc(doc(as('trainer'), 'users/enrolled'), { role: 'trainer' }));
+    await assertFails(updateDoc(doc(as('trainer'), 'users/trainer'), { role: 'admin' }));
+    await assertFails(updateDoc(doc(as('student'), 'users/student'), { role: 'admin' }));
+    await assertFails(updateDoc(doc(as('enrolled'), 'users/student'), { role: 'trainer' }));
+  });
+
+  it('read users and enrollments but cannot change access', async () => {
+    await assertSucceeds(getDocs(collection(as('trainer'), 'users')));
+    await assertSucceeds(getDocs(collection(as('trainer'), 'enrollments')));
+    await assertFails(
+      setDoc(doc(as('trainer'), 'enrollments/student'), {
+        academy: true,
+        courses: [],
+        updatedBy: 'trainer',
+      }),
+    );
+    await assertFails(deleteDoc(doc(as('trainer'), 'users/student')));
+    await assertFails(setDoc(doc(as('trainer'), 'materials/m2'), { title: 'x' }));
+  });
+
+  it('have academy access', async () => {
+    await assertSucceeds(getDoc(doc(as('trainer'), 'materials/m1')));
+  });
+});
+
+describe('evaluations', () => {
+  const hour = 60 * 60 * 1000;
+  const evaluation = (extra: Record<string, unknown> = {}) => ({
+    title: 'Evaluación oro',
+    description: '',
+    symbol: 'PAXGUSDT',
+    replayStart: 1_620_000_000_000,
+    hideDates: true,
+    startingBalance: 200,
+    durationMinutes: 30,
+    opensAt: new Date(Date.now() - hour),
+    closesAt: new Date(Date.now() + hour),
+    studentIds: ['enrolled'],
+    resultsPublished: false,
+    createdBy: 'trainer',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const attempt = (uid: string, extra: Record<string, unknown> = {}) => ({
+    uid,
+    userName: 'Ana',
+    symbol: 'PAXGUSDT',
+    interval: '15m',
+    replayStart: 1_620_000_000_000,
+    startingBalance: 200,
+    balance: 200,
+    pnl: 0,
+    tradeCount: 0,
+    status: 'active',
+    startedAt: serverTimestamp(),
+    evaluationId: 'e1',
+    durationMinutes: 30,
+    ...extra,
+  });
+  const trade = {
+    uid: 'enrolled',
+    side: 'long',
+    orderType: 'market',
+    orderPrice: null,
+    placedTime: 1_620_000_000,
+    quantity: 1,
+    entryPrice: 1800,
+    entryTime: 1_620_000_000,
+    stopLoss: null,
+    takeProfit: null,
+    status: 'open',
+    openedAt: serverTimestamp(),
+  };
+  const evalRef = (uid: string | null, id = 'e1') => doc(as(uid), `evaluations/${id}`);
+  const attemptRef = (uid: string | null, id = 'e1_enrolled') =>
+    doc(as(uid), `practiceSessions/${id}`);
+  const seed = (path: string, data: Record<string, unknown>) =>
+    env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), path), data));
+  const seeded = (data: Record<string, unknown>) => ({
+    ...data,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  beforeEach(async () => {
+    await seed('enrollments/other', { academy: true, courses: [] });
+    await seed('evaluations/e1', seeded(evaluation()));
+  });
+
+  it('are set up by trainers and admins only', async () => {
+    await assertSucceeds(setDoc(evalRef('trainer', 'e2'), evaluation()));
+    await assertSucceeds(setDoc(evalRef('admin', 'e3'), evaluation({ createdBy: 'admin' })));
+    await assertFails(setDoc(evalRef('enrolled', 'e4'), evaluation({ createdBy: 'enrolled' })));
+    await assertFails(setDoc(evalRef(null, 'e4'), evaluation()));
+    await assertFails(setDoc(evalRef('trainer', 'e4'), evaluation({ createdBy: 'admin' })));
+    await assertSucceeds(deleteDoc(evalRef('trainer', 'e2')));
+    await assertFails(deleteDoc(evalRef('enrolled')));
+  });
+
+  it('validates an evaluation', async () => {
+    const create = (extra: Record<string, unknown>) =>
+      setDoc(evalRef('trainer', 'e5'), evaluation(extra));
+    await assertFails(create({ title: '' }));
+    await assertFails(create({ durationMinutes: 2 }));
+    await assertFails(create({ durationMinutes: 30.5 }));
+    await assertFails(create({ closesAt: new Date(Date.now() - 2 * hour) }));
+    await assertFails(create({ studentIds: 'enrolled' }));
+    await assertFails(create({ grade: 'A' }));
+  });
+
+  it('keep their author when edited', async () => {
+    await assertSucceeds(
+      updateDoc(evalRef('admin'), { title: 'Nuevo', updatedAt: serverTimestamp() }),
+    );
+    await assertFails(
+      updateDoc(evalRef('admin'), { createdBy: 'admin', updatedAt: serverTimestamp() }),
+    );
+    await assertFails(updateDoc(evalRef('enrolled'), { title: 'x', updatedAt: serverTimestamp() }));
+  });
+
+  it('are visible to their students and staff', async () => {
+    await assertSucceeds(getDoc(evalRef('enrolled')));
+    await assertSucceeds(getDoc(evalRef('trainer')));
+    await assertFails(getDoc(evalRef('other')));
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(as('enrolled'), 'evaluations'),
+          where('studentIds', 'array-contains', 'enrolled'),
+        ),
+      ),
+    );
+    await assertFails(getDocs(collection(as('enrolled'), 'evaluations')));
+    await assertSucceeds(getDocs(collection(as('trainer'), 'evaluations')));
+  });
+
+  it('take one attempt per assigned student, inside the window', async () => {
+    await assertFails(setDoc(attemptRef('enrolled', 'other-id'), attempt('enrolled')));
+    await assertFails(setDoc(attemptRef('other', 'e1_other'), attempt('other')));
+    await assertFails(setDoc(attemptRef('enrolled'), attempt('enrolled', { symbol: 'BTCUSDT' })));
+    await assertFails(setDoc(attemptRef('enrolled'), attempt('enrolled', { replayStart: 1 })));
+    await assertFails(
+      setDoc(attemptRef('enrolled'), attempt('enrolled', { durationMinutes: 600 })),
+    );
+    await assertFails(
+      setDoc(attemptRef('enrolled'), attempt('enrolled', { startingBalance: 100000 })),
+    );
+    await assertFails(
+      setDoc(attemptRef('enrolled', 'e9_enrolled'), attempt('enrolled', { evaluationId: 'e9' })),
+    );
+    await assertSucceeds(setDoc(attemptRef('enrolled'), attempt('enrolled')));
+    // Starting again would overwrite the first attempt.
+    await assertFails(setDoc(attemptRef('enrolled'), attempt('enrolled')));
+  });
+
+  it('cannot be started outside the window', async () => {
+    await seed(
+      'evaluations/later',
+      seeded(
+        evaluation({
+          opensAt: new Date(Date.now() + hour),
+          closesAt: new Date(Date.now() + 2 * hour),
+        }),
+      ),
+    );
+    await seed(
+      'evaluations/past',
+      seeded(
+        evaluation({
+          opensAt: new Date(Date.now() - 2 * hour),
+          closesAt: new Date(Date.now() - hour),
+        }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        attemptRef('enrolled', 'later_enrolled'),
+        attempt('enrolled', { evaluationId: 'later' }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        attemptRef('enrolled', 'past_enrolled'),
+        attempt('enrolled', { evaluationId: 'past' }),
+      ),
+    );
+  });
+
+  it('keeps free sessions free of a time limit', async () => {
+    const free = attempt('enrolled', { evaluationId: null, durationMinutes: 30 });
+    await assertFails(setDoc(attemptRef('enrolled', 'free'), free));
+  });
+
+  it('stop taking orders when the time is up', async () => {
+    await seed('practiceSessions/e1_enrolled', {
+      ...attempt('enrolled'),
+      startedAt: new Date(Date.now() - 31 * 60 * 1000),
+    });
+    await seed('practiceSessions/e1_enrolled/trades/t1', { ...trade, openedAt: new Date() });
+    const tradeRef = (id: string) =>
+      doc(as('enrolled'), `practiceSessions/e1_enrolled/trades/${id}`);
+    await assertFails(setDoc(tradeRef('t2'), trade));
+    // Two more minutes to close what is open and finish.
+    await assertSucceeds(
+      updateDoc(tradeRef('t1'), {
+        status: 'closed',
+        exitPrice: 1810,
+        exitTime: 1_620_001_800,
+        exitReason: 'sessionEnd',
+        pnl: 10,
+        closedAt: serverTimestamp(),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(attemptRef('enrolled'), {
+        balance: 210,
+        pnl: 10,
+        tradeCount: 1,
+        status: 'finished',
+        endedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('lock an attempt after its grace period', async () => {
+    await seed('practiceSessions/e1_enrolled', {
+      ...attempt('enrolled'),
+      startedAt: new Date(Date.now() - 33 * 60 * 1000),
+    });
+    await assertFails(updateDoc(attemptRef('enrolled'), { pnl: 500, balance: 700 }));
+  });
+
+  it('take orders while the time runs', async () => {
+    await assertSucceeds(setDoc(attemptRef('enrolled'), attempt('enrolled')));
+    await assertSucceeds(
+      setDoc(doc(as('enrolled'), 'practiceSessions/e1_enrolled/trades/t1'), trade),
+    );
+  });
+
+  it('let trainers review sessions and trades, but only admins delete them', async () => {
+    await seed('practiceSessions/e1_enrolled', { ...attempt('enrolled'), startedAt: new Date() });
+    await seed('practiceSessions/e1_enrolled/trades/t1', { ...trade, openedAt: new Date() });
+    await assertSucceeds(getDocs(collection(as('trainer'), 'practiceSessions')));
+    await assertSucceeds(getDocs(collection(as('trainer'), 'practiceSessions/e1_enrolled/trades')));
+    await assertFails(deleteDoc(attemptRef('trainer')));
+    await assertFails(deleteDoc(doc(as('trainer'), 'practiceSessions/e1_enrolled/trades/t1')));
+  });
+});
+
+describe('ranking', () => {
+  const finished = (uid: string, extra: Record<string, unknown> = {}) => ({
+    uid,
+    userName: uid,
+    symbol: 'PAXGUSDT',
+    interval: '15m',
+    replayStart: 1_620_000_000_000,
+    startingBalance: 200,
+    balance: 220,
+    pnl: 20,
+    tradeCount: 3,
+    status: 'finished',
+    startedAt: new Date(),
+    endedAt: new Date(),
+    evaluationId: null,
+    ...extra,
+  });
+  const seed = (path: string, data: Record<string, unknown>) =>
+    env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), path), data));
+  const sessions = (uid: string | null) => collection(as(uid), 'practiceSessions');
+  const evaluation = (resultsPublished: boolean) => ({
+    title: 'Evaluación',
+    studentIds: ['enrolled', 'other'],
+    resultsPublished,
+  });
+
+  beforeEach(async () => {
+    await seed('enrollments/other', { academy: true, courses: [] });
+    await seed('practiceSessions/f1', finished('enrolled'));
+    await seed('practiceSessions/e1_enrolled', finished('enrolled', { evaluationId: 'e1' }));
+    await seed('practiceSessions/e2_enrolled', finished('enrolled', { evaluationId: 'e2' }));
+    await seed('evaluations/e1', evaluation(true));
+    await seed('evaluations/e2', evaluation(false));
+  });
+
+  it('lists free sessions to everyone with academy access', async () => {
+    const free = (uid: string | null) =>
+      getDocs(
+        query(
+          sessions(uid),
+          where('evaluationId', '==', null),
+          where('status', '==', 'finished'),
+          where('endedAt', '>=', new Date(0)),
+          orderBy('endedAt', 'desc'),
+        ),
+      );
+    await assertSucceeds(free('other'));
+    await assertSucceeds(free('trainer'));
+    await assertFails(free('student'));
+    await assertFails(free('partial'));
+    await assertFails(free(null));
+    await assertSucceeds(getDoc(doc(as('other'), 'practiceSessions/f1')));
+  });
+
+  it('shows evaluation results to others once published', async () => {
+    const results = (uid: string, id: string) =>
+      getDocs(query(sessions(uid), where('evaluationId', '==', id)));
+    await assertSucceeds(getDoc(doc(as('other'), 'practiceSessions/e1_enrolled')));
+    await assertFails(getDoc(doc(as('other'), 'practiceSessions/e2_enrolled')));
+    await assertSucceeds(results('other', 'e1'));
+    await assertFails(results('other', 'e2'));
+    await assertSucceeds(results('trainer', 'e2'));
+    // Trades stay private either way.
+    await assertFails(getDocs(collection(as('other'), 'practiceSessions/e1_enrolled/trades')));
   });
 });
 

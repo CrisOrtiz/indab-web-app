@@ -5,8 +5,10 @@ import { vi } from 'vitest';
 import { AuthService } from '../../core/auth/auth.service';
 import { Candle } from '../../core/models/practice';
 import { HISTORY_BARS, MarketDataService } from './market-data.service';
-import { Practice } from './practice';
+import { Practice, formatCountdown } from './practice';
 import { PracticeService } from './practice.service';
+import { EvaluationService } from '../evaluations/evaluation.service';
+import { Evaluation } from '../../core/models/evaluation';
 import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
 
 // The real chart needs a canvas; the page only passes it data.
@@ -63,7 +65,9 @@ describe('Practice page', () => {
     updateSummary: vi.fn(async () => undefined),
     finishSession: vi.fn(async () => undefined),
     mySessions: vi.fn(async () => [] as unknown[]),
+    myAttempts: vi.fn(async () => [] as unknown[]),
   };
+  const evaluations = { assignedTo: vi.fn(async () => [] as Evaluation[]) };
   const auth = {
     user: signal({ uid: 'u1', email: 'ana@indab.co' }),
     profile: signal({ displayName: 'Ana' }),
@@ -71,6 +75,9 @@ describe('Practice page', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
+    evaluations.assignedTo.mockResolvedValue([]);
+    practice.myAttempts.mockResolvedValue([]);
     let n = 0;
     practice.newTradeId.mockImplementation(() => `t${++n}`);
     begin = 0;
@@ -96,6 +103,7 @@ describe('Practice page', () => {
         { provide: AuthService, useValue: auth },
         { provide: MarketDataService, useValue: market },
         { provide: PracticeService, useValue: practice },
+        { provide: EvaluationService, useValue: evaluations },
       ],
     });
     TestBed.overrideComponent(Practice, {
@@ -142,6 +150,116 @@ describe('Practice page', () => {
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
     await fixture.whenStable();
   };
+
+  const at = (ms: number) => ({ toMillis: () => ms, toDate: () => new Date(ms) });
+  const evaluation = (id: string, extra: Partial<Record<keyof Evaluation, unknown>> = {}) =>
+    ({
+      id,
+      title: `Evaluación ${id}`,
+      description: 'Opera solo con stop loss.',
+      symbol: 'PAXGUSDT',
+      replayStart: Date.UTC(2024, 0, 2, 8),
+      hideDates: true,
+      startingBalance: 200,
+      durationMinutes: 30,
+      opensAt: at(Date.now() - 3_600_000),
+      closesAt: at(Date.now() + 3_600_000),
+      studentIds: ['u1'],
+      resultsPublished: false,
+      ...extra,
+    }) as unknown as Evaluation;
+  /** Renders the page again after the fakes changed. */
+  const reload = async () => {
+    fixture.destroy();
+    fixture = TestBed.createComponent(Practice);
+    el = fixture.nativeElement;
+    await fixture.whenStable();
+  };
+
+  it('formats the countdown', () => {
+    expect(formatCountdown(65_000)).toBe('1:05');
+    expect(formatCountdown(3_725_000)).toBe('1:02:05');
+    expect(formatCountdown(-5)).toBe('0:00');
+  });
+
+  it("lists the student's evaluations by state", async () => {
+    evaluations.assignedTo.mockResolvedValue([
+      evaluation('open'),
+      evaluation('done'),
+      evaluation('later', {
+        opensAt: at(Date.now() + 3_600_000),
+        closesAt: at(Date.now() + 7_200_000),
+      }),
+      evaluation('past', {
+        opensAt: at(Date.now() - 7_200_000),
+        closesAt: at(Date.now() - 3_600_000),
+      }),
+    ]);
+    practice.myAttempts.mockResolvedValue([{ id: 'done_u1', evaluationId: 'done', pnl: 12.5 }]);
+    await reload();
+    expect(practice.myAttempts).toHaveBeenCalledWith('u1', ['open', 'done', 'later', 'past']);
+    const cards = [...el.querySelectorAll('.evaluation')].map((c) => c.textContent);
+    expect(cards[0]).toContain('Comenzar evaluación');
+    expect(cards[0]).toContain('30 min');
+    expect(cards[1]).toContain('Presentada');
+    expect(cards[1]).toContain('12.50');
+    expect(cards[2]).toContain('Aún no abre');
+    expect(cards[3]).toContain('No presentada');
+    expect(el.textContent).toContain('Práctica libre');
+  });
+
+  it('takes an evaluation on its market and start, against the clock', async () => {
+    const ev = evaluation('e1', { hideDates: false });
+    evaluations.assignedTo.mockResolvedValue([ev]);
+    await reload();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await click('Comenzar evaluación');
+    expect(confirm.mock.calls[0][0]).toContain('un solo intento de 30 minutos');
+    expect(begin * 1000).toBe(ev.replayStart);
+    expect(practice.startSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        symbol: 'PAXGUSDT',
+        replayStart: ev.replayStart,
+        startingBalance: 200,
+      }),
+      ev,
+    );
+    expect(chart().hideDates()).toBe(false);
+    const bar = el.querySelector('.evaluation-bar')!.textContent!;
+    expect(bar).toContain('Evaluación: Evaluación e1');
+    expect(bar).toMatch(/Quedan (29:5\d|30:00)/);
+    confirm.mockRestore();
+  });
+
+  it('finishes the evaluation when its time runs out', async () => {
+    // A 0.6-second limit, so the test does not wait half an hour.
+    evaluations.assignedTo.mockResolvedValue([evaluation('e1', { durationMinutes: 0.01 })]);
+    await reload();
+    const loads = evaluations.assignedTo.mock.calls.length;
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await click('Comenzar evaluación');
+    await pressed('.quick-buy');
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    await fixture.whenStable();
+    expect(practice.closeTrade).toHaveBeenCalledWith(
+      'session-1',
+      expect.objectContaining({ exitReason: 'sessionEnd' }),
+    );
+    expect(practice.finishSession).toHaveBeenCalled();
+    expect(el.textContent).toContain('Sesión terminada');
+    // The card now shows it as taken.
+    expect(evaluations.assignedTo).toHaveBeenCalledTimes(loads + 1);
+  });
+
+  it('explains when the evaluation cannot start', async () => {
+    evaluations.assignedTo.mockResolvedValue([evaluation('e1')]);
+    await reload();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    practice.startSession.mockRejectedValueOnce(new Error('permission-denied'));
+    await click('Comenzar evaluación');
+    expect(alert()).toContain('Puede que ya la hayas presentado');
+    expect(el.querySelector('form')).not.toBeNull();
+  });
 
   it("shows the setup form and the student's past sessions", () => {
     expect(el.querySelector('h1')?.textContent).toContain('Práctica de trading');

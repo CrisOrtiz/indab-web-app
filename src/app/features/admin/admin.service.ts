@@ -16,7 +16,7 @@ import { AdminUserRow, sortUsers } from './admin-users';
 /**
  * Live list of every user and enrollment, for the admin area. Provided by the `Admin`
  * component (not in root) so the listeners stop when the admin leaves the page.
- * Firestore rules only let admins list these collections or write the changes below.
+ * Firestore rules only let admins write the changes below; it listens for admins only.
  */
 @Injectable()
 export class AdminService {
@@ -42,6 +42,11 @@ export class AdminService {
   });
 
   constructor() {
+    // Trainers open the admin area too, but only admins manage users.
+    if (!this.auth.isAdmin()) {
+      this._loading.set(false);
+      return;
+    }
     const onError = () => {
       this._error.set(this.i18n.messages().admin.loadFailed);
       this._loading.set(false);

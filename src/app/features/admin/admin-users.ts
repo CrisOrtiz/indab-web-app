@@ -1,4 +1,4 @@
-import { Enrollment, UserProfile } from '../../core/models/user-profile';
+import { Enrollment, UserProfile, UserRole } from '../../core/models/user-profile';
 
 /** A user as shown in the admin area: their profile joined with their enrollment, if any. */
 export interface AdminUserRow {
@@ -9,7 +9,7 @@ export interface AdminUserRow {
 export interface AdminUserFilter {
   /** Free text matched against name, email and uid. */
   search: string;
-  role: 'all' | 'student' | 'admin';
+  role: 'all' | UserRole;
   access: 'all' | 'granted' | 'pending';
 }
 

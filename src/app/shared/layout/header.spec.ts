@@ -11,6 +11,7 @@ describe('Header', () => {
     isLoggedIn: signal(false),
     hasAcademyAccess: signal(false),
     isAdmin: signal(false),
+    isStaff: signal(false),
     signOut: vi.fn(async () => undefined),
   };
 
@@ -18,6 +19,7 @@ describe('Header', () => {
     auth.isLoggedIn.set(false);
     auth.hasAcademyAccess.set(false);
     auth.isAdmin.set(false);
+    auth.isStaff.set(false);
     TestBed.configureTestingModule({
       imports: [Header],
       providers: [provideRouter([]), { provide: AuthService, useValue: auth }],
@@ -30,10 +32,11 @@ describe('Header', () => {
     [...(fixture.nativeElement as HTMLElement).querySelectorAll('nav a')].map((a) =>
       a.getAttribute('href'),
     );
-  const as = async (state: { academy?: boolean; admin?: boolean }) => {
+  const as = async (state: { academy?: boolean; admin?: boolean; trainer?: boolean }) => {
     auth.isLoggedIn.set(true);
     auth.hasAcademyAccess.set(!!state.academy);
     auth.isAdmin.set(!!state.admin);
+    auth.isStaff.set(!!state.admin || !!state.trainer);
     await fixture.whenStable();
   };
 
@@ -50,6 +53,11 @@ describe('Header', () => {
 
   it('shows the admin link to admins', async () => {
     await as({ academy: true, admin: true });
+    expect(links()).toEqual(['/eleva', '/academy', '/admin']);
+  });
+
+  it('shows the admin link to trainers', async () => {
+    await as({ academy: true, trainer: true });
     expect(links()).toEqual(['/eleva', '/academy', '/admin']);
   });
 

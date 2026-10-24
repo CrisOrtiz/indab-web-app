@@ -1,7 +1,8 @@
-import { Component, input } from '@angular/core';
+import { Component, input, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
+import { AuthService } from '../../../core/auth/auth.service';
 import { Candle } from '../../../core/models/practice';
 import { HISTORY_BARS, MarketDataService } from '../../practice/market-data.service';
 import { PracticeService } from '../../practice/practice.service';
@@ -36,6 +37,7 @@ describe('PracticeReview', () => {
   let el: HTMLElement;
   const practice = { allSessions: vi.fn(), sessionTrades: vi.fn(), deleteSession: vi.fn() };
   const market = { loadCandles: vi.fn() };
+  const isAdmin = signal(true);
 
   const render = async () => {
     TestBed.configureTestingModule({
@@ -44,6 +46,7 @@ describe('PracticeReview', () => {
         provideRouter([]),
         { provide: PracticeService, useValue: practice },
         { provide: MarketDataService, useValue: market },
+        { provide: AuthService, useValue: { isAdmin } },
       ],
     });
     TestBed.overrideComponent(PracticeReview, {

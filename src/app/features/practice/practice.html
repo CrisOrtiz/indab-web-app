@@ -51,6 +51,15 @@
             <button type="button" class="btn" (click)="finish()">{{ t.finish }}</button>
           </div>
         </div>
+        @if (evaluation(); as ev) {
+          <div class="evaluation-bar" role="status">
+            <strong>{{ t.evaluationTitle(ev.title) }}</strong>
+            <span class="countdown" [attr.aria-label]="t.timeLeftLabel">{{
+              t.timeLeft(remaining() ?? '')
+            }}</span>
+            <span class="muted">{{ t.leavingEnds }}</span>
+          </div>
+        }
         <p class="muted elapsed">{{ t.elapsed(elapsed()) }}</p>
 
         <div class="workspace">
@@ -518,6 +527,56 @@
     }
 
     @default {
+      @if (evaluations().length) {
+        <h2>{{ t.yourEvaluations }}</h2>
+        <ul class="evaluations">
+          @for (card of evaluations(); track card.evaluation.id) {
+            @let ev = card.evaluation;
+            <li class="evaluation">
+              <div>
+                <strong>{{ ev.title }}</strong>
+                @if (ev.description) {
+                  <p class="muted">{{ ev.description }}</p>
+                }
+                <p class="muted">
+                  {{ tr.instruments[ev.symbol] ?? ev.symbol }} ·
+                  {{ t.minutes(ev.durationMinutes) }} ·
+                  {{
+                    t.window(
+                      (ev.opensAt.toDate() | localDate: 'd MMM y, HH:mm') ?? '',
+                      (ev.closesAt.toDate() | localDate: 'd MMM y, HH:mm') ?? ''
+                    )
+                  }}
+                </p>
+              </div>
+              @if (card.attempt; as attempt) {
+                <span class="badge">
+                  {{ t.evaluationDone }} ·
+                  <span [class.up]="attempt.pnl > 0" [class.down]="attempt.pnl < 0">{{
+                    attempt.pnl | number: '1.2-2'
+                  }}</span>
+                  USD
+                </span>
+              } @else if (card.window === 'open') {
+                <button
+                  type="button"
+                  class="btn"
+                  [disabled]="phase() === 'loading'"
+                  (click)="startEvaluation(ev)"
+                >
+                  {{ t.startEvaluation }}
+                </button>
+              } @else if (card.window === 'upcoming') {
+                <span class="badge">{{ t.evaluationUpcoming }}</span>
+              } @else {
+                <span class="badge">{{ t.evaluationMissed }}</span>
+              }
+            </li>
+          }
+        </ul>
+        <h2>{{ t.freePractice }}</h2>
+      }
+
       <form class="setup" (submit)="$event.preventDefault(); start()">
         <label>
           {{ t.market }}
@@ -592,7 +651,12 @@
               <td [attr.data-label]="t.date">
                 {{ s.startedAt?.toDate() | localDate: 'd MMM y, HH:mm' }}
               </td>
-              <td [attr.data-label]="t.market">{{ s.symbol }} · {{ s.interval }}</td>
+              <td [attr.data-label]="t.market">
+                {{ s.symbol }} · {{ s.interval }}
+                @if (s.evaluationId) {
+                  <span class="badge">{{ t.evaluationTag }}</span>
+                }
+              </td>
               <td [attr.data-label]="t.trades">{{ s.tradeCount }}</td>
               <td [attr.data-label]="t.pnl" [class.up]="s.pnl > 0" [class.down]="s.pnl < 0">
                 {{ s.pnl | number: '1.2-2' }}

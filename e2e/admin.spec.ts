@@ -29,7 +29,7 @@ test('students cannot open the admin area', async ({ page }) => {
 test('admins see every user with search and filters', async ({ page }) => {
   await openAdmin(page);
   await expect(nav(page).getByRole('link', { name: 'Administración' })).toBeVisible();
-  await expect(page.locator('.stat strong')).toHaveText(['3', '1', '1']);
+  await expect(page.locator('.stat strong')).toHaveText(['3', '1', '0', '1']);
 
   await page.getByLabel('Buscar usuarios').fill('jose');
   await expect(page.getByText('1 de 3 usuarios')).toBeVisible();
@@ -96,7 +96,7 @@ test('promoting a student asks for confirmation', async ({ page }) => {
   });
   await page.getByLabel('Rol de Luis Díaz').selectOption('admin');
   await expect(page.getByRole('status')).toContainText('Luis Díaz ahora es administrador.');
-  await expect(page.locator('.stat strong').nth(2)).toHaveText('2');
+  await expect(page.locator('.stat strong').nth(3)).toHaveText('2');
   expect(await getDocument(`users/${studentUid}`)).toMatchObject({ role: 'admin' });
 
   // The new admin can open the admin area.

@@ -8,8 +8,14 @@ rules_version = '2';
 //   courses/{courseId}/lessons/{id}      lesson content; enrolled users only
 //   materials/{materialId}               learning-material repository; enrolled users only
 //   investors/{uid}                      Eleva Inversiones investor account; owner reads, admins write
+//   evaluations/{id}                     timed practice evaluation set up by trainers or admins:
+//                                        market, replay start, time limit, window, assigned students
 //   practiceSessions/{id}                chart-replay practice by a student with academy access;
-//                                        owner writes while active, admins read all
+//                                        owner writes while active, trainers and admins read all.
+//                                        Free sessions (evaluationId null) are listed in the ranking
+//                                        for everyone with academy access; an evaluation attempt has
+//                                        the id {evaluationId}_{uid} (one per student) and is shown
+//                                        to others once its results are published
 //   practiceSessions/{id}/trades/{id}    simulated orders of that session: market orders open at
 //                                        once, limit/stop orders fill or are cancelled once; open
 //                                        trades close once; only SL/TP (and a pending price) move
@@ -17,7 +23,8 @@ rules_version = '2';
 // Admins are users whose profile has role == 'admin'. Promote the first admin by editing
 // their users/{uid} document in the Firebase console; after that, admins manage roles and
 // academy access from the /admin area. Admins cannot remove their own admin role, so the
-// last admin can never lock everyone out.
+// last admin can never lock everyone out. Trainers (role == 'trainer') run evaluations and
+// review practice, but cannot change roles, academy access or delete anything but evaluations.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -29,10 +36,19 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    function role() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : null;
+    }
+
     function isAdmin() {
-      return signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return role() == 'admin';
+    }
+
+    // Trainers and admins.
+    function isStaff() {
+      return role() in ['trainer', 'admin'];
     }
 
     function enrollment() {
@@ -44,7 +60,7 @@ service cloud.firestore {
     }
 
     function hasAcademyAccess() {
-      return isAdmin() || (hasEnrollment() && enrollment().academy == true);
+      return isStaff() || (hasEnrollment() && enrollment().academy == true);
     }
 
     function isEnrolledIn(courseId) {
@@ -53,7 +69,8 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
+      // Trainers read profiles to assign students to evaluations.
+      allow read: if isOwner(uid) || isStaff();
 
       // A new profile must belong to the caller and always starts as a student.
       allow create: if isOwner(uid)
@@ -67,7 +84,7 @@ service cloud.firestore {
       // but never their role or identity fields.
       allow update: if (isAdmin()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
-          && request.resource.data.role in ['student', 'admin']
+          && request.resource.data.role in ['student', 'trainer', 'admin']
           && !isOwner(uid))
         || (isOwner(uid)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName'])
@@ -78,7 +95,7 @@ service cloud.firestore {
     }
 
     match /enrollments/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
+      allow read: if isOwner(uid) || isStaff();
       allow create, update: if isAdmin()
         && request.resource.data.keys().hasOnly(['academy', 'courses', 'updatedAt', 'updatedBy'])
         && request.resource.data.academy is bool
@@ -107,6 +124,41 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Practice evaluations: trainers and admins set them up; assigned students read them.
+    match /evaluations/{evaluationId} {
+      function validEvaluation(data) {
+        return data.keys().hasOnly(['title', 'description', 'symbol', 'replayStart', 'hideDates',
+            'startingBalance', 'durationMinutes', 'opensAt', 'closesAt', 'studentIds',
+            'resultsPublished', 'createdBy', 'createdAt', 'updatedAt'])
+          && data.title is string && data.title.size() > 0 && data.title.size() <= 120
+          && data.description is string && data.description.size() <= 2000
+          && data.symbol is string && data.symbol.size() <= 20
+          && data.replayStart is int
+          && data.hideDates is bool
+          && data.startingBalance is number && data.startingBalance > 0
+          && data.durationMinutes is int && data.durationMinutes >= 5 && data.durationMinutes <= 600
+          && data.opensAt is timestamp && data.closesAt is timestamp
+          && data.closesAt > data.opensAt
+          && data.studentIds is list && data.studentIds.size() <= 500
+          && data.resultsPublished is bool
+          && data.updatedAt == request.time;
+      }
+
+      allow read: if isStaff() || (signedIn() && request.auth.uid in resource.data.studentIds);
+
+      allow create: if isStaff()
+        && validEvaluation(request.resource.data)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if isStaff()
+        && validEvaluation(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if isStaff();
+    }
+
     // Chart-replay practice. Students log their own sessions and trades; nothing can be
     // deleted or rewritten afterwards, so instructors see every trade as it happened.
     match /practiceSessions/{sessionId} {
@@ -115,11 +167,39 @@ service cloud.firestore {
           && data.tradeCount is int && data.tradeCount >= 0;
       }
 
-      allow read: if isOwner(resource.data.uid) || isAdmin();
+      function evaluation(id) {
+        return get(/databases/$(database)/documents/evaluations/$(id)).data;
+      }
+
+      // A new evaluation attempt: one per assigned student, started inside the window, on the
+      // evaluation's market, replay start, balance and time limit.
+      function validAttempt(data) {
+        return sessionId == data.evaluationId + '_' + request.auth.uid
+          && exists(/databases/$(database)/documents/evaluations/$(data.evaluationId))
+          && request.auth.uid in evaluation(data.evaluationId).studentIds
+          && request.time >= evaluation(data.evaluationId).opensAt
+          && request.time < evaluation(data.evaluationId).closesAt
+          && data.symbol == evaluation(data.evaluationId).symbol
+          && data.replayStart == evaluation(data.evaluationId).replayStart
+          && data.startingBalance == evaluation(data.evaluationId).startingBalance
+          && data.durationMinutes == evaluation(data.evaluationId).durationMinutes;
+      }
+
+      // Results of a published evaluation are open to everyone with academy access.
+      function publishedAttempt(data) {
+        return data.evaluationId != null
+          && exists(/databases/$(database)/documents/evaluations/$(data.evaluationId))
+          && evaluation(data.evaluationId).resultsPublished == true;
+      }
+
+      allow read: if isOwner(resource.data.uid) || isStaff()
+        || (hasAcademyAccess()
+          && (resource.data.evaluationId == null || publishedAttempt(resource.data)));
 
       allow create: if hasAcademyAccess()
         && request.resource.data.keys().hasOnly(['uid', 'userName', 'symbol', 'interval',
-          'replayStart', 'startingBalance', 'balance', 'pnl', 'tradeCount', 'status', 'startedAt'])
+          'replayStart', 'startingBalance', 'balance', 'pnl', 'tradeCount', 'status', 'startedAt',
+          'evaluationId', 'durationMinutes'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.userName is string
         && request.resource.data.userName.size() <= 120
@@ -132,11 +212,19 @@ service cloud.firestore {
         && request.resource.data.pnl == 0
         && request.resource.data.tradeCount == 0
         && request.resource.data.status == 'active'
-        && request.resource.data.startedAt == request.time;
+        && request.resource.data.startedAt == request.time
+        && ((request.resource.data.evaluationId == null
+            && !('durationMinutes' in request.resource.data))
+          || (request.resource.data.evaluationId is string
+            && validAttempt(request.resource.data)));
 
-      // While active, the owner refreshes the summary and finally marks it finished.
+      // While active, the owner refreshes the summary and finally marks it finished. An
+      // evaluation attempt accepts these until two minutes after its time is up.
       allow update: if isOwner(resource.data.uid)
         && resource.data.status == 'active'
+        && (resource.data.get('durationMinutes', null) == null
+          || request.time < resource.data.startedAt
+            + duration.value(resource.data.durationMinutes + 2, 'm'))
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['balance', 'pnl', 'tradeCount', 'status', 'endedAt'])
         && validSummary(request.resource.data)
@@ -148,6 +236,14 @@ service cloud.firestore {
       match /trades/{tradeId} {
         function session() {
           return get(/databases/$(database)/documents/practiceSessions/$(sessionId)).data;
+        }
+
+        // An evaluation attempt takes orders until its time is up, and closes them for two
+        // minutes more; free practice has no limit.
+        function inTime(extraMinutes) {
+          return session().get('durationMinutes', null) == null
+            || request.time < session().startedAt
+              + duration.value(session().durationMinutes + extraMinutes, 'm');
         }
 
         function isPrice(value) {
@@ -162,13 +258,14 @@ service cloud.firestore {
           return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
         }
 
-        allow read: if isAdmin() || (signedIn() && session().uid == request.auth.uid);
+        allow read: if isStaff() || (signedIn() && session().uid == request.auth.uid);
 
         // Placed by the session's owner while the session is active: a market order opens at
         // once, a limit or stop order waits as `pending` at its order price.
         allow create: if signedIn()
           && session().uid == request.auth.uid
           && session().status == 'active'
+          && inTime(0)
           && request.resource.data.keys().hasOnly(['uid', 'side', 'orderType', 'orderPrice',
             'placedTime', 'quantity', 'entryPrice', 'entryTime', 'stopLoss', 'takeProfit',
             'status', 'openedAt'])
@@ -188,7 +285,7 @@ service cloud.firestore {
               && request.resource.data.status == 'pending'))
           && request.resource.data.openedAt == request.time;
 
-        allow update: if isOwner(resource.data.uid) && (
+        allow update: if isOwner(resource.data.uid) && inTime(2) && (
           // A pending order moves its price, stop loss or take profit...
           (resource.data.status == 'pending'
             && changes(['orderPrice', 'entryPrice', 'stopLoss', 'takeProfit'])

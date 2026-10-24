@@ -41,6 +41,27 @@ class Host {
 describe('AdminService', () => {
   let admin: AdminService;
   let destroy: () => void;
+  const isAdmin = signal(true);
+
+  const create = () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: FIRESTORE, useValue: {} },
+        { provide: AuthService, useValue: { user: signal({ uid: 'boss' }), isAdmin } },
+      ],
+    });
+    admin = TestBed.createComponent(Host).componentInstance.admin;
+  };
+
+  it('opens no listeners for trainers', () => {
+    fb.listeners.clear();
+    isAdmin.set(false);
+    create();
+    expect(fb.listeners.size).toBe(0);
+    expect(admin.loading()).toBe(false);
+    isAdmin.set(true);
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -49,7 +70,7 @@ describe('AdminService', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: FIRESTORE, useValue: {} },
-        { provide: AuthService, useValue: { user: signal({ uid: 'boss' }) } },
+        { provide: AuthService, useValue: { user: signal({ uid: 'boss' }), isAdmin } },
       ],
     });
     const fixture = TestBed.createComponent(Host);

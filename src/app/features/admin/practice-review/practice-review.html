@@ -59,7 +59,12 @@
             <td [attr.data-label]="t.started">
               {{ s.startedAt?.toDate() | localDate: 'd MMM y, HH:mm' }}
             </td>
-            <td [attr.data-label]="t.market">{{ s.symbol }} · {{ s.interval }}</td>
+            <td [attr.data-label]="t.market">
+              {{ s.symbol }} · {{ s.interval }}
+              @if (s.evaluationId) {
+                <span class="badge">{{ i18n.messages().practice.evaluationTag }}</span>
+              }
+            </td>
             <td [attr.data-label]="t.period">{{ s.replayStart | localDate: 'd MMM y' }}</td>
             <td [attr.data-label]="t.trades">{{ s.tradeCount }}</td>
             <td [attr.data-label]="t.pnl" [class.up]="s.pnl > 0" [class.down]="s.pnl < 0">
@@ -77,15 +82,17 @@
               >
                 {{ selected() === s.id ? t.hide : t.show }}
               </button>
-              <button
-                type="button"
-                class="btn btn-outline small delete"
-                [disabled]="deleting() === s.id"
-                [attr.aria-label]="t.deleteLabel(s.userName)"
-                (click)="remove(s)"
-              >
-                {{ deleting() === s.id ? t.deleting : t.delete }}
-              </button>
+              @if (auth.isAdmin()) {
+                <button
+                  type="button"
+                  class="btn btn-outline small delete"
+                  [disabled]="deleting() === s.id"
+                  [attr.aria-label]="t.deleteLabel(s.userName)"
+                  (click)="remove(s)"
+                >
+                  {{ deleting() === s.id ? t.deleting : t.delete }}
+                </button>
+              }
             </td>
           </tr>
           @if (selected() === s.id) {
