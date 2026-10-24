@@ -3,13 +3,21 @@ import { Timestamp } from 'firebase/firestore';
 /** Trainers run practice evaluations and review practice; admins also manage users. */
 export type UserRole = 'student' | 'trainer' | 'admin';
 
-/** Stored at `users/{uid}`. Users create their own profile; only admins can change `role`. */
+/**
+ * Stored at `users/{uid}`. Users create their own profile and edit `displayName` and
+ * `photoURL`; only admins can change `role`.
+ */
 export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
   role: UserRole;
   createdAt: Timestamp;
+  /**
+   * Photo uploaded from `/profile`: a small square JPEG as a `data:` URL (see `resizeImage`).
+   * Missing when the user has not uploaded one; the header then uses the Google photo.
+   */
+  photoURL?: string;
 }
 
 /**

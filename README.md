@@ -171,7 +171,7 @@ The service account needs the _Firebase Admin_ and _Service Usage Consumer_ role
 
 | Collection                                                       | Who can read                                                                                                                                                             | Who can write                                                                                                                                                                                                                                                                    |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `users/{uid}`                                                    | owner, trainers, admins                                                                                                                                                  | owner creates as `student` and edits `displayName`; admins change `role` to `student`, `trainer` or `admin` (not their own)                                                                                                                                                      |
+| `users/{uid}`                                                    | owner, trainers, admins                                                                                                                                                  | owner creates as `student` and edits `displayName` and `photoURL` (an inline JPEG/PNG/WebP `data:` URL up to 100,000 characters); admins change `role` to `student`, `trainer` or `admin` (not their own)                                                                        |
 | `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, trainers, admins                                                                                                                                                  | admins                                                                                                                                                                                                                                                                           |
 | `courses/{id}`                                                   | everyone if `published`, admins                                                                                                                                          | admins                                                                                                                                                                                                                                                                           |
 | `courses/{id}/lessons/{id}`                                      | users enrolled in that course or with academy access                                                                                                                     | admins                                                                                                                                                                                                                                                                           |
@@ -192,17 +192,18 @@ the rules are what actually protect the data. Anything not listed is denied.
 
 ## Routes
 
-| Path                  | Access                                                                                    |
-| --------------------- | ----------------------------------------------------------------------------------------- |
-| `/` landing, `/eleva` | public                                                                                    |
-| `/login`, `/register` | signed-out visitors                                                                       |
-| `/academy`            | signed-in users (shows "pending" until enrolled)                                          |
-| `/academy/material`   | enrolled users (learning material, opened from the academy; `/repository` redirects here) |
-| `/academy/practice`   | enrolled users (chart-replay trading practice: free practice and assigned evaluations)    |
-| `/academy/ranking`    | enrolled users (free-practice ranking and published evaluation rankings)                  |
-| `/admin`              | trainers and admins (users, roles and academy access for admins only)                     |
-| `/admin/practice`     | trainers and admins (review students' practice sessions on the chart; admins delete them) |
-| `/admin/evaluations`  | trainers and admins (set up timed evaluations, see and publish their results)             |
+| Path                  | Access                                                                                                     |
+| --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `/` landing, `/eleva` | public                                                                                                     |
+| `/login`, `/register` | signed-out visitors                                                                                        |
+| `/academy`            | signed-in users (shows "pending" until enrolled)                                                           |
+| `/academy/material`   | enrolled users (learning material, opened from the academy; `/repository` redirects here)                  |
+| `/academy/practice`   | enrolled users (chart-replay trading practice: free practice and assigned evaluations)                     |
+| `/academy/ranking`    | enrolled users (free-practice ranking and published evaluation rankings)                                   |
+| `/admin`              | trainers and admins (users, roles and academy access for admins only)                                      |
+| `/admin/practice`     | trainers and admins (review students' practice sessions on the chart; admins delete them)                  |
+| `/admin/evaluations`  | trainers and admins (set up timed evaluations, see and publish their results)                              |
+| `/profile`            | signed-in users (photo, name, password, language, practice P/L; opened from the avatar menu in the header) |
 
 ## Languages
 
