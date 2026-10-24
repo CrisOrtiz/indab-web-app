@@ -17,6 +17,7 @@ export const es = {
     admin: 'Administración | INDAB',
     adminPractice: 'Prácticas de trading | INDAB',
     ranking: 'Ranking de evaluaciones | INDAB',
+    calendar: 'Calendario económico | INDAB',
     adminEvaluations: 'Evaluaciones de práctica | INDAB',
     notFound: 'Página no encontrada | INDAB',
     profile: 'Mi perfil | INDAB',
@@ -254,6 +255,7 @@ export const es = {
     material: 'Ver material de estudio',
     practice: 'Práctica de trading',
     ranking: 'Ranking de evaluaciones',
+    calendar: 'Calendario económico',
     pending:
       'Tu inscripción está pendiente. Cuando el equipo de INDAB la active, verás aquí tus cursos.',
     back: '← Academia',
@@ -731,6 +733,57 @@ export const es = {
     curve: 'Curva de capital',
     curveLabel: (from: number, to: number) => `Saldo de ${from} a ${to} USD`,
     curveEmpty: 'Cierra operaciones para ver cómo evoluciona tu saldo.',
+  },
+  calendar: {
+    title: 'Calendario económico',
+    intro:
+      'Las noticias programadas de la semana con su pronóstico, el dato anterior y el dato real, que se actualiza en vivo al publicarse.',
+    countries: 'Economías',
+    country: {
+      us: 'Estados Unidos',
+      jp: 'Japón',
+      eu: 'Zona euro',
+      gb: 'Reino Unido',
+      cn: 'China',
+    },
+    importance: 'Impacto',
+    highOnly: 'Solo alto',
+    mediumAndHigh: 'Medio y alto',
+    pickCountry: 'Elige al menos una economía para ver el calendario.',
+    source: 'Datos de TradingView, actualizados en vivo.',
+    credit: 'Calendario económico de TradingView',
+    guideTitle: 'Qué noticias mueven nuestros mercados',
+    guideIntro: 'Los eventos de alto impacto que más conviene seguir para cada mercado.',
+    markets: [
+      {
+        name: 'XAU/USD (oro)',
+        events: [
+          'Decisión de tasas de la Fed (FOMC) y discursos de su presidente',
+          'Inflación de EE. UU. (IPC y PCE)',
+          'Nóminas no agrícolas (NFP) y desempleo',
+          'Datos de demanda de China',
+        ],
+      },
+      {
+        name: 'USD/JPY',
+        events: [
+          'Decisión de tasas del Banco de Japón (BoJ)',
+          'Decisión de tasas de la Fed (FOMC)',
+          'IPC de EE. UU. y de Tokio',
+          'Nóminas no agrícolas (NFP)',
+        ],
+      },
+      {
+        name: 'NASDAQ',
+        events: [
+          'Decisión de tasas de la Fed (FOMC)',
+          'IPC de EE. UU.',
+          'Nóminas no agrícolas (NFP)',
+          'PIB e ISM de EE. UU.',
+        ],
+      },
+    ],
+    tip: 'Consejo: minutos antes y después de una noticia de alto impacto el precio puede saltar y el spread se amplía. Si no tienes un plan para la noticia, espera a que el mercado se calme.',
   },
 };
 

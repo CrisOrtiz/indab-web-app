@@ -169,6 +169,11 @@ Module notes:
   `standings.ts`) ranks only evaluations, by attempt P/L: Cris does not want free practice
   ranked, so free sessions stay private to the student and staff. Students see an evaluation's ranking
   only after staff publish it. P/L is client-computed: not a trusted grade.
+- **Economic calendar (`/academy/calendar`, built)**: `features/calendar/`. TradingView's free
+  calendar widget (`widget.ts` builds its settings: locale, economies, impact); the page rebuilds
+  the embed when a filter or the language changes, keeps TradingView's credit link, and adds a
+  translated guide to the news that moves gold, USD/JPY and the NASDAQ. Cris wants it free for
+  life: no paid API, key or server function. E2e tests stub the widget script with `page.route`.
 - **Eleva (`/eleva`, investor area)**: the public page stays unguarded. Investor data lives in
   `investors/{uid}` and subcollections (e.g. `investors/{uid}/statements/{month}`), admin-written,
   owner-read. Financial figures are never computed or written by the client.

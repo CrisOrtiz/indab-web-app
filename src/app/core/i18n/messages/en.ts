@@ -13,6 +13,7 @@ export const en: Messages = {
     admin: 'Administration | INDAB',
     adminPractice: 'Trading practice sessions | INDAB',
     ranking: 'Evaluation ranking | INDAB',
+    calendar: 'Economic calendar | INDAB',
     adminEvaluations: 'Practice evaluations | INDAB',
     notFound: 'Page not found | INDAB',
     profile: 'My profile | INDAB',
@@ -257,6 +258,7 @@ export const en: Messages = {
     material: 'See study material',
     practice: 'Trading practice',
     ranking: 'Evaluation ranking',
+    calendar: 'Economic calendar',
     pending:
       'Your enrollment is pending. Once the INDAB team activates it, your courses will show up here.',
     back: '← Academy',
@@ -714,5 +716,51 @@ export const en: Messages = {
     curve: 'Equity curve',
     curveLabel: (from, to) => `Balance from ${from} to ${to} USD`,
     curveEmpty: 'Close trades to see how your balance evolves.',
+  },
+  calendar: {
+    title: 'Economic calendar',
+    intro:
+      'This week’s scheduled news with the forecast, the previous figure and the actual figure, updated live when it is released.',
+    countries: 'Economies',
+    country: {
+      us: 'United States',
+      jp: 'Japan',
+      eu: 'Euro area',
+      gb: 'United Kingdom',
+      cn: 'China',
+    },
+    importance: 'Impact',
+    highOnly: 'High only',
+    mediumAndHigh: 'Medium and high',
+    pickCountry: 'Pick at least one economy to see the calendar.',
+    source: 'Data from TradingView, updated live.',
+    credit: 'Economic calendar by TradingView',
+    guideTitle: 'Which news moves our markets',
+    guideIntro: 'The high-impact events worth following for each market.',
+    markets: [
+      {
+        name: 'XAU/USD (gold)',
+        events: [
+          'Fed rate decision (FOMC) and the Fed chair’s speeches',
+          'US inflation (CPI and PCE)',
+          'Non-farm payrolls (NFP) and unemployment',
+          'China demand data',
+        ],
+      },
+      {
+        name: 'USD/JPY',
+        events: [
+          'Bank of Japan (BoJ) rate decision',
+          'Fed rate decision (FOMC)',
+          'US and Tokyo CPI',
+          'Non-farm payrolls (NFP)',
+        ],
+      },
+      {
+        name: 'NASDAQ',
+        events: ['Fed rate decision (FOMC)', 'US CPI', 'Non-farm payrolls (NFP)', 'US GDP and ISM'],
+      },
+    ],
+    tip: 'Tip: in the minutes around a high-impact release, price can jump and spreads widen. If you have no plan for the news, wait for the market to settle.',
   },
 };

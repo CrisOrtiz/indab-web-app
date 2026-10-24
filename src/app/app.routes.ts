@@ -56,6 +56,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/ranking/ranking').then((m) => m.Ranking),
   },
   {
+    path: 'academy/calendar',
+    title: 'calendar',
+    canActivate: [enrolledGuard],
+    loadComponent: () => import('./features/calendar/calendar').then((m) => m.Calendar),
+  },
+  {
     path: 'academy/material',
     title: 'material',
     canActivate: [enrolledGuard],

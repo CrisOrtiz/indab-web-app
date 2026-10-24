@@ -13,6 +13,7 @@ export const pt: Messages = {
     admin: 'Administração | INDAB',
     adminPractice: 'Práticas de trading | INDAB',
     ranking: 'Ranking de avaliações | INDAB',
+    calendar: 'Calendário econômico | INDAB',
     adminEvaluations: 'Avaliações de prática | INDAB',
     notFound: 'Página não encontrada | INDAB',
     profile: 'Meu perfil | INDAB',
@@ -253,6 +254,7 @@ export const pt: Messages = {
     material: 'Ver material de estudo',
     practice: 'Prática de trading',
     ranking: 'Ranking de avaliações',
+    calendar: 'Calendário econômico',
     pending:
       'Sua matrícula está pendente. Quando a equipe da INDAB ativá-la, você verá seus cursos aqui.',
     back: '← Academia',
@@ -716,5 +718,56 @@ export const pt: Messages = {
     curve: 'Curva de capital',
     curveLabel: (from, to) => `Saldo de ${from} a ${to} USD`,
     curveEmpty: 'Feche operações para ver como seu saldo evolui.',
+  },
+  calendar: {
+    title: 'Calendário econômico',
+    intro:
+      'As notícias programadas da semana com a previsão, o dado anterior e o dado real, atualizado ao vivo quando é divulgado.',
+    countries: 'Economias',
+    country: {
+      us: 'Estados Unidos',
+      jp: 'Japão',
+      eu: 'Zona do euro',
+      gb: 'Reino Unido',
+      cn: 'China',
+    },
+    importance: 'Impacto',
+    highOnly: 'Só alto',
+    mediumAndHigh: 'Médio e alto',
+    pickCountry: 'Escolha pelo menos uma economia para ver o calendário.',
+    source: 'Dados do TradingView, atualizados ao vivo.',
+    credit: 'Calendário econômico do TradingView',
+    guideTitle: 'Quais notícias movem nossos mercados',
+    guideIntro: 'Os eventos de alto impacto que vale a pena acompanhar em cada mercado.',
+    markets: [
+      {
+        name: 'XAU/USD (ouro)',
+        events: [
+          'Decisão de juros do Fed (FOMC) e discursos do presidente do Fed',
+          'Inflação dos EUA (CPI e PCE)',
+          'Payroll (NFP) e desemprego',
+          'Dados de demanda da China',
+        ],
+      },
+      {
+        name: 'USD/JPY',
+        events: [
+          'Decisão de juros do Banco do Japão (BoJ)',
+          'Decisão de juros do Fed (FOMC)',
+          'CPI dos EUA e de Tóquio',
+          'Payroll (NFP)',
+        ],
+      },
+      {
+        name: 'NASDAQ',
+        events: [
+          'Decisão de juros do Fed (FOMC)',
+          'CPI dos EUA',
+          'Payroll (NFP)',
+          'PIB e ISM dos EUA',
+        ],
+      },
+    ],
+    tip: 'Dica: nos minutos em torno de uma notícia de alto impacto, o preço pode saltar e o spread aumenta. Se você não tem um plano para a notícia, espere o mercado se acalmar.',
   },
 };
