@@ -291,99 +291,160 @@ describe('ReplayChart', () => {
     expect(host.moves.at(-1)).toEqual({ target: 'draft', field: 'price', price: 97 });
   });
 
-  it('switches indicators on and off, with the RSI in its own pane', async () => {
-    const { fixture, host, click } = await render();
+  /** Drives drawings on the chart: menus, presses on the candles and the overlay. */
+  const drawing = (r: Awaited<ReturnType<typeof render>>) => {
+    const { fixture, el } = r;
+    const canvas = el.querySelector('.canvas')!;
+    const settle = () => fixture.whenStable();
+    const openMenu = async (label: string) => {
+      el.querySelector<HTMLButtonElement>(`.tools button[aria-label="${label}"]`)!.click();
+      await settle();
+    };
+    const item = (name: string) =>
+      [...el.querySelectorAll<HTMLButtonElement>('.tool-menu button')].find(
+        (b) => b.textContent!.replace('✓', '').trim() === name,
+      )!;
+    const pick = async (name: string) => {
+      await openMenu('Herramientas de dibujo');
+      item(name).click();
+      await settle();
+    };
+    const pointer = (type: string, x: number, y: number, touch = false, target = canvas) => {
+      const event = new MouseEvent(type, { clientX: x, clientY: y, bubbles: true });
+      Object.defineProperty(event, 'pointerType', { value: touch ? 'touch' : 'mouse' });
+      target.dispatchEvent(event);
+    };
+    /** A press at (x, y), dragged to (toX, toY) if given. */
+    const press = async (x: number, y: number, to?: [number, number], touch = false) => {
+      pointer('pointerdown', x, y, touch);
+      if (to) {
+        pointer('pointermove', (x + to[0]) / 2, (y + to[1]) / 2, touch);
+        pointer('pointermove', to[0], to[1], touch);
+      }
+      pointer('pointerup', ...(to ?? [x, y]), touch);
+      await settle();
+    };
+    const rect = () => {
+      const r = el.querySelector('svg.shapes rect');
+      return r && ['x', 'y', 'width', 'height'].map((a) => Number(r.getAttribute(a)));
+    };
+    const handles = () => [...el.querySelectorAll<HTMLElement>('.handle')];
+    const levels = () =>
+      [...el.querySelectorAll('svg.shapes .fib-text')].map((t) => t.textContent!.trim());
+    return { canvas, openMenu, item, pick, pointer, press, rect, handles, levels, settle };
+  };
+
+  it('switches indicators on and off from their menu, with the RSI in its own pane', async () => {
+    const r = await render();
+    const { fixture, host, el } = r;
+    const { openMenu, item } = drawing(r);
     host.candles.set(Array.from({ length: 30 }, (_, i) => c(i + 1, 100 + i)));
     await fixture.whenStable();
 
-    await click('MA 20');
+    await openMenu('Indicadores');
+    item('MA 20').click();
+    await fixture.whenStable();
     expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 0);
     const ma = lw.lines[0];
     // 30 closes: 11 values of the 20-candle average, the first one 109.5.
     expect(ma.setData.mock.calls.at(-1)![0]).toHaveLength(11);
     expect(ma.setData.mock.calls.at(-1)![0][0]).toEqual({ time: 20, value: 109.5 });
+    expect(item('MA 20').getAttribute('aria-checked')).toBe('true');
+    expect(el.querySelector('.menu-trigger .count')!.textContent).toBe('1');
 
-    await click('RSI 14');
+    // The menu stays open to pick several.
+    item('RSI 14').click();
+    await fixture.whenStable();
     expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 1);
     expect(lw.pane.setHeight).toHaveBeenCalled();
     expect(lw.lines[1].createPriceLine).toHaveBeenCalledTimes(2);
 
-    await click('MA 20');
+    item('MA 20').click();
+    await fixture.whenStable();
     expect(lw.chart.removeSeries).toHaveBeenCalledWith(ma);
+
+    // A press outside closes it.
+    document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    await fixture.whenStable();
+    expect(el.querySelector('.tool-menu')).toBeNull();
   });
 
   it('draws horizontal and trend lines where the student clicks, and erases them', async () => {
-    const { fixture, click, labels, button, el } = await render();
-    const chartClick = async (time: number, y: number) => {
-      // Bar `time` (1 or 2) is at x 0 or 10.
-      el.querySelector('.canvas')!.dispatchEvent(
-        new MouseEvent('click', { clientX: (time - 1) * 10, clientY: y, bubbles: true }),
-      );
-      await fixture.whenStable();
-    };
+    const r = await render();
+    const { fixture, el, labels } = r;
+    const { pick, press, pointer, openMenu, item, handles } = drawing(r);
 
-    await click('Horizontal');
-    expect(el.textContent).toContain('Haz clic en el gráfico para poner la línea.');
+    await pick('Línea horizontal');
+    expect(el.textContent).toContain('Toca o haz clic donde va la línea.');
+    // A tool keeps the chart from panning, so presses place points.
+    expect(lw.chart.applyOptions).toHaveBeenLastCalledWith({
+      handleScroll: false,
+      handleScale: false,
+    });
+    expect(
+      el.querySelector('.tools button[aria-label="Herramientas de dibujo"]')!.textContent,
+    ).toContain('Línea horizontal');
     // Clicks on the price scale or the RSI pane do not draw.
-    await chartClick(80, 400);
-    await chartClick(1, 450);
+    await press(800, 400);
+    await press(0, 450);
     expect(lw.series.createPriceLine).not.toHaveBeenCalled();
-    await chartClick(1, 400);
+    await press(0, 400);
     expect(lw.series.createPriceLine).toHaveBeenLastCalledWith(
       expect.objectContaining({ price: 100 }),
     );
     expect(labels()).toEqual(['×']);
+    expect(lw.chart.applyOptions).toHaveBeenLastCalledWith({
+      handleScroll: true,
+      handleScale: true,
+    });
 
-    await click('Tendencia');
-    await chartClick(2, 390);
-    expect(el.textContent).toContain('Haz clic en el segundo punto.');
-    await chartClick(1, 380);
-    expect(lw.lines[0].setData).toHaveBeenCalledWith([
-      { time: 1, value: 120 },
-      { time: 2, value: 110 },
+    // Bars 1 and 2 are at x 0 and 10; the line follows the mouse until the second click.
+    await pick('Línea de tendencia');
+    await press(10, 390);
+    expect(el.textContent).toContain('Marca el segundo punto.');
+    pointer('pointermove', 0, 370);
+    await fixture.whenStable();
+    expect(el.querySelector('svg.shapes .trend')!.getAttribute('y2')).toBe('370');
+    await press(0, 380);
+    const line = el.querySelector('svg.shapes .trend')!;
+    expect(['x1', 'y1', 'x2', 'y2'].map((a) => line.getAttribute(a))).toEqual([
+      '0',
+      '380',
+      '10',
+      '390',
     ]);
-    expect(button('Tendencia').getAttribute('aria-pressed')).toBe('false');
+    // The new line is selected, with a handle at each end.
+    expect(handles()).toHaveLength(2);
+    expect(el.querySelector('.tool-hint')).toBeNull();
 
     el.querySelector<HTMLButtonElement>('button[aria-label="Borrar línea"]')!.click();
     await fixture.whenStable();
     expect(labels()).toEqual([]);
-    await click('Borrar dibujos');
-    expect(lw.chart.removeSeries).toHaveBeenCalledWith(lw.lines[0]);
-    expect(button('Borrar dibujos').disabled).toBe(true);
+    await openMenu('Herramientas de dibujo');
+    item('Borrar dibujos').click();
+    await fixture.whenStable();
+    expect(el.querySelector('svg.shapes')).toBeNull();
+    await openMenu('Herramientas de dibujo');
+    expect(item('Borrar dibujos').disabled).toBe(true);
   });
 
-  it('draws rectangles and Fibonacci retracements over the chart, and erases them', async () => {
-    const { fixture, click, el } = await render();
-    const chartClick = async (time: number, y: number) => {
-      // Bar `time` (1 or 2) is at x 0 or 10.
-      el.querySelector('.canvas')!.dispatchEvent(
-        new MouseEvent('click', { clientX: (time - 1) * 10, clientY: y, bubbles: true }),
-      );
-      await fixture.whenStable();
-    };
+  it('draws rectangles by dragging and Fibonacci retracements by clicking', async () => {
+    const r = await render();
+    const { fixture, el } = r;
+    const { pick, press, rect, levels } = drawing(r);
 
-    await click('Rectángulo');
-    expect(el.textContent).toContain('Haz clic en una esquina del rectángulo.');
-    await chartClick(2, 300);
-    expect(el.textContent).toContain('Haz clic en la esquina opuesta.');
-    await chartClick(1, 380);
-    const rect = el.querySelector('svg.shapes rect')!;
-    // Bars 1 and 2 are at x 0 and 10; prices 120 and 200 at y 380 and 300.
-    expect(['x', 'y', 'width', 'height'].map((a) => rect.getAttribute(a))).toEqual([
-      '0',
-      '300',
-      '10',
-      '80',
-    ]);
+    await pick('Rectángulo');
+    expect(el.textContent).toContain('Marca una esquina del rectángulo.');
+    await press(10, 300, [0, 380]);
+    // Prices 120 and 200 sit at y 380 and 300.
+    expect(rect()).toEqual([0, 300, 10, 80]);
 
     // A move from 100 up to 200: the 0 level sits at its end and 1 at its start.
-    await click('Fibonacci');
-    await chartClick(1, 400);
-    await chartClick(2, 300);
-    const levels = [...el.querySelectorAll('svg.shapes .fib-text')].map((t) =>
-      t.textContent!.trim(),
-    );
-    expect(levels).toEqual([
+    await pick('Retroceso de Fibonacci');
+    await press(0, 400);
+    expect(el.textContent).toContain('Marca el final del movimiento.');
+    await press(10, 300);
+    expect(levels()).toEqual([
       '0 (200.000)',
       '0.236 (176.400)',
       '0.382 (161.800)',
@@ -393,11 +454,98 @@ describe('ReplayChart', () => {
       '1 (100.000)',
     ]);
 
-    el.querySelector<HTMLButtonElement>('button[aria-label="Borrar rectángulo"]')!.click();
+    // Escape puts a tool down halfway.
+    await pick('Rectángulo');
+    await press(0, 350);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     await fixture.whenStable();
-    expect(el.querySelector('svg.shapes rect')).toBeNull();
-    expect(el.querySelectorAll('svg.shapes .fib')).toHaveLength(7);
-    await click('Borrar dibujos');
+    expect(el.querySelector('.tool-hint')).toBeNull();
+    expect(el.querySelectorAll('svg.shapes rect')).toHaveLength(1);
+  });
+
+  it('places points on a phone by dragging a crosshair, as in TradingView', async () => {
+    const r = await render();
+    const { fixture, el } = r;
+    const { pick, press, pointer, levels, canvas } = drawing(r);
+
+    await pick('Retroceso de Fibonacci');
+    // The crosshair starts under the finger and moves as much as it does.
+    pointer('pointerdown', 30, 300, true);
+    await fixture.whenStable();
+    expect(el.querySelectorAll('svg.shapes .crosshair')).toHaveLength(2);
+    expect(el.querySelector('.cursor-price')!.textContent!.trim()).toBe('200.000');
+    const touch = new Event('touchmove', { bubbles: true, cancelable: true });
+    canvas.dispatchEvent(touch);
+    expect(touch.defaultPrevented).toBe(true);
+    pointer('pointermove', 0, 200, true);
+    pointer('pointerup', 0, 200, true);
+    await fixture.whenStable();
+    expect(el.querySelector('.cursor-price')!.textContent!.trim()).toBe('300.000');
+    expect(el.textContent).toContain('Marca el final del movimiento.');
+
+    // The second drag starts from the first point, wherever the finger lands.
+    pointer('pointerdown', 200, 350, true);
+    pointer('pointermove', 205, 400, true);
+    pointer('pointermove', 210, 450, true);
+    await fixture.whenStable();
+    expect(el.querySelector('svg.shapes .anchor-dot')).not.toBeNull();
+    pointer('pointerup', 210, 450, true);
+    await fixture.whenStable();
+    expect(levels()[0]).toBe('0 (200.000)');
+    expect(levels().at(-1)).toBe('1 (300.000)');
+    expect(el.querySelector('svg.shapes .crosshair')).toBeNull();
+
+    // A tap puts the point where it lands.
+    await pick('Línea horizontal');
+    await press(5, 250, undefined, true);
+    expect(lw.series.createPriceLine).toHaveBeenLastCalledWith(
+      expect.objectContaining({ price: 250 }),
+    );
+  });
+
+  it('selects a drawing to reshape, move, recolor or delete it', async () => {
+    const r = await render();
+    const { fixture, el } = r;
+    const { pick, press, pointer, rect, handles } = drawing(r);
+    await pick('Rectángulo');
+    await press(0, 380, [10, 300]);
+    expect(handles()).toHaveLength(8);
+
+    // A tap elsewhere puts the selection down; a tap on the rectangle picks it again.
+    await press(300, 100);
+    expect(handles()).toHaveLength(0);
+    expect(el.querySelector('.drawing-bar')).toBeNull();
+    await press(5, 340, undefined, true);
+    expect(handles()).toHaveLength(8);
+
+    // The top right handle moves the top and the right side.
+    const corner = handles().find((h) => h.style.left === '10px' && h.style.top === '300px')!;
+    pointer('pointerdown', 10, 300, false, corner);
+    pointer('pointermove', 10, 250);
+    pointer('pointerup', 10, 250);
+    await fixture.whenStable();
+    expect(rect()).toEqual([0, 250, 10, 130]);
+
+    // Dragging the body moves it whole, without panning the chart.
+    pointer('pointerdown', 5, 320);
+    expect(lw.chart.applyOptions).toHaveBeenLastCalledWith({
+      handleScroll: false,
+      handleScale: false,
+    });
+    pointer('pointermove', 5, 330);
+    await fixture.whenStable();
+    expect(rect()).toEqual([0, 260, 10, 130]);
+    pointer('pointerup', 5, 330);
+    await fixture.whenStable();
+    expect(rect()).toEqual([0, 260, 10, 130]);
+
+    el.querySelector<HTMLButtonElement>('button[aria-label="Color rojo"]')!.click();
+    await fixture.whenStable();
+    expect(el.querySelector('svg.shapes g')!.getAttribute('stroke')).toBe('#f23645');
+
+    // Delete erases it, as the bar's trash button does.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' }));
+    await fixture.whenStable();
     expect(el.querySelector('svg.shapes')).toBeNull();
   });
 

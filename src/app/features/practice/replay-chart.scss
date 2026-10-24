@@ -1,4 +1,5 @@
 :host {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 460px;
@@ -45,13 +46,8 @@
     }
   }
 
-  .swatch {
-    width: 10px;
-    height: 3px;
-    border-radius: 2px;
-  }
-
-  // On a phone the toolbar scrolls sideways instead of eating the chart's height.
+  // On a phone the toolbar scrolls sideways instead of eating the chart's height, and the
+  // menus show their icon only.
   @media (max-width: 600px) {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -59,14 +55,10 @@
     button {
       flex: none;
     }
-  }
 
-  .sep {
-    flex: none;
-    width: 1px;
-    height: 18px;
-    margin: 0 4px;
-    background: var(--color-border);
+    .trigger-text {
+      display: none;
+    }
   }
 }
 
@@ -79,43 +71,6 @@
 .canvas {
   position: absolute;
   inset: 0;
-}
-
-/* Rectangles and Fibonacci retracements, drawn over the chart. */
-.shapes {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  pointer-events: none;
-
-  .rect {
-    fill: rgb(41 98 255 / 12%);
-    stroke: #2962ff;
-  }
-
-  .fib {
-    stroke: #2962ff;
-    stroke-width: 1;
-  }
-
-  .fib-text {
-    fill: #2962ff;
-    font-size: 10px;
-    paint-order: stroke;
-    stroke: var(--color-bg);
-    stroke-width: 3px;
-  }
-}
-
-.shape-x {
-  position: absolute;
-  z-index: 2;
-  padding: 0 4px;
-  transform: translate(-100%, 0);
-  line-height: 1.4;
 }
 
 /* A faint INDAB logo behind the candles. */
@@ -404,19 +359,4 @@ button.badge {
   &:hover {
     color: var(--color-down);
   }
-}
-
-.tool-hint {
-  position: absolute;
-  bottom: 36px;
-  left: 50%;
-  z-index: 2;
-  margin: 0;
-  padding: 4px 10px;
-  transform: translateX(-50%);
-  border-radius: var(--radius);
-  background: var(--color-text);
-  color: var(--color-bg);
-  font-size: 0.8rem;
-  pointer-events: none;
 }

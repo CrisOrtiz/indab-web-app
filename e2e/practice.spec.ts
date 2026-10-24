@@ -194,3 +194,102 @@ test('a student adds an order from the chart menu and sets it up on its line', a
   });
   expect(trades[0]['takeProfit']).toEqual(expect.any(Number));
 });
+
+test.describe('on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('a student draws on the chart with a finger, as in TradingView', async ({ page }) => {
+    await signIn(page, 'jose@indab.test');
+    await page.getByRole('link', { name: 'Práctica de trading' }).click();
+    await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+    await expect(page.locator('.market .price')).toHaveText('100.000');
+
+    // The timeframes sit on top of the chart, next to the indicators and drawings menus.
+    const chart = page.locator('.workspace app-replay-chart');
+    const tools = chart.getByRole('toolbar', { name: 'Herramientas del gráfico' });
+    await expect(tools.getByRole('button', { name: '15m', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await tools.getByRole('button', { name: '1h', exact: true }).tap();
+    await expect(tools.getByRole('button', { name: '1h', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    // The chart fills the screen under the header, as when practising on a phone.
+    const stage = chart.locator('.stage');
+    const fitChart = () =>
+      page.evaluate(() => {
+        const chart = document.querySelector('.workspace app-replay-chart')!;
+        window.scrollBy({ top: chart.getBoundingClientRect().top - 100, behavior: 'instant' });
+      });
+    let box = (await stage.boundingBox())!;
+    // Real touches, so the chart gets pointer events of a finger.
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type: string, x?: number, y?: number) =>
+      cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: x === undefined ? [] : [{ x: box.x + x, y: box.y + y! }],
+      });
+    const drag = async (from: [number, number], to: [number, number]) => {
+      await fitChart();
+      box = (await stage.boundingBox())!;
+      await touch('touchStart', ...from);
+      for (let i = 1; i <= 5; i++) {
+        const at = (k: 0 | 1) => from[k] + ((to[k] - from[k]) * i) / 5;
+        await touch('touchMove', at(0), at(1));
+      }
+      await touch('touchEnd');
+    };
+
+    // Fibonacci: drag the crosshair to the start of the move, let go, then drag to its end.
+    await tools.getByRole('button', { name: 'Herramientas de dibujo' }).tap();
+    await page.getByRole('menuitemradio', { name: 'Retroceso de Fibonacci' }).tap();
+    await expect(page.getByRole('status')).toContainText('Marca el inicio del movimiento.');
+    await drag([150, 150], [120, 100]);
+    await expect(page.getByRole('status')).toContainText('Marca el final del movimiento.');
+    await drag([200, 200], [230, 260]);
+    await expect(stage.locator('svg.shapes .fib')).toHaveCount(7);
+    await expect(stage.locator('.handle')).toHaveCount(2);
+    // Its ends moved with the finger: 50 px down from the first point to the second.
+    const [start, end] = await stage
+      .locator('.handle')
+      .evaluateAll((handles) => handles.map((h) => parseFloat((h as HTMLElement).style.top)));
+    expect(end - start).toBeGreaterThan(40);
+    // The finger neither scrolled the page nor panned the chart.
+    expect((await stage.boundingBox())!.y).toBe(box.y);
+    await page.screenshot({ path: 'test-results/phone-fibonacci.png' });
+
+    // Selected, it can be recolored and deleted from its bar.
+    const bar = page.getByRole('toolbar', { name: 'Opciones del dibujo' });
+    await bar.getByRole('button', { name: 'Color rojo' }).tap();
+    await expect(stage.locator('svg.shapes g').first()).toHaveAttribute('stroke', '#f23645');
+    await bar.getByRole('button', { name: 'Borrar dibujo' }).tap();
+    await expect(stage.locator('svg.shapes .fib')).toHaveCount(0);
+
+    // A rectangle from two taps, then stretched by its bottom right handle.
+    await tools.getByRole('button', { name: 'Herramientas de dibujo' }).tap();
+    await page.getByRole('menuitemradio', { name: 'Rectángulo' }).tap();
+    await fitChart();
+    box = (await stage.boundingBox())!;
+    await page.touchscreen.tap(box.x + 100, box.y + 120);
+    await page.touchscreen.tap(box.x + 160, box.y + 180);
+    const rect = stage.locator('svg.shapes rect');
+    await expect(rect).toBeVisible();
+    await expect(stage.locator('.handle')).toHaveCount(8);
+    const before = Number(await rect.getAttribute('height'));
+    const corner = (await stage.locator('.handle').nth(4).boundingBox())!;
+    const cx = corner.x - box.x + corner.width / 2;
+    const cy = corner.y - box.y + corner.height / 2;
+    await drag([cx, cy], [cx + 20, cy + 40]);
+    await expect
+      .poll(async () => Number(await rect.getAttribute('height')))
+      .toBeGreaterThan(before + 30);
+
+    // A tap elsewhere puts the selection down.
+    await page.touchscreen.tap(box.x + 40, box.y + 300);
+    await expect(stage.locator('.handle')).toHaveCount(0);
+    await expect(rect).toBeVisible();
+  });
+});

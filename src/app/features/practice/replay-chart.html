@@ -1,98 +1,191 @@
 @let t = i18n.messages().chart;
 @if (tools()) {
   <div class="tools" role="toolbar" [attr.aria-label]="t.tools">
-    @for (indicator of indicators; track indicator.id) {
-      <button
-        type="button"
-        [class.on]="active().has(indicator.id)"
-        [attr.aria-pressed]="active().has(indicator.id)"
-        (click)="toggleIndicator(indicator.id)"
-      >
-        <span class="swatch" [style.background]="indicator.color"></span>{{ indicator.label }}
-      </button>
-    }
-    <span class="sep"></span>
+    <ng-content select="[chartToolbar]" />
     <button
       type="button"
-      [class.on]="tool() === 'hline'"
-      [attr.aria-pressed]="tool() === 'hline'"
-      [title]="t.hlineTitle"
-      (click)="pick('hline')"
+      class="menu-trigger"
+      aria-haspopup="menu"
+      [attr.aria-expanded]="toolMenu()?.kind === 'indicators'"
+      [attr.aria-label]="t.indicators"
+      [class.on]="active().size > 0"
+      (click)="toggleToolMenu('indicators', $event)"
     >
-      {{ t.hline }}
+      <ng-container *ngTemplateOutlet="icon; context: { $implicit: 'indicators' }" />
+      <span class="trigger-text">{{ t.indicators }}</span>
+      @if (active().size) {
+        <span class="count">{{ active().size }}</span>
+      }
+      <span class="caret" aria-hidden="true">▾</span>
     </button>
     <button
       type="button"
-      [class.on]="tool() === 'trend'"
-      [attr.aria-pressed]="tool() === 'trend'"
-      [title]="t.trendTitle"
-      (click)="pick('trend')"
+      class="menu-trigger"
+      aria-haspopup="menu"
+      [attr.aria-expanded]="toolMenu()?.kind === 'drawings'"
+      [attr.aria-label]="t.drawingTools"
+      [class.on]="!!tool()"
+      (click)="toggleToolMenu('drawings', $event)"
     >
-      {{ t.trend }}
-    </button>
-    <button
-      type="button"
-      [class.on]="tool() === 'rect'"
-      [attr.aria-pressed]="tool() === 'rect'"
-      (click)="pick('rect')"
-    >
-      {{ t.rect }}
-    </button>
-    <button
-      type="button"
-      [class.on]="tool() === 'fib'"
-      [attr.aria-pressed]="tool() === 'fib'"
-      (click)="pick('fib')"
-    >
-      {{ t.fib }}
-    </button>
-    <button type="button" [disabled]="!drawings().length" (click)="clearDrawings()">
-      {{ t.clear }}
+      <ng-container *ngTemplateOutlet="icon; context: { $implicit: tool() ?? 'draw' }" />
+      <span class="trigger-text">{{ tool() ? t.toolNames[tool()!] : t.draw }}</span>
+      <span class="caret" aria-hidden="true">▾</span>
     </button>
   </div>
+  @if (toolMenu(); as open) {
+    <div
+      class="tool-menu"
+      role="menu"
+      [style.left.px]="open.left"
+      [style.right.px]="open.right"
+      [style.top.px]="open.top"
+    >
+      @if (open.kind === 'indicators') {
+        @for (indicator of indicators; track indicator.id) {
+          <button
+            type="button"
+            role="menuitemcheckbox"
+            [attr.aria-checked]="active().has(indicator.id)"
+            [class.on]="active().has(indicator.id)"
+            (click)="toggleIndicator(indicator.id)"
+          >
+            <span class="swatch" [style.background]="indicator.color"></span>
+            {{ indicator.label }}
+            <span class="check" aria-hidden="true">{{
+              active().has(indicator.id) ? '✓' : ''
+            }}</span>
+          </button>
+        }
+      } @else {
+        @for (item of toolList; track item) {
+          <button
+            type="button"
+            role="menuitemradio"
+            [attr.aria-checked]="tool() === item"
+            [class.on]="tool() === item"
+            (click)="pick(item)"
+          >
+            <ng-container *ngTemplateOutlet="icon; context: { $implicit: item }" />
+            {{ t.toolNames[item] }}
+          </button>
+        }
+        <hr />
+        <button
+          type="button"
+          role="menuitem"
+          [disabled]="!drawings().length"
+          (click)="clearDrawings()"
+        >
+          <ng-container *ngTemplateOutlet="icon; context: { $implicit: 'trash' }" />
+          {{ t.clear }}
+        </button>
+      }
+    </div>
+  }
 }
 <div class="stage" #stage>
   <div class="canvas" #canvas></div>
   <img class="watermark" src="logo.jpg" alt="" aria-hidden="true" />
-  @if (shapes().length) {
+  @if (shapes().length || cursor()?.touch) {
     <svg class="shapes" aria-hidden="true">
       @for (shape of shapes(); track shape.id) {
-        @if (shape.kind === 'rect') {
-          <rect
-            class="rect"
-            [attr.x]="shape.left"
-            [attr.y]="shape.top"
-            [attr.width]="shape.right - shape.left"
-            [attr.height]="shape.bottom - shape.top"
-          />
-        } @else {
-          @for (level of shape.levels; track level.ratio) {
-            <line
-              class="fib"
-              [attr.x1]="shape.left"
-              [attr.x2]="shape.right"
-              [attr.y1]="level.y"
-              [attr.y2]="level.y"
-            />
-            <text class="fib-text" [attr.x]="shape.left + 4" [attr.y]="level.y - 3">
-              {{ level.ratio }} ({{ level.price | number: priceDigits(level.price) }})
-            </text>
+        <g [attr.stroke]="shape.color" [attr.fill]="shape.color">
+          @switch (shape.kind) {
+            @case ('rect') {
+              <rect
+                class="rect"
+                [attr.x]="shape.left"
+                [attr.y]="shape.top"
+                [attr.width]="shape.right - shape.left"
+                [attr.height]="shape.bottom - shape.top"
+              />
+            }
+            @case ('trend') {
+              <line
+                class="trend"
+                [attr.x1]="shape.a.x"
+                [attr.y1]="shape.a.y"
+                [attr.x2]="shape.b.x"
+                [attr.y2]="shape.b.y"
+              />
+            }
+            @default {
+              <line
+                class="fib-move"
+                [attr.x1]="shape.a.x"
+                [attr.y1]="shape.a.y"
+                [attr.x2]="shape.b.x"
+                [attr.y2]="shape.b.y"
+              />
+              @for (level of shape.levels; track level.ratio) {
+                <line
+                  class="fib"
+                  [attr.x1]="shape.left"
+                  [attr.x2]="shape.right"
+                  [attr.y1]="level.y"
+                  [attr.y2]="level.y"
+                />
+                <text class="fib-text" [attr.x]="shape.left + 4" [attr.y]="level.y - 3">
+                  {{ level.ratio }} ({{ level.price | number: priceDigits(level.price) }})
+                </text>
+              }
+            }
           }
+          @if (shape.id === 0) {
+            <circle class="anchor-dot" [attr.cx]="shape.a.x" [attr.cy]="shape.a.y" r="4" />
+          }
+        </g>
+      }
+      @if (cursor(); as c) {
+        @if (c.touch) {
+          <line class="crosshair" x1="0" x2="100%" [attr.y1]="c.y" [attr.y2]="c.y" />
+          <line class="crosshair" y1="0" y2="100%" [attr.x1]="c.x" [attr.x2]="c.x" />
+          <circle class="crosshair-dot" [attr.cx]="c.x" [attr.cy]="c.y" r="3" />
         }
       }
     </svg>
-    @for (shape of shapes(); track shape.id) {
+  }
+  @if (cursorPrice(); as price) {
+    <span
+      class="cursor-price"
+      [style.top.px]="cursor()!.y"
+      [style.width.px]="scaleWidth()"
+      aria-hidden="true"
+      >{{ price | number: priceDigits(price) }}</span
+    >
+  }
+  @if (selectedShape(); as shape) {
+    @for (handle of shape.handles; track handle.key) {
+      <span
+        class="handle"
+        [style.left.px]="handle.x"
+        [style.top.px]="handle.y"
+        [style.border-color]="shape.color"
+        aria-hidden="true"
+        (pointerdown)="grabHandle(shape, handle, $event)"
+      ></span>
+    }
+    <div class="drawing-bar" role="toolbar" [attr.aria-label]="t.drawingOptions">
+      @for (color of drawingColors; track color; let i = $index) {
+        <button
+          type="button"
+          class="color"
+          [style.background]="color"
+          [attr.aria-pressed]="shape.color === color"
+          [attr.aria-label]="t.color(t.colorNames[i])"
+          (click)="recolor(color)"
+        ></button>
+      }
+      <span class="sep"></span>
       <button
         type="button"
-        class="x shape-x"
-        [style.left.px]="shape.right"
-        [style.top.px]="shape.top"
-        [attr.aria-label]="shape.kind === 'rect' ? t.eraseRect : t.eraseFib"
-        (click)="act({ kind: 'erase', drawingId: shape.id, label: '' })"
+        class="erase"
+        [attr.aria-label]="t.eraseDrawing"
+        (click)="eraseSelected()"
       >
-        ×
+        <ng-container *ngTemplateOutlet="icon; context: { $implicit: 'trash' }" />
       </button>
-    }
+    </div>
   }
   @for (zone of zones(); track zone.key) {
     <div
@@ -304,9 +397,44 @@
     </div>
   }
   @if (tool(); as current) {
-    <p class="tool-hint" role="status">
-      {{ t.hints[current][anchor() ? 1 : 0] }}
-    </p>
+    <div class="tool-hint">
+      <p role="status">
+        {{ t.hints[current][anchor() ? 1 : 0] }}
+        <span class="touch-only">{{ t.dragHint }}</span>
+      </p>
+      <button type="button" (click)="pick(null)">{{ t.cancel }}</button>
+    </div>
   }
   <ng-content />
 </div>
+
+<ng-template #icon let-name>
+  <svg class="icon" viewBox="0 0 18 18" aria-hidden="true">
+    @switch (name) {
+      @case ('hline') {
+        <path d="M1 9h16" />
+        <circle cx="9" cy="9" r="2" />
+      }
+      @case ('trend') {
+        <path d="M4 14 14 4" />
+        <circle cx="3.5" cy="14.5" r="2" />
+        <circle cx="14.5" cy="3.5" r="2" />
+      }
+      @case ('rect') {
+        <rect x="2.5" y="4.5" width="13" height="9" rx="1" />
+      }
+      @case ('fib') {
+        <path d="M1 3h16M1 7h16M1 11h16M1 15h16" />
+      }
+      @case ('indicators') {
+        <path d="M1 14l5-6 3 3 8-8" />
+      }
+      @case ('trash') {
+        <path d="M3 5h12M7 5V3h4v2M5 5l1 11h6l1-11" />
+      }
+      @default {
+        <path d="M3 15l1-4 8-8 3 3-8 8-4 1z" />
+      }
+    }
+  </svg>
+</ng-template>
