@@ -273,7 +273,9 @@ Module notes:
   `auth/requires-recent-login`) and changes passwords after reauthentication. The practice P/L
   summary reads the latest 50 `practiceSessions`. Linking from Google is unit-tested only: the
   emulator's Google window needs internet.
-- **Admin (`/admin`, built)**: `features/admin/`. `AdminService` is provided by the `Admin`
+- **Admin (`/admin`, built)**: `features/admin/`. `/admin` is only the section cards; each tool
+  has its own page. User management is `/admin/users` (`features/admin/users/`, `adminGuard`).
+  `AdminService` is provided by the `AdminUsers`
   component (live `users` + `enrollments` listeners that stop on leave); search/filter is
   client-side in `admin-users.ts` (fine for hundreds of users; move to a paged query if it grows).
   Admins change roles (rules block changing their own) and toggle `enrollments/{uid}.academy`.
@@ -281,7 +283,8 @@ Module notes:
   `shared/section-cards/_section-cards.scss`, also used by `/academy`). Trainers open `/admin`
   too but only see the cards for forms, evaluations and the practice review (`AdminService`
   opens no listeners for them).
-  New admin tools (courses, materials, investors) can be added as sections of this page.
+  New admin tools (courses, materials, investors) get their own `/admin/<tool>` page and a card
+  (`cards` in `admin.ts`, `admin.cards` in the three message files).
   Any admin UI must still rely on rules (`isAdmin()`); never trust a client flag.
 
 ## Do not

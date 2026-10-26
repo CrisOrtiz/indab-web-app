@@ -16,6 +16,7 @@ export const es = {
     material: 'Material de estudio | INDAB',
     admin: 'Administración | INDAB',
     adminPractice: 'Prácticas de trading | INDAB',
+    adminUsers: 'Usuarios | INDAB',
     ranking: 'Ranking de evaluaciones | INDAB',
     calendar: 'Calendario económico | INDAB',
     adminEvaluations: 'Evaluaciones de práctica | INDAB',
@@ -381,6 +382,7 @@ export const es = {
         text: 'Cada sesión de práctica con sus operaciones.',
       },
     },
+    usersIntro: 'Busca a cada persona, cambia su rol y habilita o quita su acceso a la academia.',
     trainerNote:
       'Como entrenador puedes crear evaluaciones y revisar las prácticas. Los roles y el acceso a la academia los gestiona un administrador.',
     trainers: 'Entrenadores',

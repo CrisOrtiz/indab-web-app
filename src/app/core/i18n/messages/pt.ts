@@ -12,6 +12,7 @@ export const pt: Messages = {
     material: 'Material de estudo | INDAB',
     admin: 'Administração | INDAB',
     adminPractice: 'Práticas de trading | INDAB',
+    adminUsers: 'Usuários | INDAB',
     ranking: 'Ranking de avaliações | INDAB',
     calendar: 'Calendário econômico | INDAB',
     adminEvaluations: 'Avaliações de prática | INDAB',
@@ -377,6 +378,7 @@ export const pt: Messages = {
         text: 'Cada sessão de prática com suas operações.',
       },
     },
+    usersIntro: 'Encontre cada pessoa, altere o papel dela e ative ou remova o acesso à academia.',
     trainerNote:
       'Como treinador você pode criar avaliações e revisar as práticas. Os papéis e o acesso à academia são gerenciados por um administrador.',
     trainers: 'Treinadores',

@@ -188,10 +188,10 @@ The service account needs the _Firebase Admin_ and _Service Usage Consumer_ role
 | `examGrades/{submissionId}`                                      | trainers, admins; the student once results are published                                                                      | trainers and admins, for an existing attempt                                                                                                                                                                                                                                      |
 
 A user gets access to the academy and the material repository when an admin turns on
-"Acceso a la academia" for them in `/admin` (which writes `enrollments/{uid}` with
-`academy: true`). Admins also promote or demote other users there. The first admin has to be
-set by hand: in the Firebase console, open `users/{uid}` for that account and change `role` to
-`admin`. Admins cannot remove their own admin role, so there is always at least one.
+"Acceso a la academia" for them in `/admin/users` (the "Usuarios" card in `/admin`, which
+writes `enrollments/{uid}` with `academy: true`). Admins also promote or demote other users
+there. The first admin has to be set by hand: in the Firebase console, open `users/{uid}` for
+that account and change `role` to `admin`. Admins cannot remove their own admin role, so there is always at least one.
 Trainers (role `trainer`, appointed by an admin) have academy access, set up practice evaluations
 and evaluation forms, grade them and review practice, but cannot change roles, academy access or delete practice sessions. The route guards mirror these checks in the UI, but
 the rules are what actually protect the data. Anything not listed is denied.
@@ -220,7 +220,8 @@ Changing the password does revoke every other session, since Firebase ends them 
 | `/academy/ranking`    | enrolled users (rankings of published evaluations)                                                                                              |
 | `/academy/calendar`   | enrolled users (live economic calendar, TradingView's free widget)                                                                              |
 | `/academy/exams`      | enrolled users (assigned evaluation forms: answer, see grades; `/academy/exams/:id` takes one)                                                  |
-| `/admin`              | trainers and admins (users, roles and academy access for admins only)                                                                           |
+| `/admin`              | trainers and admins (a card per tool; trainers do not get the users card)                                                                       |
+| `/admin/users`        | admins (users, roles and academy access)                                                                                                        |
 | `/admin/practice`     | trainers and admins (review students' practice sessions on the chart; admins delete them)                                                       |
 | `/admin/evaluations`  | trainers and admins (set up timed evaluations, see and publish their results)                                                                   |
 | `/admin/forms`        | trainers and admins (build scored evaluation forms; `/admin/forms/:id` grades submissions and publishes results)                                |

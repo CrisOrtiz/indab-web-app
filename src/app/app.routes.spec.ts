@@ -5,7 +5,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from './app.routes';
 import { AuthService } from './core/auth/auth.service';
 import { FIRESTORE_LOADER } from './core/firebase/firebase.providers';
-import { Admin } from './features/admin/admin';
+import { AdminUsers } from './features/admin/users/users';
 import { AdminService } from './features/admin/admin.service';
 import { Practice } from './features/practice/practice';
 import { PracticeService } from './features/practice/practice.service';
@@ -62,8 +62,8 @@ describe('app routes', () => {
     TestBed.overrideComponent(Practice, { set: { template: '' } });
     TestBed.overrideComponent(Profile, { set: { template: '' } });
     TestBed.overrideComponent(AccountSetup, { set: { template: '' } });
-    // The admin page would open Firestore listeners; only the routing matters here.
-    TestBed.overrideComponent(Admin, {
+    // The users page would open Firestore listeners; only the routing matters here.
+    TestBed.overrideComponent(AdminUsers, {
       set: { providers: [{ provide: AdminService, useValue: {} }], template: '' },
     });
   });
@@ -169,6 +169,7 @@ describe('app routes', () => {
     expect(await visit('/academy/calendar')).toBe('/academy/calendar');
     expect(await visit('/academy/ranking')).toBe('/academy/ranking');
     expect(await visit('/admin')).toBe('/academy');
+    expect(await visit('/admin/users')).toBe('/academy');
     expect(await visit('/admin/practice')).toBe('/academy');
     expect(await visit('/admin/evaluations')).toBe('/academy');
   });
@@ -178,12 +179,14 @@ describe('app routes', () => {
     expect(await visit('/admin')).toBe('/admin');
     expect(await visit('/admin/practice')).toBe('/admin/practice');
     expect(await visit('/admin/evaluations')).toBe('/admin/evaluations');
+    expect(await visit('/admin/users')).toBe('/academy');
     expect(await visit('/academy/practice')).toBe('/academy/practice');
   });
 
   it('opens the admin area to admins', async () => {
     signIn({ admin: true });
     expect(await visit('/admin')).toBe('/admin');
+    expect(await visit('/admin/users')).toBe('/admin/users');
     expect(await visit('/admin/practice')).toBe('/admin/practice');
   });
 });
