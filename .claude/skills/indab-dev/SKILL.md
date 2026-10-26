@@ -62,12 +62,16 @@ otherwise create a feature service.
 | `investors/{uid}` (Eleva)                                        | owner, admins                                                               | admins                                                                                                                                                    |
 | `evaluations/{id}`                                               | staff, assigned students                                                    | staff (shape validated)                                                                                                                                   |
 | `practiceSessions/{id}` + `/trades/{id}`                         | owner, staff; attempts at published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
+| `examForms/{id}`                                                 | staff; published + assigned to students                                     | staff (shape validated; no answers stored here)                                                                                                           |
+| `examKeys/{examId}`                                              | staff; students once `resultsPublished && showAnswers`                      | staff                                                                                                                                                     |
+| `examSubmissions/{examId}_{uid}_{n}`                             | owner, staff                                                                | owner (academy access): attempt n ≤ `maxAttempts`, in window, previous handed in; saves until deadline + 2 min                                            |
+| `examGrades/{submissionId}`                                      | staff; student once `resultsPublished`                                      | staff, for an existing submission                                                                                                                         |
 
 Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`, `isStaff()`
 (trainers and admins), `emailVerified()`, `hasAcademyAccess()` (staff count as having it; needs
 a verified email), `isEnrolledIn(courseId)`. Tests sign in with `email_verified: true` unless
 they pass `as(uid, false)`.
-Everything not matched is denied. Trainers run evaluations and review practice; anything about
+Everything not matched is denied. Trainers run evaluations and evaluation forms, grade and review practice; anything about
 users, access or deleting practice stays admin-only.
 
 Guards in `src/app/core/auth/auth.guards.ts`: `authGuard` (signed in), `guestGuard`
@@ -231,6 +235,14 @@ Module notes:
   `standings.ts`) ranks only evaluations, by attempt P/L: Cris does not want free practice
   ranked, so free sessions stay private to the student and staff. Students see an evaluation's ranking
   only after staff publish it. P/L is client-computed: not a trusted grade.
+- **Evaluation forms (built)**: questionnaires, separate from chart evaluations.
+  `core/models/exam.ts` (types, `suggestScore`, `bestGrade`, `attemptDeadline`),
+  `features/exams/exam.service.ts`; staff build them at `/admin/forms`
+  (`features/admin/exams/`, editor maths in `exam-form.ts`) and grade at `/admin/forms/:id`
+  (`exam-results.ts`); students take them at `/academy/exams` (`features/exams/`, list state in
+  `exam-status.ts`). Answer keys live apart in `examKeys` so students can read the questions.
+  Grading runs in the staff browser ($0, no functions). The best attempt counts. Not built yet:
+  groups, CSV export, extra attempts per student, shuffled questions.
 - **Economic calendar (`/academy/calendar`, built)**: `features/calendar/`. TradingView's free
   calendar widget (`widget.ts` builds its settings: locale, economies, impact); the page rebuilds
   the embed when a filter or the language changes, keeps TradingView's credit link, and adds a
@@ -259,8 +271,10 @@ Module notes:
   component (live `users` + `enrollments` listeners that stop on leave); search/filter is
   client-side in `admin-users.ts` (fine for hundreds of users; move to a paged query if it grows).
   Admins change roles (rules block changing their own) and toggle `enrollments/{uid}.academy`.
-  Trainers open `/admin` too but only see links to evaluations and the practice review
-  (`AdminService` opens no listeners for them).
+  `/admin` opens with illustrated section cards (`admin-home.scss`, shared card styles in
+  `shared/section-cards/_section-cards.scss`, also used by `/academy`). Trainers open `/admin`
+  too but only see the cards for forms, evaluations and the practice review (`AdminService`
+  opens no listeners for them).
   New admin tools (courses, materials, investors) can be added as sections of this page.
   Any admin UI must still rely on rules (`isAdmin()`); never trust a client flag.
 

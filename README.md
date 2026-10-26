@@ -182,6 +182,10 @@ The service account needs the _Firebase Admin_ and _Service Usage Consumer_ role
 | `evaluations/{id}` (timed practice evaluation)                   | trainers, admins, assigned students                                                                                           | trainers and admins (shape validated)                                                                                                                                                                                                                                             |
 | `practiceSessions/{id}` (chart replay)                           | owner, trainers, admins; attempts at evaluations with published results also to everyone with academy access, for the ranking | owner with academy access creates it and updates its summary until `finished`; an evaluation attempt has the id `{evaluationId}_{uid}` (one per student), must start inside the window on the evaluation's settings, and is locked 2 minutes after its time limit; admins delete  |
 | `practiceSessions/{id}/trades/{id}`                              | session owner, trainers, admins                                                                                               | session owner opens trades while the session is active (and, in an evaluation, before the time is up) and closes each once (entry never editable); admins delete                                                                                                                  |
+| `examForms/{id}` (evaluation form, no answers)                   | trainers, admins; published forms to their assigned students (`audience` `all` or in `studentIds`)                            | trainers and admins (shape validated); trainers and admins delete                                                                                                                                                                                                                 |
+| `examKeys/{examId}` (right answers)                              | trainers, admins; students once results with answers are published                                                            | trainers and admins                                                                                                                                                                                                                                                               |
+| `examSubmissions/{examId}_{uid}_{n}` (attempt)                   | owner, trainers, admins                                                                                                       | owner with academy access starts attempt `n` (up to `maxAttempts`, inside the window, after the previous one is handed in) and saves answers until handing in or 2 minutes after its deadline                                                                                     |
+| `examGrades/{submissionId}`                                      | trainers, admins; the student once results are published                                                                      | trainers and admins, for an existing attempt                                                                                                                                                                                                                                      |
 
 A user gets access to the academy and the material repository when an admin turns on
 "Acceso a la academia" for them in `/admin` (which writes `enrollments/{uid}` with
@@ -189,7 +193,7 @@ A user gets access to the academy and the material repository when an admin turn
 set by hand: in the Firebase console, open `users/{uid}` for that account and change `role` to
 `admin`. Admins cannot remove their own admin role, so there is always at least one.
 Trainers (role `trainer`, appointed by an admin) have academy access, set up practice evaluations
-and review practice, but cannot change roles, academy access or delete practice sessions. The route guards mirror these checks in the UI, but
+and evaluation forms, grade them and review practice, but cannot change roles, academy access or delete practice sessions. The route guards mirror these checks in the UI, but
 the rules are what actually protect the data. Anything not listed is denied.
 
 Academy content (material, lessons, practice, ranking) also needs a confirmed email
@@ -215,9 +219,11 @@ Changing the password does revoke every other session, since Firebase ends them 
 | `/academy/practice`   | enrolled users (chart-replay trading practice: free practice and assigned evaluations)                                                          |
 | `/academy/ranking`    | enrolled users (rankings of published evaluations)                                                                                              |
 | `/academy/calendar`   | enrolled users (live economic calendar, TradingView's free widget)                                                                              |
+| `/academy/exams`      | enrolled users (assigned evaluation forms: answer, see grades; `/academy/exams/:id` takes one)                                                  |
 | `/admin`              | trainers and admins (users, roles and academy access for admins only)                                                                           |
 | `/admin/practice`     | trainers and admins (review students' practice sessions on the chart; admins delete them)                                                       |
 | `/admin/evaluations`  | trainers and admins (set up timed evaluations, see and publish their results)                                                                   |
+| `/admin/forms`        | trainers and admins (build scored evaluation forms; `/admin/forms/:id` grades submissions and publishes results)                                |
 
 ## Languages
 
@@ -338,6 +344,21 @@ Results stay with the staff until a trainer publishes them.
 `/academy/ranking` ranks only evaluations (Cris's choice: free practice is not ranked and stays
 private to the student and staff): each published evaluation by the attempt's P/L, fewer
 trades first on a tie.
+
+### Evaluation forms
+
+Separate from the chart evaluations, trainers and admins build **evaluation forms**
+(questionnaires) at `/admin/forms`: a total score and the score to pass, questions of four
+types (one answer, several answers with optional partial credit, true/false, open answer) each
+worth some points (the points must add up to the total before publishing), an optional time
+limit, 1 to 3 attempts, a window and who takes it (every student or the ones picked). Drafts stay
+hidden. Students find them at `/academy/exams`, answer one question per screen (saved as they go,
+handed in by them or when the time is up) and, once staff publish the results, see their best
+grade, the points per question and the trainer's comments (and the right answers, if staff
+choose to show them). Staff grade at `/admin/forms/:id`: closed questions come scored from the
+answer key, open ones are graded by hand. The right answers live in `examKeys`, which students
+cannot read until then. The suggested scores are computed in the staff browser, so no server
+(Blaze plan) is needed.
 
 `/academy/calendar` embeds TradingView's free
 [economic calendar widget](https://www.tradingview.com/widget-docs/widgets/calendars/economic-calendar/):

@@ -29,7 +29,7 @@ describe('Academy', () => {
     expect(el.querySelector('a[href="/academy/material"]')).toBeNull();
     expect(el.querySelector('a[href="/academy/practice"]')).toBeNull();
     // The sections still show, locked, so students see what is coming.
-    expect(el.querySelectorAll('.card.locked')).toHaveLength(4);
+    expect(el.querySelectorAll('.card.locked')).toHaveLength(5);
     expect(el.textContent).toContain('Se habilita con tu inscripción');
   });
 
@@ -42,6 +42,7 @@ describe('Academy', () => {
     expect(links).toEqual([
       '/academy/material',
       '/academy/practice',
+      '/academy/exams',
       '/academy/ranking',
       '/academy/calendar',
     ]);

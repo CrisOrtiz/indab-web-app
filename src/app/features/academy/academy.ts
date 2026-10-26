@@ -5,7 +5,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
 import { Reveal } from '../../shared/reveal/reveal';
 
-type CardKey = 'material' | 'practice' | 'ranking' | 'calendar';
+type CardKey = 'material' | 'practice' | 'exams' | 'ranking' | 'calendar';
 
 // Academy home: a card per section. Without academy access the cards show locked.
 @Component({
@@ -21,6 +21,7 @@ export class Academy {
   protected readonly cards: { key: CardKey; link: string }[] = [
     { key: 'material', link: '/academy/material' },
     { key: 'practice', link: '/academy/practice' },
+    { key: 'exams', link: '/academy/exams' },
     { key: 'ranking', link: '/academy/ranking' },
     { key: 'calendar', link: '/academy/calendar' },
   ];

@@ -1,0 +1,227 @@
+@let t = i18n.messages().examAdmin;
+@let r = t.results;
+@let tx = i18n.messages().exams;
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/admin/forms" class="back">{{ t.back }}</a>
+    <p class="eyebrow">{{ r.eyebrow }}</p>
+    @if (exam(); as exam) {
+      <h1>{{ exam.title }}</h1>
+      <p>
+        {{ t.summary(exam.totalPoints, exam.passingPoints, exam.questions.length) }} ·
+        {{ exam.durationMinutes ? t.minutes(exam.durationMinutes) : t.noLimit }} ·
+        {{ t.attemptsCount(exam.maxAttempts) }}
+      </p>
+    }
+  </header>
+
+  @if (message(); as msg) {
+    <p class="message" [class.error]="msg.kind === 'error'" role="status">
+      {{ msg.text }}
+      <button
+        type="button"
+        class="dismiss"
+        [attr.aria-label]="i18n.messages().admin.close"
+        (click)="message.set(null)"
+      >
+        ×
+      </button>
+    </p>
+  }
+
+  @if (loading()) {
+    <p class="muted">{{ t.loading }}</p>
+  } @else if (missing()) {
+    <p class="muted">{{ r.notFound }}</p>
+  } @else if (exam(); as exam) {
+    <div class="stats">
+      <div class="stat">
+        <strong>{{ stats().submissions }}</strong
+        ><span>{{ r.submissions }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ stats().graded }}</strong
+        ><span>{{ r.graded }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ stats().passed }}</strong
+        ><span>{{ r.passed }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ stats().average === null ? '—' : (stats().average | number: '1.0-1') }}</strong
+        ><span>{{ r.average }}</span>
+      </div>
+    </div>
+
+    <div class="publish">
+      <button
+        type="button"
+        class="btn"
+        [class.btn-outline]="exam.resultsPublished"
+        (click)="setResults({ resultsPublished: !exam.resultsPublished })"
+      >
+        {{ exam.resultsPublished ? r.unpublish : r.publish }}
+      </button>
+      <label class="check">
+        <input
+          type="checkbox"
+          [checked]="exam.showAnswers"
+          (change)="setResults({ showAnswers: $any($event.target).checked })"
+        />
+        {{ r.showAnswers }}
+      </label>
+    </div>
+
+    <table class="users results">
+      <thead>
+        <tr>
+          <th>{{ r.student }}</th>
+          <th>{{ r.attempt }}</th>
+          <th>{{ r.status }}</th>
+          <th>{{ r.score }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.uid + (row.submission?.id ?? '')) {
+          <tr [class.selected]="row.submission && row.submission.id === selected()">
+            <td [attr.data-label]="r.student" class="name">{{ row.name }}</td>
+            <td [attr.data-label]="r.attempt">{{ row.submission?.attempt ?? '—' }}</td>
+            <td [attr.data-label]="r.status">
+              <span class="pill" [attr.data-state]="row.state">{{ r.statuses[row.state] }}</span>
+            </td>
+            <td [attr.data-label]="r.score">
+              @if (row.grade; as g) {
+                {{ g.total }} / {{ exam.totalPoints }}
+                <span [class.up]="g.passed" [class.down]="!g.passed">
+                  · {{ g.passed ? r.passedLabel : r.failedLabel }}
+                </span>
+              } @else {
+                —
+              }
+            </td>
+            <td>
+              @if (row.submission) {
+                <button
+                  type="button"
+                  class="btn btn-outline"
+                  [attr.aria-label]="r.reviewLabel(row.name, row.submission.attempt)"
+                  (click)="open(row)"
+                >
+                  {{ row.grade ? r.reviewAgain : r.review }}
+                </button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="5" class="muted empty">{{ r.none }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    @if (current(); as row) {
+      @if (draft(); as d) {
+        <form class="grading" (submit)="$event.preventDefault(); saveGrade()">
+          <div class="grading-head">
+            <h2>{{ r.gradingTitle(row.name, row.submission!.attempt) }}</h2>
+            <button type="button" class="btn btn-outline" (click)="close()">{{ r.close }}</button>
+          </div>
+          @if (row.submission!.submittedAt; as at) {
+            <p class="muted">{{ at.toDate() | localDate: 'd MMM y, HH:mm' }}</p>
+          }
+          <ol class="answers">
+            @for (q of exam.questions; track q.id; let i = $index) {
+              @let answer = row.submission!.answers[q.id];
+              @let hint = suggestion(q);
+              <li class="answer">
+                <div class="answer-head">
+                  <strong>{{ t.question(i + 1) }} · {{ tx.points(q.points) }}</strong>
+                  @if (hint === null) {
+                    <span class="pill" data-state="submitted">{{ r.toReview }}</span>
+                  } @else {
+                    <span class="muted">{{ r.suggested(hint, q.points) }}</span>
+                  }
+                </div>
+                <p class="q-text">{{ q.text }}</p>
+                @if (q.imageUrl) {
+                  <img [src]="q.imageUrl" [alt]="tx.image" loading="lazy" />
+                }
+                @if (q.type === 'open') {
+                  <p class="label">{{ r.answer }}</p>
+                  <p class="open-answer">{{ answer?.text || r.noAnswer }}</p>
+                } @else {
+                  <ul class="choices">
+                    @for (label of optionLabels(q); track $index; let j = $index) {
+                      @let picked = answer?.choices?.includes(j) ?? false;
+                      @let right = rightAnswer(q).includes(j);
+                      <li
+                        [class.picked]="picked"
+                        [class.right]="right"
+                        [class.wrong]="picked && !right"
+                      >
+                        <span aria-hidden="true">{{
+                          picked ? (right ? '✓' : '✗') : right ? '○' : ''
+                        }}</span>
+                        {{ label }}
+                        @if (right) {
+                          <span class="muted">· {{ r.rightAnswer }}</span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                  @if (!answer?.choices?.length) {
+                    <p class="muted">{{ r.noAnswer }}</p>
+                  }
+                }
+                <div class="score-row">
+                  <label>
+                    {{ r.pointsOf(i + 1, q.points) }}
+                    <input
+                      type="number"
+                      min="0"
+                      [max]="q.points"
+                      step="any"
+                      [class.accent]="hint === null"
+                      [value]="d.scores[q.id] ?? ''"
+                      (input)="setScore(q.id, $any($event.target).value)"
+                    />
+                  </label>
+                  <label class="comment">
+                    {{ r.comment(i + 1) }}
+                    <input
+                      type="text"
+                      maxlength="500"
+                      [value]="d.comments[q.id] ?? ''"
+                      (input)="setComment(q.id, $any($event.target).value)"
+                    />
+                  </label>
+                </div>
+              </li>
+            }
+          </ol>
+          <label>
+            {{ r.feedback }}
+            <textarea
+              rows="3"
+              maxlength="2000"
+              [value]="d.feedback"
+              (input)="setFeedback($any($event.target).value)"
+            ></textarea>
+          </label>
+          <div class="grading-foot">
+            @let passes = draftTotal() >= exam.passingPoints;
+            <p class="total" [class.ok]="passes" [class.bad]="!passes" role="status">
+              {{ r.total(draftTotal(), exam.totalPoints) }} ·
+              {{ passes ? r.passedLabel : r.failedLabel }} ({{ r.minimum(exam.passingPoints) }})
+            </p>
+            <button type="submit" class="btn" [disabled]="saving()">
+              {{ saving() ? t.saving : r.saveGrade }}
+            </button>
+          </div>
+        </form>
+      }
+    }
+  }
+</section>

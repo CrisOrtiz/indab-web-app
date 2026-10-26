@@ -1,0 +1,417 @@
+@let t = i18n.messages().examAdmin;
+@let tx = i18n.messages().exams;
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/admin" class="back">{{ i18n.messages().admin.back }}</a>
+    <h1>{{ t.title }}</h1>
+    <p>{{ t.intro }}</p>
+    @if (!form()) {
+      <button type="button" class="btn" (click)="create()">{{ t.new }}</button>
+    }
+  </header>
+
+  @if (message(); as msg) {
+    <p class="message" [class.error]="msg.kind === 'error'" role="status">
+      {{ msg.text }}
+      <button
+        type="button"
+        class="dismiss"
+        [attr.aria-label]="i18n.messages().admin.close"
+        (click)="message.set(null)"
+      >
+        ×
+      </button>
+    </p>
+  }
+
+  @if (form(); as f) {
+    <form class="evaluation-form exam-form" (submit)="$event.preventDefault(); save()">
+      <h2>{{ editing() ? t.editTitle : t.newTitle }}</h2>
+      <label>
+        {{ t.name }}
+        <input
+          type="text"
+          maxlength="120"
+          required
+          [value]="f.title"
+          (input)="patch({ title: $any($event.target).value })"
+        />
+      </label>
+      <label>
+        {{ t.description }}
+        <textarea
+          rows="3"
+          maxlength="2000"
+          [value]="f.description"
+          (input)="patch({ description: $any($event.target).value })"
+        ></textarea>
+      </label>
+      <div class="row">
+        <label>
+          {{ t.totalPoints }}
+          <input
+            type="number"
+            min="1"
+            max="1000"
+            step="any"
+            required
+            [value]="f.totalPoints"
+            (input)="patch({ totalPoints: +$any($event.target).value })"
+          />
+        </label>
+        <label>
+          {{ t.passingPoints }}
+          <input
+            type="number"
+            min="0"
+            [max]="f.totalPoints"
+            step="any"
+            required
+            [value]="f.passingPoints"
+            (input)="patch({ passingPoints: +$any($event.target).value })"
+          />
+        </label>
+      </div>
+      <div class="row">
+        <label>
+          {{ t.duration }}
+          <input
+            type="number"
+            min="0"
+            max="600"
+            step="1"
+            required
+            [value]="f.durationMinutes"
+            (input)="patch({ durationMinutes: +$any($event.target).value })"
+          />
+        </label>
+        <label>
+          {{ t.attempts }}
+          <select
+            [value]="f.maxAttempts"
+            (change)="patch({ maxAttempts: +$any($event.target).value })"
+          >
+            @for (n of attemptOptions; track n) {
+              <option [value]="n" [selected]="n === f.maxAttempts">
+                {{ t.attemptsOption(n) }}
+              </option>
+            }
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <label>
+          {{ t.opensAt }}
+          <input
+            type="datetime-local"
+            required
+            [value]="f.opensAt"
+            (input)="patch({ opensAt: $any($event.target).value })"
+          />
+        </label>
+        <label>
+          {{ t.closesAt }}
+          <input
+            type="datetime-local"
+            required
+            [value]="f.closesAt"
+            (input)="patch({ closesAt: $any($event.target).value })"
+          />
+        </label>
+      </div>
+
+      <fieldset>
+        <legend>{{ t.audience }}</legend>
+        <label class="check">
+          <input
+            type="radio"
+            name="audience"
+            [checked]="f.audience === 'all'"
+            (change)="patch({ audience: 'all' })"
+          />
+          {{ t.audienceAll }}
+        </label>
+        <label class="check">
+          <input
+            type="radio"
+            name="audience"
+            [checked]="f.audience === 'selected'"
+            (change)="patch({ audience: 'selected' })"
+          />
+          {{ t.audienceSelected }}
+        </label>
+      </fieldset>
+      @if (f.audience === 'selected') {
+        <fieldset>
+          <legend>{{ t.students(f.studentIds.length) }}</legend>
+          <div class="row">
+            <input
+              type="search"
+              [placeholder]="t.searchStudents"
+              [attr.aria-label]="t.searchStudents"
+              [value]="studentSearch()"
+              (input)="studentSearch.set($any($event.target).value)"
+            />
+            <button type="button" class="btn btn-outline" (click)="selectAll()">
+              {{ t.selectAll }}
+            </button>
+          </div>
+          <div class="student-list">
+            @for (s of visibleStudents(); track s.uid) {
+              <label class="check">
+                <input
+                  type="checkbox"
+                  [checked]="f.studentIds.includes(s.uid)"
+                  (change)="toggleStudent(s.uid, $any($event.target).checked)"
+                />
+                {{ s.name }} <span class="muted">{{ s.email }}</span>
+              </label>
+            } @empty {
+              <span class="muted">{{ t.noStudents }}</span>
+            }
+          </div>
+        </fieldset>
+      }
+
+      <h3 class="questions-title">{{ t.questions }}</h3>
+      <ol class="questions">
+        @for (q of f.questions; track q.id; let i = $index, first = $first, last = $last) {
+          <li class="question">
+            <div class="q-head">
+              <strong>{{ t.question(i + 1) }}</strong>
+              <select
+                [attr.aria-label]="t.type + ' · ' + t.question(i + 1)"
+                (change)="changeType(i, $any($event.target).value)"
+              >
+                @for (type of types; track type) {
+                  <option [value]="type" [selected]="type === q.type">{{ t.types[type] }}</option>
+                }
+              </select>
+              <span class="q-tools">
+                <button
+                  type="button"
+                  class="icon"
+                  [disabled]="first"
+                  [attr.aria-label]="t.moveUp(i + 1)"
+                  (click)="moveQuestion(i, -1)"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  class="icon"
+                  [disabled]="last"
+                  [attr.aria-label]="t.moveDown(i + 1)"
+                  (click)="moveQuestion(i, 1)"
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  class="icon"
+                  [attr.aria-label]="t.removeQuestion(i + 1)"
+                  (click)="removeQuestion(i)"
+                >
+                  ×
+                </button>
+              </span>
+            </div>
+            <label>
+              {{ t.questionText }}
+              <textarea
+                rows="2"
+                maxlength="2000"
+                [value]="q.text"
+                (input)="updateQuestion(i, { text: $any($event.target).value })"
+              ></textarea>
+            </label>
+            <div class="row">
+              <label>
+                {{ t.imageUrl }}
+                <input
+                  type="url"
+                  maxlength="1000"
+                  placeholder="https://"
+                  [value]="q.imageUrl"
+                  (input)="updateQuestion(i, { imageUrl: $any($event.target).value })"
+                />
+              </label>
+              <label class="points">
+                {{ t.points }}
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  [value]="q.points"
+                  (input)="updateQuestion(i, { points: +$any($event.target).value })"
+                />
+              </label>
+            </div>
+
+            @switch (q.type) {
+              @case ('trueFalse') {
+                <fieldset>
+                  <legend>{{ t.correctAnswer }}</legend>
+                  <div class="tf">
+                    <label class="check">
+                      <input
+                        type="radio"
+                        [name]="'tf-' + q.id"
+                        [checked]="q.correct[0] === 0"
+                        (change)="setCorrect(i, 0, true)"
+                      />
+                      {{ tx.true }}
+                    </label>
+                    <label class="check">
+                      <input
+                        type="radio"
+                        [name]="'tf-' + q.id"
+                        [checked]="q.correct[0] === 1"
+                        (change)="setCorrect(i, 1, true)"
+                      />
+                      {{ tx.false }}
+                    </label>
+                  </div>
+                </fieldset>
+              }
+              @case ('open') {
+                <p class="muted hint">{{ t.openHint }}</p>
+              }
+              @default {
+                <fieldset>
+                  <legend>{{ t.options }}</legend>
+                  @for (option of q.options; track $index; let j = $index) {
+                    <div class="option" [class.right]="q.correct.includes(j)">
+                      <input
+                        [type]="q.type === 'multiple' ? 'checkbox' : 'radio'"
+                        [name]="'correct-' + q.id"
+                        [attr.aria-label]="t.correct(j + 1)"
+                        [checked]="q.correct.includes(j)"
+                        (change)="setCorrect(i, j, $any($event.target).checked)"
+                      />
+                      <input
+                        type="text"
+                        maxlength="500"
+                        [attr.aria-label]="t.question(i + 1) + ' · ' + t.option(j + 1)"
+                        [placeholder]="t.option(j + 1)"
+                        [value]="option"
+                        (input)="setOption(i, j, $any($event.target).value)"
+                      />
+                      <button
+                        type="button"
+                        class="icon"
+                        [disabled]="q.options.length <= 2"
+                        [attr.aria-label]="t.removeOption(j + 1)"
+                        (click)="removeOption(i, j)"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  }
+                  <button type="button" class="link" (click)="addOption(i)">
+                    {{ t.addOption }}
+                  </button>
+                  @if (q.type === 'multiple') {
+                    <label class="check">
+                      <input
+                        type="checkbox"
+                        [checked]="q.partial"
+                        (change)="updateQuestion(i, { partial: $any($event.target).checked })"
+                      />
+                      {{ t.partial }}
+                    </label>
+                  }
+                </fieldset>
+              }
+            }
+          </li>
+        }
+      </ol>
+
+      <div class="sum-row">
+        <button
+          type="button"
+          class="btn btn-outline add-question"
+          [disabled]="f.questions.length >= maxQuestions"
+          (click)="addQuestion()"
+        >
+          {{ t.addQuestion }}
+        </button>
+        <p class="sum" [class.ok]="sumMatches()" [class.bad]="!sumMatches()" role="status">
+          {{ t.sum(sum(), f.totalPoints) }}
+          @if (sumMatches()) {
+            <span aria-hidden="true">✓</span>
+          }
+        </p>
+      </div>
+      @if (!sumMatches()) {
+        <span class="muted">{{ t.sumHint }}</span>
+      }
+
+      <label class="check">
+        <input
+          type="checkbox"
+          [checked]="f.published"
+          (change)="patch({ published: $any($event.target).checked })"
+        />
+        {{ t.publishNow }}
+      </label>
+      <div class="actions">
+        <button type="submit" class="btn" [disabled]="saving()">
+          {{ saving() ? t.saving : t.save }}
+        </button>
+        <button type="button" class="btn btn-outline" (click)="cancel()">{{ t.cancel }}</button>
+      </div>
+    </form>
+  }
+
+  @if (loading()) {
+    <p class="muted">{{ t.loading }}</p>
+  } @else {
+    <ul class="cards">
+      @for (exam of exams(); track exam.id) {
+        @let state = stateOf(exam);
+        <li class="card" [class.draft]="state === 'draft'">
+          <h3>
+            {{ exam.title }}
+            <span class="badge">{{ t.states[state] }}</span>
+            @if (exam.resultsPublished) {
+              <span class="badge">{{ t.resultsPublished }}</span>
+            }
+          </h3>
+          @if (exam.description) {
+            <p class="muted">{{ exam.description }}</p>
+          }
+          <p class="muted">
+            {{ t.summary(exam.totalPoints, exam.passingPoints, exam.questions.length) }} ·
+            {{ exam.durationMinutes ? t.minutes(exam.durationMinutes) : t.noLimit }} ·
+            {{ t.attemptsCount(exam.maxAttempts) }} ·
+            {{ exam.audience === 'all' ? t.forAll : t.studentCount(exam.studentIds.length) }}
+          </p>
+          <p class="muted">
+            {{
+              t.window(
+                (exam.opensAt.toDate() | localDate: 'd MMM y, HH:mm') ?? '',
+                (exam.closesAt.toDate() | localDate: 'd MMM y, HH:mm') ?? ''
+              )
+            }}
+          </p>
+          <div class="actions">
+            <a class="btn" [routerLink]="['/admin/forms', exam.id]">{{ t.grade }}</a>
+            <button type="button" class="btn btn-outline" (click)="edit(exam)">{{ t.edit }}</button>
+            <button
+              type="button"
+              class="btn btn-outline"
+              [attr.aria-label]="t.deleteLabel(exam.title)"
+              (click)="remove(exam)"
+            >
+              {{ t.delete }}
+            </button>
+          </div>
+        </li>
+      } @empty {
+        <li class="muted">{{ t.empty }}</li>
+      }
+    </ul>
+  }
+</section>

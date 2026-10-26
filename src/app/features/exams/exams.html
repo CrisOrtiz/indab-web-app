@@ -1,0 +1,71 @@
+@let t = i18n.messages().exams;
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/academy" class="back">{{ i18n.messages().academy.back }}</a>
+    <h1>{{ t.title }}</h1>
+    <p>{{ t.intro }}</p>
+  </header>
+
+  @if (loading()) {
+    <p class="muted">{{ t.loading }}</p>
+  } @else if (failed()) {
+    <p class="message error" role="alert">{{ t.loadFailed }}</p>
+  } @else if (empty()) {
+    <p class="muted">{{ t.empty }}</p>
+  } @else {
+    <div class="board">
+      @for (list of lists; track list) {
+        <section class="column" [attr.aria-label]="t[list]">
+          <h2>{{ t[list] }}</h2>
+          <ul>
+            @for (card of cards()[list]; track card.exam.id) {
+              @let exam = card.exam;
+              @let s = card.state;
+              <li class="exam">
+                <h3>{{ exam.title }}</h3>
+                <p class="muted">
+                  @switch (list) {
+                    @case ('upcoming') {
+                      {{ t.opens((exam.opensAt.toDate() | localDate: 'd MMM, HH:mm') ?? '') }}
+                    }
+                    @case ('done') {
+                      {{ t.closed((exam.closesAt.toDate() | localDate: 'd MMM') ?? '') }}
+                    }
+                    @default {
+                      {{ t.closes((exam.closesAt.toDate() | localDate: 'd MMM, HH:mm') ?? '') }}
+                    }
+                  }
+                  · {{ exam.durationMinutes ? t.minutes(exam.durationMinutes) : t.noLimit }} ·
+                  {{ t.attemptsUsed(s.used, exam.maxAttempts) }}
+                </p>
+                @if (s.best; as g) {
+                  <p class="grade" [class.ok]="g.passed" [class.bad]="!g.passed">
+                    {{ t.gradeLine(g.total, exam.totalPoints) }} ·
+                    {{ g.passed ? t.passed : t.failed }}
+                  </p>
+                } @else if (s.used && s.action !== 'continue' && !exam.resultsPublished) {
+                  <p class="grade review">{{ t.inReview }}</p>
+                }
+                @if (list === 'upcoming') {
+                  <p class="muted note">{{ t.notYet }}</p>
+                } @else {
+                  <a
+                    class="btn"
+                    [class.btn-outline]="s.action === 'view'"
+                    [routerLink]="['/academy/exams', exam.id]"
+                  >
+                    {{
+                      s.action === 'start' ? t.start : s.action === 'continue' ? t.continue : t.view
+                    }}
+                  </a>
+                }
+              </li>
+            } @empty {
+              <li class="muted none">{{ t.emptyList }}</li>
+            }
+          </ul>
+        </section>
+      }
+    </div>
+  }
+</section>
