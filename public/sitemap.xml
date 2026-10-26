@@ -50,6 +50,30 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://indab-academy.web.app/calendar</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/calendar" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/calendar?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/calendar?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/calendar" />
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://indab-academy.web.app/calendar?lang=en</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/calendar" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/calendar?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/calendar?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/calendar" />
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://indab-academy.web.app/calendar?lang=pt</loc>
+    <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/calendar" />
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/calendar?lang=en" />
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://indab-academy.web.app/calendar?lang=pt" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://indab-academy.web.app/calendar" />
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://indab-academy.web.app/register</loc>
     <xhtml:link rel="alternate" hreflang="es-419" href="https://indab-academy.web.app/register" />
     <xhtml:link rel="alternate" hreflang="en-US" href="https://indab-academy.web.app/register?lang=en" />

@@ -36,6 +36,8 @@ export const en: Messages = {
         'Sign in to your INDAB Academy account to see your courses, study material and trading practice.',
       register:
         'Create your INDAB Academy account and start learning to trade with a clear, measurable process.',
+      calendar:
+        'Free INDAB economic calendar: US, Japan and other news with impact, forecast and live actual figures, plus what moves gold, USD/JPY and the NASDAQ.',
     },
   },
 
@@ -50,6 +52,7 @@ export const en: Messages = {
     academy: 'Academy',
     admin: 'Administration',
     adminShort: 'Admin',
+    calendar: 'Calendar',
     signOut: 'Sign out',
     signIn: 'Sign in',
     language: 'Language',
@@ -1090,8 +1093,10 @@ export const en: Messages = {
       cn: 'China',
     },
     importance: 'Impact',
-    highOnly: 'High only',
-    mediumAndHigh: 'Medium and high',
+    level: { high: 'High', medium: 'Medium', low: 'Low' },
+    legend: 'In the calendar, impact shows as bars:',
+    bars: { high: '3 bars', medium: '2 bars', low: '1 bar' },
+    pickImportance: 'Pick at least one impact level to see the calendar.',
     pickCountry: 'Pick at least one economy to see the calendar.',
     source: 'Data from TradingView, updated live.',
     credit: 'Economic calendar by TradingView',

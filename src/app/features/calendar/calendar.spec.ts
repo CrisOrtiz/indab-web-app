@@ -44,12 +44,35 @@ describe('Calendar page', () => {
   it('rebuilds the widget when the filters change', async () => {
     checkbox('China').click();
     checkbox('Japón').click();
-    const select = el.querySelector('select')!;
-    select.value = 'medium';
-    select.dispatchEvent(new Event('change'));
+    checkbox('Medio').click();
     await settle();
     expect(el.querySelectorAll('script').length).toBe(1);
     expect(widgetSettings()).toMatchObject({ countryFilter: 'us,cn', importanceFilter: '0,1' });
+  });
+
+  it('shows impact as ForexFactory folders and maps them to the widget’s bars', () => {
+    const folders = [...el.querySelectorAll('label.impact svg.folder')].map((svg) =>
+      svg.getAttribute('class'),
+    );
+    expect(folders).toEqual(['folder high', 'folder medium', 'folder low']);
+    expect(el.querySelector('.legend')?.textContent).toContain('Alto: 3 barras');
+    expect(el.querySelector('.legend')?.textContent).toContain('Bajo: 1 barra');
+  });
+
+  it('asks for an impact level when none is picked', async () => {
+    checkbox('Alto').click();
+    await settle();
+    expect(widgetSettings()).toBeNull();
+    expect(el.querySelector('[role="status"]')?.textContent).toContain(
+      'Elige al menos un nivel de impacto',
+    );
+  });
+
+  it('links back to the academy only when opened from it', async () => {
+    expect(el.querySelector('a.back')).toBeNull();
+    fixture.componentRef.setInput('fromAcademy', true);
+    await settle();
+    expect(el.querySelector('a.back')?.getAttribute('href')).toBe('/academy');
   });
 
   it('asks for an economy when none is picked', async () => {

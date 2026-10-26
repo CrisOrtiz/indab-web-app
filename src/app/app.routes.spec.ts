@@ -104,6 +104,7 @@ describe('app routes', () => {
   it('lets visitors see the public pages', async () => {
     expect(await visit('/')).toBe('/');
     expect(await visit('/eleva')).toBe('/eleva');
+    expect(await visit('/calendar')).toBe('/calendar');
     expect(await visit('/login')).toBe('/login');
     expect(await visit('/register')).toBe('/register');
     expect(await visit('/no-existe')).toBe('/no-existe');
@@ -112,6 +113,7 @@ describe('app routes', () => {
   it('downloads Firestore only once a visitor heads to sign in or register', async () => {
     await visit('/');
     await visit('/eleva');
+    await visit('/calendar');
     expect(firestore.load).not.toHaveBeenCalled();
     await visit('/login');
     expect(firestore.load).toHaveBeenCalled();
@@ -156,7 +158,8 @@ describe('app routes', () => {
     expect(await visit('/academy/material')).toBe('/academy');
     expect(await visit('/academy/practice')).toBe('/academy');
     expect(await visit('/academy/ranking')).toBe('/academy');
-    expect(await visit('/academy/calendar')).toBe('/academy');
+    // The calendar is public, so the academy opens it for everyone signed in.
+    expect(await visit('/academy/calendar')).toBe('/academy/calendar');
     expect(await visit('/admin')).toBe('/academy');
     expect(await visit('/login')).toBe('/academy');
     expect(await visit('/register')).toBe('/academy');

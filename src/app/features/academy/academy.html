@@ -41,7 +41,7 @@
     @for (card of cards; track card.key; let i = $index) {
       @let c = t.cards[card.key];
       <li [appReveal]="i * 80">
-        @if (auth.hasAcademyAccess()) {
+        @if (auth.hasAcademyAccess() || card.open) {
           <a class="card" [routerLink]="card.link">
             <ng-container *ngTemplateOutlet="body; context: { $implicit: card, c }" />
             <span class="cta">{{ t.open }} <span aria-hidden="true">→</span></span>

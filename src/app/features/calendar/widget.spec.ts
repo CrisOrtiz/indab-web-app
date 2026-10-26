@@ -2,19 +2,26 @@ import { widgetConfig } from './widget';
 
 describe('widgetConfig', () => {
   it('asks TradingView for the chosen economies and impact in the page language', () => {
-    expect(widgetConfig({ countries: ['jp', 'us'], importance: 'high' }, 'es-419')).toMatchObject({
-      locale: 'es',
-      countryFilter: 'us,jp',
-      importanceFilter: '1',
-    });
+    expect(widgetConfig({ countries: ['jp', 'us'], importance: ['high'] }, 'es-419')).toMatchObject(
+      {
+        locale: 'es',
+        countryFilter: 'us,jp',
+        importanceFilter: '1',
+      },
+    );
   });
 
-  it('adds medium-impact events and maps Brazilian Portuguese to TradingView’s code', () => {
-    expect(widgetConfig({ countries: ['cn'], importance: 'medium' }, 'pt-BR')).toMatchObject({
+  it('maps each impact folder to TradingView’s level and Brazilian Portuguese to its code', () => {
+    expect(
+      widgetConfig({ countries: ['cn'], importance: ['high', 'low', 'medium'] }, 'pt-BR'),
+    ).toMatchObject({
       locale: 'br',
       countryFilter: 'cn',
-      importanceFilter: '0,1',
+      importanceFilter: '-1,0,1',
     });
-    expect(widgetConfig({ countries: ['us'], importance: 'high' }, 'en-US').locale).toBe('en');
+    expect(widgetConfig({ countries: ['us'], importance: ['medium'] }, 'en-US')).toMatchObject({
+      locale: 'en',
+      importanceFilter: '0',
+    });
   });
 });

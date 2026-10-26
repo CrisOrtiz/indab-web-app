@@ -41,6 +41,8 @@ export const es = {
         'Ingresa a tu cuenta de INDAB Academy para ver tus cursos, el material de estudio y la práctica de trading.',
       register:
         'Crea tu cuenta en INDAB Academy y empieza a formarte en trading con un proceso claro y medible.',
+      calendar:
+        'Calendario económico gratis de INDAB: noticias de EE. UU., Japón y más con su impacto, pronóstico y dato real en vivo, y qué mueve al oro, USD/JPY y el NASDAQ.',
     },
   },
 
@@ -55,6 +57,7 @@ export const es = {
     academy: 'Academia',
     admin: 'Administración',
     adminShort: 'Admin',
+    calendar: 'Calendario',
     signOut: 'Cerrar sesión',
     signIn: 'Ingresar',
     language: 'Idioma',
@@ -1118,8 +1121,10 @@ export const es = {
       cn: 'China',
     },
     importance: 'Impacto',
-    highOnly: 'Solo alto',
-    mediumAndHigh: 'Medio y alto',
+    level: { high: 'Alto', medium: 'Medio', low: 'Bajo' },
+    legend: 'En el calendario, el impacto se ve como barras:',
+    bars: { high: '3 barras', medium: '2 barras', low: '1 barra' },
+    pickImportance: 'Elige al menos un nivel de impacto para ver el calendario.',
     pickCountry: 'Elige al menos una economía para ver el calendario.',
     source: 'Datos de TradingView, actualizados en vivo.',
     credit: 'Calendario económico de TradingView',
