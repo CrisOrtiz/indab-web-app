@@ -232,7 +232,8 @@ Module notes:
   Indicators are only EMA 100 and EMA 200 (on from the start) and RSI 14 (Cris, 2026-10-26: no
   other moving averages). The drawings menu has TradingView's sections (`TOOL_GROUPS`): trend
   line, ray, extended line, arrow, horizontal line/ray, vertical line, parallel channel (three
-  points), rectangle, Fibonacci, long/short position (entry, target, stop with risk/reward) and
+  points), rectangle, Fibonacci (Cris's TradingView levels and colors in `FIB_LEVELS`, -1 to 4.236,
+  with a background and ratio-only labels), long/short position (entry, target, stop with risk/reward) and
   price range; `POINTS` says how many points each takes and `build` turns them into a drawing.
   Cris chose to grow this with FX Replay's best ideas rather than clone it: session
   stats (`stats.ts`, `SessionStatsPanel`), rectangle/Fibonacci, picking the start date.

@@ -227,6 +227,16 @@
                 />
               }
               @case ('fib') {
+                @for (band of shape.bands; track band.ratio) {
+                  <rect
+                    class="fib-band"
+                    [attr.x]="shape.left"
+                    [attr.y]="band.top"
+                    [attr.width]="shape.right - shape.left"
+                    [attr.height]="band.height"
+                    [attr.fill]="band.color ?? shape.color"
+                  />
+                }
                 <line
                   class="fib-move"
                   [attr.x1]="shape.a.x"
@@ -241,9 +251,15 @@
                     [attr.x2]="shape.right"
                     [attr.y1]="level.y"
                     [attr.y2]="level.y"
+                    [attr.stroke]="level.color ?? shape.color"
                   />
-                  <text class="fib-text" [attr.x]="shape.left + 4" [attr.y]="level.y - 3">
-                    {{ level.ratio }} ({{ level.price | number: priceDigits(level.price) }})
+                  <text
+                    class="fib-text"
+                    [attr.x]="shape.left + 4"
+                    [attr.y]="level.y - 3"
+                    [attr.fill]="level.color ?? shape.color"
+                  >
+                    {{ level.ratio }}
                   </text>
                 }
               }

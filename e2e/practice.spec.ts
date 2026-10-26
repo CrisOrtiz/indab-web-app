@@ -272,7 +272,7 @@ test.describe('on a phone', () => {
     await drag([150, 150], [120, 100]);
     await expect(page.getByRole('status')).toContainText('Marca el final del movimiento.');
     await drag([200, 200], [230, 260]);
-    await expect(stage.locator('svg.shapes .fib')).toHaveCount(7);
+    await expect(stage.locator('svg.shapes .fib')).toHaveCount(19);
     await expect(stage.locator('.handle')).toHaveCount(2);
     // Its ends moved with the finger: 50 px down from the first point to the second.
     const [start, end] = await stage
@@ -297,7 +297,7 @@ test.describe('on a phone', () => {
     box = (await stage.boundingBox())!;
     await page.touchscreen.tap(box.x + 100, box.y + 120);
     await page.touchscreen.tap(box.x + 160, box.y + 180);
-    const rect = stage.locator('svg.shapes rect');
+    const rect = stage.locator('svg.shapes rect.rect');
     await expect(rect).toBeVisible();
     await expect(stage.locator('.handle')).toHaveCount(8);
     const before = Number(await rect.getAttribute('height'));
