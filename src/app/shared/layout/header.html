@@ -17,6 +17,17 @@
           >{{ link.label }}</a
         >
       }
+      <!-- An icon on phones, so every link still fits on one row at 390 px. -->
+      <a
+        routerLink="/calendar"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        class="calendar"
+        [attr.aria-label]="t.calendar"
+        [title]="t.calendar"
+        ><span class="long">{{ t.calendar }}</span
+        ><app-icon class="short" name="calendar" [size]="18"
+      /></a>
       @if (auth.isLoggedIn()) {
         <a routerLink="/academy" routerLinkActive="active" ariaCurrentWhenActive="page">{{
           t.academy

@@ -1,7 +1,9 @@
 @let t = i18n.messages().calendar;
 <section class="container">
   <header class="page-header">
-    <a routerLink="/academy" class="back">{{ i18n.messages().academy.back }}</a>
+    @if (fromAcademy()) {
+      <a routerLink="/academy" class="back">{{ i18n.messages().academy.back }}</a>
+    }
     <h1>{{ t.title }}</h1>
     <p>{{ t.intro }}</p>
   </header>
@@ -20,20 +22,40 @@
         </label>
       }
     </fieldset>
-    <label class="importance">
-      {{ t.importance }}
-      <select [value]="importance()" (change)="importance.set($any($event.target).value)">
-        <option value="high">{{ t.highOnly }}</option>
-        <option value="medium">{{ t.mediumAndHigh }}</option>
-      </select>
-    </label>
+    <fieldset>
+      <legend>{{ t.importance }}</legend>
+      @for (level of levels; track level) {
+        <label class="chip impact" [class]="level">
+          <input
+            type="checkbox"
+            [checked]="importance().includes(level)"
+            (change)="toggleImportance(level)"
+          />
+          <ng-container *ngTemplateOutlet="folder; context: { $implicit: level }" />
+          {{ t.level[level] }}
+        </label>
+      }
+    </fieldset>
   </div>
 
-  @if (selected().length) {
+  <!-- The widget is TradingView's iframe: its bars cannot be restyled, so this maps them. -->
+  <p class="legend">
+    <span>{{ t.legend }}</span>
+    @for (level of levels; track level) {
+      <span class="legend-item">
+        <ng-container *ngTemplateOutlet="folder; context: { $implicit: level }" />
+        {{ t.level[level] }}: {{ t.bars[level] }}
+      </span>
+    }
+  </p>
+
+  @if (!selected().length) {
+    <p class="notice" role="status">{{ t.pickCountry }}</p>
+  } @else if (!importance().length) {
+    <p class="notice" role="status">{{ t.pickImportance }}</p>
+  } @else {
     <div #widget class="widget"></div>
     <p class="muted small">{{ t.source }}</p>
-  } @else {
-    <p class="notice" role="status">{{ t.pickCountry }}</p>
   }
 
   <h2>{{ t.guideTitle }}</h2>
@@ -52,3 +74,13 @@
   </div>
   <p class="tip">{{ t.tip }}</p>
 </section>
+
+<!-- ForexFactory-style impact folder: red high, orange medium, yellow low. -->
+<ng-template #folder let-level>
+  <svg class="folder" [class]="level" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      d="M2.5 6.5a2 2 0 0 1 2-2h4.6l2 2.2h8.4a2 2 0 0 1 2 2v9.8a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2z"
+    />
+    <path class="tab" d="M2.5 9.5h19" />
+  </svg>
+</ng-template>

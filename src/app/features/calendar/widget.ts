@@ -15,12 +15,18 @@ export const COUNTRIES = ['us', 'jp', 'eu', 'gb', 'cn'] as const;
 export type Country = (typeof COUNTRIES)[number];
 export const DEFAULT_COUNTRIES: Country[] = ['us', 'jp'];
 
-/** `high` shows only high-impact events; `medium` adds medium-impact ones. */
-export type Importance = 'high' | 'medium';
+/**
+ * Impact levels, shown as ForexFactory's folders: red high, orange medium, yellow low.
+ * TradingView's levels are -1 low, 0 medium and 1 high.
+ */
+export const IMPORTANCE_LEVELS = ['high', 'medium', 'low'] as const;
+export type Importance = (typeof IMPORTANCE_LEVELS)[number];
+export const DEFAULT_IMPORTANCE: Importance[] = ['high'];
+const TRADINGVIEW_IMPORTANCE: Record<Importance, string> = { low: '-1', medium: '0', high: '1' };
 
 export interface CalendarFilters {
   countries: Country[];
-  importance: Importance;
+  importance: Importance[];
 }
 
 /** The JSON the embed script reads from its own tag. */
@@ -29,8 +35,10 @@ export function widgetConfig(filters: CalendarFilters, language: Language) {
     colorTheme: 'light',
     isTransparent: true,
     locale: WIDGET_LOCALES[language],
-    // TradingView's importance levels: -1 low, 0 medium, 1 high.
-    importanceFilter: filters.importance === 'high' ? '1' : '0,1',
+    importanceFilter: (['low', 'medium', 'high'] as const)
+      .filter((level) => filters.importance.includes(level))
+      .map((level) => TRADINGVIEW_IMPORTANCE[level])
+      .join(','),
     countryFilter: COUNTRIES.filter((c) => filters.countries.includes(c)).join(','),
     width: '100%',
     height: 640,

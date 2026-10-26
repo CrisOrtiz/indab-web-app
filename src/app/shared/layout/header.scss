@@ -147,6 +147,14 @@
   }
 }
 
+// The calendar's icon (phones) sits on the text's baseline like the other links.
+.calendar app-icon.short {
+  @media (max-width: 600px) {
+    display: inline-flex;
+    vertical-align: -3px;
+  }
+}
+
 // Avatar button and its dropdown, at the far right.
 .account {
   position: relative;
@@ -250,8 +258,9 @@
   }
 
   .nav {
-    --link-padding: 8px;
+    --link-padding: 6px;
     order: 2;
+    gap: 2px;
     font-size: 0.9rem;
     margin: 0 -16px;
     width: calc(100% + 32px);
@@ -274,7 +283,8 @@
     bottom: 6px;
   }
 
-  // "Admin" instead of "Administración", so four links fit on one row at 390 px.
+  // "Admin" instead of "Administración" and an icon for the calendar, so the links fit on one
+  // row at 390 px.
   .nav .long {
     display: none;
   }

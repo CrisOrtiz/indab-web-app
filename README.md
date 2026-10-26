@@ -218,7 +218,8 @@ Changing the password does revoke every other session, since Firebase ends them 
 | `/academy/material`   | enrolled users (learning material, opened from the academy; `/repository` redirects here)                                                       |
 | `/academy/practice`   | enrolled users (chart-replay trading practice: free practice and assigned evaluations)                                                          |
 | `/academy/ranking`    | enrolled users (rankings of published evaluations)                                                                                              |
-| `/academy/calendar`   | enrolled users (live economic calendar, TradingView's free widget)                                                                              |
+| `/calendar`           | public (live economic calendar, TradingView's free widget; in the header, prerendered)                                                          |
+| `/academy/calendar`   | signed-in users (same page as `/calendar`, with a link back to the academy)                                                                     |
 | `/academy/exams`      | enrolled users (assigned evaluation forms: answer, see grades; `/academy/exams/:id` takes one)                                                  |
 | `/admin`              | trainers and admins (a card per tool; trainers do not get the users card)                                                                       |
 | `/admin/users`        | admins (users, roles and academy access)                                                                                                        |
@@ -258,7 +259,7 @@ missing). To add a language: a new file in `messages/`, an entry in `LANGUAGES` 
 
 ## SEO and loading speed
 
-- **Prerendering**: `ng build` renders the public pages (`/`, `/eleva`, `/login`, `/register`,
+- **Prerendering**: `ng build` renders the public pages (`/`, `/eleva`, `/calendar`, `/login`, `/register`,
   listed in `src/app/app.routes.server.ts`) to static HTML in Spanish (`outputMode: "static"`,
   `@angular/ssr`, no server needed, so it works on the free Spark plan). Search engines and link
   previews (WhatsApp, Facebook, LinkedIn) read their text and tags without running JavaScript.
@@ -373,10 +374,14 @@ answer key, open ones are graded by hand. The right answers live in `examKeys`, 
 cannot read until then. The suggested scores are computed in the staff browser, so no server
 (Blaze plan) is needed.
 
-`/academy/calendar` embeds TradingView's free
+`/calendar` (public, in the header; `/academy/calendar` is the same page with a link back to the
+academy) embeds TradingView's free
 [economic calendar widget](https://www.tradingview.com/widget-docs/widgets/calendars/economic-calendar/):
 the scheduled news with forecast, previous and actual figures, updated live by TradingView, in
-the site's language. Students filter it by economy (US and Japan by default) and impact. Cris
+the site's language. Visitors filter it by economy (US and Japan by default) and impact, picked
+with ForexFactory-style folders (red high, orange medium, yellow low). The widget is TradingView's
+iframe, so its own impact bars cannot be restyled; a legend under the filters maps the bars to the
+folders (TradingView has no gray "non-economic" level). Cris
 wanted this at no cost, so there is no API, key or Blaze plan behind it; keep TradingView's
 credit link under the widget. Paid APIs (Financial Modeling Prep, Trading Economics) were
 weighed and left for later; their data needs an extra display license to show to students.

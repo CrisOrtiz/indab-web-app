@@ -29,6 +29,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/eleva/eleva').then((m) => m.Eleva),
   },
   {
+    path: 'calendar',
+    title: 'calendar',
+    data: { description: 'calendar' } satisfies SeoData,
+    loadComponent: () => import('./features/calendar/calendar').then((m) => m.Calendar),
+  },
+  {
     path: 'login',
     title: 'login',
     data: { description: 'login' } satisfies SeoData,
@@ -59,6 +65,14 @@ export const routes: Routes = [
     loadComponent: () => import('./features/academy/academy').then((m) => m.Academy),
   },
   {
+    // The public calendar opened from the academy: same page, with a link back to the academy.
+    path: 'academy/calendar',
+    title: 'calendar',
+    canActivate: [authGuard],
+    data: { fromAcademy: true },
+    loadComponent: () => import('./features/calendar/calendar').then((m) => m.Calendar),
+  },
+  {
     path: 'profile',
     title: 'profile',
     canActivate: [authGuard],
@@ -77,12 +91,6 @@ export const routes: Routes = [
     title: 'ranking',
     canActivate: [enrolledGuard],
     loadComponent: () => import('./features/ranking/ranking').then((m) => m.Ranking),
-  },
-  {
-    path: 'academy/calendar',
-    title: 'calendar',
-    canActivate: [enrolledGuard],
-    loadComponent: () => import('./features/calendar/calendar').then((m) => m.Calendar),
   },
   {
     path: 'academy/material',

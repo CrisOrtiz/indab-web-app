@@ -28,8 +28,9 @@ describe('Academy', () => {
     expect(el.textContent).toContain('Tu inscripción está pendiente.');
     expect(el.querySelector('a[href="/academy/material"]')).toBeNull();
     expect(el.querySelector('a[href="/academy/practice"]')).toBeNull();
-    // The sections still show, locked, so students see what is coming.
-    expect(el.querySelectorAll('.card.locked')).toHaveLength(5);
+    // The sections still show, locked, so students see what is coming; the calendar is public.
+    expect(el.querySelectorAll('.card.locked')).toHaveLength(4);
+    expect(el.querySelector('a.card[href="/academy/calendar"]')).not.toBeNull();
     expect(el.textContent).toContain('Se habilita con tu inscripción');
   });
 
