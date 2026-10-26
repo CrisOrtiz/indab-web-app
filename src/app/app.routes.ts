@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import {
+  adminGuard,
   authGuard,
   enrolledGuard,
   guestGuard,
@@ -104,12 +105,18 @@ export const routes: Routes = [
   // The material used to be its own section; keep old links working.
   { path: 'repository', redirectTo: 'academy/material' },
 
-  // Trainers and admins; user management inside /admin is for admins only.
+  // Trainers and admins; user management is for admins only.
   {
     path: 'admin',
     title: 'admin',
     canActivate: [staffGuard],
     loadComponent: () => import('./features/admin/admin').then((m) => m.Admin),
+  },
+  {
+    path: 'admin/users',
+    title: 'adminUsers',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./features/admin/users/users').then((m) => m.AdminUsers),
   },
   {
     path: 'admin/practice',

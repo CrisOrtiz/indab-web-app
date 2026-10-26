@@ -16,6 +16,8 @@ const row = (page: Page, name: string) => page.getByRole('row').filter({ hasText
 const openAdmin = async (page: Page) => {
   await signIn(page, 'admin@indab.test', '/login?returnUrl=%2Fadmin');
   await expect(page).toHaveURL('/admin');
+  await page.getByRole('link', { name: /Usuarios/ }).click();
+  await expect(page).toHaveURL('/admin/users');
   await expect(page.getByText('3 de 3 usuarios')).toBeVisible();
 };
 
@@ -24,6 +26,19 @@ test('students cannot open the admin area', async ({ page }) => {
   await expect(page).toHaveURL('/academy');
   await expect(nav(page).getByRole('link', { name: 'Administración' })).toHaveCount(0);
   await page.goto('/admin');
+  await expect(page).toHaveURL('/academy');
+  await page.goto('/admin/users');
+  await expect(page).toHaveURL('/academy');
+});
+
+test('trainers get no users card and cannot open the users page', async ({ page }) => {
+  await createUser('Marta Ruiz', 'marta@indab.test', { role: 'trainer' });
+  await signIn(page, 'marta@indab.test', '/login?returnUrl=%2Fadmin');
+  await expect(page).toHaveURL('/admin');
+  await expect(page.getByRole('link', { name: /Formularios de evaluación/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Usuarios/ })).toHaveCount(0);
+  await expect(page.getByRole('table')).toHaveCount(0);
+  await page.goto('/admin/users');
   await expect(page).toHaveURL('/academy');
 });
 

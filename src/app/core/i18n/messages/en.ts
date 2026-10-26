@@ -12,6 +12,7 @@ export const en: Messages = {
     material: 'Study material | INDAB',
     admin: 'Administration | INDAB',
     adminPractice: 'Trading practice sessions | INDAB',
+    adminUsers: 'Users | INDAB',
     ranking: 'Evaluation ranking | INDAB',
     calendar: 'Economic calendar | INDAB',
     adminEvaluations: 'Practice evaluations | INDAB',
@@ -382,6 +383,7 @@ export const en: Messages = {
         text: 'Every practice session with its trades.',
       },
     },
+    usersIntro: 'Find each person, change their role and turn their academy access on or off.',
     trainerNote:
       'As a trainer you can create evaluations and review practice. Roles and academy access are managed by an administrator.',
     trainers: 'Trainers',
