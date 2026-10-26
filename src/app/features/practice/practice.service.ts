@@ -1,13 +1,19 @@
 import { Injectable, inject } from '@angular/core';
 import {
+  QueryConstraint,
+  QueryDocumentSnapshot,
   collection,
+  count,
   doc,
+  getAggregateFromServer,
   getDocs,
   limit,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
+  startAfter,
+  sum,
   updateDoc,
   where,
   writeBatch,
@@ -16,6 +22,7 @@ import { FIRESTORE } from '../../core/firebase/firebase.providers';
 import { LoadingService } from '../../core/loading/loading.service';
 import { Evaluation, attemptId } from '../../core/models/evaluation';
 import { PracticeSession, PracticeTrade } from '../../core/models/practice';
+import { CursorPage } from '../../shared/pager/cursor-pages';
 
 export type NewPracticeSession = Pick<
   PracticeSession,
@@ -23,6 +30,22 @@ export type NewPracticeSession = Pick<
 >;
 
 export type SessionSummary = Pick<PracticeSession, 'balance' | 'pnl' | 'tradeCount'>;
+
+/**
+ * Filters of a session list, all optional. `evaluationId` null keeps free practice only, an id
+ * the attempts at that evaluation; `to` is exclusive. Each combination of `uid`, `evaluationId`
+ * and `status` has an index in `firestore.indexes.json`.
+ */
+export interface SessionFilters {
+  uid?: string;
+  evaluationId?: string | null;
+  status?: PracticeSession['status'];
+  from?: Date;
+  to?: Date;
+}
+
+export type SessionCursor = QueryDocumentSnapshot;
+export type SessionPage = CursorPage<PracticeSession, SessionCursor>;
 
 /**
  * Logs chart-replay practice to Firestore: `practiceSessions/{id}` and its `trades`.
@@ -139,7 +162,7 @@ export class PracticeService {
     });
   }
 
-  /** The student's most recent sessions. */
+  /** The student's most recent sessions (the profile's P/L summary). */
   async mySessions(uid: string, max = 20): Promise<PracticeSession[]> {
     const snapshot = await this.loading.track(
       getDocs(
@@ -147,6 +170,44 @@ export class PracticeService {
       ),
     );
     return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
+  }
+
+  /**
+   * One page of sessions, newest first, that match `filters`, starting after `after`. Students
+   * must filter by their own `uid` (the rules only let them list their own sessions).
+   */
+  async sessionsPage(
+    filters: SessionFilters,
+    pageSize: number,
+    after?: SessionCursor,
+  ): Promise<SessionPage> {
+    const constraints = [
+      ...sessionFilters(filters),
+      orderBy('startedAt', 'desc'),
+      ...(after ? [startAfter(after)] : []),
+      // One extra tells whether another page follows.
+      limit(pageSize + 1),
+    ];
+    const snapshot = await this.loading.track(getDocs(query(this.sessions, ...constraints)));
+    const docs = snapshot.docs.slice(0, pageSize);
+    return {
+      items: docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id })),
+      last: docs.at(-1),
+      hasMore: snapshot.docs.length > pageSize,
+    };
+  }
+
+  /** How many sessions and trades match `filters`, read as one aggregation (not per session). */
+  async sessionTotals(filters: SessionFilters): Promise<{ sessions: number; trades: number }> {
+    const snapshot = await getAggregateFromServer(
+      query(this.sessions, ...sessionFilters(filters)),
+      {
+        sessions: count(),
+        trades: sum('tradeCount'),
+      },
+    );
+    const { sessions, trades } = snapshot.data();
+    return { sessions, trades };
   }
 
   /** Every attempt at an evaluation (staff, or anyone once its results are published). */
@@ -176,14 +237,6 @@ export class PracticeService {
     );
   }
 
-  /** Every student's most recent sessions (trainers and admins). */
-  async allSessions(max = 200): Promise<PracticeSession[]> {
-    const snapshot = await this.loading.track(
-      getDocs(query(this.sessions, orderBy('startedAt', 'desc'), limit(max))),
-    );
-    return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
-  }
-
   /** Deletes a session and its trades (admins only). */
   async deleteSession(sessionId: string): Promise<void> {
     const trades = await getDocs(this.trades(sessionId));
@@ -205,4 +258,24 @@ export class PracticeService {
       (d) => ({ orderType: 'market', orderPrice: null, ...d.data(), id: d.id }) as PracticeTrade,
     );
   }
+}
+
+function sessionFilters(filters: SessionFilters): QueryConstraint[] {
+  const constraints: QueryConstraint[] = [];
+  if (filters.uid) {
+    constraints.push(where('uid', '==', filters.uid));
+  }
+  if (filters.evaluationId !== undefined) {
+    constraints.push(where('evaluationId', '==', filters.evaluationId));
+  }
+  if (filters.status) {
+    constraints.push(where('status', '==', filters.status));
+  }
+  if (filters.from) {
+    constraints.push(where('startedAt', '>=', filters.from));
+  }
+  if (filters.to) {
+    constraints.push(where('startedAt', '<', filters.to));
+  }
+  return constraints;
 }

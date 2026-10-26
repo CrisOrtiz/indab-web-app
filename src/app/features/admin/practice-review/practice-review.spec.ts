@@ -5,10 +5,11 @@ import { vi } from 'vitest';
 import { AuthService } from '../../../core/auth/auth.service';
 import { Candle } from '../../../core/models/practice';
 import { HISTORY_BARS, MarketDataService } from '../../practice/market-data.service';
+import { EvaluationService } from '../../evaluations/evaluation.service';
 import { PracticeService } from '../../practice/practice.service';
 import { ReplayChart } from '../../practice/replay-chart';
 import { SessionReview } from '../../practice/session-review';
-import { PracticeReview } from './practice-review';
+import { PracticeReview, REVIEW_PAGE_SIZE } from './practice-review';
 
 // The real chart needs a canvas; the review only passes it data.
 @Component({ selector: 'app-replay-chart', template: '' })
@@ -39,7 +40,19 @@ const session = (id: string, uid: string, userName: string, symbol: string, pnl:
 describe('PracticeReview', () => {
   let fixture: ComponentFixture<PracticeReview>;
   let el: HTMLElement;
-  const practice = { allSessions: vi.fn(), sessionTrades: vi.fn(), deleteSession: vi.fn() };
+  const practice = {
+    sessionsPage: vi.fn(),
+    sessionTotals: vi.fn(),
+    sessionTrades: vi.fn(),
+    deleteSession: vi.fn(),
+  };
+  const evaluations = {
+    students: vi.fn(async () => [
+      { uid: 'ana', name: 'Ana' },
+      { uid: 'luis', name: 'Luis' },
+    ]),
+    all: vi.fn(async () => [{ id: 'e1', title: 'Evaluación de octubre' }]),
+  };
   const market = { loadCandles: vi.fn(), loadHistory: vi.fn() };
   const isAdmin = signal(true);
 
@@ -49,6 +62,7 @@ describe('PracticeReview', () => {
       providers: [
         provideRouter([]),
         { provide: PracticeService, useValue: practice },
+        { provide: EvaluationService, useValue: evaluations },
         { provide: MarketDataService, useValue: market },
         { provide: AuthService, useValue: { isAdmin } },
       ],
@@ -68,11 +82,16 @@ describe('PracticeReview', () => {
     market.loadHistory.mockResolvedValue([candle]);
     market.loadCandles.mockResolvedValue([later]);
     practice.deleteSession.mockResolvedValue(undefined);
-    practice.allSessions.mockResolvedValue([
-      session('s1', 'ana', 'Ana', 'PAXGUSDT', 25),
-      session('s2', 'ana', 'Ana', 'BTCUSDT', -5),
-      session('s3', 'luis', 'Luis', 'PAXGUSDT', 0),
-    ]);
+    practice.sessionsPage.mockResolvedValue({
+      items: [
+        session('s1', 'ana', 'Ana', 'PAXGUSDT', 25),
+        session('s2', 'ana', 'Ana', 'BTCUSDT', -5),
+        session('s3', 'luis', 'Luis', 'PAXGUSDT', 0),
+      ],
+      last: 'cursor-1',
+      hasMore: false,
+    });
+    practice.sessionTotals.mockResolvedValue({ sessions: 3, trades: 6 });
     practice.sessionTrades.mockResolvedValue([
       {
         id: 't1',
@@ -112,22 +131,95 @@ describe('PracticeReview', () => {
     fixture.debugElement.query((d) => d.componentInstance instanceof FakeChart)
       ?.componentInstance as FakeChart | undefined;
 
-  it('lists every session with totals and a search', async () => {
+  const select = (label: string) =>
+    [...el.querySelectorAll('label')]
+      .find((l) => l.textContent?.trim().startsWith(label))!
+      .querySelector<HTMLInputElement | HTMLSelectElement>('select, input')!;
+  const change = async (field: HTMLInputElement | HTMLSelectElement, value: string) => {
+    field.value = value;
+    field.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+  };
+
+  it('lists the first page of sessions with totals for the filters', async () => {
     await render();
-    expect([...el.querySelectorAll('.stat strong')].map((s) => s.textContent)).toEqual([
-      '3',
-      '2',
-      '6',
-    ]);
+    expect(practice.sessionsPage).toHaveBeenCalledWith({}, REVIEW_PAGE_SIZE, undefined);
+    expect(practice.sessionTotals).toHaveBeenCalledWith({});
+    expect([...el.querySelectorAll('.stat strong')].map((s) => s.textContent)).toEqual(['3', '6']);
     expect(sessionRows()).toHaveLength(3);
     // Dates follow the site's language (Spanish by default).
     expect(el.textContent).toContain('10 may 2021');
+    // A single page needs no pager.
+    expect(el.querySelector('.pager')).toBeNull();
+  });
 
-    const search = el.querySelector<HTMLInputElement>('input[type=search]')!;
-    search.value = 'luis';
-    search.dispatchEvent(new Event('input'));
+  it('queries again with the student, type, status and dates picked', async () => {
+    await render();
+    expect([...select('Estudiante').querySelectorAll('option')].map((o) => o.textContent)).toEqual([
+      'Todos los estudiantes',
+      'Ana',
+      'Luis',
+    ]);
+    await change(select('Estudiante'), 'luis');
+    expect(practice.sessionsPage).toHaveBeenLastCalledWith(
+      { uid: 'luis' },
+      REVIEW_PAGE_SIZE,
+      undefined,
+    );
+    await change(select('Tipo'), 'e1');
+    await change(select('Estado'), 'finished');
+    await change(select('Desde'), '2026-10-01');
+    await change(select('Hasta'), '2026-10-20');
+    const filters = {
+      uid: 'luis',
+      evaluationId: 'e1',
+      status: 'finished',
+      from: new Date(2026, 9, 1),
+      // The whole last day counts.
+      to: new Date(2026, 9, 21),
+    };
+    expect(practice.sessionsPage).toHaveBeenLastCalledWith(filters, REVIEW_PAGE_SIZE, undefined);
+    expect(practice.sessionTotals).toHaveBeenLastCalledWith(filters);
+
+    await change(select('Tipo'), 'free');
+    expect(practice.sessionsPage.mock.lastCall![0].evaluationId).toBeNull();
+
+    practice.sessionsPage.mockResolvedValue({ items: [], last: undefined, hasMore: false });
+    [...el.querySelectorAll('button')]
+      .find((b) => b.textContent?.trim() === 'Limpiar filtros')!
+      .click();
     await fixture.whenStable();
-    expect(sessionRows()).toHaveLength(1);
+    expect(practice.sessionsPage).toHaveBeenLastCalledWith({}, REVIEW_PAGE_SIZE, undefined);
+    expect(el.textContent).toContain('No hay prácticas registradas.');
+  });
+
+  it('pages forward with the cursor and back to the first page', async () => {
+    practice.sessionsPage.mockResolvedValueOnce({
+      items: [session('s1', 'ana', 'Ana', 'PAXGUSDT', 25)],
+      last: 'cursor-1',
+      hasMore: true,
+    });
+    await render();
+    const pager = () => el.querySelector('.pager')!;
+    expect(pager().textContent).toContain('Página 1');
+    const [previous, next] = [...pager().querySelectorAll('button')];
+    expect(previous.disabled).toBe(true);
+
+    practice.sessionsPage.mockResolvedValueOnce({
+      items: [session('s9', 'luis', 'Luis', 'XAUUSDT', 3)],
+      last: 'cursor-2',
+      hasMore: false,
+    });
+    next.click();
+    await fixture.whenStable();
+    expect(practice.sessionsPage).toHaveBeenLastCalledWith({}, REVIEW_PAGE_SIZE, 'cursor-1');
+    expect(pager().textContent).toContain('Página 2');
+    expect(sessionRows()[0].textContent).toContain('Luis');
+    expect(pager().querySelectorAll('button')[1].disabled).toBe(true);
+
+    pager().querySelector('button')!.click();
+    await fixture.whenStable();
+    expect(practice.sessionsPage).toHaveBeenLastCalledWith({}, REVIEW_PAGE_SIZE, undefined);
   });
 
   it("shows a session's chart and trades on demand", async () => {
@@ -180,6 +272,7 @@ describe('PracticeReview', () => {
     expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('práctica de Ana'));
     expect(practice.deleteSession).toHaveBeenCalledWith('s1');
     expect(sessionRows()).toHaveLength(2);
+    expect(el.querySelector('.stat strong')!.textContent).toBe('2');
 
     practice.deleteSession.mockRejectedValue(new Error('denied'));
     button(sessionRows()[0], 'Eliminar').click();
@@ -189,7 +282,8 @@ describe('PracticeReview', () => {
   });
 
   it('explains when the sessions cannot load', async () => {
-    practice.allSessions.mockRejectedValue(new Error('denied'));
+    practice.sessionsPage.mockRejectedValue(new Error('denied'));
+    practice.sessionTotals.mockRejectedValue(new Error('denied'));
     await render();
     expect(el.textContent).toContain('No se pudieron cargar las prácticas.');
   });

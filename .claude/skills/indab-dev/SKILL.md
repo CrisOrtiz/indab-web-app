@@ -138,6 +138,11 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
 - Admin list actions are icon buttons: `<app-icon>` (`shared/icon`, inline SVG paths in `ICONS`)
   inside `.icon-btn` (`shared/icon/_icon-button.scss`), with `aria-label` naming the action and
   the item (`admin.itemAction`) and a short tooltip in `data-tip`.
+- Long lists: `CursorPages` (`shared/pager/cursor-pages.ts`) pages a Firestore query with
+  cursors and `<app-pager>` shows previous/next; filters go in the query (each equality-filter
+  combination needs its index in `firestore.indexes.json`). Lists already in memory use
+  `pageOf`/`pageCount`. Filter bars use `shared/pager/_list-filters.scss`. Practice session lists
+  use `<app-session-filters>` and `PracticeService.sessionsPage`/`sessionTotals`.
 - Formatting: Prettier (`printWidth` 100, single quotes). Run `npx prettier --write` on changed files.
 
 ## Adding a module

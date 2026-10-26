@@ -30,7 +30,9 @@ import {
   replayWindow,
 } from './market-data.service';
 import { formatLots, priceDigits, roundPrice, signedMoney } from './practice-format';
-import { PracticeService } from './practice.service';
+import { CursorPages } from '../../shared/pager/cursor-pages';
+import { Pager } from '../../shared/pager/pager';
+import { PracticeService, SessionCursor, SessionFilters } from './practice.service';
 import {
   LEVERAGE,
   LOT_SIZE,
@@ -46,6 +48,7 @@ import {
   validateOrder,
 } from './replay';
 import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
+import { SessionFilterBar } from './session-filters';
 import { SessionReview } from './session-review';
 import { SessionStatsPanel } from './session-stats';
 import { filledTrades } from './trade-boxes';
@@ -98,6 +101,9 @@ export function formatCountdown(ms: number): string {
  * set up only shows on the chart once the student adds it from the chart's "+" menu or starts
  * filling in the panel; it is placed with its Buy/Sell button and discarded with its ×.
  */
+/** Past sessions per page. */
+export const SESSIONS_PAGE_SIZE = 10;
+
 @Component({
   selector: 'app-practice',
   imports: [
@@ -105,7 +111,9 @@ export function formatCountdown(ms: number): string {
     LocalDatePipe,
     DecimalPipe,
     PercentPipe,
+    Pager,
     ReplayChart,
+    SessionFilterBar,
     SessionReview,
     SessionStatsPanel,
     TradeNavigator,
@@ -164,7 +172,25 @@ export class Practice {
   protected readonly error = signal<string | null>(null);
   protected readonly playing = signal(false);
   protected readonly speed = signal(SPEEDS[1]);
-  protected readonly history = signal<PracticeSession[]>([]);
+  /** The student's past sessions, a page at a time, with the filters picked. */
+  protected readonly history = new CursorPages<PracticeSession, SessionCursor>((after) =>
+    this.practice.sessionsPage(
+      { ...this.historyFilters(), uid: this.auth.user()?.uid },
+      SESSIONS_PAGE_SIZE,
+      after,
+    ),
+  );
+  protected readonly historyFilters = signal<SessionFilters>({});
+  protected readonly historyFiltered = computed(
+    () => Object.keys(this.historyFilters()).length > 0,
+  );
+  protected readonly historyFailed = signal(false);
+  /** Evaluations the student has taken, to filter the sessions by. */
+  protected readonly takenEvaluations = computed(() =>
+    this.evaluations()
+      .filter((card) => card.attempt)
+      .map(({ evaluation }) => ({ id: evaluation.id, title: evaluation.title })),
+  );
   /** Past session opened for review below its row. */
   protected readonly reviewing = signal<string | null>(null);
   /** Trade of the finished session that the navigator and the chart show. */
@@ -919,13 +945,22 @@ export class Practice {
     }
   }
 
+  protected filterSessions(filters: SessionFilters): void {
+    this.historyFilters.set(filters);
+    this.loadSessions();
+  }
+
+  protected pageSessions(direction: 'previous' | 'next'): void {
+    this.reviewing.set(null);
+    this.historyFailed.set(false);
+    this.history[direction]().catch(() => this.historyFailed.set(true));
+  }
+
   private loadSessions(): void {
-    const uid = this.auth.user()?.uid;
-    if (uid) {
-      this.practice
-        .mySessions(uid)
-        .then((sessions) => this.history.set(sessions))
-        .catch(() => this.history.set([]));
+    this.reviewing.set(null);
+    this.historyFailed.set(false);
+    if (this.auth.user()?.uid) {
+      this.history.first().catch(() => this.historyFailed.set(true));
     }
   }
 }

@@ -9,17 +9,22 @@ import {
   deleteDoc,
   deleteField,
   doc,
+  count,
   getDoc,
+  getAggregateFromServer,
   getDocs,
+  limit,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
+  startAfter,
+  sum,
   updateDoc,
   where,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 let env: RulesTestEnvironment;
 
@@ -530,6 +535,61 @@ describe('trading practice', () => {
     await assertFails(getDocs(sessions('enrolled')));
     await assertFails(getDocs(sessions('student')));
     await assertSucceeds(getDocs(query(sessions('admin'), orderBy('startedAt', 'desc'))));
+  });
+
+  it('lets students page and count only their own sessions, with filters', async () => {
+    const sessions = (uid: string) => collection(as(uid), 'practiceSessions');
+    const filtered = (uid: string, owner: string) =>
+      query(
+        sessions(uid),
+        where('uid', '==', owner),
+        where('evaluationId', '==', null),
+        where('status', '==', 'active'),
+        where('startedAt', '>=', new Date(2020, 0, 1)),
+        where('startedAt', '<', new Date(2100, 0, 1)),
+        orderBy('startedAt', 'desc'),
+        limit(11),
+      );
+    const first = await assertSucceeds(getDocs(filtered('enrolled', 'enrolled')));
+    // The finished session is filtered out.
+    expect(first.docs.map((d) => d.id)).toEqual(['s1']);
+    await assertSucceeds(
+      getDocs(query(filtered('enrolled', 'enrolled'), startAfter(first.docs[0]))),
+    );
+    await assertFails(getDocs(filtered('student', 'enrolled')));
+    await assertFails(getDocs(filtered('other', 'enrolled')));
+    const totals = (uid: string, owner?: string) =>
+      getAggregateFromServer(query(sessions(uid), ...(owner ? [where('uid', '==', owner)] : [])), {
+        sessions: count(),
+        trades: sum('tradeCount'),
+      });
+    await assertSucceeds(totals('enrolled', 'enrolled'));
+    await assertFails(totals('enrolled'));
+    await assertFails(totals('other', 'enrolled'));
+  });
+
+  it('lets staff page and count every session, by student, type or status', async () => {
+    const sessions = (uid: string) => collection(as(uid), 'practiceSessions');
+    for (const uid of ['admin', 'trainer']) {
+      await assertSucceeds(
+        getDocs(
+          query(
+            sessions(uid),
+            where('uid', '==', 'enrolled'),
+            where('evaluationId', '==', 'e1'),
+            where('status', '==', 'finished'),
+            orderBy('startedAt', 'desc'),
+            limit(21),
+          ),
+        ),
+      );
+      await assertSucceeds(
+        getAggregateFromServer(query(sessions(uid), where('status', '==', 'active')), {
+          sessions: count(),
+          trades: sum('tradeCount'),
+        }),
+      );
+    }
   });
 
   it('lets the owner update the summary and finish the session, once', async () => {
