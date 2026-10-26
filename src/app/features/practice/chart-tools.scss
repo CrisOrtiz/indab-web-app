@@ -40,6 +40,10 @@
   display: flex;
   flex-direction: column;
   min-width: 220px;
+  // Many tools: the list scrolls rather than run off a phone's screen.
+  max-height: min(70vh, 460px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -81,6 +85,15 @@
     margin-left: auto;
   }
 
+  .menu-heading {
+    margin: 6px 10px 2px;
+    color: var(--color-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
   hr {
     width: 100%;
     margin: 4px 0;
@@ -114,6 +127,66 @@
 
   .fib {
     stroke-width: 1;
+  }
+
+  .head {
+    stroke-width: 1;
+  }
+
+  // A parallel channel: its two lines, a light fill and a dashed middle line.
+  .channel {
+    fill-opacity: 0.08;
+    stroke: none;
+  }
+
+  .channel-middle {
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+    stroke-opacity: 0.7;
+  }
+
+  // Long/short position tool: TradingView's green target and red stop.
+  .profit {
+    fill: color-mix(in srgb, var(--color-candle-up) 20%, transparent);
+    stroke: var(--color-candle-up);
+    stroke-width: 1;
+  }
+
+  .loss {
+    fill: color-mix(in srgb, var(--color-candle-down) 20%, transparent);
+    stroke: var(--color-candle-down);
+    stroke-width: 1;
+  }
+
+  .entry {
+    stroke: var(--color-muted);
+    stroke-width: 1;
+  }
+
+  .range {
+    fill-opacity: 0.12;
+    stroke-width: 1;
+  }
+
+  .measure-text {
+    fill: var(--color-text);
+    stroke: var(--color-bg);
+    stroke-width: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    paint-order: stroke;
+
+    &.up {
+      fill: var(--color-up);
+    }
+
+    &.down {
+      fill: var(--color-down);
+    }
+  }
+
+  .range-text {
+    text-anchor: middle;
   }
 
   .fib-move {

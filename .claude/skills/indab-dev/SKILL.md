@@ -229,6 +229,11 @@ Module notes:
   or click puts each point, a finger can drag a crosshair and let go, a tap selects a drawing
   (handles reshape it, a drag moves it, a bar recolors or deletes it). The chart's top bar holds
   the timeframes (projected with `chartToolbar`) and one menu each for indicators and drawings.
+  Indicators are only EMA 100 and EMA 200 (on from the start) and RSI 14 (Cris, 2026-10-26: no
+  other moving averages). The drawings menu has TradingView's sections (`TOOL_GROUPS`): trend
+  line, ray, extended line, arrow, horizontal line/ray, vertical line, parallel channel (three
+  points), rectangle, Fibonacci, long/short position (entry, target, stop with risk/reward) and
+  price range; `POINTS` says how many points each takes and `build` turns them into a drawing.
   Cris chose to grow this with FX Replay's best ideas rather than clone it: session
   stats (`stats.ts`, `SessionStatsPanel`), rectangle/Fibonacci, picking the start date.
   Gold is Binance Futures' XAUUSDT perpetual (PAXGUSDT, a thin token, looked nothing like the

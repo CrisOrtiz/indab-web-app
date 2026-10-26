@@ -1,4 +1,5 @@
 import { OrderType, TradeSide } from '../../models/practice';
+import type { Tool, ToolGroup } from '../../../features/practice/replay-chart';
 
 /**
  * Spanish (Latin America) texts: the default language and the source of the `Messages` type.
@@ -658,11 +659,31 @@ export const es = {
     draw: 'Dibujar',
     drawingTools: 'Herramientas de dibujo',
     toolNames: {
-      hline: 'Línea horizontal',
       trend: 'Línea de tendencia',
+      ray: 'Rayo',
+      extended: 'Línea extendida',
+      arrow: 'Flecha',
+      hline: 'Línea horizontal',
+      hray: 'Rayo horizontal',
+      vline: 'Línea vertical',
+      channel: 'Canal paralelo',
       rect: 'Rectángulo',
       fib: 'Retroceso de Fibonacci',
-    } as Record<'hline' | 'trend' | 'rect' | 'fib', string>,
+      long: 'Posición larga',
+      short: 'Posición corta',
+      range: 'Rango de precio',
+    } as Record<Tool, string>,
+    toolGroups: {
+      lines: 'Líneas',
+      shapes: 'Canales y formas',
+      fibonacci: 'Fibonacci',
+      projection: 'Proyección y medición',
+    } as Record<ToolGroup, string>,
+    positionTarget: (distance: string, pct: string) => `Objetivo: ${distance} (${pct})`,
+    positionStop: (distance: string, pct: string) => `Stop: ${distance} (${pct})`,
+    riskReward: (ratio: string) => `Riesgo/beneficio: ${ratio}`,
+    rangeLabel: (distance: string, pct: string, bars: number) =>
+      `${distance} (${pct}) · ${bars === 1 ? '1 vela' : `${bars} velas`}`,
     clear: 'Borrar dibujos',
     drawingOptions: 'Opciones del dibujo',
     color: (name: string) => `Color ${name.toLowerCase()}`,
@@ -686,11 +707,24 @@ export const es = {
     cancelOrder: 'Cancelar orden',
     removeLevel: (level: string) => `Quitar ${level.toLowerCase()}`,
     hints: {
-      hline: ['Toca o haz clic donde va la línea.', ''],
       trend: ['Marca el primer punto de la línea.', 'Marca el segundo punto.'],
+      ray: ['Marca dónde empieza el rayo.', 'Marca hacia dónde sigue.'],
+      extended: ['Marca un punto de la línea.', 'Marca otro punto.'],
+      arrow: ['Marca dónde empieza la flecha.', 'Marca hacia dónde apunta.'],
+      hline: ['Toca o haz clic donde va la línea.'],
+      hray: ['Toca o haz clic donde empieza el rayo.'],
+      vline: ['Toca o haz clic en la vela donde va la línea.'],
+      channel: [
+        'Marca el primer punto del canal.',
+        'Marca el segundo punto.',
+        'Marca el ancho del canal.',
+      ],
       rect: ['Marca una esquina del rectángulo.', 'Marca la esquina opuesta.'],
       fib: ['Marca el inicio del movimiento.', 'Marca el final del movimiento.'],
-    } as Record<'hline' | 'trend' | 'rect' | 'fib', [string, string]>,
+      long: ['Marca la entrada de la compra.', 'Marca el objetivo (o el stop) y el final.'],
+      short: ['Marca la entrada de la venta.', 'Marca el objetivo (o el stop) y el final.'],
+      range: ['Marca el inicio de lo que quieres medir.', 'Marca el final.'],
+    } as Record<Tool, string[]>,
   },
 
   evaluations: {

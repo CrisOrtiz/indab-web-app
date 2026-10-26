@@ -6,7 +6,7 @@ export interface IndicatorPoint {
   value: number;
 }
 
-export type IndicatorKind = 'sma' | 'ema' | 'rsi';
+export type IndicatorKind = 'ema' | 'rsi';
 
 export interface Indicator {
   id: string;
@@ -16,32 +16,21 @@ export interface Indicator {
   color: string;
 }
 
-/** The indicators students can switch on, as in TradingView's favourites bar. */
+/**
+ * The indicators students can switch on, as in TradingView's favourites bar. Cris trades with
+ * the EMA 100 and 200 only (2026-10-26), so those are the moving averages, on from the start.
+ */
 export const INDICATORS: Indicator[] = [
-  { id: 'sma20', label: 'MA 20', kind: 'sma', period: 20, color: '#2962ff' },
-  { id: 'sma50', label: 'MA 50', kind: 'sma', period: 50, color: '#ff9800' },
-  { id: 'ema21', label: 'EMA 21', kind: 'ema', period: 21, color: '#9c27b0' },
+  { id: 'ema100', label: 'EMA 100', kind: 'ema', period: 100, color: '#ff9800' },
+  { id: 'ema200', label: 'EMA 200', kind: 'ema', period: 200, color: '#2962ff' },
   { id: 'rsi14', label: 'RSI 14', kind: 'rsi', period: 14, color: '#7e57c2' },
 ];
 
+/** Indicators shown when the chart opens. */
+export const DEFAULT_INDICATORS = ['ema100', 'ema200'];
+
 /** RSI levels drawn as guides in its pane. */
 export const RSI_LEVELS = [70, 30];
-
-/** Simple moving average of the closes; starts once `period` candles exist. */
-export function sma(candles: Candle[], period: number): IndicatorPoint[] {
-  const points: IndicatorPoint[] = [];
-  let sum = 0;
-  candles.forEach((c, i) => {
-    sum += c.close;
-    if (i >= period) {
-      sum -= candles[i - period].close;
-    }
-    if (i >= period - 1) {
-      points.push({ time: c.time, value: sum / period });
-    }
-  });
-  return points;
-}
 
 /** Exponential moving average of the closes, seeded with the SMA of the first `period`. */
 export function ema(candles: Candle[], period: number): IndicatorPoint[] {
@@ -84,6 +73,6 @@ export function rsi(candles: Candle[], period: number): IndicatorPoint[] {
 }
 
 export function computeIndicator(indicator: Indicator, candles: Candle[]): IndicatorPoint[] {
-  const compute = { sma, ema, rsi }[indicator.kind];
+  const compute = { ema, rsi }[indicator.kind];
   return compute(candles, indicator.period);
 }

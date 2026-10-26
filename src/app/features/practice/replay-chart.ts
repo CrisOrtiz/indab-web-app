@@ -30,8 +30,8 @@ import {
 } from 'lightweight-charts';
 import { I18n } from '../../core/i18n/i18n.service';
 import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/practice';
-import { INDICATORS, RSI_LEVELS, computeIndicator } from './indicators';
-import { formatLots, priceDigits, roundPrice, signedMoney } from './practice-format';
+import { DEFAULT_INDICATORS, INDICATORS, RSI_LEVELS, computeIndicator } from './indicators';
+import { formatLots, priceDecimals, priceDigits, roundPrice, signedMoney } from './practice-format';
 import { LOT_SIZE, LOT_STEP, tradeLots } from './replay';
 import { filledTrades, tradeBox } from './trade-boxes';
 
@@ -140,16 +140,34 @@ interface PlacedLabel extends LineLabel {
   line: Line;
 }
 
-export type Tool = 'hline' | 'trend' | 'rect' | 'fib';
-/** Drawings made of two points: a trend line, a rectangle or a Fibonacci retracement. */
-type TwoPointKind = 'trend' | 'rect' | 'fib';
-interface TwoPointDrawing {
+export type Tool =
+  | 'trend'
+  | 'ray'
+  | 'extended'
+  | 'arrow'
+  | 'hline'
+  | 'hray'
+  | 'vline'
+  | 'channel'
+  | 'rect'
+  | 'fib'
+  | 'long'
+  | 'short'
+  | 'range';
+/** Drawings on the overlay: every tool but the horizontal line, which is a price line. */
+type ShapeKind = Exclude<Tool, 'hline'>;
+interface ShapeDrawing {
   id: number;
-  kind: TwoPointKind;
-  points: [ChartPoint, ChartPoint];
+  kind: ShapeKind;
+  /** One point (horizontal ray, vertical line) or two: the ends, corners or move. */
+  points: ChartPoint[];
   color: string;
+  /** Parallel channel: how far (price) its parallel line is from the first one. */
+  offset?: number;
+  /** Long/short position: the stop loss; the target is the second point's price. */
+  stop?: number;
 }
-type Drawing = { id: number; kind: 'hline'; price: number } | TwoPointDrawing;
+type Drawing = { id: number; kind: 'hline'; price: number } | ShapeDrawing;
 interface ChartPoint {
   time: number;
   price: number;
@@ -161,29 +179,49 @@ interface Pixel {
 
 /**
  * A dot on the selected drawing. Dragging it moves the time (x) of point `timeOf` and the price
- * (y) of point `priceOf`: both for the ends of a line, one of them for a rectangle's sides.
+ * (y) of point `priceOf`: both for the ends of a line, one of them for a rectangle's sides. A
+ * `level` handle moves a channel's parallel line or a position's stop loss instead.
  */
 interface Handle {
   key: string;
   x: number;
   y: number;
-  timeOf: 0 | 1 | null;
-  priceOf: 0 | 1 | null;
+  timeOf: number | null;
+  priceOf: number | null;
+  level?: 'offset' | 'stop';
 }
 
-/** A trend line, rectangle or Fibonacci retracement placed on the chart, in pixels. */
+/** A drawing of the overlay, in pixels. */
 interface PlacedShape {
   id: number;
-  kind: TwoPointKind;
+  kind: ShapeKind;
   color: string;
+  /** The drawing's points. */
+  pixels: Pixel[];
   a: Pixel;
   b: Pixel;
   left: number;
   right: number;
   top: number;
   bottom: number;
+  /** The line drawn: from `a` to `b`, past them for rays and extended lines. */
+  segment: [Pixel, Pixel];
+  /** A channel's parallel line. */
+  parallel?: [Pixel, Pixel];
+  /** An arrow's head, as SVG polygon points. */
+  head?: string;
   /** Fibonacci levels: their ratio, price and height. */
   levels: { ratio: number; price: number; y: number }[];
+  /** Long/short position: its entry, target (profit) and stop (loss) bands, and labels. */
+  position?: {
+    entryY: number;
+    profit: { top: number; height: number };
+    loss: { top: number; height: number };
+    labels: { key: string; y: number; up: boolean; text: string }[];
+    ratio: string;
+  };
+  /** Price range: its label, where it goes and whether the price went up. */
+  range?: { text: string; y: number; up: boolean };
   handles: Handle[];
 }
 
@@ -210,7 +248,7 @@ interface Gesture {
   /** Placing a point: where the cursor was as the press started; whether a point was set. */
   place?: { from: Pixel; anchored: boolean };
   /** Moving a drawing by one of its handles, or whole when there is none. */
-  edit?: { drawing: TwoPointDrawing; from: [Pixel, Pixel]; handle: Handle | null };
+  edit?: { drawing: ShapeDrawing; from: Pixel[]; handle: Handle | null };
   /** A tap selects this drawing, or none. */
   select?: number | null;
 }
@@ -233,7 +271,68 @@ const DRAWING_COLOR = DRAWING_COLORS[0];
 /** Id of the drawing shown while its second point is being placed. */
 const PREVIEW_ID = 0;
 const RSI_PANE_HEIGHT = 110;
-const TOOLS: Tool[] = ['hline', 'trend', 'rect', 'fib'];
+/** Length (px) of an arrow's head. */
+const ARROW_HEAD = 12;
+
+export type ToolGroup = 'lines' | 'shapes' | 'fibonacci' | 'projection';
+/** The drawings menu, in sections as TradingView groups its tools. */
+export const TOOL_GROUPS: { group: ToolGroup; tools: Tool[] }[] = [
+  { group: 'lines', tools: ['trend', 'ray', 'extended', 'arrow', 'hline', 'hray', 'vline'] },
+  { group: 'shapes', tools: ['channel', 'rect'] },
+  { group: 'fibonacci', tools: ['fib'] },
+  { group: 'projection', tools: ['long', 'short', 'range'] },
+];
+
+/** Points a drawing takes: a channel's third sets its width. */
+const POINTS: Record<Tool, number> = {
+  trend: 2,
+  ray: 2,
+  extended: 2,
+  arrow: 2,
+  hline: 1,
+  hray: 1,
+  vline: 1,
+  channel: 3,
+  rect: 2,
+  fib: 2,
+  long: 2,
+  short: 2,
+  range: 2,
+};
+
+/** Drawings whose two points must be on different bars, as they are lines through them. */
+const LINE_KINDS: ReadonlySet<Tool> = new Set([
+  'trend',
+  'ray',
+  'extended',
+  'arrow',
+  'channel',
+  'long',
+  'short',
+]);
+
+const DECIMALS = new Map<number, Intl.NumberFormat>();
+/** A price distance with the decimals of `price`, in en-US numbers as prices are. */
+function formatDistance(value: number, price: number, signed = false): string {
+  const digits = priceDecimals(price);
+  const key = digits * 2 + Number(signed);
+  let format = DECIMALS.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+      signDisplay: signed ? 'exceptZero' : 'auto',
+    });
+    DECIMALS.set(key, format);
+  }
+  return format.format(value);
+}
+
+/** A share of a price as a percentage with two decimals: "0.48%". */
+function formatPercent(value: number, of: number, signed = false): string {
+  const pct = of ? (value / of) * 100 : 0;
+  return `${signed && pct > 0 ? '+' : ''}${pct.toFixed(2)}%`;
+}
 
 /**
  * Candlestick chart for the replay (TradingView lightweight-charts, Apache-2.0), laid out like
@@ -249,9 +348,10 @@ const TOOLS: Tool[] = ['hline', 'trend', 'rect', 'fib'];
  * quantity pad, an order type menu, TP/SL tabs to drag out and a × to discard it.
  *
  * A toolbar on top (content marked `chartToolbar`, such as the timeframes, goes first) has a
- * menu of indicators (moving averages, RSI in its own pane) and one of drawings (horizontal
- * and trend lines, rectangles and Fibonacci retracements). Indicators only use the candles
- * shown, so they never peek ahead.
+ * menu of indicators (EMA 100 and 200, on from the start, and the RSI in its own pane) and one
+ * of drawings, in TradingView's sections (`TOOL_GROUPS`): lines, rays and arrows, parallel
+ * channels and rectangles, Fibonacci retracements, long/short positions and price ranges.
+ * Indicators only use the candles shown, so they never peek ahead.
  *
  * Drawings work as in TradingView's app: a click or tap puts each point, and on a phone the
  * finger can also drag a crosshair to the point and let go, so it does not hide the spot. A
@@ -316,19 +416,19 @@ export class ReplayChart {
   protected readonly formatLots = formatLots;
   protected readonly lotPresets = LOT_PRESETS;
   protected readonly orderTypes: OrderType[] = ['market', 'limit', 'stop'];
-  protected readonly active = signal<ReadonlySet<string>>(new Set());
-  protected readonly toolList = TOOLS;
+  protected readonly active = signal<ReadonlySet<string>>(new Set(DEFAULT_INDICATORS));
+  protected readonly toolGroups = TOOL_GROUPS;
   protected readonly drawingColors = DRAWING_COLORS;
   protected readonly tool = signal<Tool | null>(null);
-  /** First point of a drawing being placed. */
-  protected readonly anchor = signal<ChartPoint | null>(null);
+  /** Points put so far of a drawing being placed. */
+  protected readonly anchors = signal<ChartPoint[]>([]);
   /** Where the next point goes while a tool is on; `touch` shows it as a crosshair. */
   protected readonly cursor = signal<(Pixel & { touch: boolean }) | null>(null);
   protected readonly drawings = signal<Drawing[]>([]);
   /** The drawing whose handles and bar are shown. */
   protected readonly selected = signal<number | null>(null);
   /** The selected drawing while it is being dragged, until it is dropped. */
-  private readonly editing = signal<TwoPointDrawing | null>(null);
+  private readonly editing = signal<ShapeDrawing | null>(null);
   /** The indicators or drawings menu of the toolbar, open below its button. */
   protected readonly toolMenu = signal<{
     kind: 'indicators' | 'drawings';
@@ -341,6 +441,12 @@ export class ReplayChart {
   protected readonly selectedShape = computed(() =>
     this.shapes().find((s) => s.id === this.selected() && s.id !== PREVIEW_ID),
   );
+  /** What to do next with the tool that is on. */
+  protected readonly hint = computed(() => {
+    const tool = this.tool();
+    const hints = tool ? this.i18n.messages().chart.hints[tool] : [];
+    return hints[Math.min(this.anchors().length, hints.length - 1)] ?? '';
+  });
   /** Price at the touch crosshair, for its tag on the price scale. */
   protected readonly cursorPrice = computed(() => {
     const cursor = this.cursor();
@@ -488,8 +594,10 @@ export class ReplayChart {
     });
     effect(() => {
       this.drawings();
-      this.anchor();
+      this.anchors();
       this.cursor();
+      // Measurements are labelled in the current language.
+      this.i18n.messages();
       this.editing();
       this.barSeconds();
       untracked(() => this.series && this.shapes.set(this.placeShapes()));
@@ -535,7 +643,7 @@ export class ReplayChart {
   protected pick(tool: Tool | null): void {
     this.toolMenu.set(null);
     this.tool.update((current) => (current === tool ? null : tool));
-    this.anchor.set(null);
+    this.anchors.set([]);
     this.cursor.set(null);
     this.selected.set(null);
   }
@@ -574,6 +682,11 @@ export class ReplayChart {
     ) {
       this.eraseSelected();
     }
+  }
+
+  /** SVG polygon points through `pixels`. */
+  protected polygon(...pixels: Pixel[]): string {
+    return pixels.map((p) => `${p.x},${p.y}`).join(' ');
   }
 
   /** A handle of the selected drawing: dragging it reshapes the drawing. */
@@ -1103,9 +1216,8 @@ export class ReplayChart {
     };
   }
 
-  /** Trend lines, rectangles and Fibonacci retracements in pixels, for the overlay. */
+  /** The drawings of the overlay in pixels, with the one being placed. */
   private placeShapes(): PlacedShape[] {
-    const series = this.series!;
     const editing = untracked(this.editing);
     const list = untracked(this.drawings).map((d) => (editing?.id === d.id ? editing : d));
     const preview = this.preview();
@@ -1114,47 +1226,163 @@ export class ReplayChart {
     }
     const shapes: PlacedShape[] = [];
     for (const d of list) {
-      if (d.kind === 'hline') {
-        continue;
+      const shape = d.kind === 'hline' ? null : this.placeShape(d);
+      if (shape) {
+        shapes.push(shape);
       }
-      const [pa, pb] = d.points;
-      const a = this.toPixel(pa);
-      const b = this.toPixel(pb);
-      if (!a || !b) {
-        continue;
-      }
-      // A retracement runs from the end of the move (0) back to its start (1).
-      const levels =
-        d.kind === 'fib'
-          ? FIB_LEVELS.map((ratio) => {
-              const price = roundPrice(pb.price + (pa.price - pb.price) * ratio);
-              return { ratio, price, y: series.priceToCoordinate(price) ?? 0 };
-            })
-          : [];
-      const box = {
-        left: Math.min(a.x, b.x),
-        right: Math.max(a.x, b.x),
-        top: Math.min(a.y, b.y),
-        bottom: Math.max(a.y, b.y),
-      };
-      shapes.push({
-        id: d.id,
-        kind: d.kind,
-        color: d.color,
-        a,
-        b,
-        ...box,
-        levels,
-        handles:
-          d.kind === 'rect'
-            ? this.rectHandles(a, b, box)
-            : [
-                { key: 'a', ...a, timeOf: 0, priceOf: 0 },
-                { key: 'b', ...b, timeOf: 1, priceOf: 1 },
-              ],
-      });
     }
     return shapes;
+  }
+
+  /** One drawing in pixels: its lines, handles and, for measures, their labels. */
+  private placeShape(d: ShapeDrawing): PlacedShape | null {
+    const series = this.series!;
+    const pixels: Pixel[] = [];
+    for (const point of d.points) {
+      const pixel = this.toPixel(point);
+      if (!pixel) {
+        return null;
+      }
+      pixels.push(pixel);
+    }
+    const a = pixels[0];
+    const b = pixels[1] ?? a;
+    const pane = this.pane() ?? { width: 0, height: 0 };
+    const tr = untracked(this.i18n.messages).chart;
+    const shape: PlacedShape = {
+      id: d.id,
+      kind: d.kind,
+      color: d.color,
+      pixels,
+      a,
+      b,
+      left: Math.min(a.x, b.x),
+      right: Math.max(a.x, b.x),
+      top: Math.min(a.y, b.y),
+      bottom: Math.max(a.y, b.y),
+      segment: [a, b],
+      levels: [],
+      handles: [
+        { key: 'a', ...a, timeOf: 0, priceOf: 0 },
+        { key: 'b', ...b, timeOf: 1, priceOf: 1 },
+      ],
+    };
+    switch (d.kind) {
+      case 'ray':
+        shape.segment = [a, extend(a, b, pane.width)];
+        break;
+      case 'extended':
+        shape.segment = [extend(b, a, pane.width), extend(a, b, pane.width)];
+        break;
+      case 'arrow':
+        shape.head = arrowHead(a, b);
+        break;
+      case 'hray':
+        shape.segment = [a, { x: Math.max(a.x, pane.width), y: a.y }];
+        shape.handles = [{ key: 'a', ...a, timeOf: 0, priceOf: 0 }];
+        break;
+      case 'vline':
+        shape.segment = [
+          { x: a.x, y: 0 },
+          { x: a.x, y: pane.height },
+        ];
+        shape.handles = [{ key: 'a', x: a.x, y: pane.height / 2, timeOf: 0, priceOf: null }];
+        break;
+      case 'channel': {
+        // The offset is a price distance; the price scale is linear, so it is one height.
+        const dy = (series.priceToCoordinate(d.points[0].price + (d.offset ?? 0)) ?? a.y) - a.y;
+        const parallel: [Pixel, Pixel] = [
+          { x: a.x, y: a.y + dy },
+          { x: b.x, y: b.y + dy },
+        ];
+        shape.parallel = parallel;
+        shape.top = Math.min(shape.top, shape.top + dy);
+        shape.bottom = Math.max(shape.bottom, shape.bottom + dy);
+        shape.handles.push({
+          key: 'offset',
+          x: (a.x + b.x) / 2,
+          y: (a.y + b.y) / 2 + dy,
+          timeOf: null,
+          priceOf: null,
+          level: 'offset',
+        });
+        break;
+      }
+      case 'rect':
+        shape.handles = this.rectHandles(a, b, shape);
+        break;
+      case 'fib':
+        // A retracement runs from the end of the move (0) back to its start (1).
+        shape.levels = FIB_LEVELS.map((ratio) => {
+          const [pa, pb] = d.points;
+          const price = roundPrice(pb.price + (pa.price - pb.price) * ratio);
+          return { ratio, price, y: series.priceToCoordinate(price) ?? 0 };
+        });
+        break;
+      case 'long':
+      case 'short': {
+        const entry = d.points[0].price;
+        const target = d.points[1].price;
+        const stop = d.stop ?? entry;
+        const stopY = series.priceToCoordinate(stop) ?? a.y;
+        const reward = Math.abs(target - entry);
+        const risk = Math.abs(entry - stop);
+        const band = (y: number) => ({ top: Math.min(a.y, y), height: Math.abs(a.y - y) });
+        // Labels sit outside the box, past the target and the stop.
+        const outside = (y: number) => (y < a.y ? y - 5 : y + 13);
+        shape.top = Math.min(b.y, stopY);
+        shape.bottom = Math.max(b.y, stopY);
+        shape.position = {
+          entryY: a.y,
+          profit: band(b.y),
+          loss: band(stopY),
+          labels: [
+            {
+              key: 'target',
+              y: outside(b.y),
+              up: true,
+              text: tr.positionTarget(formatDistance(reward, entry), formatPercent(reward, entry)),
+            },
+            {
+              key: 'stop',
+              y: outside(stopY),
+              up: false,
+              text: tr.positionStop(formatDistance(risk, entry), formatPercent(risk, entry)),
+            },
+          ],
+          ratio: tr.riskReward(risk ? (reward / risk).toFixed(2) : '-'),
+        };
+        shape.handles = [
+          { key: 'entry', ...a, timeOf: 0, priceOf: 0 },
+          { key: 'target', x: a.x, y: b.y, timeOf: null, priceOf: 1 },
+          { key: 'stop', x: a.x, y: stopY, timeOf: null, priceOf: null, level: 'stop' },
+          { key: 'end', x: b.x, y: a.y, timeOf: 1, priceOf: null },
+        ];
+        break;
+      }
+      case 'range': {
+        const [from, to] = d.points;
+        const change = to.price - from.price;
+        const bars = this.indexAt(to.time) - this.indexAt(from.time);
+        const middle = (shape.left + shape.right) / 2;
+        shape.segment = [
+          { x: middle, y: a.y },
+          { x: middle, y: b.y },
+        ];
+        shape.head = arrowHead(...shape.segment);
+        shape.range = {
+          up: change >= 0,
+          y: change >= 0 ? shape.top - 6 : shape.bottom + 14,
+          text: tr.rangeLabel(
+            formatDistance(change, from.price, true),
+            formatPercent(change, from.price, true),
+            bars,
+          ),
+        };
+        break;
+      }
+    }
+    return shape;
   }
 
   /** A rectangle's corners and the middle of its sides, each moving what it sits on. */
@@ -1181,16 +1409,52 @@ export class ReplayChart {
     ];
   }
 
-  /** The drawing being placed, from its first point to the cursor. */
-  private preview(): TwoPointDrawing | null {
+  /** The drawing being placed, from its points so far to the cursor. */
+  private preview(): ShapeDrawing | null {
     const tool = untracked(this.tool);
-    const anchor = untracked(this.anchor);
+    const anchors = untracked(this.anchors);
     const cursor = untracked(this.cursor);
     const point = cursor && this.toPoint(cursor);
-    if (!anchor || !point || !tool || tool === 'hline') {
+    if (!tool || tool === 'hline' || !point || (POINTS[tool] > 1 && !anchors.length)) {
       return null;
     }
-    return { id: PREVIEW_ID, kind: tool, points: [anchor, point], color: DRAWING_COLOR };
+    return this.build(tool, [...anchors, point], PREVIEW_ID);
+  }
+
+  /** A drawing of `tool` through `points`; a channel of two points is still a line. */
+  private build(tool: ShapeKind, points: ChartPoint[], id: number): ShapeDrawing {
+    const color = DRAWING_COLOR;
+    if (tool === 'channel') {
+      const [a, b = a, c] = points;
+      return { id, kind: tool, points: [a, b], color, offset: c ? this.offsetOf(a, b, c) : 0 };
+    }
+    if (tool === 'long' || tool === 'short') {
+      const [entry, end] = points;
+      const up = tool === 'long' ? 1 : -1;
+      // The second point sets the target, or the stop when it is on the losing side; the
+      // other one mirrors it, for a risk/reward of 1 to adjust from.
+      const move = (end.price - entry.price) * up;
+      const mirror = roundPrice(entry.price - move * up);
+      return {
+        id,
+        kind: tool,
+        points: [entry, { time: end.time, price: move >= 0 ? end.price : mirror }],
+        color,
+        stop: move >= 0 ? mirror : end.price,
+      };
+    }
+    return { id, kind: tool, points: points.slice(0, POINTS[tool]), color };
+  }
+
+  /** Price distance from the line through `a` and `b` to `c`, at `c`'s bar. */
+  private offsetOf(a: ChartPoint, b: ChartPoint, c: ChartPoint): number {
+    const [pa, pb, pc] = [a, b, c].map((p) => this.toPixel(p));
+    if (!pa || !pb || !pc || pa.x === pb.x) {
+      return roundPrice(c.price - a.price);
+    }
+    const y = pa.y + ((pb.y - pa.y) * (pc.x - pa.x)) / (pb.x - pa.x);
+    const price = this.series!.coordinateToPrice(y);
+    return price === null ? 0 : roundPrice(c.price - price);
   }
 
   private toPixel(point: ChartPoint): Pixel | null {
@@ -1283,7 +1547,11 @@ export class ReplayChart {
         this.indicatorSeries.set(indicator.id, series);
       }
       series.setData(
-        computeIndicator(indicator, candles).map((p) => ({ time: p.time as Time, value: p.value })),
+        computeIndicator(indicator, candles).map((p) => ({
+          time: p.time as Time,
+          // Averages at price precision: float noise on flat prices would stretch the scale.
+          value: indicator.kind === 'rsi' ? p.value : roundPrice(p.value),
+        })),
       );
     }
   }
@@ -1323,8 +1591,15 @@ export class ReplayChart {
       .reverse()
       .sort((s, t) => Number(t.id === selected) - Number(s.id === selected));
     return shapes.find((s) => {
-      if (s.kind === 'trend') {
-        return distanceToSegment(p, s.a, s.b) <= reach;
+      if (s.parallel) {
+        return (
+          distanceToSegment(p, ...s.segment) <= reach ||
+          distanceToSegment(p, ...s.parallel) <= reach ||
+          insideChannel(p, s.segment, s.parallel)
+        );
+      }
+      if (['trend', 'ray', 'extended', 'arrow', 'hray', 'vline'].includes(s.kind)) {
+        return distanceToSegment(p, ...s.segment) <= reach;
       }
       const ys = s.kind === 'fib' ? s.levels.map((l) => l.y) : [s.top, s.bottom];
       return (
@@ -1343,11 +1618,11 @@ export class ReplayChart {
     this.holdPointer(event);
     // With a mouse, the press puts the first point (a drag then draws the whole shape); on a
     // phone it waits for the finger to lift, from where the crosshair was.
-    const anchored = !!untracked(this.anchor);
-    if (!touch && !anchored && tool !== 'hline') {
+    const anchored = untracked(this.anchors).length > 0;
+    if (!touch && !anchored && POINTS[tool] > 1) {
       const point = this.toPoint(p);
       if (point) {
-        this.anchor.set(point);
+        this.anchors.set([point]);
       }
     }
     const cursor = untracked(this.cursor);
@@ -1375,7 +1650,7 @@ export class ReplayChart {
       start: { x: event.clientX - box.left, y: event.clientY - box.top },
       touch: event.pointerType === 'touch',
       moved: false,
-      edit: { drawing, from: [shape.a, shape.b], handle },
+      edit: { drawing, from: shape.pixels, handle },
     };
   }
 
@@ -1432,33 +1707,52 @@ export class ReplayChart {
       this.pick(null);
       return;
     }
-    const anchor = untracked(this.anchor);
-    if (!anchor) {
-      // A finger lifted on the first point: the crosshair stays there for the second one.
-      this.anchor.set(point);
+    const anchors = untracked(this.anchors);
+    const needed = POINTS[tool];
+    if (needed > 1 && !anchors.length) {
+      // A finger lifted on the first point: the crosshair stays there for the next one.
+      this.anchors.set([point]);
       this.cursor.set({ ...at, touch: gesture.touch });
       return;
     }
-    if (!gesture.touch && !gesture.place!.anchored && !gesture.moved) {
-      // The click that put the first point: the second one comes with the next click.
+    if (needed > 1 && !gesture.touch && !gesture.place!.anchored && !gesture.moved) {
+      // The click that put the first point: the next one comes with the next click.
       return;
     }
-    if (anchor.time === point.time && (tool === 'trend' || anchor.price === point.price)) {
+    const last = anchors.length === 1 ? anchors[0] : null;
+    if (last && last.time === point.time && (LINE_KINDS.has(tool) || last.price === point.price)) {
       return;
     }
-    // A retracement keeps the order of the move; the other drawings go left to right.
-    const points = (
-      tool === 'fib' ? [anchor, point] : [anchor, point].sort((a, b) => a.time - b.time)
-    ) as [ChartPoint, ChartPoint];
+    const points = [...anchors, point];
+    if (points.length < needed) {
+      this.anchors.set(points);
+      this.cursor.set({ ...at, touch: gesture.touch });
+      return;
+    }
+    // Lines, channels and rectangles go left to right; rays, arrows, retracements, positions
+    // and measures keep the direction they were drawn in.
+    if (tool === 'trend' || tool === 'extended' || tool === 'channel' || tool === 'rect') {
+      points.splice(0, 2, ...points.slice(0, 2).sort((p, q) => p.time - q.time));
+    }
     const id = this.nextDrawingId++;
-    this.drawings.update((list) => [...list, { id, kind: tool, points, color: DRAWING_COLOR }]);
+    this.drawings.update((list) => [...list, this.build(tool, points, id)]);
     this.pick(null);
     this.selected.set(id);
   }
 
   /** The drawing being edited, moved by (dx, dy) pixels: one handle's coordinates, or all. */
-  private reshape(edit: NonNullable<Gesture['edit']>, dx: number, dy: number): TwoPointDrawing {
+  private reshape(edit: NonNullable<Gesture['edit']>, dx: number, dy: number): ShapeDrawing {
     const { drawing, from, handle } = edit;
+    if (handle?.level) {
+      // A channel's width or a position's stop: by the price the handle moved.
+      const was = this.series!.coordinateToPrice(handle.y);
+      const now = this.series!.coordinateToPrice(handle.y + dy);
+      if (was === null || now === null) {
+        return drawing;
+      }
+      const value = roundPrice((drawing[handle.level] ?? 0) + now - was);
+      return handle.level === 'stop' ? { ...drawing, stop: value } : { ...drawing, offset: value };
+    }
     const points = drawing.points.map((point, i) => {
       const moveX = !handle || handle.timeOf === i;
       const moveY = !handle || handle.priceOf === i;
@@ -1470,8 +1764,13 @@ export class ReplayChart {
         time: moveX && next ? next.time : point.time,
         price: moveY && next ? next.price : point.price,
       };
-    }) as [ChartPoint, ChartPoint];
-    return { ...drawing, points };
+    });
+    const moved = { ...drawing, points };
+    if (!handle && drawing.stop !== undefined) {
+      // A position moved whole takes its stop along.
+      moved.stop = roundPrice(drawing.stop + points[0].price - drawing.points[0].price);
+    }
+    return moved;
   }
 
   private startDrag(entry: { line: Line; api: IPriceLine }, event: PointerEvent): void {
@@ -1740,6 +2039,35 @@ export class ReplayChart {
   private point(candle: Candle) {
     return { ...candle, time: candle.time as Time };
   }
+}
+
+/** Where the line from `a` through `b` leaves the pane, past `b` (x = 0 or `width`). */
+function extend(a: Pixel, b: Pixel, width: number): Pixel {
+  const dx = b.x - a.x;
+  if (!dx) {
+    return b;
+  }
+  const x = dx > 0 ? Math.max(width, b.x) : Math.min(0, b.x);
+  return { x, y: a.y + ((b.y - a.y) * (x - a.x)) / dx };
+}
+
+/** The head of an arrow from `a` to `b`, as SVG polygon points. */
+function arrowHead(a: Pixel, b: Pixel): string {
+  const angle = Math.atan2(b.y - a.y, b.x - a.x);
+  const wing = (turn: number) =>
+    `${b.x - ARROW_HEAD * Math.cos(angle + turn)},${b.y - ARROW_HEAD * Math.sin(angle + turn)}`;
+  return `${b.x},${b.y} ${wing(0.45)} ${wing(-0.45)}`;
+}
+
+/** Whether `p` is between a channel's two lines. */
+function insideChannel(p: Pixel, line: [Pixel, Pixel], parallel: [Pixel, Pixel]): boolean {
+  const [a, b] = line;
+  if (p.x < Math.min(a.x, b.x) || p.x > Math.max(a.x, b.x) || a.x === b.x) {
+    return false;
+  }
+  const y = a.y + ((b.y - a.y) * (p.x - a.x)) / (b.x - a.x);
+  const offset = parallel[0].y - a.y;
+  return p.y >= Math.min(y, y + offset) && p.y <= Math.max(y, y + offset);
 }
 
 /** Distance from `p` to the segment from `a` to `b`, in pixels. */
