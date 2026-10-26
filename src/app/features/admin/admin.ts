@@ -1,23 +1,37 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../core/i18n/local-date.pipe';
 import { UserRole } from '../../core/models/user-profile';
+import { Reveal } from '../../shared/reveal/reveal';
 import { AdminService } from './admin.service';
 import { AdminUserFilter, AdminUserRow, filterUsers, hasAcademyAccess } from './admin-users';
 
+type AdminCard = 'users' | 'exams' | 'evaluations' | 'practice';
+
+// Admin home: a card per tool, then the user management (admins only).
 @Component({
   selector: 'app-admin',
-  imports: [LocalDatePipe, RouterLink],
+  imports: [LocalDatePipe, NgTemplateOutlet, Reveal, RouterLink],
   providers: [AdminService],
   templateUrl: './admin.html',
-  styleUrl: './admin.scss',
+  styleUrls: ['./admin.scss', './admin-home.scss'],
 })
 export class Admin {
   protected readonly admin = inject(AdminService);
   protected readonly auth = inject(AuthService);
   protected readonly i18n = inject(I18n);
+
+  /** A card per admin tool; the users card (admins only) scrolls to the list below. */
+  protected readonly cards = computed<{ key: AdminCard; link: string | null }[]>(() => [
+    ...(this.auth.isAdmin() ? [{ key: 'users' as const, link: null }] : []),
+    { key: 'exams', link: '/admin/forms' },
+    { key: 'evaluations', link: '/admin/evaluations' },
+    { key: 'practice', link: '/admin/practice' },
+  ]);
+  private readonly usersSection = viewChild<ElementRef<HTMLElement>>('users');
 
   protected readonly filter = signal<AdminUserFilter>({ search: '', role: 'all', access: 'all' });
   protected readonly visible = computed(() => filterUsers(this.admin.users(), this.filter()));
@@ -36,6 +50,10 @@ export class Admin {
   protected readonly message = signal<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   protected readonly hasAcademyAccess = hasAcademyAccess;
+
+  protected showUsers(): void {
+    this.usersSection()?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   protected isSelf(row: AdminUserRow): boolean {
     return row.profile.uid === this.auth.user()?.uid;

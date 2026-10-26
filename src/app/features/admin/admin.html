@@ -1,17 +1,95 @@
 @let t = i18n.messages().admin;
-<section class="container">
-  <header class="page-header">
-    <h1>{{ t.title }}</h1>
-    <p>{{ t.intro }}</p>
-    <div class="links">
-      <a routerLink="/admin/evaluations" class="btn">{{ t.evaluations }}</a>
-      <a routerLink="/admin/practice" class="btn btn-outline">{{ t.reviewPractice }}</a>
+<section class="hero">
+  <div class="container hero-inner">
+    <div>
+      <p class="eyebrow">{{ t.eyebrow }}</p>
+      <h1>{{ t.title }}</h1>
+      <p class="lead">{{ auth.isAdmin() ? t.intro : t.trainerNote }}</p>
     </div>
-  </header>
+    <svg class="hero-art" viewBox="0 0 220 120" aria-hidden="true">
+      <rect x="20" y="14" width="84" height="96" rx="10" />
+      <path d="M40 40h44M40 60h44M40 80h28" />
+      <circle cx="160" cy="50" r="22" />
+      <path d="M124 108c4-20 18-30 36-30s32 10 36 30" />
+    </svg>
+  </div>
+</section>
 
-  @if (!auth.isAdmin()) {
-    <p class="muted">{{ t.trainerNote }}</p>
-  } @else {
+<section class="container sections">
+  <ul class="cards">
+    @for (card of cards(); track card.key; let i = $index) {
+      @let c = t.cards[card.key];
+      <li [appReveal]="i * 80">
+        @if (card.link) {
+          <a class="card" [routerLink]="card.link">
+            <ng-container *ngTemplateOutlet="body; context: { $implicit: card, c }" />
+            <span class="cta">{{ t.open }} <span aria-hidden="true">→</span></span>
+          </a>
+        } @else {
+          <button type="button" class="card" (click)="showUsers()">
+            <ng-container *ngTemplateOutlet="body; context: { $implicit: card, c }" />
+            <span class="cta">{{ t.open }} <span aria-hidden="true">↓</span></span>
+          </button>
+        }
+      </li>
+    }
+  </ul>
+</section>
+
+<ng-template #body let-card let-c="c">
+  <span class="art" [attr.data-art]="card.key" aria-hidden="true">
+    @switch (card.key) {
+      @case ('users') {
+        <svg viewBox="0 0 96 72">
+          <circle class="solid" cx="36" cy="22" r="11" />
+          <path class="solid" d="M14 62c2-14 11-22 22-22s20 8 22 22z" />
+          <circle cx="66" cy="26" r="9" />
+          <path d="M56 46c3-3 6-4 10-4 9 0 16 7 18 20H62" />
+        </svg>
+      }
+      @case ('exams') {
+        <svg viewBox="0 0 96 72">
+          <rect x="22" y="8" width="52" height="60" rx="6" />
+          <rect class="solid" x="36" y="3" width="24" height="10" rx="3" />
+          <path d="M32 30l5 5 9-9M32 50l5 5 9-9" />
+          <path class="thin" d="M52 31h12M52 51h12" />
+        </svg>
+      }
+      @case ('evaluations') {
+        <svg viewBox="0 0 96 72">
+          <path class="thin" d="M6 64h60" />
+          <line x1="16" y1="30" x2="16" y2="58" />
+          <rect class="solid" x="11" y="36" width="10" height="14" rx="2" />
+          <line x1="34" y1="20" x2="34" y2="50" />
+          <rect class="solid" x="29" y="26" width="10" height="16" rx="2" />
+          <line x1="52" y1="10" x2="52" y2="40" />
+          <rect class="solid" x="47" y="14" width="10" height="16" rx="2" />
+          <circle cx="74" cy="44" r="16" />
+          <path d="M74 34v10l6 5M70 24h8" />
+        </svg>
+      }
+      @case ('practice') {
+        <svg viewBox="0 0 96 72">
+          <line x1="18" y1="16" x2="18" y2="52" />
+          <rect class="solid" x="12" y="24" width="12" height="18" rx="2" />
+          <line x1="38" y1="10" x2="38" y2="44" />
+          <rect class="solid" x="32" y="16" width="12" height="16" rx="2" />
+          <circle cx="62" cy="38" r="16" />
+          <path d="M74 50l14 14" />
+          <path class="thin" d="M54 40l5-6 5 4 6-8" />
+        </svg>
+      }
+    }
+  </span>
+  <span class="text">
+    <h2>{{ c.title }}</h2>
+    <p>{{ c.text }}</p>
+  </span>
+</ng-template>
+
+@if (auth.isAdmin()) {
+  <section class="container users-section" id="users" #users>
+    <h2>{{ t.cards.users.title }}</h2>
     <div class="stats">
       <div class="stat">
         <strong>{{ stats().total }}</strong
@@ -149,5 +227,5 @@
         </tbody>
       </table>
     }
-  }
-</section>
+  </section>
+}

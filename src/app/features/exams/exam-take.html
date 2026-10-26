@@ -1,0 +1,235 @@
+@let t = i18n.messages().exams;
+<section class="container">
+  @if (loading()) {
+    <p class="muted">{{ t.loading }}</p>
+  } @else if (missing() || !exam()) {
+    <a routerLink="/academy/exams" class="back">{{ t.back }}</a>
+    <p class="muted">{{ t.notFound }}</p>
+  } @else if (exam(); as exam) {
+    @if (attempt(); as current) {
+      <!-- Answering -->
+      @let q = question();
+      <div class="taking">
+        <header class="taking-bar">
+          <div>
+            <strong>{{ exam.title }}</strong>
+            <span class="muted">· {{ t.attempt(current.attempt) }}</span>
+          </div>
+          <span class="save" role="status">
+            @switch (saveState()) {
+              @case ('saving') {
+                {{ t.saving }}
+              }
+              @case ('saved') {
+                {{ t.saved }} ✓
+              }
+              @case ('error') {
+                <span class="bad">{{ t.saveFailed }}</span>
+              }
+            }
+          </span>
+          @if (timeLeft(); as left) {
+            <span
+              class="timer"
+              [class.low]="left < 60000"
+              role="timer"
+              [attr.aria-label]="t.timeLeft"
+              >{{ t.remaining(clock(left)) }}</span
+            >
+          }
+        </header>
+
+        <nav class="dots" [attr.aria-label]="t.questionOf(index() + 1, exam.questions.length)">
+          @for (item of exam.questions; track item.id; let i = $index) {
+            <button
+              type="button"
+              [class.current]="i === index()"
+              [class.done]="isAnswered(item)"
+              [attr.aria-label]="t.goTo(i + 1)"
+              [attr.aria-current]="i === index() ? 'step' : null"
+              (click)="go(i)"
+            >
+              {{ i + 1 }}
+            </button>
+          }
+        </nav>
+
+        @if (q) {
+          <article class="question-card">
+            <p class="eyebrow">
+              {{ t.questionOf(index() + 1, exam.questions.length) }} · {{ t.points(q.points) }}
+            </p>
+            <h2>{{ q.text }}</h2>
+            @if (q.imageUrl) {
+              <img [src]="q.imageUrl" [alt]="t.image" />
+            }
+            @if (q.type === 'open') {
+              <label class="open">
+                {{ t.writeAnswer }}
+                <textarea
+                  rows="6"
+                  maxlength="5000"
+                  [value]="answers()[q.id]?.text ?? ''"
+                  (input)="write(q, $any($event.target).value)"
+                ></textarea>
+              </label>
+            } @else {
+              <fieldset class="choices">
+                <legend class="muted">{{ q.type === 'multiple' ? t.pickAll : t.pickOne }}</legend>
+                @for (label of optionLabels(q); track $index; let j = $index) {
+                  <label class="choice" [class.picked]="picked(q, j)">
+                    <input
+                      [type]="q.type === 'multiple' ? 'checkbox' : 'radio'"
+                      [name]="'q-' + q.id"
+                      [checked]="picked(q, j)"
+                      (change)="choose(q, j, $any($event.target).checked)"
+                    />
+                    <span>{{ label }}</span>
+                  </label>
+                }
+              </fieldset>
+            }
+          </article>
+        }
+
+        <div class="steps">
+          <button
+            type="button"
+            class="btn btn-outline"
+            [disabled]="index() === 0"
+            (click)="go(index() - 1)"
+          >
+            ← {{ t.previous }}
+          </button>
+          @if (index() < exam.questions.length - 1) {
+            <button type="button" class="btn" (click)="go(index() + 1)">{{ t.next }} →</button>
+          } @else {
+            <button type="button" class="btn" (click)="handIn()">{{ t.submit }}</button>
+          }
+        </div>
+      </div>
+    } @else {
+      <!-- Overview -->
+      <header class="page-header">
+        <a routerLink="/academy/exams" class="back">{{ t.back }}</a>
+        <h1>{{ exam.title }}</h1>
+        @if (exam.description) {
+          <p class="description">{{ exam.description }}</p>
+        }
+        <p class="muted">
+          {{ t.totalLine(exam.totalPoints, exam.passingPoints) }} ·
+          {{ t.questionCount(exam.questions.length) }} ·
+          {{ exam.durationMinutes ? t.minutes(exam.durationMinutes) : t.noLimit }} ·
+          {{ t.attemptsInfo(exam.maxAttempts) }}
+        </p>
+        <p class="muted">
+          {{ t.closes((exam.closesAt.toDate() | localDate: 'd MMM y, HH:mm') ?? '') }}
+        </p>
+      </header>
+
+      @if (notice(); as n) {
+        <p class="notice" [class.error]="n.kind === 'error'" role="status">{{ n.text }}</p>
+      }
+
+      @if (state(); as s) {
+        @if (s.best; as g) {
+          <div class="best" [class.ok]="g.passed" [class.bad]="!g.passed">
+            <span class="muted">{{ t.yourGrade }}</span>
+            <strong>{{ t.gradeLine(g.total, exam.totalPoints) }}</strong>
+            <span>{{ g.passed ? t.passed : t.failed }}</span>
+          </div>
+        }
+
+        <div class="actions">
+          @if (s.action === 'start' && s.nextAttempt) {
+            <button type="button" class="btn" [disabled]="busy()" (click)="startOrContinue()">
+              {{ t.startAttempt(s.nextAttempt) }}
+            </button>
+          } @else if (s.action === 'continue' && s.active) {
+            <button type="button" class="btn" (click)="startOrContinue()">
+              {{ t.continueAttempt(s.active.attempt) }}
+            </button>
+          } @else if (window() === 'upcoming') {
+            <p class="muted">
+              {{ t.windowUpcoming((exam.opensAt.toDate() | localDate: 'd MMM y, HH:mm') ?? '') }}
+            </p>
+          } @else if (window() === 'closed') {
+            <p class="muted">{{ t.windowClosed }}</p>
+          } @else {
+            <p class="muted">{{ t.noMoreAttempts }}</p>
+          }
+        </div>
+      }
+
+      @if (submissions().length) {
+        <h2 class="section-title">{{ t.attemptsTitle }}</h2>
+        <ul class="attempts">
+          @for (s of submissions(); track s.id) {
+            @let g = gradeOf(s);
+            <li>
+              <span>{{ t.attempt(s.attempt) }}</span>
+              <span class="muted">{{ t.statuses[statusOf(s)] }}</span>
+              @if (g) {
+                <strong [class.up]="g.passed" [class.down]="!g.passed">
+                  {{ t.gradeLine(g.total, exam.totalPoints) }}
+                </strong>
+                <button type="button" class="btn btn-outline" (click)="review(g)">
+                  {{ t.review(s.attempt) }}
+                </button>
+              } @else if (statusOf(s) !== 'inProgress') {
+                <span class="pill">{{ t.inReview }}</span>
+              }
+            </li>
+          }
+        </ul>
+      }
+
+      @if (reviewing(); as g) {
+        <section class="review" [attr.aria-label]="t.review(g.attempt)">
+          <h2>{{ t.review(g.attempt) }}</h2>
+          @if (g.feedback) {
+            <div class="feedback">
+              <span class="muted">{{ t.feedback }}</span>
+              <p>{{ g.feedback }}</p>
+            </div>
+          }
+          <ol>
+            @for (q of exam.questions; track q.id; let i = $index) {
+              @let answer = answerOf(g, q);
+              @let right = rightAnswer(q);
+              <li>
+                <div class="review-head">
+                  <strong>{{ t.questionOf(i + 1, exam.questions.length) }}</strong>
+                  <span>{{ t.yourPoints(g.scores[q.id] ?? 0, q.points) }}</span>
+                </div>
+                <p class="q-text">{{ q.text }}</p>
+                @if (q.type === 'open') {
+                  <p class="muted">{{ t.yourAnswer }}</p>
+                  <p class="open-answer">{{ answer?.text || t.noAnswer }}</p>
+                } @else {
+                  <ul class="choices-review">
+                    @for (label of optionLabels(q); track $index; let j = $index) {
+                      @let mine = answer?.choices?.includes(j) ?? false;
+                      <li [class.mine]="mine" [class.right]="right.includes(j)">
+                        {{ label }}
+                        @if (mine) {
+                          <span class="muted">· {{ t.yourAnswer }}</span>
+                        }
+                        @if (right.includes(j)) {
+                          <span class="up">· {{ t.rightAnswer }}</span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                }
+                @if (g.comments[q.id]; as comment) {
+                  <p class="comment">{{ comment }}</p>
+                }
+              </li>
+            }
+          </ol>
+        </section>
+      }
+    }
+  }
+</section>

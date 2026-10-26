@@ -992,6 +992,219 @@ describe('ranking', () => {
   });
 });
 
+describe('evaluation forms', () => {
+  const hour = 60 * 60 * 1000;
+  const exam = (extra: Record<string, unknown> = {}) => ({
+    title: 'Fundamentos de trading',
+    description: '',
+    totalPoints: 100,
+    passingPoints: 70,
+    durationMinutes: 30,
+    maxAttempts: 2,
+    audience: 'selected',
+    studentIds: ['enrolled'],
+    opensAt: new Date(Date.now() - hour),
+    closesAt: new Date(Date.now() + hour),
+    questions: [
+      {
+        id: 'q1',
+        type: 'single',
+        text: '¿RSI?',
+        imageUrl: '',
+        options: ['a', 'b'],
+        points: 100,
+        partial: false,
+      },
+    ],
+    published: true,
+    resultsPublished: false,
+    showAnswers: false,
+    createdBy: 'trainer',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const submission = (uid: string, attempt = 1, extra: Record<string, unknown> = {}) => ({
+    examId: 'x1',
+    uid,
+    userName: 'Ana',
+    attempt,
+    status: 'inProgress',
+    answers: {},
+    startedAt: serverTimestamp(),
+    submittedAt: null,
+    ...extra,
+  });
+  const grade = (extra: Record<string, unknown> = {}) => ({
+    examId: 'x1',
+    uid: 'enrolled',
+    attempt: 1,
+    scores: { q1: 100 },
+    comments: {},
+    feedback: 'Bien',
+    total: 100,
+    passed: true,
+    gradedBy: 'trainer',
+    gradedAt: serverTimestamp(),
+    ...extra,
+  });
+  const examRef = (uid: string | null, id = 'x1') => doc(as(uid), `examForms/${id}`);
+  const subRef = (uid: string | null, id = 'x1_enrolled_1') =>
+    doc(as(uid), `examSubmissions/${id}`);
+  const gradeRef = (uid: string | null, id = 'x1_enrolled_1') => doc(as(uid), `examGrades/${id}`);
+  const keyRef = (uid: string | null, id = 'x1') => doc(as(uid), `examKeys/${id}`);
+  const seed = (path: string, data: Record<string, unknown>) =>
+    env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), path), data));
+  const seededExam = (extra: Record<string, unknown> = {}) =>
+    seed('examForms/x1', { ...exam(extra), createdAt: new Date(), updatedAt: new Date() });
+
+  beforeEach(async () => {
+    await seed('enrollments/other', { academy: true, courses: [] });
+    await seededExam();
+    await seed('examKeys/x1', { answers: { q1: [0] }, updatedAt: new Date() });
+  });
+
+  it('are built by trainers and admins only', async () => {
+    await assertSucceeds(setDoc(examRef('trainer', 'x2'), exam()));
+    await assertSucceeds(setDoc(examRef('admin', 'x3'), exam({ createdBy: 'admin' })));
+    await assertFails(setDoc(examRef('enrolled', 'x4'), exam({ createdBy: 'enrolled' })));
+    await assertFails(setDoc(examRef(null, 'x4'), exam()));
+    await assertFails(setDoc(examRef('trainer', 'x4'), exam({ createdBy: 'admin' })));
+    await assertSucceeds(
+      updateDoc(examRef('admin'), { title: 'Nuevo', updatedAt: serverTimestamp() }),
+    );
+    await assertFails(updateDoc(examRef('enrolled'), { title: 'x', updatedAt: serverTimestamp() }));
+    await assertFails(deleteDoc(examRef('enrolled')));
+    await assertSucceeds(deleteDoc(examRef('trainer')));
+  });
+
+  it('validates a form', async () => {
+    const create = (extra: Record<string, unknown>) =>
+      setDoc(examRef('trainer', 'x5'), exam(extra));
+    await assertFails(create({ title: '' }));
+    await assertFails(create({ totalPoints: 0 }));
+    await assertFails(create({ passingPoints: 120 }));
+    await assertFails(create({ maxAttempts: 4 }));
+    await assertFails(create({ durationMinutes: 601 }));
+    await assertFails(create({ audience: 'group' }));
+    await assertFails(create({ closesAt: new Date(Date.now() - 2 * hour) }));
+    await assertFails(create({ answers: { q1: [0] } }));
+  });
+
+  it('show published forms to their students only, never the answer key', async () => {
+    await assertSucceeds(getDoc(examRef('enrolled')));
+    await assertFails(getDoc(examRef('other')));
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(as('enrolled'), 'examForms'),
+          where('published', '==', true),
+          where('studentIds', 'array-contains', 'enrolled'),
+        ),
+      ),
+    );
+    await assertFails(getDoc(keyRef('enrolled')));
+    await assertSucceeds(getDoc(keyRef('trainer')));
+    await assertFails(setDoc(keyRef('enrolled'), { answers: {}, updatedAt: serverTimestamp() }));
+    await assertSucceeds(setDoc(keyRef('trainer'), { answers: {}, updatedAt: serverTimestamp() }));
+
+    // Forms for everyone: any student with academy access, not one without it.
+    await seededExam({ audience: 'all', studentIds: [] });
+    await assertSucceeds(getDoc(examRef('other')));
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(as('other'), 'examForms'),
+          where('published', '==', true),
+          where('audience', '==', 'all'),
+        ),
+      ),
+    );
+    await assertFails(getDoc(examRef('student')));
+
+    // Drafts stay with the staff.
+    await seededExam({ audience: 'all', published: false });
+    await assertFails(getDoc(examRef('enrolled')));
+  });
+
+  it('share the right answers once results are published with them', async () => {
+    await seededExam({ resultsPublished: true });
+    await assertFails(getDoc(keyRef('enrolled')));
+    await seededExam({ resultsPublished: true, showAnswers: true });
+    await assertSucceeds(getDoc(keyRef('enrolled')));
+    await assertFails(getDoc(keyRef('other')));
+  });
+
+  it('take attempts from assigned students inside the window', async () => {
+    await assertSucceeds(setDoc(subRef('enrolled'), submission('enrolled')));
+    await assertFails(setDoc(subRef('other', 'x1_other_1'), submission('other')));
+    await assertFails(setDoc(subRef('enrolled', 'x1_other_1'), submission('enrolled')));
+    await assertFails(setDoc(subRef('enrolled', 'x1_enrolled_3'), submission('enrolled', 3)));
+    await assertFails(
+      setDoc(subRef('enrolled', 'x1_enrolled_2'), submission('enrolled', 2, { examId: 'x1' })),
+    );
+    await assertFails(
+      setDoc(
+        subRef('enrolled', 'x1_enrolled_1'),
+        submission('enrolled', 1, { status: 'submitted' }),
+      ),
+    );
+
+    await seededExam({
+      opensAt: new Date(Date.now() + hour),
+      closesAt: new Date(Date.now() + 2 * hour),
+    });
+    await assertFails(setDoc(subRef('enrolled'), submission('enrolled')));
+  });
+
+  it('let the student save and hand in an attempt once, then open the next', async () => {
+    await assertSucceeds(setDoc(subRef('enrolled'), submission('enrolled')));
+    const answers = { q1: { choices: [0], text: '' } };
+    await assertSucceeds(updateDoc(subRef('enrolled'), { answers }));
+    await assertFails(updateDoc(subRef('other'), { answers }));
+    await assertFails(updateDoc(subRef('enrolled'), { attempt: 2 }));
+    // The second attempt waits for the first.
+    await assertFails(setDoc(subRef('enrolled', 'x1_enrolled_2'), submission('enrolled', 2)));
+    await assertSucceeds(
+      updateDoc(subRef('enrolled'), { status: 'submitted', submittedAt: serverTimestamp() }),
+    );
+    await assertFails(updateDoc(subRef('enrolled'), { answers: {} }));
+    await assertSucceeds(setDoc(subRef('enrolled', 'x1_enrolled_2'), submission('enrolled', 2)));
+    await assertSucceeds(getDoc(subRef('enrolled')));
+    await assertSucceeds(getDoc(subRef('trainer')));
+    await assertFails(getDoc(subRef('other')));
+    await assertFails(deleteDoc(subRef('enrolled')));
+  });
+
+  it('stop taking answers after the time limit', async () => {
+    await seed('examSubmissions/x1_enrolled_1', {
+      ...submission('enrolled'),
+      startedAt: new Date(Date.now() - 40 * 60 * 1000),
+    });
+    await assertFails(updateDoc(subRef('enrolled'), { answers: {} }));
+    // Its time is up, so the next attempt can start.
+    await assertSucceeds(setDoc(subRef('enrolled', 'x1_enrolled_2'), submission('enrolled', 2)));
+  });
+
+  it('are graded by staff, and students see grades once published', async () => {
+    await seed('examSubmissions/x1_enrolled_1', {
+      ...submission('enrolled', 1, { status: 'submitted' }),
+      startedAt: new Date(),
+      submittedAt: new Date(),
+    });
+    await assertSucceeds(setDoc(gradeRef('trainer'), grade()));
+    await assertFails(setDoc(gradeRef('enrolled'), grade({ gradedBy: 'enrolled' })));
+    await assertFails(setDoc(gradeRef('admin'), grade()));
+    await assertFails(setDoc(gradeRef('trainer', 'x1_enrolled_2'), grade({ attempt: 2 })));
+    await assertFails(setDoc(gradeRef('trainer'), grade({ total: -1 })));
+    await assertFails(getDoc(gradeRef('enrolled')));
+    await assertSucceeds(getDoc(gradeRef('trainer')));
+    await seededExam({ resultsPublished: true });
+    await assertSucceeds(getDoc(gradeRef('enrolled')));
+    await assertFails(getDoc(gradeRef('other')));
+  });
+});
+
 describe('unknown collections', () => {
   it('are closed to everyone, admins included', async () => {
     await assertFails(getDoc(doc(as('admin'), 'secrets/s1')));

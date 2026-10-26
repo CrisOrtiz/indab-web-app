@@ -14,6 +14,13 @@ rules_version = '2';
 //   investors/{uid}                      Eleva Inversiones investor account; owner reads, admins write
 //   evaluations/{id}                     timed practice evaluation set up by trainers or admins:
 //                                        market, replay start, time limit, window, assigned students
+//   examForms/{id}                       evaluation form (questions, points, window, attempts,
+//                                        audience) built by trainers or admins; no right answers
+//   examKeys/{examId}                    right answers of a form; staff only, and assigned students
+//                                        once results are published with answers
+//   examSubmissions/{examId}_{uid}_{n}   a student's attempt n, saved as they answer until handed in
+//   examGrades/{submissionId}            points per question set by staff; the student reads it once
+//                                        the form's results are published
 //   practiceSessions/{id}                chart-replay practice by a student with academy access;
 //                                        owner writes while active, trainers and admins read all.
 //                                        Free sessions have evaluationId null; an evaluation attempt
@@ -28,7 +35,8 @@ rules_version = '2';
 // their users/{uid} document in the Firebase console; after that, admins manage roles and
 // academy access from the /admin area. Admins cannot remove their own admin role, so the
 // last admin can never lock everyone out. Trainers (role == 'trainer') run evaluations and
-// review practice, but cannot change roles, academy access or delete anything but evaluations.
+// review practice, but cannot change roles, academy access or delete anything but evaluations
+// and evaluation forms.
 // Academy content also needs a verified email (emailVerified()), so an account registered with
 // someone else's address never opens it.
 service cloud.firestore {
@@ -219,6 +227,157 @@ service cloud.firestore {
         && validEvaluation(request.resource.data)
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if isStaff();
+    }
+
+    // Evaluation forms. Staff build them; students with academy access see the published ones
+    // assigned to them. Right answers and grades live in their own documents so students never
+    // read them before staff publish the results.
+    function examForm(id) {
+      return get(/databases/$(database)/documents/examForms/$(id)).data;
+    }
+
+    function assignedExam(exam) {
+      return hasAcademyAccess() && exam.published == true
+        && (exam.audience == 'all' || request.auth.uid in exam.studentIds);
+    }
+
+    match /examForms/{examId} {
+      function validExam(data) {
+        return data.keys().hasOnly(['title', 'description', 'totalPoints', 'passingPoints',
+            'durationMinutes', 'maxAttempts', 'audience', 'studentIds', 'opensAt', 'closesAt',
+            'questions', 'published', 'resultsPublished', 'showAnswers', 'createdBy', 'createdAt',
+            'updatedAt'])
+          && data.title is string && data.title.size() > 0 && data.title.size() <= 120
+          && data.description is string && data.description.size() <= 2000
+          && data.totalPoints is number && data.totalPoints > 0 && data.totalPoints <= 1000
+          && data.passingPoints is number && data.passingPoints >= 0
+          && data.passingPoints <= data.totalPoints
+          && data.durationMinutes is int && data.durationMinutes >= 0 && data.durationMinutes <= 600
+          && data.maxAttempts is int && data.maxAttempts >= 1 && data.maxAttempts <= 3
+          && data.audience in ['all', 'selected']
+          && data.studentIds is list && data.studentIds.size() <= 500
+          && data.opensAt is timestamp && data.closesAt is timestamp
+          && data.closesAt > data.opensAt
+          && data.questions is list && data.questions.size() <= 100
+          && data.published is bool && data.resultsPublished is bool && data.showAnswers is bool
+          && data.updatedAt == request.time;
+      }
+
+      allow read: if isStaff() || assignedExam(resource.data);
+
+      allow create: if isStaff()
+        && validExam(request.resource.data)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if isStaff()
+        && validExam(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if isStaff();
+    }
+
+    match /examKeys/{examId} {
+      allow read: if isStaff()
+        || (signedIn() && exists(/databases/$(database)/documents/examForms/$(examId))
+          && assignedExam(examForm(examId))
+          && examForm(examId).resultsPublished == true
+          && examForm(examId).showAnswers == true);
+
+      allow create, update: if isStaff()
+        && request.resource.data.keys().hasOnly(['answers', 'updatedAt'])
+        && request.resource.data.answers is map
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if isStaff();
+    }
+
+    match /examSubmissions/{submissionId} {
+      // Answers are taken until the time limit (and the window's close) plus two minutes.
+      function inTime(exam, startedAt) {
+        return request.time < exam.closesAt + duration.value(2, 'm')
+          && (exam.durationMinutes == 0
+            || request.time < startedAt + duration.value(exam.durationMinutes + 2, 'm'));
+      }
+
+      // A later attempt waits until the previous one is handed in or its time ran out.
+      function previousDone(data) {
+        let prevPath = /databases/$(database)/documents/examSubmissions/$(data.examId + '_' + request.auth.uid + '_' + string(data.attempt - 1));
+        let exam = examForm(data.examId);
+        return data.attempt == 1
+          || (exists(prevPath)
+            && (get(prevPath).data.status == 'submitted'
+              || (exam.durationMinutes > 0
+                && request.time >= get(prevPath).data.startedAt
+                  + duration.value(exam.durationMinutes + 2, 'm'))));
+      }
+
+      function validAnswers(data) {
+        return data.answers is map && data.answers.size() <= 100;
+      }
+
+      allow read: if isStaff() || isOwner(resource.data.uid);
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['examId', 'uid', 'userName', 'attempt',
+          'status', 'answers', 'startedAt', 'submittedAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.examId is string
+        && request.resource.data.attempt is int
+        && submissionId == request.resource.data.examId + '_' + request.auth.uid + '_'
+          + string(request.resource.data.attempt)
+        && exists(/databases/$(database)/documents/examForms/$(request.resource.data.examId))
+        && assignedExam(examForm(request.resource.data.examId))
+        && request.resource.data.attempt >= 1
+        && request.resource.data.attempt <= examForm(request.resource.data.examId).maxAttempts
+        && request.time >= examForm(request.resource.data.examId).opensAt
+        && request.time < examForm(request.resource.data.examId).closesAt
+        && previousDone(request.resource.data)
+        && request.resource.data.userName is string
+        && request.resource.data.userName.size() <= 120
+        && request.resource.data.status == 'inProgress'
+        && validAnswers(request.resource.data)
+        && request.resource.data.startedAt == request.time
+        && request.resource.data.submittedAt == null;
+
+      // The owner saves answers while the attempt is open and finally hands it in.
+      allow update: if isOwner(resource.data.uid)
+        && resource.data.status == 'inProgress'
+        && inTime(examForm(resource.data.examId), resource.data.startedAt)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['answers', 'status', 'submittedAt'])
+        && validAnswers(request.resource.data)
+        && ((request.resource.data.status == 'inProgress'
+            && request.resource.data.submittedAt == null)
+          || (request.resource.data.status == 'submitted'
+            && request.resource.data.submittedAt == request.time));
+    }
+
+    match /examGrades/{gradeId} {
+      allow read: if isStaff()
+        || (isOwner(resource.data.uid)
+          && examForm(resource.data.examId).resultsPublished == true);
+
+      allow create, update: if isStaff()
+        && request.resource.data.keys().hasOnly(['examId', 'uid', 'attempt', 'scores', 'comments',
+          'feedback', 'total', 'passed', 'gradedBy', 'gradedAt'])
+        && request.resource.data.examId is string
+        && request.resource.data.uid is string
+        && request.resource.data.attempt is int
+        && gradeId == request.resource.data.examId + '_' + request.resource.data.uid + '_'
+          + string(request.resource.data.attempt)
+        && exists(/databases/$(database)/documents/examSubmissions/$(gradeId))
+        && request.resource.data.scores is map
+        && request.resource.data.comments is map
+        && request.resource.data.feedback is string
+        && request.resource.data.feedback.size() <= 2000
+        && request.resource.data.total is number && request.resource.data.total >= 0
+        && request.resource.data.passed is bool
+        && request.resource.data.gradedBy == request.auth.uid
+        && request.resource.data.gradedAt == request.time;
 
       allow delete: if isStaff();
     }

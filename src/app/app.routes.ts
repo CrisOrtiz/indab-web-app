@@ -89,6 +89,18 @@ export const routes: Routes = [
     canActivate: [enrolledGuard],
     loadComponent: () => import('./features/repository/repository').then((m) => m.Repository),
   },
+  {
+    path: 'academy/exams',
+    title: 'exams',
+    canActivate: [enrolledGuard],
+    loadComponent: () => import('./features/exams/exams').then((m) => m.Exams),
+  },
+  {
+    path: 'academy/exams/:id',
+    title: 'exam',
+    canActivate: [enrolledGuard],
+    loadComponent: () => import('./features/exams/exam-take').then((m) => m.ExamTake),
+  },
   // The material used to be its own section; keep old links working.
   { path: 'repository', redirectTo: 'academy/material' },
 
@@ -112,6 +124,19 @@ export const routes: Routes = [
     canActivate: [staffGuard],
     loadComponent: () =>
       import('./features/admin/evaluations/admin-evaluations').then((m) => m.AdminEvaluations),
+  },
+
+  {
+    path: 'admin/forms',
+    title: 'adminExams',
+    canActivate: [staffGuard],
+    loadComponent: () => import('./features/admin/exams/admin-exams').then((m) => m.AdminExams),
+  },
+  {
+    path: 'admin/forms/:id',
+    title: 'adminExamResults',
+    canActivate: [staffGuard],
+    loadComponent: () => import('./features/admin/exams/exam-results').then((m) => m.ExamResults),
   },
 
   {

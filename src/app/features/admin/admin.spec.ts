@@ -77,6 +77,22 @@ describe('Admin page', () => {
     expect(el.textContent).toContain('4 de 4 usuarios');
   });
 
+  it('opens each admin tool from its card', () => {
+    const cards = [...el.querySelectorAll('.card h2')].map((h) => h.textContent?.trim());
+    expect(cards).toEqual([
+      'Usuarios',
+      'Formularios de evaluación',
+      'Evaluaciones de práctica',
+      'Revisar prácticas de trading',
+    ]);
+    const links = [...el.querySelectorAll('a.card')].map((a) => a.getAttribute('href'));
+    expect(links).toEqual(['/admin/forms', '/admin/evaluations', '/admin/practice']);
+    const section = el.querySelector<HTMLElement>('#users')!;
+    section.scrollIntoView = vi.fn();
+    el.querySelector<HTMLButtonElement>('button.card')!.click();
+    expect(section.scrollIntoView).toHaveBeenCalled();
+  });
+
   it("links to a user's WhatsApp when they gave one", async () => {
     rows.update((list) =>
       list.map((r) =>
@@ -98,7 +114,8 @@ describe('Admin page', () => {
     expect(el.querySelector('table')).toBeNull();
     expect(el.textContent).toContain('Como entrenador puedes crear evaluaciones');
     const links = [...el.querySelectorAll('a')].map((a) => a.getAttribute('href'));
-    expect(links).toEqual(['/admin/evaluations', '/admin/practice']);
+    expect(links).toEqual(['/admin/forms', '/admin/evaluations', '/admin/practice']);
+    expect(el.textContent).not.toContain('Roles y acceso a la academia');
   });
 
   it('appoints trainers', async () => {

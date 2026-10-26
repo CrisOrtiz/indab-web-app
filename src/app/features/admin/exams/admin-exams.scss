@@ -1,0 +1,160 @@
+.back {
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.exam-form {
+  max-width: 760px;
+
+  input:not([type='checkbox'], [type='radio']),
+  textarea,
+  select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .questions-title {
+    margin: 8px 0 0;
+  }
+}
+
+.questions {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.question {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+
+  fieldset {
+    gap: 8px;
+  }
+
+  legend {
+    margin-bottom: 4px;
+  }
+
+  .row {
+    grid-template-columns: 1fr 120px;
+  }
+}
+
+.q-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+
+  select {
+    flex: 1 1 200px;
+  }
+}
+
+.q-tools {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.icon {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+}
+
+.option {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+
+  input[type='radio'],
+  input[type='checkbox'] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--color-up);
+  }
+
+  &.right input[type='text'] {
+    border-color: var(--color-up);
+  }
+}
+
+.tf {
+  display: flex;
+  gap: 24px;
+}
+
+.link {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hint {
+  margin: 0;
+}
+
+.sum-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.add-question {
+  border-style: dashed;
+}
+
+.sum {
+  margin: 0;
+  padding: 8px 14px;
+  border: 2px solid;
+  border-radius: var(--radius);
+  font-weight: 700;
+
+  &.ok {
+    border-color: var(--color-up);
+    color: var(--color-up);
+  }
+
+  &.bad {
+    border-color: var(--color-error);
+    color: var(--color-error);
+  }
+}
+
+.card.draft {
+  border-style: dashed;
+}
+
+@media (max-width: 600px) {
+  .question .row {
+    grid-template-columns: 1fr;
+  }
+}

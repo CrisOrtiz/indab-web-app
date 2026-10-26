@@ -1,0 +1,42 @@
+@use '../../shared/section-cards/section-cards';
+
+:host {
+  padding: 0 0 56px;
+}
+
+.hero-art {
+  flex: none;
+  width: 220px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.6;
+}
+
+// The users card is a button that scrolls to the list.
+button.card {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.art .solid {
+  fill: currentColor;
+}
+
+.art rect:not(.solid) {
+  fill: none;
+}
+
+.users-section {
+  margin-top: 48px;
+  scroll-margin-top: 80px;
+
+  h2 {
+    margin: 0 0 8px;
+  }
+}
