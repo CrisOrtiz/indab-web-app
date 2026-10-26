@@ -324,9 +324,11 @@ why, while it cannot be placed), its lots (a quantity pad), its order type (a Ma
 menu), TP and SL tabs to drag out (or click for a default distance) with the profit or loss band
 shaded, and a × to discard it. Dragging a TP/SL back onto its entry removes it; dragging up or
 down from an open position pulls out a new one. Working on the order panel shows its order on
-the chart too. The bar on top of the chart has the timeframes and two menus: indicators (MA 20,
-MA 50, EMA 21 and RSI 14, in its own pane, computed only from the bars shown) and drawings
-(horizontal and trend lines, rectangles and Fibonacci retracements). Drawings work as in
+the chart too. The bar on top of the chart has the timeframes and two menus: indicators (EMA 100
+and EMA 200, shown from the start, and RSI 14 in its own pane, computed only from the bars shown)
+and drawings in TradingView's sections (trend line, ray, extended line, arrow, horizontal line and
+ray, vertical line, parallel channel, rectangle, Fibonacci retracement, long and short positions
+with target, stop and risk/reward, and price range). Drawings work as in
 TradingView's app: tap or click each point, or on a phone drag the crosshair and let go; tap a
 drawing to select it, drag its handles or body to adjust it, and recolor or delete it from its bar. A Statistics tab, the end screen and the admin
 review show the session's win rate, profit factor, average win and loss, maximum drawdown and

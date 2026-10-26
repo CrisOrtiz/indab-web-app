@@ -340,34 +340,43 @@ describe('ReplayChart', () => {
     return { canvas, openMenu, item, pick, pointer, press, rect, handles, levels, settle };
   };
 
-  it('switches indicators on and off from their menu, with the RSI in its own pane', async () => {
+  it('starts with the EMA 100 and 200, and switches indicators from their menu', async () => {
     const r = await render();
     const { fixture, host, el } = r;
     const { openMenu, item } = drawing(r);
-    host.candles.set(Array.from({ length: 30 }, (_, i) => c(i + 1, 100 + i)));
+    host.candles.set(Array.from({ length: 250 }, (_, i) => c(i + 1, 100 + i)));
     await fixture.whenStable();
 
-    await openMenu('Indicadores');
-    item('MA 20').click();
-    await fixture.whenStable();
+    // Both averages are on the candles' pane from the start.
+    expect(lw.lines).toHaveLength(2);
     expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 0);
-    const ma = lw.lines[0];
-    // 30 closes: 11 values of the 20-candle average, the first one 109.5.
-    expect(ma.setData.mock.calls.at(-1)![0]).toHaveLength(11);
-    expect(ma.setData.mock.calls.at(-1)![0][0]).toEqual({ time: 20, value: 109.5 });
-    expect(item('MA 20').getAttribute('aria-checked')).toBe('true');
-    expect(el.querySelector('.menu-trigger .count')!.textContent).toBe('1');
+    const [ema100, ema200] = lw.lines;
+    // 250 closes: 151 values of the 100-candle average, 51 of the 200-candle one.
+    expect(ema100.setData.mock.calls.at(-1)![0]).toHaveLength(151);
+    expect(ema200.setData.mock.calls.at(-1)![0]).toHaveLength(51);
+    // The 200 average starts at bar 200 with the mean of the first 200 closes.
+    expect(ema200.setData.mock.calls.at(-1)![0][0]).toEqual({ time: 200, value: 199.5 });
+
+    await openMenu('Indicadores');
+    expect(
+      [...el.querySelectorAll('.tool-menu button')].map((b) =>
+        b.textContent!.replace(/\s+/g, ' ').trim(),
+      ),
+    ).toEqual(['EMA 100 ✓', 'EMA 200 ✓', 'RSI 14']);
+    expect(el.querySelector('.menu-trigger .count')!.textContent).toBe('2');
 
     // The menu stays open to pick several.
     item('RSI 14').click();
     await fixture.whenStable();
     expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 1);
     expect(lw.pane.setHeight).toHaveBeenCalled();
-    expect(lw.lines[1].createPriceLine).toHaveBeenCalledTimes(2);
+    expect(lw.lines[2].createPriceLine).toHaveBeenCalledTimes(2);
+    expect(item('RSI 14').getAttribute('aria-checked')).toBe('true');
 
-    item('MA 20').click();
+    item('EMA 100').click();
     await fixture.whenStable();
-    expect(lw.chart.removeSeries).toHaveBeenCalledWith(ma);
+    expect(lw.chart.removeSeries).toHaveBeenCalledWith(ema100);
+    expect(el.querySelector('.menu-trigger .count')!.textContent).toBe('2');
 
     // A press outside closes it.
     document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
@@ -467,6 +476,195 @@ describe('ReplayChart', () => {
     await fixture.whenStable();
     expect(el.querySelector('.tool-hint')).toBeNull();
     expect(el.querySelectorAll('svg.shapes rect')).toHaveLength(1);
+  });
+
+  it('lists the drawing tools in sections, as TradingView does', async () => {
+    const r = await render();
+    const { el } = r;
+    await drawing(r).openMenu('Herramientas de dibujo');
+    const menu = [...el.querySelectorAll('.tool-menu > *')].map((e) =>
+      e.textContent!.replace(/\s+/g, ' ').trim(),
+    );
+    expect(menu).toEqual([
+      'Líneas',
+      'Línea de tendencia',
+      'Rayo',
+      'Línea extendida',
+      'Flecha',
+      'Línea horizontal',
+      'Rayo horizontal',
+      'Línea vertical',
+      'Canales y formas',
+      'Canal paralelo',
+      'Rectángulo',
+      'Fibonacci',
+      'Retroceso de Fibonacci',
+      'Proyección y medición',
+      'Posición larga',
+      'Posición corta',
+      'Rango de precio',
+      '',
+      'Borrar dibujos',
+    ]);
+  });
+
+  it('draws rays, extended lines, arrows and horizontal rays and vertical lines', async () => {
+    const r = await render();
+    const { fixture, host, el } = r;
+    const { pick, press, handles } = drawing(r);
+    host.candles.set(Array.from({ length: 30 }, (_, i) => c(i + 1)));
+    await fixture.whenStable();
+    /** The main line of the newest drawing, as [x1, y1, x2, y2]. */
+    const line = () => {
+      const l = [...el.querySelectorAll('svg.shapes g')].at(-1)!.querySelector('line')!;
+      return ['x1', 'y1', 'x2', 'y2'].map((a) => Number(l.getAttribute(a)));
+    };
+
+    // A ray runs from its first point through the second to the edge of the pane (700 px).
+    await pick('Rayo');
+    expect(el.textContent).toContain('Marca dónde empieza el rayo.');
+    await press(20, 390);
+    await press(10, 400);
+    expect(line()).toEqual([20, 390, 0, 410]);
+    await pick('Rayo');
+    await press(10, 400);
+    await press(20, 390);
+    expect(line()).toEqual([10, 400, 700, -290]);
+
+    // An extended line runs through both points to both edges.
+    await pick('Línea extendida');
+    await press(20, 390);
+    await press(10, 400);
+    expect(line()).toEqual([0, 410, 700, -290]);
+
+    await pick('Flecha');
+    await press(10, 400);
+    await press(50, 400);
+    expect(line()).toEqual([10, 400, 50, 400]);
+    const head = [...el.querySelectorAll('svg.shapes polygon.head')].at(-1)!;
+    expect(head.getAttribute('points')!.startsWith('50,400 ')).toBe(true);
+
+    // One click each: a horizontal ray to the right edge, a vertical line across the pane.
+    await pick('Rayo horizontal');
+    expect(el.textContent).toContain('Toca o haz clic donde empieza el rayo.');
+    await press(50, 300);
+    expect(line()).toEqual([50, 300, 700, 300]);
+    expect(handles()).toHaveLength(1);
+    await pick('Línea vertical');
+    await press(52, 300);
+    expect(line()).toEqual([50, 0, 50, 420]);
+    expect(el.querySelector('.tool-hint')).toBeNull();
+
+    // A tap near the horizontal ray, far right of its start, picks it.
+    await press(300, 200);
+    expect(handles()).toHaveLength(0);
+    await press(400, 303);
+    expect(handles()).toHaveLength(1);
+  });
+
+  it('draws a parallel channel in three points and widens it by its middle handle', async () => {
+    const r = await render();
+    const { fixture, host, el } = r;
+    const { pick, press, pointer, handles } = drawing(r);
+    host.candles.set(Array.from({ length: 30 }, (_, i) => c(i + 1)));
+    await fixture.whenStable();
+    const lines = () =>
+      [...el.querySelectorAll('svg.shapes .channel-line')].map((l) =>
+        ['x1', 'y1', 'x2', 'y2'].map((a) => Number(l.getAttribute(a))),
+      );
+
+    await pick('Canal paralelo');
+    await press(10, 400);
+    expect(el.textContent).toContain('Marca el segundo punto.');
+    await press(50, 380);
+    expect(el.textContent).toContain('Marca el ancho del canal.');
+    // The line at bar 3 (x 30) is at 390: the third point 40 px above sets the width.
+    await press(30, 350);
+    expect(lines()).toEqual([
+      [10, 400, 50, 380],
+      [10, 360, 50, 340],
+    ]);
+    expect(el.querySelector('svg.shapes .channel-middle')!.getAttribute('y1')).toBe('380');
+    expect(handles()).toHaveLength(3);
+
+    const middle = handles().find((h) => h.style.left === '30px')!;
+    pointer('pointerdown', 30, 350, false, middle);
+    pointer('pointermove', 30, 340);
+    pointer('pointerup', 30, 340);
+    await fixture.whenStable();
+    expect(lines()[1]).toEqual([10, 350, 50, 330]);
+
+    // A tap inside the channel selects it.
+    await press(300, 100);
+    expect(handles()).toHaveLength(0);
+    await press(30, 370);
+    expect(handles()).toHaveLength(3);
+  });
+
+  it('measures long positions and price ranges, as TradingView does', async () => {
+    const r = await render();
+    const { fixture, host, el } = r;
+    const { pick, press, pointer, handles } = drawing(r);
+    host.candles.set(Array.from({ length: 30 }, (_, i) => c(i + 1)));
+    await fixture.whenStable();
+    const texts = () =>
+      [...el.querySelectorAll('svg.shapes .measure-text')].map((t) => t.textContent!.trim());
+    const band = (name: string) => {
+      const b = el.querySelector(`svg.shapes rect.${name}`)!;
+      return ['x', 'y', 'width', 'height'].map((a) => Number(b.getAttribute(a)));
+    };
+
+    // Entry at 100; the second point, under it, is the stop: the target mirrors it.
+    await pick('Posición larga');
+    expect(el.textContent).toContain('Marca la entrada de la compra.');
+    await press(10, 400);
+    await press(60, 420);
+    expect(band('profit')).toEqual([10, 380, 50, 20]);
+    expect(band('loss')).toEqual([10, 400, 50, 20]);
+    expect(texts()).toEqual([
+      'Objetivo: 20.000 (20.00%)',
+      'Stop: 20.000 (20.00%)',
+      'Riesgo/beneficio: 1.00',
+    ]);
+    // Its colors are the target's and the stop's: the bar only deletes it.
+    expect(el.querySelector('.drawing-bar .color')).toBeNull();
+    expect(handles()).toHaveLength(4);
+
+    // The stop handle moves the stop up to 90: risk 10 for a reward of 20.
+    const stop = handles().find((h) => h.style.top === '420px')!;
+    pointer('pointerdown', 10, 420, false, stop);
+    pointer('pointermove', 10, 410);
+    pointer('pointerup', 10, 410);
+    await fixture.whenStable();
+    expect(texts()).toEqual([
+      'Objetivo: 20.000 (20.00%)',
+      'Stop: 10.000 (10.00%)',
+      'Riesgo/beneficio: 2.00',
+    ]);
+
+    // A tap elsewhere puts it down; a tap inside picks it again.
+    await press(300, 100);
+    expect(handles()).toHaveLength(0);
+    await press(30, 395);
+    expect(handles()).toHaveLength(4);
+
+    // Moved whole, it takes its stop along.
+    pointer('pointerdown', 30, 395);
+    pointer('pointermove', 30, 385);
+    pointer('pointerup', 30, 385);
+    await fixture.whenStable();
+    expect(band('loss')).toEqual([10, 390, 50, 10]);
+    expect(texts()[2]).toBe('Riesgo/beneficio: 2.00');
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' }));
+    await fixture.whenStable();
+
+    // A price range from 100 to 150 over 5 bars.
+    await pick('Rango de precio');
+    await press(10, 400);
+    await press(60, 350);
+    expect(texts()).toEqual(['+50.000 (+50.00%) · 5 velas']);
+    expect(el.querySelector('svg.shapes rect.range')).not.toBeNull();
   });
 
   it('places points on a phone by dragging a crosshair, as in TradingView', async () => {

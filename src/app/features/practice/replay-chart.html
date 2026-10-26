@@ -57,17 +57,20 @@
           </button>
         }
       } @else {
-        @for (item of toolList; track item) {
-          <button
-            type="button"
-            role="menuitemradio"
-            [attr.aria-checked]="tool() === item"
-            [class.on]="tool() === item"
-            (click)="pick(item)"
-          >
-            <ng-container *ngTemplateOutlet="icon; context: { $implicit: item }" />
-            {{ t.toolNames[item] }}
-          </button>
+        @for (section of toolGroups; track section.group) {
+          <p class="menu-heading" role="presentation">{{ t.toolGroups[section.group] }}</p>
+          @for (item of section.tools; track item) {
+            <button
+              type="button"
+              role="menuitemradio"
+              [attr.aria-checked]="tool() === item"
+              [class.on]="tool() === item"
+              (click)="pick(item)"
+            >
+              <ng-container *ngTemplateOutlet="icon; context: { $implicit: item }" />
+              {{ t.toolNames[item] }}
+            </button>
+          }
         }
         <hr />
         <button
@@ -153,48 +156,133 @@
     <svg class="shapes" aria-hidden="true">
       @for (shape of shapes(); track shape.id) {
         <g [attr.stroke]="shape.color" [attr.fill]="shape.color">
-          @switch (shape.kind) {
-            @case ('rect') {
-              <rect
-                class="rect"
-                [attr.x]="shape.left"
-                [attr.y]="shape.top"
-                [attr.width]="shape.right - shape.left"
-                [attr.height]="shape.bottom - shape.top"
-              />
+          @if (shape.position; as position) {
+            <rect
+              class="profit"
+              [attr.x]="shape.left"
+              [attr.y]="position.profit.top"
+              [attr.width]="shape.right - shape.left"
+              [attr.height]="position.profit.height"
+            />
+            <rect
+              class="loss"
+              [attr.x]="shape.left"
+              [attr.y]="position.loss.top"
+              [attr.width]="shape.right - shape.left"
+              [attr.height]="position.loss.height"
+            />
+            <line
+              class="entry"
+              [attr.x1]="shape.left"
+              [attr.x2]="shape.right"
+              [attr.y1]="position.entryY"
+              [attr.y2]="position.entryY"
+            />
+            @for (label of position.labels; track label.key) {
+              <text
+                class="measure-text"
+                [class.up]="label.up"
+                [class.down]="!label.up"
+                [attr.x]="shape.left + 4"
+                [attr.y]="label.y"
+              >
+                {{ label.text }}
+              </text>
             }
-            @case ('trend') {
-              <line
-                class="trend"
-                [attr.x1]="shape.a.x"
-                [attr.y1]="shape.a.y"
-                [attr.x2]="shape.b.x"
-                [attr.y2]="shape.b.y"
-              />
-            }
-            @default {
-              <line
-                class="fib-move"
-                [attr.x1]="shape.a.x"
-                [attr.y1]="shape.a.y"
-                [attr.x2]="shape.b.x"
-                [attr.y2]="shape.b.y"
-              />
-              @for (level of shape.levels; track level.ratio) {
-                <line
-                  class="fib"
-                  [attr.x1]="shape.left"
-                  [attr.x2]="shape.right"
-                  [attr.y1]="level.y"
-                  [attr.y2]="level.y"
+            <text class="measure-text" [attr.x]="shape.left + 4" [attr.y]="position.entryY - 4">
+              {{ position.ratio }}
+            </text>
+          } @else if (shape.range; as range) {
+            <rect
+              class="range"
+              [attr.x]="shape.left"
+              [attr.y]="shape.top"
+              [attr.width]="shape.right - shape.left"
+              [attr.height]="shape.bottom - shape.top"
+            />
+            <line
+              class="trend"
+              [attr.x1]="shape.segment[0].x"
+              [attr.y1]="shape.segment[0].y"
+              [attr.x2]="shape.segment[1].x"
+              [attr.y2]="shape.segment[1].y"
+            />
+            <polygon class="head" [attr.points]="shape.head" />
+            <text
+              class="measure-text range-text"
+              [attr.x]="(shape.left + shape.right) / 2"
+              [attr.y]="range.y"
+            >
+              {{ range.text }}
+            </text>
+          } @else {
+            @switch (shape.kind) {
+              @case ('rect') {
+                <rect
+                  class="rect"
+                  [attr.x]="shape.left"
+                  [attr.y]="shape.top"
+                  [attr.width]="shape.right - shape.left"
+                  [attr.height]="shape.bottom - shape.top"
                 />
-                <text class="fib-text" [attr.x]="shape.left + 4" [attr.y]="level.y - 3">
-                  {{ level.ratio }} ({{ level.price | number: priceDigits(level.price) }})
-                </text>
+              }
+              @case ('fib') {
+                <line
+                  class="fib-move"
+                  [attr.x1]="shape.a.x"
+                  [attr.y1]="shape.a.y"
+                  [attr.x2]="shape.b.x"
+                  [attr.y2]="shape.b.y"
+                />
+                @for (level of shape.levels; track level.ratio) {
+                  <line
+                    class="fib"
+                    [attr.x1]="shape.left"
+                    [attr.x2]="shape.right"
+                    [attr.y1]="level.y"
+                    [attr.y2]="level.y"
+                  />
+                  <text class="fib-text" [attr.x]="shape.left + 4" [attr.y]="level.y - 3">
+                    {{ level.ratio }} ({{ level.price | number: priceDigits(level.price) }})
+                  </text>
+                }
+              }
+              @default {
+                <line
+                  class="trend"
+                  [class.channel-line]="!!shape.parallel"
+                  [attr.x1]="shape.segment[0].x"
+                  [attr.y1]="shape.segment[0].y"
+                  [attr.x2]="shape.segment[1].x"
+                  [attr.y2]="shape.segment[1].y"
+                />
+                @if (shape.head; as head) {
+                  <polygon class="head" [attr.points]="head" />
+                }
+                @if (shape.parallel; as parallel) {
+                  <polygon
+                    class="channel"
+                    [attr.points]="polygon(shape.a, shape.b, parallel[1], parallel[0])"
+                  />
+                  <line
+                    class="trend channel-line"
+                    [attr.x1]="parallel[0].x"
+                    [attr.y1]="parallel[0].y"
+                    [attr.x2]="parallel[1].x"
+                    [attr.y2]="parallel[1].y"
+                  />
+                  <line
+                    class="channel-middle"
+                    [attr.x1]="shape.a.x"
+                    [attr.y1]="(shape.a.y + parallel[0].y) / 2"
+                    [attr.x2]="shape.b.x"
+                    [attr.y2]="(shape.b.y + parallel[1].y) / 2"
+                  />
+                }
               }
             }
           }
-          @if (shape.id === 0) {
+          @if (shape.id === 0 && anchors().length) {
             <circle class="anchor-dot" [attr.cx]="shape.a.x" [attr.cy]="shape.a.y" r="4" />
           }
         </g>
@@ -229,17 +317,19 @@
       ></span>
     }
     <div class="drawing-bar" role="toolbar" [attr.aria-label]="t.drawingOptions">
-      @for (color of drawingColors; track color; let i = $index) {
-        <button
-          type="button"
-          class="color"
-          [style.background]="color"
-          [attr.aria-pressed]="shape.color === color"
-          [attr.aria-label]="t.color(t.colorNames[i])"
-          (click)="recolor(color)"
-        ></button>
+      @if (!shape.position) {
+        @for (color of drawingColors; track color; let i = $index) {
+          <button
+            type="button"
+            class="color"
+            [style.background]="color"
+            [attr.aria-pressed]="shape.color === color"
+            [attr.aria-label]="t.color(t.colorNames[i])"
+            (click)="recolor(color)"
+          ></button>
+        }
+        <span class="sep"></span>
       }
-      <span class="sep"></span>
       <button
         type="button"
         class="erase"
@@ -462,7 +552,7 @@
   @if (tool(); as current) {
     <div class="tool-hint">
       <p role="status">
-        {{ t.hints[current][anchor() ? 1 : 0] }}
+        {{ hint() }}
         <span class="touch-only">{{ t.dragHint }}</span>
       </p>
       <button type="button" (click)="pick(null)">{{ t.cancel }}</button>
@@ -488,6 +578,39 @@
       }
       @case ('fib') {
         <path d="M1 3h16M1 7h16M1 11h16M1 15h16" />
+      }
+      @case ('ray') {
+        <path d="M4 14 17 3" />
+        <circle cx="3.5" cy="14.5" r="2" />
+      }
+      @case ('extended') {
+        <path d="M1 17 17 1" />
+        <circle cx="6" cy="12" r="2" />
+        <circle cx="12" cy="6" r="2" />
+      }
+      @case ('arrow') {
+        <path d="M3 15 15 3M8 3h7v7" />
+      }
+      @case ('hray') {
+        <path d="M6 9h11" />
+        <circle cx="4" cy="9" r="2" />
+      }
+      @case ('vline') {
+        <path d="M9 1v16" />
+        <circle cx="9" cy="9" r="2" />
+      }
+      @case ('channel') {
+        <path d="M1 11 11 2M7 16 17 7" />
+        <path d="M4 13.5 14 4.5" stroke-dasharray="2 2" />
+      }
+      @case ('long') {
+        <path d="M2 2.5h14v13H2zM2 10h14M9 8V4M7 6l2-2 2 2" />
+      }
+      @case ('short') {
+        <path d="M2 2.5h14v13H2zM2 8h14M9 10v4M7 12l2 2 2-2" />
+      }
+      @case ('range') {
+        <path d="M2 2h14M2 16h14M9 4v10M6.5 6.5 9 4l2.5 2.5M6.5 11.5 9 14l2.5-2.5" />
       }
       @case ('indicators') {
         <path d="M1 14l5-6 3 3 8-8" />

@@ -313,5 +313,18 @@ test.describe('on a phone', () => {
     await page.touchscreen.tap(box.x + 40, box.y + 300);
     await expect(stage.locator('.handle')).toHaveCount(0);
     await expect(rect).toBeVisible();
+
+    // A long position from two taps: the second, above the entry, is its target.
+    await tools.getByRole('button', { name: 'Herramientas de dibujo' }).tap();
+    await page.getByRole('menuitemradio', { name: 'Posición larga' }).tap();
+    await fitChart();
+    box = (await stage.boundingBox())!;
+    await page.touchscreen.tap(box.x + 120, box.y + 220);
+    await page.touchscreen.tap(box.x + 220, box.y + 170);
+    await expect(stage.locator('svg.shapes rect.profit')).toBeVisible();
+    await expect(stage.locator('svg.shapes rect.loss')).toBeVisible();
+    await expect(stage.locator('svg.shapes .measure-text').last()).toHaveText(
+      'Riesgo/beneficio: 1.00',
+    );
   });
 });
