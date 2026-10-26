@@ -31,6 +31,11 @@ export const ICONS = {
   up: ['M12 19V5', 'm5 12 7-7 7 7'],
   down: ['M12 5v14', 'm19 12-7 7-7-7'],
   close: ['M18 6 6 18', 'm6 6 12 12'],
+  more: [
+    'M13 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z',
+    'M13 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z',
+    'M13 19a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z',
+  ],
 } satisfies Record<string, string[]>;
 
 export type IconName = keyof typeof ICONS;

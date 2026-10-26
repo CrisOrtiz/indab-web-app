@@ -403,6 +403,7 @@ export const en: Messages = {
     pendingFilter: 'Pending',
     close: 'Close',
     itemAction: (action: string, title: string) => `${action}: ${title}`,
+    actions: 'Actions',
     loading: 'Loading users…',
     count: (shown: number, total: number) => `${shown} of ${total} users`,
     user: 'User',
@@ -709,7 +710,6 @@ export const en: Messages = {
     unpublish: 'Hide results from students',
     edit: 'Edit',
     delete: 'Delete',
-    deleteLabel: (title: string) => `Delete the evaluation ${title}`,
     clone: 'Duplicate',
     cloneTitle: 'Duplicate evaluation',
     cloneHint:
@@ -813,7 +813,6 @@ export const en: Messages = {
     grade: 'Grade submissions',
     edit: 'Edit',
     delete: 'Delete',
-    deleteLabel: (title: string) => `Delete the form ${title}`,
     clone: 'Duplicate',
     cloneTitle: 'Duplicate form',
     cloneHint:
