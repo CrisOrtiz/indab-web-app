@@ -241,9 +241,15 @@
                     [attr.x2]="shape.right"
                     [attr.y1]="level.y"
                     [attr.y2]="level.y"
+                    [attr.stroke]="level.color ?? shape.color"
                   />
-                  <text class="fib-text" [attr.x]="shape.left + 4" [attr.y]="level.y - 3">
-                    {{ level.ratio }} ({{ level.price | number: priceDigits(level.price) }})
+                  <text
+                    class="fib-text"
+                    [attr.x]="shape.left + 4"
+                    [attr.y]="level.y - 3"
+                    [attr.fill]="level.color ?? shape.color"
+                  >
+                    {{ level.ratio }}
                   </text>
                 }
               }

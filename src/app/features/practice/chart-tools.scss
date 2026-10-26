@@ -189,9 +189,11 @@
     text-anchor: middle;
   }
 
+  // The move itself, a dashed gray line as in TradingView.
   .fib-move {
+    stroke: var(--color-muted);
     stroke-dasharray: 4 4;
-    stroke-opacity: 0.6;
+    stroke-opacity: 0.8;
   }
 
   .fib-text {

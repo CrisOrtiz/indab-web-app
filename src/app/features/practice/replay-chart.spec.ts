@@ -331,12 +331,15 @@ describe('ReplayChart', () => {
       await settle();
     };
     const rect = () => {
-      const r = el.querySelector('svg.shapes rect');
+      const r = el.querySelector('svg.shapes rect.rect');
       return r && ['x', 'y', 'width', 'height'].map((a) => Number(r.getAttribute(a)));
     };
     const handles = () => [...el.querySelectorAll<HTMLElement>('.handle')];
     const levels = () =>
-      [...el.querySelectorAll('svg.shapes .fib-text')].map((t) => t.textContent!.trim());
+      // Each level's label and its price (y = 500 - price; labels sit 3 px above their line).
+      [...el.querySelectorAll('svg.shapes .fib-text')].map(
+        (t) => `${t.textContent!.trim()} (${+(497 - Number(t.getAttribute('y'))).toFixed(3)})`,
+      );
     return { canvas, openMenu, item, pick, pointer, press, rect, handles, levels, settle };
   };
 
@@ -460,14 +463,30 @@ describe('ReplayChart', () => {
     expect(el.textContent).toContain('Marca el final del movimiento.');
     await press(10, 300);
     expect(levels()).toEqual([
-      '0 (200.000)',
-      '0.236 (176.400)',
-      '0.382 (161.800)',
-      '0.5 (150.000)',
-      '0.618 (138.200)',
-      '0.786 (121.400)',
-      '1 (100.000)',
+      '-1 (300)',
+      '-0.618 (261.8)',
+      '-0.5 (250)',
+      '-0.27 (227)',
+      '0 (200)',
+      '0.236 (176.4)',
+      '0.382 (161.8)',
+      '0.5 (150)',
+      '0.618 (138.2)',
+      '0.71 (129)',
+      '0.786 (121.4)',
+      '0.81 (119)',
+      '1 (100)',
+      '1.12 (88)',
+      '1.1618 (83.82)',
+      '1.272 (72.8)',
+      '2.618 (-61.8)',
+      '3.272 (-127.2)',
+      '4.236 (-223.6)',
     ]);
+    // Levels keep the colors Cris uses; the others take the drawing's. No background.
+    const stroke = (i: number) => el.querySelectorAll('svg.shapes .fib')[i].getAttribute('stroke');
+    expect([stroke(0), stroke(4), stroke(8)]).toEqual(['#f23645', '#2962ff', '#f23645']);
+    expect(el.querySelectorAll('svg.shapes rect')).toHaveLength(1);
 
     // Escape puts a tool down halfway.
     await pick('Rectángulo');
@@ -475,7 +494,7 @@ describe('ReplayChart', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     await fixture.whenStable();
     expect(el.querySelector('.tool-hint')).toBeNull();
-    expect(el.querySelectorAll('svg.shapes rect')).toHaveLength(1);
+    expect(el.querySelectorAll('svg.shapes rect.rect')).toHaveLength(1);
   });
 
   it('lists the drawing tools in sections, as TradingView does', async () => {
@@ -695,8 +714,8 @@ describe('ReplayChart', () => {
     expect(el.querySelector('svg.shapes .anchor-dot')).not.toBeNull();
     pointer('pointerup', 210, 450, true);
     await fixture.whenStable();
-    expect(levels()[0]).toBe('0 (200.000)');
-    expect(levels().at(-1)).toBe('1 (300.000)');
+    expect(levels()[4]).toBe('0 (200)');
+    expect(levels()[12]).toBe('1 (300)');
     expect(el.querySelector('svg.shapes .crosshair')).toBeNull();
 
     // A tap puts the point where it lands.

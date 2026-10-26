@@ -210,8 +210,8 @@ interface PlacedShape {
   parallel?: [Pixel, Pixel];
   /** An arrow's head, as SVG polygon points. */
   head?: string;
-  /** Fibonacci levels: their ratio, price and height. */
-  levels: { ratio: number; price: number; y: number }[];
+  /** Fibonacci levels: their ratio, price, height and own color (else the drawing's). */
+  levels: { ratio: number; price: number; y: number; color: string | null }[];
   /** Long/short position: its entry, target (profit) and stop (loss) bands, and labels. */
   position?: {
     entryY: number;
@@ -256,8 +256,33 @@ interface Gesture {
 /** Lot shortcuts of the quantity pad. */
 export const LOT_PRESETS = [0.01, 0.05, 0.1, 0.5, 1];
 
-/** Retracement levels, as TradingView draws them by default. */
-export const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+const FIB_RED = '#f23645';
+const FIB_PURPLE = '#9c27b0';
+/**
+ * Retracement levels and colors Cris uses in TradingView (2026-10-26); a level without a color
+ * takes the drawing's. Ordered from the end of the move (0) past its start (1) and beyond.
+ */
+export const FIB_LEVELS: { ratio: number; color: string | null }[] = [
+  { ratio: -1, color: FIB_RED },
+  { ratio: -0.618, color: FIB_PURPLE },
+  { ratio: -0.5, color: FIB_PURPLE },
+  { ratio: -0.27, color: '#5e35b1' },
+  { ratio: 0, color: null },
+  { ratio: 0.236, color: null },
+  { ratio: 0.382, color: null },
+  { ratio: 0.5, color: null },
+  { ratio: 0.618, color: FIB_RED },
+  { ratio: 0.71, color: FIB_RED },
+  { ratio: 0.786, color: FIB_RED },
+  { ratio: 0.81, color: '#7b1fa2' },
+  { ratio: 1, color: null },
+  { ratio: 1.12, color: null },
+  { ratio: 1.1618, color: null },
+  { ratio: 1.272, color: null },
+  { ratio: 2.618, color: FIB_RED },
+  { ratio: 3.272, color: '#787b86' },
+  { ratio: 4.236, color: FIB_RED },
+];
 
 /** How close (px) the pointer must be to a line to grab it; a finger needs more room. */
 const GRAB_DISTANCE = 6;
@@ -1313,10 +1338,10 @@ export class ReplayChart {
         break;
       case 'fib':
         // A retracement runs from the end of the move (0) back to its start (1).
-        shape.levels = FIB_LEVELS.map((ratio) => {
+        shape.levels = FIB_LEVELS.map(({ ratio, color }) => {
           const [pa, pb] = d.points;
           const price = roundPrice(pb.price + (pa.price - pb.price) * ratio);
-          return { ratio, price, y: series.priceToCoordinate(price) ?? 0 };
+          return { ratio, price, y: series.priceToCoordinate(price) ?? 0, color };
         });
         break;
       case 'long':
