@@ -24,6 +24,7 @@ export interface ExamForm {
   maxAttempts: number;
   audience: Exam['audience'];
   studentIds: string[];
+  mentorshipIds: string[];
   /** yyyy-mm-ddTHH:mm, local time. */
   opensAt: string;
   closesAt: string;
@@ -87,6 +88,7 @@ export function toForm(exam: Exam | null, key: ExamKey | null, now = new Date())
       maxAttempts: 1,
       audience: 'all',
       studentIds: [],
+      mentorshipIds: [],
       opensAt: toLocalInput(opens),
       closesAt: toLocalInput(new Date(opens.getTime() + 7 * DAY)),
       questions: [newQuestion()],
@@ -102,6 +104,7 @@ export function toForm(exam: Exam | null, key: ExamKey | null, now = new Date())
     maxAttempts: exam.maxAttempts,
     audience: exam.audience,
     studentIds: [...exam.studentIds],
+    mentorshipIds: [...(exam.mentorshipIds ?? [])],
     opensAt: toLocalInput(exam.opensAt.toDate()),
     closesAt: toLocalInput(exam.closesAt.toDate()),
     questions: exam.questions.map((q) => ({ ...q, correct: [...(key?.answers[q.id] ?? [])] })),
@@ -112,7 +115,7 @@ export function toForm(exam: Exam | null, key: ExamKey | null, now = new Date())
 /**
  * A copy of a form to assign to other students: same questions, answer key, points and
  * settings, saved as a new draft. Its window opens now and lasts as long as the original's,
- * and the chosen students are cleared so staff pick the new ones.
+ * and the chosen students and mentorships are cleared so staff pick the new ones.
  */
 export function cloneForm(
   exam: Exam,
@@ -128,6 +131,7 @@ export function cloneForm(
     ...form,
     title: title.slice(0, 120),
     studentIds: [],
+    mentorshipIds: [],
     opensAt: toLocalInput(opens),
     closesAt: toLocalInput(new Date(opens.getTime() + length)),
     questions: form.questions.map((q) => ({ ...q, options: [...q.options] })),
@@ -157,7 +161,7 @@ export function formProblem(form: ExamForm, t: Messages['examAdmin']): string | 
   if (isNaN(opens) || isNaN(closes) || closes <= opens) {
     return t.windowInvalid;
   }
-  if (form.audience === 'selected' && !form.studentIds.length) {
+  if (form.audience === 'selected' && !form.studentIds.length && !form.mentorshipIds.length) {
     return t.studentsRequired;
   }
   if (form.published && !form.questions.length) {
@@ -224,6 +228,7 @@ export function fromForm(
       maxAttempts: Number(form.maxAttempts),
       audience: form.audience,
       studentIds: form.audience === 'selected' ? form.studentIds : [],
+      mentorshipIds: form.audience === 'selected' ? form.mentorshipIds : [],
       opensAt: new Date(form.opensAt),
       closesAt: new Date(form.closesAt),
       questions: questions.map((q) => q.question),

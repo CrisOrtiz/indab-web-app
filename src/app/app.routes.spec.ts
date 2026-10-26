@@ -7,6 +7,7 @@ import { AuthService } from './core/auth/auth.service';
 import { FIRESTORE_LOADER } from './core/firebase/firebase.providers';
 import { AdminUsers } from './features/admin/users/users';
 import { AdminService } from './features/admin/admin.service';
+import { MentorshipService } from './features/mentorships/mentorship.service';
 import { Practice } from './features/practice/practice';
 import { PracticeService } from './features/practice/practice.service';
 import { EvaluationService } from './features/evaluations/evaluation.service';
@@ -57,7 +58,15 @@ describe('app routes', () => {
             sessionTotals: async () => ({ sessions: 0, trades: 0 }),
           },
         },
-        { provide: EvaluationService, useValue: { all: async () => [], students: async () => [] } },
+        {
+          provide: EvaluationService,
+          useValue: {
+            all: async () => [],
+            students: async () => [],
+            directory: async () => ({ students: [], staff: [] }),
+          },
+        },
+        { provide: MentorshipService, useValue: { all: async () => [] } },
       ],
     });
     TestBed.overrideComponent(Practice, { set: { template: '' } });
@@ -173,6 +182,7 @@ describe('app routes', () => {
     expect(await visit('/admin/users')).toBe('/academy');
     expect(await visit('/admin/practice')).toBe('/academy');
     expect(await visit('/admin/evaluations')).toBe('/academy');
+    expect(await visit('/admin/mentorships')).toBe('/academy');
   });
 
   it('opens the admin area and evaluations to trainers', async () => {
@@ -180,6 +190,7 @@ describe('app routes', () => {
     expect(await visit('/admin')).toBe('/admin');
     expect(await visit('/admin/practice')).toBe('/admin/practice');
     expect(await visit('/admin/evaluations')).toBe('/admin/evaluations');
+    expect(await visit('/admin/mentorships')).toBe('/admin/mentorships');
     expect(await visit('/admin/users')).toBe('/academy');
     expect(await visit('/academy/practice')).toBe('/academy/practice');
   });

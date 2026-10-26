@@ -83,6 +83,13 @@
           (input)="filter(search, $event)"
         />
       </label>
+      @if (mentorships().length) {
+        <app-mentorship-filter
+          [mentorships]="mentorships()"
+          [value]="mentorship()"
+          (valueChange)="mentorship.set($event); page.set(0)"
+        />
+      }
       <label>
         {{ tl.status }}
         <select [value]="state()" (change)="filter(state, $event)">

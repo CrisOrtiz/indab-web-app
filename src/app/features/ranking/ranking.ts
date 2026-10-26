@@ -61,7 +61,9 @@ export class Ranking {
     try {
       const list = this.auth.isStaff()
         ? await this.evaluationService.all()
-        : (await this.evaluationService.assignedTo(uid ?? '')).filter((e) => e.resultsPublished);
+        : (
+            await this.evaluationService.assignedTo(uid ?? '', this.auth.profile()?.mentorshipIds)
+          ).filter((e) => e.resultsPublished);
       this.evaluations.set(list);
       if (list.length) {
         await this.select(list[0].id);

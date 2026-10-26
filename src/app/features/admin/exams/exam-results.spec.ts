@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 import { EvaluationService } from '../../evaluations/evaluation.service';
 import { ExamService } from '../../exams/exam.service';
+import { MentorshipService } from '../../mentorships/mentorship.service';
 import { ExamResults, resultState } from './exam-results';
 
 const at = (ms: number) => ({ toMillis: () => ms, toDate: () => new Date(ms) });
@@ -15,7 +16,9 @@ const exam = {
   durationMinutes: 30,
   maxAttempts: 1,
   audience: 'selected',
-  studentIds: ['jose', 'luis', 'eva'],
+  // Eva is assigned through her mentorship.
+  studentIds: ['jose', 'luis'],
+  mentorshipIds: ['m1'],
   opensAt: at(Date.now() - 3_600_000),
   closesAt: at(Date.now() + 3_600_000),
   questions: [
@@ -68,9 +71,15 @@ describe('ExamResults', () => {
   };
   const evaluations = {
     students: vi.fn(async () => [
-      { uid: 'jose', name: 'José Pérez', email: '', academy: true },
-      { uid: 'luis', name: 'Luis Díaz', email: '', academy: true },
-      { uid: 'eva', name: 'Eva Ruiz', email: '', academy: true },
+      { uid: 'jose', name: 'José Pérez', email: '', academy: true, mentorshipIds: [] },
+      { uid: 'luis', name: 'Luis Díaz', email: '', academy: true, mentorshipIds: ['m2'] },
+      { uid: 'eva', name: 'Eva Ruiz', email: '', academy: true, mentorshipIds: ['m1'] },
+    ]),
+  };
+  const mentorships = {
+    all: vi.fn(async () => [
+      { id: 'm1', name: 'Grupo oro', active: true },
+      { id: 'm2', name: 'Grupo índices', active: true },
     ]),
   };
 
@@ -87,6 +96,7 @@ describe('ExamResults', () => {
         provideRouter([]),
         { provide: ExamService, useValue: service },
         { provide: EvaluationService, useValue: evaluations },
+        { provide: MentorshipService, useValue: mentorships },
       ],
     });
     fixture = TestBed.createComponent(ExamResults);
@@ -107,6 +117,21 @@ describe('ExamResults', () => {
     expect(rowOf('Luis Díaz').textContent).toContain('Respondiendo');
     expect(rowOf('Eva Ruiz').textContent).toContain('Sin presentar');
     expect(el.querySelector('.stat strong')?.textContent).toBe('1');
+  });
+
+  it('filters the attempts by mentorship', async () => {
+    const select = [...el.querySelectorAll('.list-filters label')]
+      .find((l) => l.textContent?.trim().startsWith('Mentoría'))!
+      .querySelector('select')!;
+    select.value = 'm2';
+    select.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    const names = () => [...el.querySelectorAll('tbody td.name')].map((td) => td.textContent);
+    expect(names()).toEqual(['Luis Díaz']);
+    select.value = '';
+    select.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(names()).toHaveLength(3);
   });
 
   it('filters the attempts by name and state', async () => {

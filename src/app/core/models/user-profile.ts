@@ -25,6 +25,8 @@ export interface UserProfile {
   birthDate?: string;
   /** Optional WhatsApp number with country code, digits only: `+5215512345678`. */
   whatsapp?: string;
+  /** Ids of the student's `mentorships`; set by admins only. */
+  mentorshipIds?: string[];
 }
 
 /** Details asked from every user besides their name. */

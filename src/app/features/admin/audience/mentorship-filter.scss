@@ -1,0 +1,13 @@
+@use '../../../shared/pager/list-filters';
+
+:host {
+  display: contents;
+}
+
+label {
+  @include list-filters.filter-label;
+}
+
+select {
+  @include list-filters.filter-input;
+}

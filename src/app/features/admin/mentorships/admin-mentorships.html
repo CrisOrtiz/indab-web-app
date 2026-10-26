@@ -1,0 +1,201 @@
+@let t = i18n.messages().mentorships;
+@let ta = i18n.messages().admin;
+@let tl = i18n.messages().lists;
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/admin" class="back">{{ ta.back }}</a>
+    <h1>{{ t.title }}</h1>
+    <p>{{ auth.isAdmin() ? t.intro : t.trainerIntro }}</p>
+    @if (auth.isAdmin() && !form()) {
+      <button type="button" class="btn" (click)="create()">
+        <app-icon name="plus" />{{ t.new }}
+      </button>
+    }
+  </header>
+
+  @if (message(); as msg) {
+    <p class="message" [class.error]="msg.kind === 'error'" role="status">
+      {{ msg.text }}
+      <button
+        type="button"
+        class="dismiss"
+        [attr.aria-label]="ta.close"
+        (click)="message.set(null)"
+      >
+        ×
+      </button>
+    </p>
+  }
+
+  @if (form(); as f) {
+    <form class="evaluation-form" (submit)="$event.preventDefault(); save()">
+      <h2>{{ editing() ? t.editTitle : t.newTitle }}</h2>
+      <label>
+        {{ t.name }}
+        <input
+          type="text"
+          maxlength="80"
+          required
+          [value]="f.name"
+          (input)="patch({ name: $any($event.target).value })"
+        />
+      </label>
+      <label>
+        {{ t.description }}
+        <textarea
+          rows="3"
+          maxlength="1000"
+          [value]="f.description"
+          (input)="patch({ description: $any($event.target).value })"
+        ></textarea>
+      </label>
+      <fieldset>
+        <legend>{{ t.mentors(f.mentorIds.length) }}</legend>
+        <div class="student-list">
+          @for (s of staff(); track s.uid) {
+            <label class="check">
+              <input
+                type="checkbox"
+                [checked]="f.mentorIds.includes(s.uid)"
+                (change)="toggleMentor(s.uid, $any($event.target).checked)"
+              />
+              {{ s.name }} <span class="muted">{{ ta.roles[s.role] }}</span>
+            </label>
+          } @empty {
+            <span class="muted">{{ t.noStaff }}</span>
+          }
+        </div>
+        <span class="muted">{{ t.mentorsHint }}</span>
+      </fieldset>
+      <div class="row">
+        <label>
+          {{ t.startDate }}
+          <input
+            type="date"
+            required
+            [value]="f.startDate"
+            (input)="patch({ startDate: $any($event.target).value })"
+          />
+        </label>
+        <label>
+          {{ t.endDate }}
+          <input
+            type="date"
+            [min]="f.startDate"
+            [value]="f.endDate"
+            (input)="patch({ endDate: $any($event.target).value })"
+          />
+        </label>
+      </div>
+      <label class="check">
+        <input
+          type="checkbox"
+          [checked]="f.active"
+          (change)="patch({ active: $any($event.target).checked })"
+        />
+        {{ t.activeLabel }}
+      </label>
+      <span class="muted">{{ t.activeHint }}</span>
+      <div class="actions">
+        <button type="submit" class="btn" [disabled]="saving()">
+          {{ saving() ? t.saving : t.save }}
+        </button>
+        <button type="button" class="btn btn-outline" (click)="cancel()">{{ t.cancel }}</button>
+      </div>
+    </form>
+  }
+
+  @if (loading()) {
+    <p class="muted">{{ t.loading }}</p>
+  } @else {
+    <div class="stats">
+      <div class="stat">
+        <strong>{{ stats().total }}</strong
+        ><span>{{ t.title }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ stats().active }}</strong
+        ><span>{{ t.activePlural }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ stats().students }}</strong
+        ><span>{{ t.studentsInMentorships }}</span>
+      </div>
+    </div>
+
+    <div class="list-filters" role="group" [attr.aria-label]="tl.filters">
+      <label>
+        {{ t.searchLabel }}
+        <input
+          type="search"
+          [placeholder]="t.searchPlaceholder"
+          [value]="search()"
+          (input)="search.set($any($event.target).value)"
+        />
+      </label>
+      <label>
+        {{ tl.status }}
+        <select [value]="status()" (change)="status.set($any($event.target).value)">
+          <option value="">{{ tl.allStatuses }}</option>
+          <option value="active">{{ t.active }}</option>
+          <option value="inactive">{{ t.inactive }}</option>
+        </select>
+      </label>
+    </div>
+
+    <ul class="cards">
+      @for (m of visible(); track m.id) {
+        @let start = dayDate(m.startDate);
+        @let end = dayDate(m.endDate);
+        @let people = members(m);
+        <li class="card">
+          <app-actions-menu
+            class="card-menu"
+            [actions]="menus().get(m.id) ?? []"
+            [label]="ta.itemAction(ta.actions, m.name)"
+            (picked)="act(m, $event)"
+          />
+          <h3>
+            {{ m.name }}
+            <span class="badge" [class.off]="!m.active">{{
+              m.active ? t.active : t.inactive
+            }}</span>
+          </h3>
+          @if (m.description) {
+            <p class="muted">{{ m.description }}</p>
+          }
+          <p class="muted">
+            {{
+              end
+                ? t.period((start | localDate: 'd MMM y') ?? '', (end | localDate: 'd MMM y') ?? '')
+                : t.since((start | localDate: 'd MMM y') ?? '')
+            }}
+            · {{ t.studentCount(people.length) }}
+          </p>
+          <p class="muted">{{ t.mentorsLabel }}: {{ mentorNames(m) || '—' }}</p>
+
+          @if (selected() === m.id) {
+            <div class="members">
+              @for (s of people; track s.uid) {
+                <div class="member">
+                  <span class="name">{{ s.name }}</span>
+                  <span class="muted email">{{ s.email }}</span>
+                  @if (!s.academy) {
+                    <span class="badge off">{{ t.noAccess }}</span>
+                  }
+                </div>
+              } @empty {
+                <p class="muted">{{ t.noMembers }}</p>
+              }
+              @if (auth.isAdmin()) {
+                <a class="manage" routerLink="/admin/users">{{ t.manageMembers }}</a>
+              }
+            </div>
+          }
+        </li>
+      } @empty {
+        <li class="muted">{{ mentorships().length ? tl.noMatches : t.empty }}</li>
+      }
+    </ul>
+  }
+</section>

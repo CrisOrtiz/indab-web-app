@@ -20,6 +20,8 @@ export interface Evaluation {
   opensAt: Timestamp;
   closesAt: Timestamp;
   studentIds: string[];
+  /** Mentorships whose students are also assigned (missing on older evaluations). */
+  mentorshipIds?: string[];
   /** Once true, everyone with academy access sees the evaluation's ranking. */
   resultsPublished: boolean;
   createdBy: string;

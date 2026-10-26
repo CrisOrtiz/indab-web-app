@@ -53,14 +53,15 @@ otherwise create a feature service.
 
 | Collection                                                       | Read                                                                        | Write                                                                                                                                                     |
 | ---------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `users/{uid}`                                                    | owner, staff                                                                | owner creates as `student`, edits `displayName`, `photoURL`, `birthDate`, `whatsapp`; admins change `role` (`student`/`trainer`/`admin`) of others only   |
+| `users/{uid}`                                                    | owner, staff                                                                | owner creates as `student`, edits `displayName`, `photoURL`, `birthDate`, `whatsapp`; admins change `role` and `mentorshipIds` of others only             |
 | `users/{uid}/sessions/{id}`                                      | owner                                                                       | each browser records itself; owner sets `revoked` once, deletes; admins delete                                                                            |
 | `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, staff                                                                | admins (shape validated)                                                                                                                                  |
 | `courses/{id}`                                                   | everyone if `published`, admins                                             | admins                                                                                                                                                    |
 | `courses/{id}/lessons/{id}`                                      | enrolled in course or academy access                                        | admins                                                                                                                                                    |
 | `materials/{id}`                                                 | academy access                                                              | admins                                                                                                                                                    |
 | `investors/{uid}` (Eleva)                                        | owner, admins                                                               | admins                                                                                                                                                    |
-| `evaluations/{id}`                                               | staff, assigned students                                                    | staff (shape validated)                                                                                                                                   |
+| `mentorships/{id}`                                               | staff; members (`users/{uid}.mentorshipIds`)                                | admins (shape validated)                                                                                                                                  |
+| `evaluations/{id}`                                               | staff, assigned students (by uid or mentorship)                             | staff (shape validated)                                                                                                                                   |
 | `practiceSessions/{id}` + `/trades/{id}`                         | owner, staff; attempts at published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
 | `examForms/{id}`                                                 | staff; published + assigned to students                                     | staff (shape validated; no answers stored here)                                                                                                           |
 | `examKeys/{examId}`                                              | staff; students once `resultsPublished && showAnswers`                      | staff                                                                                                                                                     |
@@ -69,10 +70,11 @@ otherwise create a feature service.
 
 Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`, `isStaff()`
 (trainers and admins), `emailVerified()`, `hasAcademyAccess()` (staff count as having it; needs
-a verified email), `isEnrolledIn(courseId)`. Tests sign in with `email_verified: true` unless
+a verified email), `isEnrolledIn(courseId)`, `myMentorships()` and `assignedTo(data)` (in
+`studentIds` or one of `mentorshipIds`; use it for anything assigned to students). Tests sign in with `email_verified: true` unless
 they pass `as(uid, false)`.
 Everything not matched is denied. Trainers run evaluations and evaluation forms, grade and review practice; anything about
-users, access or deleting practice stays admin-only.
+users, access, mentorships or deleting practice stays admin-only.
 
 Guards in `src/app/core/auth/auth.guards.ts`: `authGuard` (signed in), `guestGuard`
 (signed out), `enrolledGuard` (academy access), `staffGuard` (trainer or admin), `adminGuard` (admin role).
@@ -256,7 +258,16 @@ Module notes:
   (`cloneForm`) opens the editor with a copy (questions, key, points, settings) as a new draft with
   no students, to give the same test to others; practice evaluations have the same action
   (`clone`, keeps the exact `replayStart`). Not built yet:
-  groups, CSV export, extra attempts per student, shuffled questions.
+  CSV export, extra attempts per student, shuffled questions.
+- **Mentorships (built)**: the "groups" of students. `mentorships/{id}` (`core/models/mentorship.ts`:
+  `audienceIds`, `membersOf`; `features/mentorships/mentorship.service.ts`), managed by admins at
+  `/admin/mentorships` (`features/admin/mentorships/`; trainers read-only). Membership is
+  `users/{uid}.mentorshipIds`, set from `/admin/users` (chips + "+ Agregar"). Forms and practice
+  evaluations store `mentorshipIds` beside `studentIds` and use `<app-audience-picker>`
+  (`features/admin/audience/`); students load theirs with an extra `array-contains-any` query
+  (`assignedTo(uid, profile.mentorshipIds)`). Staff lists filter with `<app-mentorship-filter>`;
+  the practice review sends `uids` (`uid in`, 30 at most). Anything new that is assigned to
+  students should accept mentorships too.
 - **Economic calendar (`/academy/calendar`, built)**: `features/calendar/`. TradingView's free
   calendar widget (`widget.ts` builds its settings: locale, economies, impact); the page rebuilds
   the embed when a filter or the language changes, keeps TradingView's credit link, and adds a
@@ -282,7 +293,8 @@ Module notes:
   summary reads the latest 50 `practiceSessions`. Linking from Google is unit-tested only: the
   emulator's Google window needs internet.
 - **Admin (`/admin`, built)**: `features/admin/`. `/admin` is only the section cards; each tool
-  has its own page. User management is `/admin/users` (`features/admin/users/`, `adminGuard`).
+  has its own page. User management is `/admin/users` (`features/admin/users/`, `adminGuard`);
+  mentorships are `/admin/mentorships` (`staffGuard`, writes for admins only).
   `AdminService` is provided by the `AdminUsers`
   component (live `users` + `enrollments` listeners that stop on leave); search/filter is
   client-side in `admin-users.ts` (fine for hundreds of users; move to a paged query if it grows).

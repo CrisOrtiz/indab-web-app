@@ -2,3 +2,50 @@
   color: var(--color-muted);
   text-decoration: none;
 }
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 2px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 0.85rem;
+
+  button {
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--color-muted);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      color: var(--color-text);
+      background: var(--color-surface);
+    }
+  }
+}
+
+.add-mentorship {
+  padding: 4px 8px;
+  font-size: 0.85rem;
+}
+
+// Phones: the chips sit under the label, on the right.
+@media (max-width: 720px) {
+  .mentorships .chips {
+    justify-content: flex-end;
+  }
+}

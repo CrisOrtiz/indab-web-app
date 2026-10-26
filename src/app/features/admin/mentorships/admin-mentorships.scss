@@ -1,0 +1,27 @@
+.badge.off {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+.members {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+}
+
+.member {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.manage {
+  justify-self: start;
+  margin-top: 4px;
+  font-size: 0.9rem;
+}

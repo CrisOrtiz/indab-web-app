@@ -124,17 +124,29 @@ export class ExamService {
 
   // Students
 
-  /** Published forms for everyone plus the ones assigned to the student. */
-  async assignedTo(uid: string): Promise<Exam[]> {
+  /**
+   * Published forms for everyone plus the ones assigned to the student, by name or through one
+   * of their mentorships.
+   */
+  async assignedTo(uid: string, mentorshipIds: string[] = []): Promise<Exam[]> {
     const published = where('published', '==', true);
-    const [forAll, forMe] = await this.loading.track(
+    // `array-contains-any` takes at most 30 values (a student has at most 20 mentorships).
+    const groups = mentorshipIds.slice(0, 30);
+    const snapshots = await this.loading.track(
       Promise.all([
         getDocs(query(this.forms, published, where('audience', '==', 'all'))),
         getDocs(query(this.forms, published, where('studentIds', 'array-contains', uid))),
+        ...(groups.length
+          ? [
+              getDocs(
+                query(this.forms, published, where('mentorshipIds', 'array-contains-any', groups)),
+              ),
+            ]
+          : []),
       ]),
     );
     const byId = new Map<string, Exam>();
-    for (const d of [...forAll.docs, ...forMe.docs]) {
+    for (const d of snapshots.flatMap((s) => s.docs)) {
       byId.set(d.id, { ...(d.data() as Exam), id: d.id });
     }
     return sortByWindow([...byId.values()]);

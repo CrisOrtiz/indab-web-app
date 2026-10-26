@@ -64,6 +64,17 @@ describe('EvaluationService', () => {
     expect((await service.all()).map((e) => e.id)).toEqual(['new', 'old']);
     expect((await service.assignedTo('u1')).map((e) => e.id)).toEqual(['new', 'old']);
     expect(where).toHaveBeenCalledWith('studentIds', 'array-contains', 'u1');
+    expect(where).not.toHaveBeenCalledWith('mentorshipIds', 'array-contains-any', []);
+  });
+
+  it("also lists the evaluations of the student's mentorships, once each", async () => {
+    fb.docs['evaluations'] = [
+      { id: 'a', data: { title: 'A', opensAt: at(1) } },
+      { id: 'b', data: { title: 'B', opensAt: at(2) } },
+    ];
+    // The fake returns both for each query: they must not repeat.
+    expect((await service.assignedTo('u1', ['m1', 'm2'])).map((e) => e.id)).toEqual(['b', 'a']);
+    expect(where).toHaveBeenCalledWith('mentorshipIds', 'array-contains-any', ['m1', 'm2']);
   });
 
   it('creates an evaluation signed by the trainer', async () => {
@@ -97,13 +108,26 @@ describe('EvaluationService', () => {
   it('lists students by name with their academy access', async () => {
     fb.docs['users'] = [
       { id: 'b', data: { displayName: 'Bea', email: 'b@x.co', role: 'student' } },
-      { id: 'a', data: { displayName: '', email: 'ana@x.co', role: 'student' } },
+      {
+        id: 'a',
+        data: { displayName: '', email: 'ana@x.co', role: 'student', mentorshipIds: ['m1'] },
+      },
       { id: 't', data: { displayName: 'Coach', email: 't@x.co', role: 'trainer' } },
+      { id: 'z', data: { displayName: 'Admin', email: 'z@x.co', role: 'admin' } },
     ];
     fb.docs['enrollments'] = [{ id: 'b', data: { academy: true, courses: [] } }];
-    expect(await service.students()).toEqual([
-      { uid: 'a', name: 'ana@x.co', email: 'ana@x.co', academy: false },
-      { uid: 'b', name: 'Bea', email: 'b@x.co', academy: true },
-    ]);
+    const students = [
+      { uid: 'a', name: 'ana@x.co', email: 'ana@x.co', academy: false, mentorshipIds: ['m1'] },
+      { uid: 'b', name: 'Bea', email: 'b@x.co', academy: true, mentorshipIds: [] },
+    ];
+    expect(await service.students()).toEqual(students);
+    // Trainers and admins can lead mentorships.
+    expect(await service.directory()).toEqual({
+      students,
+      staff: [
+        { uid: 'z', name: 'Admin', role: 'admin' },
+        { uid: 't', name: 'Coach', role: 'trainer' },
+      ],
+    });
   });
 });

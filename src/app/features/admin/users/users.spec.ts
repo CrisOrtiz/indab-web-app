@@ -6,6 +6,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { Enrollment, UserProfile } from '../../../core/models/user-profile';
 import { AdminUsers } from './users';
 import { AdminService } from '../admin.service';
+import { MentorshipService } from '../../mentorships/mentorship.service';
 import { AdminUserRow } from '../admin-users';
 
 const row = (uid: string, displayName: string, role: UserProfile['role'], academy?: boolean) =>
@@ -24,6 +25,14 @@ describe('Admin users page', () => {
     error: signal<string | null>(null),
     setRole: vi.fn(async () => undefined),
     setAcademyAccess: vi.fn(async () => undefined),
+    setMentorships: vi.fn(async () => undefined),
+  };
+  const mentorships = {
+    all: vi.fn(async () => [
+      { id: 'm1', name: 'Grupo oro', active: true },
+      { id: 'm2', name: 'Grupo índices', active: true },
+      { id: 'm3', name: 'Grupo 2025', active: false },
+    ]),
   };
 
   beforeEach(async () => {
@@ -37,11 +46,13 @@ describe('Admin users page', () => {
       row('luis', 'Luis Díaz', 'student'),
       row('marta', 'Marta Ruiz', 'trainer', true),
     ]);
+    rows()[1].profile.mentorshipIds = ['m1'];
     TestBed.configureTestingModule({
       imports: [AdminUsers],
       providers: [
         provideRouter([]),
         { provide: AuthService, useValue: { user: signal({ uid: 'boss' }) } },
+        { provide: MentorshipService, useValue: mentorships },
       ],
     });
     TestBed.overrideComponent(AdminUsers, {
@@ -137,6 +148,37 @@ describe('Admin users page', () => {
       'pending',
     );
     expect(names()).toEqual(['Ana Admin Tú', 'Luis Díaz']);
+  });
+
+  it('adds students to mentorships and takes them out', async () => {
+    const jose = rowOf('José Pérez');
+    expect(jose.querySelector('.chip')?.textContent).toContain('Grupo oro');
+    // Inactive mentorships and the ones they are already in are not offered.
+    const add = el.querySelector<HTMLSelectElement>(
+      '[aria-label="Agregar a José Pérez a una mentoría"]',
+    )!;
+    expect([...add.options].map((o) => o.textContent?.trim())).toEqual([
+      '+ Agregar',
+      'Grupo índices',
+    ]);
+    await change(add, 'm2');
+    expect(fake.setMentorships).toHaveBeenCalledWith('jose', ['m1', 'm2']);
+    expect(message()).toContain('José Pérez ahora está en Grupo índices.');
+
+    el.querySelector<HTMLButtonElement>('[aria-label="Quitar a José Pérez de Grupo oro"]')!.click();
+    await fixture.whenStable();
+    expect(fake.setMentorships).toHaveBeenLastCalledWith('jose', []);
+    expect(message()).toContain('José Pérez salió de Grupo oro.');
+    // Only students join mentorships.
+    expect(rowOf('Marta Ruiz').querySelector('.chips')).toBeNull();
+  });
+
+  it('filters by mentorship', async () => {
+    const filter = el.querySelector<HTMLSelectElement>('[aria-label="Filtrar por mentoría"]')!;
+    await change(filter, 'm1');
+    expect(names()).toEqual(['José Pérez']);
+    await change(filter, 'none');
+    expect(names()).toEqual(['Luis Díaz']);
   });
 
   it('does not let admins change their own role', () => {

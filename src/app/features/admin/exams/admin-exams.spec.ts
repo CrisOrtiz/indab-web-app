@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 import { EvaluationService } from '../../evaluations/evaluation.service';
 import { ExamService } from '../../exams/exam.service';
+import { MentorshipService } from '../../mentorships/mentorship.service';
 import { AdminExams } from './admin-exams';
 
 const at = (ms: number) => ({ toMillis: () => ms, toDate: () => new Date(ms) });
@@ -16,6 +17,7 @@ const existing = {
   maxAttempts: 2,
   audience: 'selected',
   studentIds: ['jose'],
+  mentorshipIds: ['m1'],
   opensAt: at(Date.now() - 3_600_000),
   closesAt: at(Date.now() + 3_600_000),
   questions: [
@@ -44,6 +46,7 @@ describe('AdminExams', () => {
     remove: vi.fn(async () => undefined),
   };
   const evaluations = { students: vi.fn() };
+  const mentorships = { all: vi.fn(async () => [{ id: 'm1', name: 'Grupo oro', active: true }]) };
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -53,8 +56,9 @@ describe('AdminExams', () => {
       { ...existing, id: 'x2', title: 'Borrador', published: false },
     ]);
     evaluations.students.mockResolvedValue([
-      { uid: 'jose', name: 'José Pérez', email: 'jose@x.co', academy: true },
-      { uid: 'eva', name: 'Eva Ruiz', email: 'eva@x.co', academy: false },
+      { uid: 'jose', name: 'José Pérez', email: 'jose@x.co', academy: true, mentorshipIds: [] },
+      { uid: 'ana', name: 'Ana Gómez', email: 'ana@x.co', academy: true, mentorshipIds: ['m1'] },
+      { uid: 'eva', name: 'Eva Ruiz', email: 'eva@x.co', academy: false, mentorshipIds: [] },
     ]);
     TestBed.configureTestingModule({
       imports: [AdminExams],
@@ -62,6 +66,7 @@ describe('AdminExams', () => {
         provideRouter([]),
         { provide: ExamService, useValue: service },
         { provide: EvaluationService, useValue: evaluations },
+        { provide: MentorshipService, useValue: mentorships },
       ],
     });
     fixture = TestBed.createComponent(AdminExams);
@@ -92,7 +97,9 @@ describe('AdminExams', () => {
     const cards = [...el.querySelectorAll('.card')].map((c) => c.textContent);
     expect(cards[0]).toContain('Abierto');
     expect(cards[0]).toContain('100 puntos · aprueba con 70 · 1 pregunta');
-    expect(cards[0]).toContain('1 alumno');
+    // José by name and Ana through her mentorship.
+    expect(cards[0]).toContain('2 alumnos');
+    expect(cards[0]).toContain('Mentorías: Grupo oro');
     expect(cards[1]).toContain('Borrador');
   });
 
@@ -190,11 +197,12 @@ describe('AdminExams', () => {
     // Only students with academy access can be picked.
     expect(el.querySelector('.student-list')?.textContent).toContain('José Pérez');
     expect(el.querySelector('.student-list')?.textContent).not.toContain('Eva Ruiz');
+    expect(el.querySelector<HTMLInputElement>('.mentorship-list input')!.checked).toBe(true);
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
     await fixture.whenStable();
     expect(service.save).toHaveBeenCalledWith(
       'x1',
-      expect.objectContaining({ studentIds: ['jose'], maxAttempts: 2 }),
+      expect.objectContaining({ studentIds: ['jose'], mentorshipIds: ['m1'], maxAttempts: 2 }),
       { answers: { q1: [1] } },
     );
   });
@@ -210,10 +218,11 @@ describe('AdminExams', () => {
     expect(el.querySelector<HTMLInputElement>('.tf input:checked')).toBe(
       el.querySelectorAll('.tf input')[1],
     );
-    // The students are cleared, so the copy needs new ones.
+    // The students and mentorships are cleared, so the copy needs new ones.
+    expect(el.querySelector<HTMLInputElement>('.mentorship-list input')!.checked).toBe(false);
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
     await fixture.whenStable();
-    expect(message()).toContain('Elige al menos un alumno');
+    expect(message()).toContain('Elige al menos una mentoría o un alumno');
     el.querySelector<HTMLInputElement>('.student-list input')!.click();
     await fixture.whenStable();
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
@@ -223,6 +232,7 @@ describe('AdminExams', () => {
       expect.objectContaining({
         title: 'Fundamentos de trading (copia)',
         studentIds: ['jose'],
+        mentorshipIds: [],
         maxAttempts: 2,
         totalPoints: 100,
         published: false,

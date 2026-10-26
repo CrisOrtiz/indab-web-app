@@ -12,7 +12,10 @@ import {
   examWindow,
   pointsSum,
 } from '../../../core/models/exam';
+import { Mentorship, audienceIds } from '../../../core/models/mentorship';
 import { EvaluationService, StudentOption } from '../../evaluations/evaluation.service';
+import { MentorshipService } from '../../mentorships/mentorship.service';
+import { AudiencePicker } from '../audience/audience-picker';
 import { ExamService } from '../../exams/exam.service';
 import {
   EditorQuestion,
@@ -32,13 +35,14 @@ import {
  */
 @Component({
   selector: 'app-admin-exams',
-  imports: [ActionsMenu, Icon, LocalDatePipe, RouterLink],
+  imports: [ActionsMenu, AudiencePicker, Icon, LocalDatePipe, RouterLink],
   templateUrl: './admin-exams.html',
   styleUrls: ['../admin.scss', '../evaluations/admin-evaluations.scss', './admin-exams.scss'],
 })
 export class AdminExams {
   private readonly service = inject(ExamService);
   private readonly evaluations = inject(EvaluationService);
+  private readonly mentorshipService = inject(MentorshipService);
   protected readonly i18n = inject(I18n);
 
   protected readonly types: QuestionType[] = ['single', 'multiple', 'trueFalse', 'open'];
@@ -47,6 +51,7 @@ export class AdminExams {
 
   protected readonly exams = signal<Exam[]>([]);
   protected readonly students = signal<StudentOption[]>([]);
+  protected readonly mentorships = signal<Mentorship[]>([]);
   protected readonly loading = signal(true);
   protected readonly message = signal<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
@@ -56,17 +61,23 @@ export class AdminExams {
   /** The form being copied, while the editor holds its copy. */
   protected readonly cloning = signal<Exam | null>(null);
   protected readonly saving = signal(false);
-  protected readonly studentSearch = signal('');
 
   protected readonly sum = computed(() => pointsSum(this.form()?.questions ?? []));
   protected readonly sumMatches = computed(
     () => this.sum() === Number(this.form()?.totalPoints ?? 0),
   );
-  protected readonly visibleStudents = computed(() => {
-    const term = this.studentSearch().trim().toLowerCase();
-    const list = this.students().filter((s) => s.academy);
-    return term ? list.filter((s) => `${s.name} ${s.email}`.toLowerCase().includes(term)) : list;
-  });
+  /** Mentorship names by id, for the cards. */
+  private readonly mentorshipNames = computed(
+    () => new Map(this.mentorships().map((m) => [m.id, m.name])),
+  );
+
+  /** The names of the mentorships an item is assigned to, for its card. */
+  protected mentorshipList(item: Exam): string {
+    const deleted = this.i18n.messages().audience.deleted;
+    return (item.mentorshipIds ?? [])
+      .map((id) => this.mentorshipNames().get(id) ?? deleted)
+      .join(', ');
+  }
 
   /** Each form's card menu, by id. */
   protected readonly menus = computed(() => {
@@ -106,7 +117,6 @@ export class AdminExams {
   protected create(): void {
     this.editing.set(null);
     this.cloning.set(null);
-    this.studentSearch.set('');
     this.form.set(toForm(null, null));
   }
 
@@ -115,7 +125,6 @@ export class AdminExams {
       const key = await this.service.key(exam.id);
       this.editing.set(exam);
       this.cloning.set(null);
-      this.studentSearch.set('');
       this.form.set(toForm(exam, key));
     } catch {
       this.message.set({ kind: 'error', text: this.i18n.messages().examAdmin.loadFailed });
@@ -129,7 +138,6 @@ export class AdminExams {
       const key = await this.service.key(exam.id);
       this.editing.set(null);
       this.cloning.set(exam);
-      this.studentSearch.set('');
       this.message.set(null);
       this.form.set(cloneForm(exam, key, t.copyOf(exam.title)));
     } catch {
@@ -147,14 +155,9 @@ export class AdminExams {
     this.form.update((form) => (form ? { ...form, ...change } : form));
   }
 
-  protected toggleStudent(uid: string, on: boolean): void {
-    const ids = this.form()?.studentIds ?? [];
-    this.patch({ studentIds: on ? [...new Set([...ids, uid])] : ids.filter((id) => id !== uid) });
-  }
-
-  protected selectAll(): void {
-    const ids = this.form()?.studentIds ?? [];
-    this.patch({ studentIds: [...new Set([...ids, ...this.visibleStudents().map((s) => s.uid)])] });
+  /** How many students a form for selected students is assigned to, mentorships included. */
+  protected assignedCount(exam: Exam): number {
+    return audienceIds(exam, this.students()).length;
   }
 
   // Questions
@@ -277,8 +280,13 @@ export class AdminExams {
 
   private async load(): Promise<void> {
     try {
-      const [, students] = await Promise.all([this.reload(), this.evaluations.students()]);
+      const [, students, mentorships] = await Promise.all([
+        this.reload(),
+        this.evaluations.students(),
+        this.mentorshipService.all(),
+      ]);
       this.students.set(students);
+      this.mentorships.set(mentorships);
     } catch {
       this.message.set({ kind: 'error', text: this.i18n.messages().examAdmin.loadFailed });
     } finally {

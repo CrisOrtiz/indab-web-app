@@ -5,7 +5,10 @@ import { ActionsMenu, MenuAction } from '../../../shared/actions-menu/actions-me
 import { Icon } from '../../../shared/icon/icon';
 import { LocalDatePipe } from '../../../core/i18n/local-date.pipe';
 import { Evaluation, evaluationWindow } from '../../../core/models/evaluation';
+import { Mentorship, audienceIds } from '../../../core/models/mentorship';
 import { EvaluationService, StudentOption } from '../../evaluations/evaluation.service';
+import { MentorshipService } from '../../mentorships/mentorship.service';
+import { AudiencePicker } from '../audience/audience-picker';
 import {
   INSTRUMENTS,
   randomReplayStart,
@@ -31,6 +34,7 @@ interface EvaluationForm {
   opensAt: string;
   closesAt: string;
   studentIds: string[];
+  mentorshipIds: string[];
 }
 
 export const MIN_DURATION = 5;
@@ -52,13 +56,14 @@ const utcDay = (time: number) => new Date(time).toISOString().slice(0, 10);
  */
 @Component({
   selector: 'app-admin-evaluations',
-  imports: [ActionsMenu, EvaluationResults, Icon, LocalDatePipe, RouterLink],
+  imports: [ActionsMenu, AudiencePicker, EvaluationResults, Icon, LocalDatePipe, RouterLink],
   templateUrl: './admin-evaluations.html',
   styleUrls: ['../admin.scss', './admin-evaluations.scss'],
 })
 export class AdminEvaluations {
   private readonly service = inject(EvaluationService);
   private readonly practice = inject(PracticeService);
+  private readonly mentorshipService = inject(MentorshipService);
   protected readonly i18n = inject(I18n);
 
   protected readonly instruments = INSTRUMENTS;
@@ -68,6 +73,7 @@ export class AdminEvaluations {
 
   protected readonly evaluations = signal<Evaluation[]>([]);
   protected readonly students = signal<StudentOption[]>([]);
+  protected readonly mentorships = signal<Mentorship[]>([]);
   protected readonly loading = signal(true);
   protected readonly message = signal<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
@@ -77,7 +83,6 @@ export class AdminEvaluations {
   /** The evaluation being copied, while the form holds its copy. */
   protected readonly cloning = signal<Evaluation | null>(null);
   protected readonly saving = signal(false);
-  protected readonly studentSearch = signal('');
 
   /** Evaluation whose results are shown, and its standings once loaded. */
   protected readonly selected = signal<string | null>(null);
@@ -88,11 +93,18 @@ export class AdminEvaluations {
     const { earliest, latest } = replayWindow(instrument);
     return { min: utcDay(earliest), max: utcDay(latest) };
   });
-  protected readonly visibleStudents = computed(() => {
-    const term = this.studentSearch().trim().toLowerCase();
-    const list = this.students().filter((s) => s.academy);
-    return term ? list.filter((s) => `${s.name} ${s.email}`.toLowerCase().includes(term)) : list;
-  });
+  /** Mentorship names by id, for the cards. */
+  private readonly mentorshipNames = computed(
+    () => new Map(this.mentorships().map((m) => [m.id, m.name])),
+  );
+
+  /** The names of the mentorships an item is assigned to, for its card. */
+  protected mentorshipList(item: Evaluation): string {
+    const deleted = this.i18n.messages().audience.deleted;
+    return (item.mentorshipIds ?? [])
+      .map((id) => this.mentorshipNames().get(id) ?? deleted)
+      .join(', ');
+  }
 
   /** Each evaluation's card menu, by id. */
   protected readonly menus = computed(() => {
@@ -148,7 +160,6 @@ export class AdminEvaluations {
     opens.setSeconds(0, 0);
     this.editing.set(null);
     this.cloning.set(null);
-    this.studentSearch.set('');
     this.form.set({
       title: '',
       description: '',
@@ -160,13 +171,13 @@ export class AdminEvaluations {
       opensAt: toLocalInput(opens),
       closesAt: toLocalInput(new Date(opens.getTime() + 7 * DAY)),
       studentIds: [],
+      mentorshipIds: [],
     });
   }
 
   protected edit(evaluation: Evaluation): void {
     this.editing.set(evaluation);
     this.cloning.set(null);
-    this.studentSearch.set('');
     this.form.set({
       title: evaluation.title,
       description: evaluation.description,
@@ -178,6 +189,7 @@ export class AdminEvaluations {
       opensAt: toLocalInput(evaluation.opensAt.toDate()),
       closesAt: toLocalInput(evaluation.closesAt.toDate()),
       studentIds: [...evaluation.studentIds],
+      mentorshipIds: [...(evaluation.mentorshipIds ?? [])],
     });
   }
 
@@ -192,7 +204,6 @@ export class AdminEvaluations {
     const length = Math.max(evaluation.closesAt.toMillis() - evaluation.opensAt.toMillis(), DAY);
     this.editing.set(null);
     this.cloning.set(evaluation);
-    this.studentSearch.set('');
     this.message.set(null);
     this.form.set({
       title: this.i18n.messages().evaluations.copyOf(evaluation.title).slice(0, 120),
@@ -205,6 +216,7 @@ export class AdminEvaluations {
       opensAt: toLocalInput(opens),
       closesAt: toLocalInput(new Date(opens.getTime() + length)),
       studentIds: [],
+      mentorshipIds: [],
     });
   }
 
@@ -218,14 +230,9 @@ export class AdminEvaluations {
     this.form.update((form) => (form ? { ...form, ...change } : form));
   }
 
-  protected toggleStudent(uid: string, on: boolean): void {
-    const ids = this.form()?.studentIds ?? [];
-    this.patch({ studentIds: on ? [...new Set([...ids, uid])] : ids.filter((id) => id !== uid) });
-  }
-
-  protected selectAll(): void {
-    const ids = this.form()?.studentIds ?? [];
-    this.patch({ studentIds: [...new Set([...ids, ...this.visibleStudents().map((s) => s.uid)])] });
+  /** The students an evaluation is for: picked by name or through its mentorships. */
+  protected assigned(evaluation: Evaluation): string[] {
+    return audienceIds(evaluation, this.students());
   }
 
   protected async save(): Promise<void> {
@@ -246,7 +253,7 @@ export class AdminEvaluations {
       problem = t.windowInvalid;
     } else if (!form.randomStart && !form.startDate) {
       problem = t.startRequired;
-    } else if (!form.studentIds.length) {
+    } else if (!form.studentIds.length && !form.mentorshipIds.length) {
       problem = t.studentsRequired;
     }
     if (problem) {
@@ -277,6 +284,7 @@ export class AdminEvaluations {
       opensAt,
       closesAt,
       studentIds: form.studentIds,
+      mentorshipIds: form.mentorshipIds,
       resultsPublished: editing?.resultsPublished ?? false,
     };
     this.saving.set(true);
@@ -338,7 +346,7 @@ export class AdminEvaluations {
     this.standings.set(null);
     try {
       const sessions = await this.practice.evaluationSessions(evaluation.id);
-      const students = evaluation.studentIds.map((uid) => ({ uid, name: this.nameOf(uid) }));
+      const students = this.assigned(evaluation).map((uid) => ({ uid, name: this.nameOf(uid) }));
       if (this.selected() === evaluation.id) {
         this.standings.set(evaluationStandings(sessions, students));
       }
@@ -350,8 +358,13 @@ export class AdminEvaluations {
 
   private async load(): Promise<void> {
     try {
-      const [, students] = await Promise.all([this.reload(), this.service.students()]);
+      const [, students, mentorships] = await Promise.all([
+        this.reload(),
+        this.service.students(),
+        this.mentorshipService.all(),
+      ]);
       this.students.set(students);
+      this.mentorships.set(mentorships);
     } catch {
       this.message.set({ kind: 'error', text: this.i18n.messages().evaluations.loadFailed });
     } finally {

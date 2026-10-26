@@ -1,7 +1,9 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { I18n } from '../../core/i18n/i18n.service';
+import { Mentorship, membersOf } from '../../core/models/mentorship';
 import { PracticeSession } from '../../core/models/practice';
-import { SessionFilters } from './practice.service';
+import { MentorshipFilter } from '../admin/audience/mentorship-filter';
+import { MAX_IN_FILTER, SessionFilters } from './practice.service';
 
 /** `''` for any; `free` for free practice; otherwise an evaluation id. */
 type Kind = '' | 'free' | (string & {});
@@ -13,22 +15,30 @@ export function dayStart(value: string, days = 0): Date | undefined {
 }
 
 /**
- * The filters above a list of practice sessions: student (staff only, when `students` is
- * given), free practice or one evaluation, status and a date range on the start. Emits the
- * filters for `PracticeService.sessionsPage` on every change.
+ * The filters above a list of practice sessions: mentorship and student (staff only, when
+ * `mentorships` and `students` are given), free practice or one evaluation, status and a date
+ * range on the start. Emits the filters for `PracticeService.sessionsPage` on every change.
  */
 @Component({
   selector: 'app-session-filters',
+  imports: [MentorshipFilter],
   template: `
     @let t = i18n.messages().lists;
     @let tr = i18n.messages().trading;
     <div class="list-filters" role="group" [attr.aria-label]="t.filters">
+      @if (mentorships().length) {
+        <app-mentorship-filter
+          [mentorships]="mentorships()"
+          [value]="mentorship()"
+          (valueChange)="pickMentorship($event)"
+        />
+      }
       @if (students().length) {
         <label>
           {{ t.student }}
           <select [value]="student()" (change)="set(student, $event)">
             <option value="">{{ t.allStudents }}</option>
-            @for (s of students(); track s.uid) {
+            @for (s of studentOptions(); track s.uid) {
               <option [value]="s.uid">{{ s.name }}</option>
             }
           </select>
@@ -70,32 +80,68 @@ export function dayStart(value: string, days = 0): Date | undefined {
         </button>
       }
     </div>
+    @if (!student() && members().length > maxMembers) {
+      <p class="muted filter-note">{{ t.mentorshipTooBig(maxMembers) }}</p>
+    }
   `,
-  styleUrl: '../../shared/pager/_list-filters.scss',
+  styles: `
+    @use '../../shared/pager/list-filters';
+
+    .filter-note {
+      margin: -8px 0 16px;
+      font-size: 0.85rem;
+    }
+  `,
 })
 export class SessionFilterBar {
   protected readonly i18n = inject(I18n);
 
   /** Students to pick from; none hides the student filter (a student's own list). */
-  readonly students = input<{ uid: string; name: string }[]>([]);
+  readonly students = input<{ uid: string; name: string; mentorshipIds?: string[] }[]>([]);
+  /** Mentorships to pick from; none hides the mentorship filter. */
+  readonly mentorships = input<Mentorship[]>([]);
   readonly evaluations = input<{ id: string; title: string }[]>([]);
   readonly filtersChange = output<SessionFilters>();
 
+  protected readonly maxMembers = MAX_IN_FILTER;
+  protected readonly mentorship = signal('');
   protected readonly student = signal('');
   protected readonly kind = signal<Kind>('');
   protected readonly status = signal<'' | PracticeSession['status']>('');
   protected readonly from = signal('');
   protected readonly to = signal('');
 
+  /** The picked mentorship's students. */
+  protected readonly members = computed(() =>
+    this.mentorship() ? membersOf(this.mentorship(), this.students()) : [],
+  );
+  /** With a mentorship picked, only its students. */
+  protected readonly studentOptions = computed(() => {
+    const members = new Set(this.members());
+    return this.mentorship() ? this.students().filter((s) => members.has(s.uid)) : this.students();
+  });
+
   protected readonly active = computed(
-    () => !!(this.student() || this.kind() || this.status() || this.from() || this.to()),
+    () =>
+      !!(
+        this.mentorship() ||
+        this.student() ||
+        this.kind() ||
+        this.status() ||
+        this.from() ||
+        this.to()
+      ),
   );
 
   /** The filters as `PracticeService` takes them; `to` includes that whole day. */
   readonly value = computed<SessionFilters>(() => {
     const kind = this.kind();
     return {
-      ...(this.student() ? { uid: this.student() } : {}),
+      ...(this.student()
+        ? { uid: this.student() }
+        : this.mentorship()
+          ? { uids: this.members() }
+          : {}),
       ...(kind ? { evaluationId: kind === 'free' ? null : kind } : {}),
       ...(this.status() ? { status: this.status() as PracticeSession['status'] } : {}),
       ...(this.from() ? { from: dayStart(this.from()) } : {}),
@@ -108,8 +154,24 @@ export class SessionFilterBar {
     this.filtersChange.emit(this.value());
   }
 
+  /** Picks a mentorship; a student from another one is let go. */
+  protected pickMentorship(id: string): void {
+    this.mentorship.set(id);
+    if (id && this.student() && !this.members().includes(this.student())) {
+      this.student.set('');
+    }
+    this.filtersChange.emit(this.value());
+  }
+
   protected clear(): void {
-    for (const field of [this.student, this.kind, this.status, this.from, this.to]) {
+    for (const field of [
+      this.mentorship,
+      this.student,
+      this.kind,
+      this.status,
+      this.from,
+      this.to,
+    ]) {
       field.set('');
     }
     this.filtersChange.emit(this.value());

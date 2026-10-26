@@ -14,7 +14,10 @@ import {
   bestGrade,
   suggestScore,
 } from '../../../core/models/exam';
-import { EvaluationService } from '../../evaluations/evaluation.service';
+import { Mentorship, audienceIds, membersOf } from '../../../core/models/mentorship';
+import { EvaluationService, StudentOption } from '../../evaluations/evaluation.service';
+import { MentorshipService } from '../../mentorships/mentorship.service';
+import { MentorshipFilter } from '../audience/mentorship-filter';
 import { ExamService } from '../../exams/exam.service';
 import { optionLabels } from '../../exams/exam-labels';
 import { pageCount, pageOf } from '../../../shared/pager/cursor-pages';
@@ -65,7 +68,7 @@ export function resultState(
  */
 @Component({
   selector: 'app-exam-results',
-  imports: [DecimalPipe, LocalDatePipe, Pager, RouterLink],
+  imports: [DecimalPipe, LocalDatePipe, MentorshipFilter, Pager, RouterLink],
   templateUrl: './exam-results.html',
   styleUrls: [
     '../admin.scss',
@@ -77,6 +80,7 @@ export function resultState(
 export class ExamResults {
   private readonly service = inject(ExamService);
   private readonly evaluations = inject(EvaluationService);
+  private readonly mentorshipService = inject(MentorshipService);
   protected readonly i18n = inject(I18n);
 
   /** The form id, from the route. */
@@ -86,7 +90,9 @@ export class ExamResults {
   protected readonly key = signal<ExamKey>({ answers: {} });
   protected readonly submissions = signal<ExamSubmission[]>([]);
   protected readonly grades = signal<ExamGrade[]>([]);
-  protected readonly names = signal<Map<string, string>>(new Map());
+  protected readonly students = signal<StudentOption[]>([]);
+  protected readonly names = computed(() => new Map(this.students().map((s) => [s.uid, s.name])));
+  protected readonly mentorships = signal<Mentorship[]>([]);
   protected readonly loading = signal(true);
   protected readonly missing = signal(false);
   protected readonly message = signal<{ kind: 'ok' | 'error'; text: string } | null>(null);
@@ -114,7 +120,8 @@ export class ExamResults {
     });
     if (exam.audience === 'selected') {
       const started = new Set(rows.map((r) => r.uid));
-      for (const uid of exam.studentIds.filter((id) => !started.has(id))) {
+      const assigned = audienceIds(exam, this.students());
+      for (const uid of assigned.filter((id) => !started.has(id))) {
         const name = this.names().get(uid) || uid;
         rows.push({ uid, name, submission: null, grade: null, state: 'notStarted' });
       }
@@ -135,12 +142,18 @@ export class ExamResults {
   ];
   protected readonly search = signal('');
   protected readonly state = signal('');
+  protected readonly mentorship = signal('');
   protected readonly page = signal(0);
   protected readonly matches = computed(() => {
     const term = this.search().trim().toLowerCase();
     const state = this.state();
+    const mentorship = this.mentorship();
+    const members = mentorship ? new Set(membersOf(mentorship, this.students())) : null;
     return this.rows().filter(
-      (row) => (!term || row.name.toLowerCase().includes(term)) && (!state || row.state === state),
+      (row) =>
+        (!term || row.name.toLowerCase().includes(term)) &&
+        (!state || row.state === state) &&
+        (!members || members.has(row.uid)),
     );
   });
   protected readonly pages = computed(() => pageCount(this.matches().length, RESULTS_PAGE_SIZE));
@@ -319,19 +332,21 @@ export class ExamResults {
   private async load(id: string): Promise<void> {
     this.loading.set(true);
     try {
-      const [exam, key, submissions, grades, students] = await Promise.all([
+      const [exam, key, submissions, grades, students, mentorships] = await Promise.all([
         this.service.get(id),
         this.service.key(id),
         this.service.submissions(id),
         this.service.grades(id),
         this.evaluations.students(),
+        this.mentorshipService.all(),
       ]);
       this.missing.set(!exam);
       this.exam.set(exam);
       this.key.set(key);
       this.submissions.set(submissions);
       this.grades.set(grades);
-      this.names.set(new Map(students.map((s) => [s.uid, s.name])));
+      this.students.set(students);
+      this.mentorships.set(mentorships);
     } catch {
       this.message.set({ kind: 'error', text: this.i18n.messages().examAdmin.results.loadFailed });
     } finally {

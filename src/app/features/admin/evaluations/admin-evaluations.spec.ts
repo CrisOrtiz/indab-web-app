@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 import { EvaluationService } from '../../evaluations/evaluation.service';
+import { MentorshipService } from '../../mentorships/mentorship.service';
 import { PracticeService } from '../../practice/practice.service';
 import { AdminEvaluations, toLocalInput } from './admin-evaluations';
 
@@ -18,6 +19,8 @@ const existing = {
   opensAt: at(Date.now() - 3_600_000),
   closesAt: at(Date.now() + 3_600_000),
   studentIds: ['jose', 'luis'],
+  // Ana joins through her (now inactive) mentorship.
+  mentorshipIds: ['m2'],
   resultsPublished: false,
 };
 
@@ -33,15 +36,34 @@ describe('AdminEvaluations', () => {
     setResultsPublished: vi.fn(async () => undefined),
   };
   const practice = { evaluationSessions: vi.fn() };
+  const mentorships = {
+    all: vi.fn(async () => [
+      { id: 'm1', name: 'Grupo oro', active: true },
+      { id: 'm2', name: 'Grupo 2025', active: false },
+    ]),
+  };
 
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
     service.all.mockResolvedValue([existing]);
     service.students.mockResolvedValue([
-      { uid: 'jose', name: 'José Pérez', email: 'jose@x.co', academy: true },
-      { uid: 'luis', name: 'Luis Díaz', email: 'luis@x.co', academy: true },
-      { uid: 'eva', name: 'Eva Ruiz', email: 'eva@x.co', academy: false },
+      { uid: 'jose', name: 'José Pérez', email: 'jose@x.co', academy: true, mentorshipIds: [] },
+      {
+        uid: 'luis',
+        name: 'Luis Díaz',
+        email: 'luis@x.co',
+        academy: true,
+        mentorshipIds: ['m1'],
+      },
+      {
+        uid: 'ana',
+        name: 'Ana Gómez',
+        email: 'ana@x.co',
+        academy: true,
+        mentorshipIds: ['m1', 'm2'],
+      },
+      { uid: 'eva', name: 'Eva Ruiz', email: 'eva@x.co', academy: false, mentorshipIds: ['m1'] },
     ]);
     practice.evaluationSessions.mockResolvedValue([
       {
@@ -60,6 +82,7 @@ describe('AdminEvaluations', () => {
         provideRouter([]),
         { provide: EvaluationService, useValue: service },
         { provide: PracticeService, useValue: practice },
+        { provide: MentorshipService, useValue: mentorships },
       ],
     });
     fixture = TestBed.createComponent(AdminEvaluations);
@@ -95,7 +118,8 @@ describe('AdminEvaluations', () => {
     expect(card).toContain('Final de oro');
     expect(card).toContain('Abierta');
     expect(card).toContain('45 min');
-    expect(card).toContain('2 estudiantes');
+    expect(card).toContain('3 estudiantes');
+    expect(card).toContain('Mentorías: Grupo 2025');
   });
 
   it('creates an evaluation for the chosen students', async () => {
@@ -130,6 +154,29 @@ describe('AdminEvaluations', () => {
     expect(el.querySelector('form')).toBeNull();
   });
 
+  it('assigns an evaluation to a whole mentorship', async () => {
+    await click('Nueva evaluación');
+    // Inactive mentorships are not offered for new evaluations.
+    const groups = el.querySelector('.mentorship-list')!;
+    expect(groups.textContent).toContain('Grupo oro');
+    expect(groups.textContent).toContain('2 estudiantes');
+    expect(groups.textContent).not.toContain('Grupo 2025');
+    await type('input[type=text]', 'Semana 2');
+    groups.querySelector<HTMLInputElement>('input')!.click();
+    await fixture.whenStable();
+    // Its students show as included, and each counts once in the total.
+    const luis = [...el.querySelectorAll('.student-list label')].find((l) =>
+      l.textContent?.includes('Luis Díaz'),
+    )!;
+    expect(luis.textContent).toContain('por Grupo oro');
+    expect(luis.querySelector<HTMLInputElement>('input')!.disabled).toBe(true);
+    expect(el.textContent).toContain('En total: 2 estudiantes');
+    await submit();
+    expect(service.create).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Semana 2', studentIds: [], mentorshipIds: ['m1'] }),
+    );
+  });
+
   it('checks the time limit and window', async () => {
     await click('Nueva evaluación');
     await type('input[type=text]', 'Prueba');
@@ -160,6 +207,7 @@ describe('AdminEvaluations', () => {
         durationMinutes: 90,
         replayStart: existing.replayStart,
         studentIds: ['jose', 'luis'],
+        mentorshipIds: ['m2'],
       }),
     );
   });
@@ -201,8 +249,18 @@ describe('AdminEvaluations', () => {
     expect(rows[0]).toContain('José Pérez');
     expect(rows[0]).toContain('12.00');
     expect(rows[0]).toContain('6.0%');
-    expect(rows[1]).toContain('Luis Díaz');
     expect(rows[1]).toContain('Sin presentar');
+    expect(rows.slice(1).join()).toContain('Luis Díaz');
+    expect(rows.slice(1).join()).toContain('Ana Gómez');
+    // Filtering by mentorship keeps only its students.
+    const filter = [...el.querySelectorAll<HTMLSelectElement>('.list-filters select')].find((s) =>
+      s.textContent?.includes('Todas las mentorías'),
+    )!;
+    filter.value = 'm2';
+    filter.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    const names = [...el.querySelectorAll('.results tbody td.name')].map((td) => td.textContent);
+    expect(names).toEqual(['Ana Gómez']);
   });
 
   it('keeps the actions in a three-dot menu that follows each evaluation', async () => {

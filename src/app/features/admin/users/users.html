@@ -1,4 +1,5 @@
 @let t = i18n.messages().admin;
+@let tm = i18n.messages().mentorships;
 <section class="container">
   <header class="page-header">
     <a routerLink="/admin" class="back">{{ t.back }}</a>
@@ -49,6 +50,18 @@
       <option value="granted">{{ t.granted }}</option>
       <option value="pending">{{ t.pendingFilter }}</option>
     </select>
+    @if (mentorships().length) {
+      <select
+        [attr.aria-label]="tm.filter"
+        (change)="updateFilter({ mentorship: $any($event.target).value })"
+      >
+        <option value="">{{ tm.allMentorships }}</option>
+        <option value="none">{{ tm.noMentorship }}</option>
+        @for (m of mentorships(); track m.id) {
+          <option [value]="m.id">{{ m.name }}</option>
+        }
+      </select>
+    }
   </div>
 
   @if (message(); as msg) {
@@ -73,6 +86,7 @@
           <th>{{ t.joined }}</th>
           <th>{{ t.role }}</th>
           <th>{{ t.access }}</th>
+          <th>{{ tm.column }}</th>
         </tr>
       </thead>
       <tbody>
@@ -128,10 +142,49 @@
                 <div class="muted hint">{{ t.adminsHaveAccess }}</div>
               }
             </td>
+            <td [attr.data-label]="tm.column" class="mentorships">
+              @if (row.profile.role === 'student') {
+                @let mine = row.profile.mentorshipIds ?? [];
+                <div class="chips">
+                  @for (id of mine; track id) {
+                    @let name = mentorshipNames().get(id) ?? tm.deleted;
+                    <span class="chip">
+                      {{ name }}
+                      <button
+                        type="button"
+                        [attr.aria-label]="tm.removeFrom(label(row), name)"
+                        [disabled]="saving().has(row.profile.uid)"
+                        (click)="removeMentorship(row, id)"
+                      >
+                        <app-icon name="close" [size]="14" />
+                      </button>
+                    </span>
+                  }
+                  @if (joinable(row).length && mine.length < maxMentorships) {
+                    <select
+                      #mentorshipSelect
+                      class="add-mentorship"
+                      [attr.aria-label]="tm.addTo(label(row))"
+                      [disabled]="saving().has(row.profile.uid)"
+                      (change)="addMentorship(row, mentorshipSelect)"
+                    >
+                      <option value="">{{ tm.add }}</option>
+                      @for (m of joinable(row); track m.id) {
+                        <option [value]="m.id">{{ m.name }}</option>
+                      }
+                    </select>
+                  } @else if (!mine.length) {
+                    <span class="muted">{{ mentorships().length ? '—' : tm.noneYet }}</span>
+                  }
+                </div>
+              } @else {
+                <span class="muted">—</span>
+              }
+            </td>
           </tr>
         } @empty {
           <tr>
-            <td colspan="4" class="muted empty">{{ t.noMatches }}</td>
+            <td colspan="5" class="muted empty">{{ t.noMatches }}</td>
           </tr>
         }
       </tbody>
