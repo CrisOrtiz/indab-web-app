@@ -53,7 +53,8 @@ describe('app routes', () => {
           provide: PracticeService,
           useValue: {
             mySessions: async () => [],
-            allSessions: async () => [],
+            sessionsPage: async () => ({ items: [], last: undefined, hasMore: false }),
+            sessionTotals: async () => ({ sessions: 0, trades: 0 }),
           },
         },
         { provide: EvaluationService, useValue: { all: async () => [], students: async () => [] } },

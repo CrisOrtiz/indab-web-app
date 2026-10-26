@@ -17,6 +17,11 @@ import {
 import { EvaluationService } from '../../evaluations/evaluation.service';
 import { ExamService } from '../../exams/exam.service';
 import { optionLabels } from '../../exams/exam-labels';
+import { pageCount, pageOf } from '../../../shared/pager/cursor-pages';
+import { Pager } from '../../../shared/pager/pager';
+
+/** Attempts per page of results. */
+export const RESULTS_PAGE_SIZE = 20;
 
 export type ResultState = 'inProgress' | 'expired' | 'submitted' | 'graded' | 'notStarted';
 
@@ -55,13 +60,19 @@ export function resultState(
 /**
  * A form's submissions for trainers and admins: every attempt with its state and score, a
  * grading panel (closed questions come with suggested points from the answer key, open ones
- * wait for the grader) and the switches that publish the grades and the right answers.
+ * wait for the grader) and the switches that publish the grades and the right answers. The
+ * list filters by name and state and shows a page at a time (stats count every attempt).
  */
 @Component({
   selector: 'app-exam-results',
-  imports: [DecimalPipe, LocalDatePipe, RouterLink],
+  imports: [DecimalPipe, LocalDatePipe, Pager, RouterLink],
   templateUrl: './exam-results.html',
-  styleUrls: ['../admin.scss', '../evaluations/admin-evaluations.scss', './exam-results.scss'],
+  styleUrls: [
+    '../admin.scss',
+    '../evaluations/admin-evaluations.scss',
+    '../../../shared/pager/_list-filters.scss',
+    './exam-results.scss',
+  ],
 })
 export class ExamResults {
   private readonly service = inject(ExamService);
@@ -114,6 +125,28 @@ export class ExamResults {
         (a.submission?.attempt ?? 0) - (b.submission?.attempt ?? 0),
     );
   });
+
+  protected readonly states: ResultState[] = [
+    'submitted',
+    'graded',
+    'inProgress',
+    'expired',
+    'notStarted',
+  ];
+  protected readonly search = signal('');
+  protected readonly state = signal('');
+  protected readonly page = signal(0);
+  protected readonly matches = computed(() => {
+    const term = this.search().trim().toLowerCase();
+    const state = this.state();
+    return this.rows().filter(
+      (row) => (!term || row.name.toLowerCase().includes(term)) && (!state || row.state === state),
+    );
+  });
+  protected readonly pages = computed(() => pageCount(this.matches().length, RESULTS_PAGE_SIZE));
+  protected readonly visible = computed(() =>
+    pageOf(this.matches(), Math.min(this.page(), this.pages() - 1), RESULTS_PAGE_SIZE),
+  );
 
   protected readonly stats = computed(() => {
     const exam = this.exam();
@@ -183,6 +216,11 @@ export class ExamResults {
       comments: { ...(grade?.comments ?? {}) },
       feedback: grade?.feedback ?? '',
     });
+  }
+
+  protected filter(field: { set(value: string): void }, event: Event): void {
+    field.set((event.target as HTMLInputElement | HTMLSelectElement).value);
+    this.page.set(0);
   }
 
   protected close(): void {

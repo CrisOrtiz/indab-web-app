@@ -16,6 +16,10 @@ vi.mock('firebase/firestore', () => ({
   where: vi.fn((...args) => ['where', ...args]),
   orderBy: vi.fn((...args) => ['orderBy', ...args]),
   limit: vi.fn((n) => ['limit', n]),
+  startAfter: vi.fn((cursor) => ['startAfter', cursor]),
+  count: vi.fn(() => 'count'),
+  sum: vi.fn((field) => ['sum', field]),
+  getAggregateFromServer: vi.fn(async () => ({ data: () => ({ sessions: 12, trades: 40 }) })),
   getDocs: vi.fn(async () => ({
     docs: [{ id: 's1', data: () => ({ symbol: 'PAXGUSDT', id: 'ignored' }) }],
   })),
@@ -25,7 +29,15 @@ vi.mock('firebase/firestore', () => ({
   writeBatch: vi.fn(() => batch),
 }));
 
-import { getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import {
+  getAggregateFromServer,
+  getDocs,
+  query,
+  setDoc,
+  sum,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 
 describe('PracticeService', () => {
   let service: PracticeService;
@@ -197,16 +209,63 @@ describe('PracticeService', () => {
     );
   });
 
-  it("reads the student's own sessions, every session and a session's trades", async () => {
+  it("reads the student's own sessions and a session's trades", async () => {
     expect(await service.mySessions('u1')).toEqual([{ symbol: 'PAXGUSDT', id: 's1' }]);
     expect(where).toHaveBeenCalledWith('uid', '==', 'u1');
-    expect(await service.allSessions()).toHaveLength(1);
+    expect(await service.sessionsPage({}, 20)).toEqual(
+      expect.objectContaining({ items: [{ symbol: 'PAXGUSDT', id: 's1' }], hasMore: false }),
+    );
     // Trades logged before order types existed read as market orders.
     expect(await service.sessionTrades('s1')).toEqual([
       { orderType: 'market', orderPrice: null, symbol: 'PAXGUSDT', id: 's1' },
     ]);
     expect(vi.mocked(query).mock.calls[2][0]).toEqual({ path: 'practiceSessions/s1/trades' });
     expect(getDocs).toHaveBeenCalledTimes(3);
+  });
+
+  it('pages sessions with filters and a cursor, reading one extra to know if more follow', async () => {
+    const docs = ['a', 'b', 'c'].map((id) => ({ id, data: () => ({ symbol: 'XAUUSDT' }) }));
+    vi.mocked(getDocs).mockResolvedValueOnce({ docs } as never);
+    const from = new Date(2026, 9, 1);
+    const to = new Date(2026, 9, 2);
+    const cursor = { id: 'z' } as never;
+    const page = await service.sessionsPage(
+      { uid: 'u1', evaluationId: null, status: 'finished', from, to },
+      2,
+      cursor,
+    );
+    expect(page.items.map((s) => s.id)).toEqual(['a', 'b']);
+    expect(page.last).toBe(docs[1]);
+    expect(page.hasMore).toBe(true);
+    expect(vi.mocked(query).mock.calls[0].slice(1)).toEqual([
+      ['where', 'uid', '==', 'u1'],
+      ['where', 'evaluationId', '==', null],
+      ['where', 'status', '==', 'finished'],
+      ['where', 'startedAt', '>=', from],
+      ['where', 'startedAt', '<', to],
+      ['orderBy', 'startedAt', 'desc'],
+      ['startAfter', cursor],
+      ['limit', 3],
+    ]);
+  });
+
+  it('leaves out the filters that are not set', async () => {
+    await service.sessionsPage({ evaluationId: 'e1' }, 10);
+    expect(vi.mocked(query).mock.calls[0].slice(1)).toEqual([
+      ['where', 'evaluationId', '==', 'e1'],
+      ['orderBy', 'startedAt', 'desc'],
+      ['limit', 11],
+    ]);
+  });
+
+  it('counts the sessions and trades that match the filters in one aggregation', async () => {
+    expect(await service.sessionTotals({ uid: 'u1' })).toEqual({ sessions: 12, trades: 40 });
+    expect(vi.mocked(query).mock.calls[0].slice(1)).toEqual([['where', 'uid', '==', 'u1']]);
+    expect(getAggregateFromServer).toHaveBeenCalledWith(expect.anything(), {
+      sessions: 'count',
+      trades: ['sum', 'tradeCount'],
+    });
+    expect(sum).toHaveBeenCalledWith('tradeCount');
   });
 
   it('deletes a session with its trades', async () => {

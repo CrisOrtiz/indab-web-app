@@ -72,6 +72,28 @@
       </label>
     </div>
 
+    @let tl = i18n.messages().lists;
+    <div class="list-filters" role="group" [attr.aria-label]="tl.filters">
+      <label>
+        {{ tl.search }}
+        <input
+          type="search"
+          [placeholder]="tl.searchPlaceholder"
+          [value]="search()"
+          (input)="filter(search, $event)"
+        />
+      </label>
+      <label>
+        {{ tl.status }}
+        <select [value]="state()" (change)="filter(state, $event)">
+          <option value="">{{ tl.allStatuses }}</option>
+          @for (s of states; track s) {
+            <option [value]="s">{{ r.statuses[s] }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
     <table class="users results">
       <thead>
         <tr>
@@ -83,7 +105,7 @@
         </tr>
       </thead>
       <tbody>
-        @for (row of rows(); track row.uid + (row.submission?.id ?? '')) {
+        @for (row of visible(); track row.uid + (row.submission?.id ?? '')) {
           <tr [class.selected]="row.submission && row.submission.id === selected()">
             <td [attr.data-label]="r.student" class="name">{{ row.name }}</td>
             <td [attr.data-label]="r.attempt">{{ row.submission?.attempt ?? '—' }}</td>
@@ -115,11 +137,18 @@
           </tr>
         } @empty {
           <tr>
-            <td colspan="5" class="muted empty">{{ r.none }}</td>
+            <td colspan="5" class="muted empty">{{ rows().length ? tl.noMatches : r.none }}</td>
           </tr>
         }
       </tbody>
     </table>
+    <app-pager
+      [page]="page()"
+      [pages]="pages()"
+      [hasNext]="page() + 1 < pages()"
+      (previous)="page.set(page() - 1)"
+      (next)="page.set(page() + 1)"
+    />
 
     @if (current(); as row) {
       @if (draft(); as d) {

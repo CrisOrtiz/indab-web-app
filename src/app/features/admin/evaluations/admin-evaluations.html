@@ -213,42 +213,7 @@
 
           @if (selected() === ev.id) {
             @if (standings(); as rows) {
-              <table class="users results">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>{{ t.student }}</th>
-                    <th>{{ t.status }}</th>
-                    <th>{{ t.pnl }}</th>
-                    <th>{{ t.return }}</th>
-                    <th>{{ t.trades }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (row of rows; track row.uid) {
-                    <tr>
-                      <td data-label="#">{{ row.rank ?? '—' }}</td>
-                      <td [attr.data-label]="t.student" class="name">{{ row.name }}</td>
-                      <td [attr.data-label]="t.status">{{ t.attemptStates[row.status] }}</td>
-                      <td
-                        [attr.data-label]="t.pnl"
-                        [class.up]="(row.pnl ?? 0) > 0"
-                        [class.down]="(row.pnl ?? 0) < 0"
-                      >
-                        {{ row.pnl === null ? '—' : (row.pnl | number: '1.2-2') }}
-                      </td>
-                      <td [attr.data-label]="t.return">
-                        {{ row.return === null ? '—' : (row.return | percent: '1.1-1') }}
-                      </td>
-                      <td [attr.data-label]="t.trades">{{ row.trades ?? '—' }}</td>
-                    </tr>
-                  } @empty {
-                    <tr>
-                      <td colspan="6" class="muted empty">{{ t.noAttempts }}</td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
+              <app-evaluation-results [standings]="rows" />
             } @else {
               <p class="muted">{{ t.loadingResults }}</p>
             }

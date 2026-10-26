@@ -332,6 +332,18 @@ Sessions and orders are written to Firestore as they happen; admins review them 
 `/admin/practice`, where each session's trades are drawn on its candles (fetched again from
 Binance) and a session can be deleted with its trades.
 
+### Long lists: filters and pages
+
+The student's "Your sessions" list (10 per page) and `/admin/practice` (20 per page) read one
+page at a time with Firestore cursors (`limit` + `startAfter`), filtered in the query by student
+(staff only), free practice or one evaluation, status and start date, so a long history never
+loads at once. Each combination of `uid`, `evaluationId` and `status` with `startedAt` has a
+composite index in `firestore.indexes.json` (deploy them with the rules). The staff totals come
+from one aggregation query (`count` + `sum`). Free-practice filtering matches `evaluationId ==
+null`, so sessions logged before evaluations existed only show under "All". Evaluation rankings
+and form results load every attempt (one per assigned student, needed to rank them) and filter
+and page in the browser.
+
 ### Evaluations and ranking
 
 Free practice is open at any time and builds each student's record. Trainers and admins also set

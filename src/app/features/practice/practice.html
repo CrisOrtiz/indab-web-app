@@ -646,6 +646,13 @@
       </form>
 
       <h2>{{ t.yourSessions }}</h2>
+      <app-session-filters
+        [evaluations]="takenEvaluations()"
+        (filtersChange)="filterSessions($event)"
+      />
+      @if (historyFailed()) {
+        <p class="message error" role="alert">{{ i18n.messages().lists.loadFailed }}</p>
+      }
       <table class="trades">
         <thead>
           <tr>
@@ -658,7 +665,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (s of history(); track s.id) {
+          @for (s of history.items(); track s.id) {
             <tr>
               <td [attr.data-label]="t.date">
                 {{ s.startedAt?.toDate() | localDate: 'd MMM y, HH:mm' }}
@@ -696,11 +703,24 @@
             }
           } @empty {
             <tr>
-              <td colspan="6" class="muted empty">{{ t.noSessions }}</td>
+              <td colspan="6" class="muted empty">
+                {{
+                  history.page() === 0 && !historyFiltered()
+                    ? t.noSessions
+                    : i18n.messages().lists.noMatches
+                }}
+              </td>
             </tr>
           }
         </tbody>
       </table>
+      <app-pager
+        [page]="history.page()"
+        [hasNext]="history.hasNext()"
+        [busy]="history.loading()"
+        (previous)="pageSessions('previous')"
+        (next)="pageSessions('next')"
+      />
     }
   }
 </section>

@@ -109,6 +109,35 @@ describe('ExamResults', () => {
     expect(el.querySelector('.stat strong')?.textContent).toBe('1');
   });
 
+  it('filters the attempts by name and state', async () => {
+    const field = (label: string) =>
+      [...el.querySelectorAll('.list-filters label')]
+        .find((l) => l.textContent?.trim().startsWith(label))!
+        .querySelector<HTMLInputElement | HTMLSelectElement>('input, select')!;
+    const names = () => [...el.querySelectorAll('tbody td.name')].map((td) => td.textContent);
+    const search = field('Buscar estudiante') as HTMLInputElement;
+    search.value = 'lu';
+    search.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    expect(names()).toEqual(['Luis Díaz']);
+
+    search.value = '';
+    search.dispatchEvent(new Event('input'));
+    const state = field('Estado');
+    state.value = 'notStarted';
+    state.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(names()).toEqual(['Eva Ruiz']);
+
+    state.value = 'graded';
+    state.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(el.textContent).toContain('Nada coincide con estos filtros.');
+    // Stats still count every attempt; one page needs no pager.
+    expect(el.querySelector('.stat strong')?.textContent).toBe('1');
+    expect(el.querySelector('.pager')).toBeNull();
+  });
+
   it('suggests points for closed questions and saves the grade', async () => {
     byLabel<HTMLButtonElement>('Calificar a José Pérez, intento 1').click();
     await fixture.whenStable();

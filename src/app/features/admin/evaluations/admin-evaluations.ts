@@ -1,4 +1,3 @@
-import { DecimalPipe, PercentPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { I18n } from '../../../core/i18n/i18n.service';
@@ -16,6 +15,7 @@ import {
 import { PracticeService } from '../../practice/practice.service';
 import { STARTING_BALANCE } from '../../practice/replay';
 import { EvaluationStanding, evaluationStandings } from '../../ranking/standings';
+import { EvaluationResults } from './evaluation-results';
 
 /** The evaluation form, as the inputs hold it. */
 interface EvaluationForm {
@@ -52,7 +52,7 @@ const utcDay = (time: number) => new Date(time).toISOString().slice(0, 10);
  */
 @Component({
   selector: 'app-admin-evaluations',
-  imports: [ActionsMenu, DecimalPipe, Icon, PercentPipe, LocalDatePipe, RouterLink],
+  imports: [ActionsMenu, EvaluationResults, Icon, LocalDatePipe, RouterLink],
   templateUrl: './admin-evaluations.html',
   styleUrls: ['../admin.scss', './admin-evaluations.scss'],
 })

@@ -5,7 +5,7 @@ import { vi } from 'vitest';
 import { AuthService } from '../../core/auth/auth.service';
 import { Candle, OrderType } from '../../core/models/practice';
 import { HISTORY_BARS, MarketDataService, REPLAY_BARS } from './market-data.service';
-import { Practice, formatCountdown } from './practice';
+import { Practice, SESSIONS_PAGE_SIZE, formatCountdown } from './practice';
 import { PracticeService } from './practice.service';
 import { EvaluationService } from '../evaluations/evaluation.service';
 import { Evaluation } from '../../core/models/evaluation';
@@ -81,7 +81,7 @@ describe('Practice page', () => {
     closeTrade: vi.fn(async () => undefined),
     updateSummary: vi.fn(async () => undefined),
     finishSession: vi.fn(async () => undefined),
-    mySessions: vi.fn(async () => [] as unknown[]),
+    sessionsPage: vi.fn(),
     myAttempts: vi.fn(async () => [] as unknown[]),
     sessionTrades: vi.fn(async () => [] as unknown[]),
   };
@@ -104,17 +104,21 @@ describe('Practice page', () => {
         klines(interval, from, limit),
     );
     market.loadHistory.mockImplementation(history);
-    practice.mySessions.mockResolvedValue([
-      {
-        id: 'old',
-        symbol: 'PAXGUSDT',
-        interval: '4h',
-        tradeCount: 3,
-        pnl: -12.5,
-        status: 'finished',
-        startedAt: { toDate: () => new Date(2026, 9, 1) },
-      },
-    ]);
+    practice.sessionsPage.mockResolvedValue({
+      items: [
+        {
+          id: 'old',
+          symbol: 'PAXGUSDT',
+          interval: '4h',
+          tradeCount: 3,
+          pnl: -12.5,
+          status: 'finished',
+          startedAt: { toDate: () => new Date(2026, 9, 1) },
+        },
+      ],
+      last: 'cursor-1',
+      hasMore: false,
+    });
     TestBed.configureTestingModule({
       imports: [Practice],
       providers: [
@@ -287,11 +291,46 @@ describe('Practice page', () => {
   it("shows the setup form and the student's past sessions", () => {
     expect(el.querySelector('h1')?.textContent).toContain('Práctica de trading');
     // Only the market: the practice starts on 15 minutes and switches inside.
-    expect(el.querySelectorAll('select')).toHaveLength(1);
+    expect(el.querySelectorAll('form select')).toHaveLength(1);
     expect(el.textContent).toContain('Empiezas con 200 USD virtuales y apalancamiento 1:100');
-    expect(practice.mySessions).toHaveBeenCalledWith('u1');
+    expect(practice.sessionsPage).toHaveBeenCalledWith(
+      { uid: 'u1' },
+      SESSIONS_PAGE_SIZE,
+      undefined,
+    );
     expect(el.textContent).toContain('PAXGUSDT · 4h');
     expect(el.textContent).toContain('Terminada');
+  });
+
+  it('filters the past sessions and pages through them', async () => {
+    const field = (label: string) =>
+      [...el.querySelectorAll('.list-filters label')]
+        .find((l) => l.textContent?.trim().startsWith(label))!
+        .querySelector<HTMLInputElement | HTMLSelectElement>('select, input')!;
+    // Students only see their own sessions: no student filter.
+    expect(
+      [...el.querySelectorAll('.list-filters label')].map((l) => l.textContent?.trim()),
+    ).not.toContain('Estudiante');
+
+    practice.sessionsPage.mockResolvedValueOnce({ items: [], last: 'cursor-1', hasMore: true });
+    const status = field('Estado');
+    status.value = 'active';
+    status.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(practice.sessionsPage).toHaveBeenLastCalledWith(
+      { status: 'active', uid: 'u1' },
+      SESSIONS_PAGE_SIZE,
+      undefined,
+    );
+    expect(el.textContent).toContain('Nada coincide con estos filtros.');
+
+    await click('Siguiente');
+    expect(practice.sessionsPage).toHaveBeenLastCalledWith(
+      { status: 'active', uid: 'u1' },
+      SESSIONS_PAGE_SIZE,
+      'cursor-1',
+    );
+    expect(el.querySelector('.pager')?.textContent).toContain('Página 2');
   });
 
   it('starts on 15 minutes at a random 4-hour boundary, with the dates hidden', async () => {

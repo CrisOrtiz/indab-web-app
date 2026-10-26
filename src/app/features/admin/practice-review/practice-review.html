@@ -9,28 +9,20 @@
 
   <div class="stats">
     <div class="stat">
-      <strong>{{ stats().sessions }}</strong
+      <strong>{{ totals()?.sessions ?? '—' }}</strong
       ><span>{{ t.sessions }}</span>
     </div>
     <div class="stat">
-      <strong>{{ stats().students }}</strong
-      ><span>{{ t.students }}</span>
-    </div>
-    <div class="stat">
-      <strong>{{ stats().trades }}</strong
+      <strong>{{ totals()?.trades ?? '—' }}</strong
       ><span>{{ t.trades }}</span>
     </div>
   </div>
 
-  <div class="filters">
-    <input
-      type="search"
-      [placeholder]="t.search"
-      [attr.aria-label]="t.searchLabel"
-      [value]="search()"
-      (input)="search.set($any($event.target).value)"
-    />
-  </div>
+  <app-session-filters
+    [students]="students()"
+    [evaluations]="evaluationOptions()"
+    (filtersChange)="filter($event)"
+  />
 
   @if (error(); as message) {
     <p class="message error">{{ message }}</p>
@@ -53,7 +45,7 @@
         </tr>
       </thead>
       <tbody>
-        @for (s of visible(); track s.id) {
+        @for (s of pages.items(); track s.id) {
           <tr>
             <td [attr.data-label]="t.student" class="name">{{ s.userName }}</td>
             <td [attr.data-label]="t.started">
@@ -102,10 +94,19 @@
           }
         } @empty {
           <tr>
-            <td colspan="8" class="muted empty">{{ t.empty }}</td>
+            <td colspan="8" class="muted empty">
+              {{ pages.page() === 0 && !filtered() ? t.empty : i18n.messages().lists.noMatches }}
+            </td>
           </tr>
         }
       </tbody>
     </table>
+    <app-pager
+      [page]="pages.page()"
+      [hasNext]="pages.hasNext()"
+      [busy]="pages.loading()"
+      (previous)="previous()"
+      (next)="next()"
+    />
   }
 </section>
