@@ -402,6 +402,7 @@ export const es = {
     pendingFilter: 'Pendientes',
     close: 'Cerrar',
     itemAction: (action: string, title: string) => `${action}: ${title}`,
+    actions: 'Acciones',
     loading: 'Cargando usuarios…',
     count: (shown: number, total: number) => `${shown} de ${total} usuarios`,
     user: 'Usuario',
@@ -726,7 +727,6 @@ export const es = {
     unpublish: 'Ocultar resultados a estudiantes',
     edit: 'Editar',
     delete: 'Eliminar',
-    deleteLabel: (title: string) => `Eliminar la evaluación ${title}`,
     clone: 'Duplicar',
     cloneTitle: 'Duplicar evaluación',
     cloneHint:
@@ -830,7 +830,6 @@ export const es = {
     grade: 'Calificar entregas',
     edit: 'Editar',
     delete: 'Eliminar',
-    deleteLabel: (title: string) => `Eliminar el formulario ${title}`,
     clone: 'Duplicar',
     cloneTitle: 'Duplicar formulario',
     cloneHint:

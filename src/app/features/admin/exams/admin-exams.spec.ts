@@ -73,6 +73,14 @@ describe('AdminExams', () => {
     [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === name)!;
   const byLabel = <T extends HTMLElement>(label: string) =>
     el.querySelector<T>(`[aria-label="${label}"]`)!;
+  /** Opens a card's three-dot menu and returns its action with this text. */
+  const menuItem = async (title: string, action: string) => {
+    byLabel<HTMLButtonElement>(`Acciones: ${title}`).click();
+    await fixture.whenStable();
+    return [...el.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+      (item) => item.textContent?.trim() === action,
+    )!;
+  };
   const type = async (input: HTMLInputElement | HTMLTextAreaElement, value: string) => {
     input.value = value;
     input.dispatchEvent(new Event('input'));
@@ -86,9 +94,26 @@ describe('AdminExams', () => {
     expect(cards[0]).toContain('100 puntos · aprueba con 70 · 1 pregunta');
     expect(cards[0]).toContain('1 alumno');
     expect(cards[1]).toContain('Borrador');
-    const grade = byLabel('Calificar entregas: Fundamentos de trading');
+  });
+
+  it("keeps each form's actions in a three-dot menu with icons and text", async () => {
+    const trigger = byLabel<HTMLButtonElement>('Acciones: Fundamentos de trading');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    const grade = await menuItem('Fundamentos de trading', 'Calificar entregas');
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
     expect(grade.getAttribute('href')).toBe('/admin/forms/x1');
-    expect(grade.dataset['tip']).toBe('Calificar entregas');
+    const items = [...el.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+    expect(items.map((i) => i.textContent?.trim())).toEqual([
+      'Calificar entregas',
+      'Editar',
+      'Duplicar',
+      'Eliminar',
+    ]);
+    expect(items.every((i) => i.querySelector('svg'))).toBe(true);
+    // Escape closes it.
+    items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await fixture.whenStable();
+    expect(el.querySelector('[role="menu"]')).toBeNull();
   });
 
   it('builds a form with points per question and saves its answer key apart', async () => {
@@ -156,7 +181,7 @@ describe('AdminExams', () => {
   });
 
   it('edits a form with its right answers and students', async () => {
-    byLabel<HTMLButtonElement>('Editar: Fundamentos de trading').click();
+    (await menuItem('Fundamentos de trading', 'Editar')).click();
     await fixture.whenStable();
     expect(service.key).toHaveBeenCalledWith('x1');
     expect(el.textContent).toContain('Editar formulario');
@@ -175,7 +200,7 @@ describe('AdminExams', () => {
   });
 
   it('duplicates a form as a new draft to assign other students', async () => {
-    byLabel<HTMLButtonElement>('Duplicar: Fundamentos de trading').click();
+    (await menuItem('Fundamentos de trading', 'Duplicar')).click();
     await fixture.whenStable();
     expect(service.key).toHaveBeenCalledWith('x1');
     expect(el.textContent).toContain('Duplicar formulario');
@@ -210,7 +235,7 @@ describe('AdminExams', () => {
 
   it('deletes a form after confirming', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    byLabel<HTMLButtonElement>('Eliminar el formulario Fundamentos de trading').click();
+    (await menuItem('Fundamentos de trading', 'Eliminar')).click();
     await fixture.whenStable();
     expect(service.remove).toHaveBeenCalledWith('x1');
     expect(el.querySelectorAll('.card')).toHaveLength(1);

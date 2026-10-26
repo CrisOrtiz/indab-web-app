@@ -382,6 +382,12 @@
       @for (exam of exams(); track exam.id) {
         @let state = stateOf(exam);
         <li class="card" [class.draft]="state === 'draft'">
+          <app-actions-menu
+            class="card-menu"
+            [actions]="menus().get(exam.id) ?? []"
+            [label]="ta.itemAction(ta.actions, exam.title)"
+            (picked)="act(exam, $event)"
+          />
           <h3>
             {{ exam.title }}
             <span class="badge">{{ t.states[state] }}</span>
@@ -406,43 +412,6 @@
               )
             }}
           </p>
-          <div class="actions icon-actions">
-            <a
-              class="icon-btn primary"
-              [routerLink]="['/admin/forms', exam.id]"
-              [attr.aria-label]="ta.itemAction(t.grade, exam.title)"
-              [attr.data-tip]="t.grade"
-            >
-              <app-icon name="grade" />
-            </a>
-            <button
-              type="button"
-              class="icon-btn"
-              [attr.aria-label]="ta.itemAction(t.edit, exam.title)"
-              [attr.data-tip]="t.edit"
-              (click)="edit(exam)"
-            >
-              <app-icon name="edit" />
-            </button>
-            <button
-              type="button"
-              class="icon-btn"
-              [attr.aria-label]="ta.itemAction(t.clone, exam.title)"
-              [attr.data-tip]="t.clone"
-              (click)="clone(exam)"
-            >
-              <app-icon name="copy" />
-            </button>
-            <button
-              type="button"
-              class="icon-btn danger"
-              [attr.aria-label]="t.deleteLabel(exam.title)"
-              [attr.data-tip]="t.delete"
-              (click)="remove(exam)"
-            >
-              <app-icon name="trash" />
-            </button>
-          </div>
         </li>
       } @empty {
         <li class="muted">{{ t.empty }}</li>

@@ -67,13 +67,15 @@ describe('AdminEvaluations', () => {
     await fixture.whenStable();
   });
 
-  // By its text, or the start of an icon button's label (`Editar: Final de oro`).
   const button = (name: string) =>
-    [...el.querySelectorAll('button')].find(
-      (b) => b.textContent?.trim() === name || b.getAttribute('aria-label')?.startsWith(name),
-    )!;
+    [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === name);
+  /** Clicks a button, opening the card's three-dot menu first when the action is in there. */
   const click = async (name: string) => {
-    button(name).click();
+    if (!button(name)) {
+      el.querySelector<HTMLButtonElement>('.card-menu .trigger')!.click();
+      await fixture.whenStable();
+    }
+    button(name)!.click();
     await fixture.whenStable();
   };
   const type = async (selector: string, value: string) => {
@@ -203,17 +205,28 @@ describe('AdminEvaluations', () => {
     expect(rows[1]).toContain('Sin presentar');
   });
 
-  it('shows each action as an icon button with a tooltip', () => {
-    const actions = [...el.querySelectorAll<HTMLButtonElement>('.card .icon-btn')];
-    expect(actions.map((b) => b.dataset['tip'])).toEqual([
+  it('keeps the actions in a three-dot menu that follows each evaluation', async () => {
+    const trigger = el.querySelector<HTMLButtonElement>('.card-menu .trigger')!;
+    expect(trigger.getAttribute('aria-label')).toBe('Acciones: Final de oro');
+    trigger.click();
+    await fixture.whenStable();
+    const labels = () =>
+      [...el.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent?.trim());
+    expect(labels()).toEqual([
       'Ver resultados',
       'Publicar resultados',
       'Editar',
       'Duplicar',
       'Eliminar',
     ]);
-    expect(actions[3].getAttribute('aria-label')).toBe('Duplicar: Final de oro');
-    expect(actions.every((b) => b.querySelector('svg[aria-hidden=true]'))).toBe(true);
+    // A click outside closes it.
+    document.body.click();
+    await fixture.whenStable();
+    expect(el.querySelector('[role="menu"]')).toBeNull();
+    await click('Ver resultados');
+    trigger.click();
+    await fixture.whenStable();
+    expect(labels()[0]).toBe('Ocultar resultados');
   });
 
   it('publishes the results and deletes after confirming', async () => {
