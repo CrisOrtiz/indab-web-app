@@ -1,12 +1,15 @@
 @let t = i18n.messages().examAdmin;
 @let tx = i18n.messages().exams;
+@let ta = i18n.messages().admin;
 <section class="container">
   <header class="page-header">
     <a routerLink="/admin" class="back">{{ i18n.messages().admin.back }}</a>
     <h1>{{ t.title }}</h1>
     <p>{{ t.intro }}</p>
     @if (!form()) {
-      <button type="button" class="btn" (click)="create()">{{ t.new }}</button>
+      <button type="button" class="btn" (click)="create()">
+        <app-icon name="plus" />{{ t.new }}
+      </button>
     }
   </header>
 
@@ -26,7 +29,10 @@
 
   @if (form(); as f) {
     <form class="evaluation-form exam-form" (submit)="$event.preventDefault(); save()">
-      <h2>{{ editing() ? t.editTitle : t.newTitle }}</h2>
+      <h2>{{ editing() ? t.editTitle : cloning() ? t.cloneTitle : t.newTitle }}</h2>
+      @if (cloning()) {
+        <p class="muted clone-hint">{{ t.cloneHint }}</p>
+      }
       <label>
         {{ t.name }}
         <input
@@ -187,32 +193,35 @@
                   <option [value]="type" [selected]="type === q.type">{{ t.types[type] }}</option>
                 }
               </select>
-              <span class="q-tools">
+              <span class="q-tools tips-end">
                 <button
                   type="button"
-                  class="icon"
+                  class="icon-btn small"
                   [disabled]="first"
                   [attr.aria-label]="t.moveUp(i + 1)"
+                  [attr.data-tip]="t.moveUp(i + 1)"
                   (click)="moveQuestion(i, -1)"
                 >
-                  ↑
+                  <app-icon name="up" [size]="16" />
                 </button>
                 <button
                   type="button"
-                  class="icon"
+                  class="icon-btn small"
                   [disabled]="last"
                   [attr.aria-label]="t.moveDown(i + 1)"
+                  [attr.data-tip]="t.moveDown(i + 1)"
                   (click)="moveQuestion(i, 1)"
                 >
-                  ↓
+                  <app-icon name="down" [size]="16" />
                 </button>
                 <button
                   type="button"
-                  class="icon"
+                  class="icon-btn small danger"
                   [attr.aria-label]="t.removeQuestion(i + 1)"
+                  [attr.data-tip]="t.removeQuestion(i + 1)"
                   (click)="removeQuestion(i)"
                 >
-                  ×
+                  <app-icon name="trash" [size]="16" />
                 </button>
               </span>
             </div>
@@ -299,12 +308,13 @@
                       />
                       <button
                         type="button"
-                        class="icon"
+                        class="icon-btn small danger"
                         [disabled]="q.options.length <= 2"
                         [attr.aria-label]="t.removeOption(j + 1)"
+                        [attr.data-tip]="t.removeOption(j + 1)"
                         (click)="removeOption(i, j)"
                       >
-                        ×
+                        <app-icon name="close" [size]="16" />
                       </button>
                     </div>
                   }
@@ -396,16 +406,41 @@
               )
             }}
           </p>
-          <div class="actions">
-            <a class="btn" [routerLink]="['/admin/forms', exam.id]">{{ t.grade }}</a>
-            <button type="button" class="btn btn-outline" (click)="edit(exam)">{{ t.edit }}</button>
+          <div class="actions icon-actions">
+            <a
+              class="icon-btn primary"
+              [routerLink]="['/admin/forms', exam.id]"
+              [attr.aria-label]="ta.itemAction(t.grade, exam.title)"
+              [attr.data-tip]="t.grade"
+            >
+              <app-icon name="grade" />
+            </a>
             <button
               type="button"
-              class="btn btn-outline"
+              class="icon-btn"
+              [attr.aria-label]="ta.itemAction(t.edit, exam.title)"
+              [attr.data-tip]="t.edit"
+              (click)="edit(exam)"
+            >
+              <app-icon name="edit" />
+            </button>
+            <button
+              type="button"
+              class="icon-btn"
+              [attr.aria-label]="ta.itemAction(t.clone, exam.title)"
+              [attr.data-tip]="t.clone"
+              (click)="clone(exam)"
+            >
+              <app-icon name="copy" />
+            </button>
+            <button
+              type="button"
+              class="icon-btn danger"
               [attr.aria-label]="t.deleteLabel(exam.title)"
+              [attr.data-tip]="t.delete"
               (click)="remove(exam)"
             >
-              {{ t.delete }}
+              <app-icon name="trash" />
             </button>
           </div>
         </li>

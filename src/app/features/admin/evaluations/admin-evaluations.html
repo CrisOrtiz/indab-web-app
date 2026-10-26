@@ -1,12 +1,15 @@
 @let t = i18n.messages().evaluations;
 @let tr = i18n.messages().trading;
+@let ta = i18n.messages().admin;
 <section class="container">
   <header class="page-header">
     <a routerLink="/admin" class="back">{{ i18n.messages().admin.back }}</a>
     <h1>{{ t.title }}</h1>
     <p>{{ t.intro }}</p>
     @if (!form()) {
-      <button type="button" class="btn" (click)="create()">{{ t.new }}</button>
+      <button type="button" class="btn" (click)="create()">
+        <app-icon name="plus" />{{ t.new }}
+      </button>
     }
   </header>
 
@@ -26,7 +29,10 @@
 
   @if (form(); as f) {
     <form class="evaluation-form" (submit)="$event.preventDefault(); save()">
-      <h2>{{ editing() ? t.editTitle : t.newTitle }}</h2>
+      <h2>{{ editing() ? t.editTitle : cloning() ? t.cloneTitle : t.newTitle }}</h2>
+      @if (cloning()) {
+        <p class="muted clone-hint">{{ t.cloneHint }}</p>
+      }
       <label>
         {{ t.name }}
         <input
@@ -198,21 +204,54 @@
               )
             }}
           </p>
-          <div class="actions">
-            <button type="button" class="btn btn-outline" (click)="toggleResults(ev)">
-              {{ selected() === ev.id ? t.hideResults : t.showResults }}
-            </button>
-            <button type="button" class="btn btn-outline" (click)="togglePublished(ev)">
-              {{ ev.resultsPublished ? t.unpublish : t.publish }}
-            </button>
-            <button type="button" class="btn btn-outline" (click)="edit(ev)">{{ t.edit }}</button>
+          <div class="actions icon-actions">
+            @let resultsTip = selected() === ev.id ? t.hideResults : t.showResults;
+            @let publishTip = ev.resultsPublished ? t.unpublish : t.publish;
             <button
               type="button"
-              class="btn btn-outline"
+              class="icon-btn"
+              [attr.aria-pressed]="selected() === ev.id"
+              [attr.aria-label]="ta.itemAction(resultsTip, ev.title)"
+              [attr.data-tip]="resultsTip"
+              (click)="toggleResults(ev)"
+            >
+              <app-icon name="results" />
+            </button>
+            <button
+              type="button"
+              class="icon-btn"
+              [attr.aria-label]="ta.itemAction(publishTip, ev.title)"
+              [attr.data-tip]="publishTip"
+              (click)="togglePublished(ev)"
+            >
+              <app-icon [name]="ev.resultsPublished ? 'eyeOff' : 'eye'" />
+            </button>
+            <button
+              type="button"
+              class="icon-btn"
+              [attr.aria-label]="ta.itemAction(t.edit, ev.title)"
+              [attr.data-tip]="t.edit"
+              (click)="edit(ev)"
+            >
+              <app-icon name="edit" />
+            </button>
+            <button
+              type="button"
+              class="icon-btn"
+              [attr.aria-label]="ta.itemAction(t.clone, ev.title)"
+              [attr.data-tip]="t.clone"
+              (click)="clone(ev)"
+            >
+              <app-icon name="copy" />
+            </button>
+            <button
+              type="button"
+              class="icon-btn danger"
               [attr.aria-label]="t.deleteLabel(ev.title)"
+              [attr.data-tip]="t.delete"
               (click)="remove(ev)"
             >
-              {{ t.delete }}
+              <app-icon name="trash" />
             </button>
           </div>
 

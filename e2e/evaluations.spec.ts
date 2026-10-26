@@ -1,5 +1,5 @@
 import { Page, expect, test } from '@playwright/test';
-import { createUser, listDocuments, resetEmulators, setDocument } from './emulators';
+import { createUser, listDocuments, resetEmulators, setDocument, uidOf } from './emulators';
 import { nav, signIn, signOut } from './helpers';
 import { mockMarket } from './market';
 
@@ -121,4 +121,44 @@ test('free practice stays out of the ranking and private', async ({ page }) => {
     page.getByText('Todavía no hay resultados de evaluaciones publicados.'),
   ).toBeVisible();
   await expect(page.getByText('José Pérez')).toHaveCount(0);
+});
+
+test('a trainer duplicates an evaluation to give the same replay to other students', async ({
+  page,
+}) => {
+  await openEvaluations(page);
+  await page.getByRole('button', { name: 'Nueva evaluación' }).click();
+  await page.getByLabel('Nombre').fill('Evaluación semanal');
+  await page.getByLabel('Tiempo límite (minutos)').fill('20');
+  await page.getByRole('checkbox', { name: /José Pérez/ }).check();
+  await page.getByRole('button', { name: 'Guardar evaluación' }).click();
+  await expect(page.getByRole('status')).toContainText('Se guardó la evaluación');
+
+  // Each action is an icon button with its name for screen readers and a tooltip.
+  const copy = page.getByRole('button', { name: 'Duplicar: Evaluación semanal' });
+  await expect(copy).toHaveAttribute('data-tip', 'Duplicar');
+  await copy.click();
+  await expect(page.getByRole('heading', { name: 'Duplicar evaluación' })).toBeVisible();
+  await expect(page.getByLabel('Nombre')).toHaveValue('Evaluación semanal (copia)');
+  await expect(page.getByLabel('Tiempo límite (minutos)')).toHaveValue('20');
+  await page.getByRole('checkbox', { name: /Luis Díaz/ }).check();
+  await page.getByRole('button', { name: 'Guardar evaluación' }).click();
+  await expect(page.getByRole('status')).toContainText(
+    'Se guardó la evaluación Evaluación semanal (copia)',
+  );
+
+  const evaluations = await listDocuments('evaluations');
+  const original = evaluations.find((e) => e['title'] === 'Evaluación semanal')!;
+  const duplicate = evaluations.find((e) => e['title'] === 'Evaluación semanal (copia)')!;
+  expect(duplicate).toMatchObject({
+    symbol: original['symbol'],
+    replayStart: original['replayStart'],
+    durationMinutes: 20,
+    studentIds: [await uidOf('luis@indab.test')],
+  });
+
+  await signOut(page);
+  await signIn(page, 'luis@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await expect(page.locator('.evaluation')).toContainText('Evaluación semanal (copia)');
 });

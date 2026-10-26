@@ -135,6 +135,9 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
   TikTok @indab.academy); `<app-social-links>` shows icons, `[labels]="true"` adds network and
   handle (landing contact section). Landing stats only show figures Cris confirmed; INDAB has no
   recorded courses yet, only study material. Email and WhatsApp are not public yet.
+- Admin list actions are icon buttons: `<app-icon>` (`shared/icon`, inline SVG paths in `ICONS`)
+  inside `.icon-btn` (`shared/icon/_icon-button.scss`), with `aria-label` naming the action and
+  the item (`admin.itemAction`) and a short tooltip in `data-tip`.
 - Formatting: Prettier (`printWidth` 100, single quotes). Run `npx prettier --write` on changed files.
 
 ## Adding a module
@@ -241,7 +244,10 @@ Module notes:
   (`features/admin/exams/`, editor maths in `exam-form.ts`) and grade at `/admin/forms/:id`
   (`exam-results.ts`); students take them at `/academy/exams` (`features/exams/`, list state in
   `exam-status.ts`). Answer keys live apart in `examKeys` so students can read the questions.
-  Grading runs in the staff browser ($0, no functions). The best attempt counts. Not built yet:
+  Grading runs in the staff browser ($0, no functions). The best attempt counts. "Duplicar"
+  (`cloneForm`) opens the editor with a copy (questions, key, points, settings) as a new draft with
+  no students, to give the same test to others; practice evaluations have the same action
+  (`clone`, keeps the exact `replayStart`). Not built yet:
   groups, CSV export, extra attempts per student, shuffled questions.
 - **Economic calendar (`/academy/calendar`, built)**: `features/calendar/`. TradingView's free
   calendar widget (`widget.ts` builds its settings: locale, economies, impact); the page rebuilds

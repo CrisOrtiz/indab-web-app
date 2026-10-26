@@ -399,6 +399,7 @@ export const es = {
     granted: 'Con acceso',
     pendingFilter: 'Pendientes',
     close: 'Cerrar',
+    itemAction: (action: string, title: string) => `${action}: ${title}`,
     loading: 'Cargando usuarios…',
     count: (shown: number, total: number) => `${shown} de ${total} usuarios`,
     user: 'Usuario',
@@ -724,6 +725,11 @@ export const es = {
     edit: 'Editar',
     delete: 'Eliminar',
     deleteLabel: (title: string) => `Eliminar la evaluación ${title}`,
+    clone: 'Duplicar',
+    cloneTitle: 'Duplicar evaluación',
+    cloneHint:
+      'Es una copia con el mismo mercado, inicio del replay y tiempo límite. Elige los estudiantes y las fechas, y guárdala como una evaluación nueva.',
+    copyOf: (title: string) => `${title} (copia)`,
     student: 'Estudiante',
     status: 'Estado',
     pnl: 'Ganancia / pérdida',
@@ -823,6 +829,11 @@ export const es = {
     edit: 'Editar',
     delete: 'Eliminar',
     deleteLabel: (title: string) => `Eliminar el formulario ${title}`,
+    clone: 'Duplicar',
+    cloneTitle: 'Duplicar formulario',
+    cloneHint:
+      'Es una copia con las mismas preguntas, respuestas y puntajes. Elige los alumnos y las fechas; queda como borrador hasta que la publiques.',
+    copyOf: (title: string) => `${title} (copia)`,
     confirmDelete: (title: string) =>
       `¿Eliminar el formulario ${title}? Las entregas y las notas quedan guardadas.`,
     titleRequired: 'Escribe un título para el formulario.',
