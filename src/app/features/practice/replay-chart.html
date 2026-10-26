@@ -227,16 +227,6 @@
                 />
               }
               @case ('fib') {
-                @for (band of shape.bands; track band.ratio) {
-                  <rect
-                    class="fib-band"
-                    [attr.x]="shape.left"
-                    [attr.y]="band.top"
-                    [attr.width]="shape.right - shape.left"
-                    [attr.height]="band.height"
-                    [attr.fill]="band.color ?? shape.color"
-                  />
-                }
                 <line
                   class="fib-move"
                   [attr.x1]="shape.a.x"

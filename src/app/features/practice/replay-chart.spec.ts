@@ -483,10 +483,10 @@ describe('ReplayChart', () => {
       '3.272 (-127.2)',
       '4.236 (-223.6)',
     ]);
-    // Levels keep the colors Cris uses; the others take the drawing's. A band fills each gap.
+    // Levels keep the colors Cris uses; the others take the drawing's. No background.
     const stroke = (i: number) => el.querySelectorAll('svg.shapes .fib')[i].getAttribute('stroke');
     expect([stroke(0), stroke(4), stroke(8)]).toEqual(['#f23645', '#2962ff', '#f23645']);
-    expect(el.querySelectorAll('svg.shapes .fib-band')).toHaveLength(18);
+    expect(el.querySelectorAll('svg.shapes rect')).toHaveLength(1);
 
     // Escape puts a tool down halfway.
     await pick('Rectángulo');

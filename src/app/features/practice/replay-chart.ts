@@ -212,8 +212,6 @@ interface PlacedShape {
   head?: string;
   /** Fibonacci levels: their ratio, price, height and own color (else the drawing's). */
   levels: { ratio: number; price: number; y: number; color: string | null }[];
-  /** Fibonacci background: the band below each level, in that level's color. */
-  bands: { ratio: number; top: number; height: number; color: string | null }[];
   /** Long/short position: its entry, target (profit) and stop (loss) bands, and labels. */
   position?: {
     entryY: number;
@@ -1289,7 +1287,6 @@ export class ReplayChart {
       bottom: Math.max(a.y, b.y),
       segment: [a, b],
       levels: [],
-      bands: [],
       handles: [
         { key: 'a', ...a, timeOf: 0, priceOf: 0 },
         { key: 'b', ...b, timeOf: 1, priceOf: 1 },
@@ -1345,17 +1342,6 @@ export class ReplayChart {
           const [pa, pb] = d.points;
           const price = roundPrice(pb.price + (pa.price - pb.price) * ratio);
           return { ratio, price, y: series.priceToCoordinate(price) ?? 0, color };
-        });
-        // Each band runs from a level to the one before it, in its color, as TradingView's
-        // background does.
-        shape.bands = shape.levels.slice(1).map((level, i) => {
-          const previous = shape.levels[i].y;
-          return {
-            ratio: level.ratio,
-            top: Math.min(previous, level.y),
-            height: Math.abs(previous - level.y),
-            color: level.color,
-          };
         });
         break;
       case 'long':
