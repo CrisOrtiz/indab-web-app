@@ -135,35 +135,14 @@
         </label>
       </div>
       <span class="muted">{{ t.windowHint }}</span>
-      <fieldset>
-        <legend>{{ t.students(f.studentIds.length) }}</legend>
-        <div class="row">
-          <input
-            type="search"
-            [placeholder]="t.searchStudents"
-            [attr.aria-label]="t.searchStudents"
-            [value]="studentSearch()"
-            (input)="studentSearch.set($any($event.target).value)"
-          />
-          <button type="button" class="btn btn-outline" (click)="selectAll()">
-            {{ t.selectAll }}
-          </button>
-        </div>
-        <div class="student-list">
-          @for (s of visibleStudents(); track s.uid) {
-            <label class="check">
-              <input
-                type="checkbox"
-                [checked]="f.studentIds.includes(s.uid)"
-                (change)="toggleStudent(s.uid, $any($event.target).checked)"
-              />
-              {{ s.name }} <span class="muted">{{ s.email }}</span>
-            </label>
-          } @empty {
-            <span class="muted">{{ t.noStudents }}</span>
-          }
-        </div>
-      </fieldset>
+      <app-audience-picker
+        [students]="students()"
+        [mentorships]="mentorships()"
+        [studentIds]="f.studentIds"
+        (studentIdsChange)="patch({ studentIds: $event })"
+        [mentorshipIds]="f.mentorshipIds"
+        (mentorshipIdsChange)="patch({ mentorshipIds: $event })"
+      />
       <div class="actions">
         <button type="submit" class="btn" [disabled]="saving()">
           {{ saving() ? t.saving : t.save }}
@@ -200,8 +179,13 @@
             {{ tr.instruments[ev.symbol] ?? ev.symbol }} ·
             {{ ev.replayStart | localDate: 'd MMM y, HH:mm' }} ·
             {{ t.minutes(ev.durationMinutes) }} ·
-            {{ t.studentCount(ev.studentIds.length) }}
+            {{ t.studentCount(assigned(ev).length) }}
           </p>
+          @if (ev.mentorshipIds?.length) {
+            <p class="muted">
+              {{ i18n.messages().audience.mentorshipList }}: {{ mentorshipList(ev) }}
+            </p>
+          }
           <p class="muted">
             {{
               t.window(
@@ -213,7 +197,11 @@
 
           @if (selected() === ev.id) {
             @if (standings(); as rows) {
-              <app-evaluation-results [standings]="rows" />
+              <app-evaluation-results
+                [standings]="rows"
+                [students]="students()"
+                [mentorships]="mentorships()"
+              />
             } @else {
               <p class="muted">{{ t.loadingResults }}</p>
             }

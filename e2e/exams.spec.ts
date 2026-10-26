@@ -34,7 +34,7 @@ test('a trainer builds a scored form, the student answers it and sees the grade'
   // The form: 100 points to pass with 70, a closed question and an open one.
   await page.getByRole('button', { name: 'Nuevo formulario' }).click();
   await page.getByLabel('Título').fill('Fundamentos de trading');
-  await page.getByLabel('Solo los alumnos que elija').check();
+  await page.getByLabel('Las mentorías y los alumnos que elija').check();
   await page.getByRole('checkbox', { name: /José Pérez/ }).check();
   await page.getByLabel('Texto de la pregunta').first().fill('¿Qué indica un RSI sobre 70?');
   await page.getByLabel('Pregunta 1 · Opción 1').fill('Sobrecompra');
@@ -164,7 +164,7 @@ test('a trainer duplicates a form to give the same test to other students', asyn
   await openForms(page);
   await page.getByRole('button', { name: 'Nuevo formulario' }).click();
   await page.getByLabel('Título').fill('Gestión de riesgo');
-  await page.getByLabel('Solo los alumnos que elija').check();
+  await page.getByLabel('Las mentorías y los alumnos que elija').check();
   await page.getByRole('checkbox', { name: /José Pérez/ }).check();
   await page.getByLabel('Texto de la pregunta').fill('El stop loss limita la pérdida');
   await page.getByLabel('Tipo · Pregunta 1').selectOption('trueFalse');

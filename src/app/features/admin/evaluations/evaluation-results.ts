@@ -1,6 +1,8 @@
 import { DecimalPipe, PercentPipe } from '@angular/common';
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { I18n } from '../../../core/i18n/i18n.service';
+import { Mentorship, membersOf } from '../../../core/models/mentorship';
+import { MentorshipFilter } from '../audience/mentorship-filter';
 import { Pager } from '../../../shared/pager/pager';
 import { pageCount, pageOf } from '../../../shared/pager/cursor-pages';
 import { EvaluationStanding } from '../../ranking/standings';
@@ -15,7 +17,7 @@ export const RESULTS_PAGE_SIZE = 20;
  */
 @Component({
   selector: 'app-evaluation-results',
-  imports: [DecimalPipe, Pager, PercentPipe],
+  imports: [DecimalPipe, MentorshipFilter, Pager, PercentPipe],
   template: `
     @let t = i18n.messages().evaluations;
     @let tl = i18n.messages().lists;
@@ -29,6 +31,13 @@ export const RESULTS_PAGE_SIZE = 20;
           (input)="filter(search, $event)"
         />
       </label>
+      @if (mentorships().length) {
+        <app-mentorship-filter
+          [mentorships]="mentorships()"
+          [value]="mentorship()"
+          (valueChange)="mentorship.set($event); page.set(0)"
+        />
+      }
       <label>
         {{ tl.status }}
         <select [value]="status()" (change)="filter(status, $event)">
@@ -95,18 +104,26 @@ export class EvaluationResults {
   protected readonly i18n = inject(I18n);
 
   readonly standings = input.required<EvaluationStanding[]>();
+  /** Students with their mentorships and the mentorships to filter by; none hides the filter. */
+  readonly students = input<{ uid: string; mentorshipIds: string[] }[]>([]);
+  readonly mentorships = input<Mentorship[]>([]);
 
   protected readonly states: EvaluationStanding['status'][] = ['finished', 'active', 'notStarted'];
   protected readonly search = signal('');
   protected readonly status = signal('');
+  protected readonly mentorship = signal('');
   protected readonly page = signal(0);
 
   protected readonly matches = computed(() => {
     const term = this.search().trim().toLowerCase();
     const status = this.status();
+    const mentorship = this.mentorship();
+    const members = mentorship ? new Set(membersOf(mentorship, this.students())) : null;
     return this.standings().filter(
       (row) =>
-        (!term || row.name.toLowerCase().includes(term)) && (!status || row.status === status),
+        (!term || row.name.toLowerCase().includes(term)) &&
+        (!status || row.status === status) &&
+        (!members || members.has(row.uid)),
     );
   });
   protected readonly pages = computed(() => pageCount(this.matches().length, RESULTS_PAGE_SIZE));

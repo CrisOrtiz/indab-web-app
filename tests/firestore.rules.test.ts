@@ -1265,6 +1265,216 @@ describe('evaluation forms', () => {
   });
 });
 
+describe('mentorships', () => {
+  const hour = 60 * 60 * 1000;
+  const mentorship = (extra: Record<string, unknown> = {}) => ({
+    name: 'Mentoría oro 2026',
+    description: '',
+    mentorIds: ['trainer'],
+    startDate: '2026-10-01',
+    endDate: null,
+    active: true,
+    createdBy: 'admin',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const ref = (uid: string | null, id = 'm1') => doc(as(uid), `mentorships/${id}`);
+  const seed = (path: string, data: Record<string, unknown>) =>
+    env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), path), data));
+  const stamps = { createdAt: new Date(), updatedAt: new Date() };
+  const audience = {
+    studentIds: [],
+    mentorshipIds: ['m1'],
+    opensAt: new Date(Date.now() - hour),
+    closesAt: new Date(Date.now() + hour),
+    createdBy: 'trainer',
+    ...stamps,
+  };
+
+  beforeEach(async () => {
+    await seed('mentorships/m1', { ...mentorship(), ...stamps });
+    await seed('mentorships/m2', { ...mentorship({ name: 'Otra' }), ...stamps });
+    // `enrolled` belongs to m1; `other` has academy access but no mentorship.
+    await seed('users/enrolled', { uid: 'enrolled', role: 'student', mentorshipIds: ['m1'] });
+    await seed('users/other', { uid: 'other', role: 'student' });
+    await seed('enrollments/other', { academy: true, courses: [] });
+  });
+
+  it('are managed by admins only', async () => {
+    await assertSucceeds(setDoc(ref('admin', 'm3'), mentorship()));
+    await assertSucceeds(
+      updateDoc(ref('admin'), {
+        active: false,
+        endDate: '2026-12-31',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(setDoc(ref('trainer', 'm4'), mentorship({ createdBy: 'trainer' })));
+    await assertFails(updateDoc(ref('trainer'), { name: 'x', updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(ref('enrolled', 'm4'), mentorship({ createdBy: 'enrolled' })));
+    await assertFails(setDoc(ref('admin', 'm4'), mentorship({ createdBy: 'trainer' })));
+    await assertFails(deleteDoc(ref('trainer')));
+    await assertSucceeds(deleteDoc(ref('admin')));
+  });
+
+  it('validates a mentorship', async () => {
+    const create = (extra: Record<string, unknown>) =>
+      setDoc(ref('admin', 'm5'), mentorship(extra));
+    await assertFails(create({ name: '' }));
+    await assertFails(create({ name: 'x'.repeat(81) }));
+    await assertFails(create({ startDate: '1 oct' }));
+    await assertFails(create({ endDate: '2026-09-01' }));
+    await assertFails(create({ mentorIds: 'trainer' }));
+    await assertFails(create({ studentIds: ['enrolled'] }));
+    await assertSucceeds(create({ endDate: '2027-03-31' }));
+  });
+
+  it('are read by staff and by their own students', async () => {
+    await assertSucceeds(getDocs(collection(as('trainer'), 'mentorships')));
+    await assertSucceeds(getDoc(ref('enrolled')));
+    await assertFails(getDoc(ref('enrolled', 'm2')));
+    await assertFails(getDoc(ref('other')));
+    await assertFails(getDocs(collection(as('enrolled'), 'mentorships')));
+    await assertFails(getDoc(ref(null)));
+  });
+
+  it('are assigned to students by admins, never by the student or trainers', async () => {
+    await assertSucceeds(
+      updateDoc(doc(as('admin'), 'users/other'), { mentorshipIds: ['m1', 'm2'] }),
+    );
+    await assertSucceeds(updateDoc(doc(as('admin'), 'users/other'), { mentorshipIds: [] }));
+    await assertFails(updateDoc(doc(as('admin'), 'users/other'), { mentorshipIds: 'm1' }));
+    await assertFails(updateDoc(doc(as('other'), 'users/other'), { mentorshipIds: ['m1'] }));
+    await assertFails(updateDoc(doc(as('trainer'), 'users/other'), { mentorshipIds: ['m1'] }));
+  });
+
+  it('give their students the evaluations assigned to the mentorship', async () => {
+    await seed('evaluations/e1', {
+      title: 'Evaluación oro',
+      description: '',
+      symbol: 'XAUUSDT',
+      replayStart: 1_620_000_000_000,
+      hideDates: true,
+      startingBalance: 200,
+      durationMinutes: 30,
+      resultsPublished: false,
+      ...audience,
+    });
+    await assertSucceeds(getDoc(doc(as('enrolled'), 'evaluations/e1')));
+    await assertFails(getDoc(doc(as('other'), 'evaluations/e1')));
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(as('enrolled'), 'evaluations'),
+          where('mentorshipIds', 'array-contains-any', ['m1']),
+        ),
+      ),
+    );
+    await assertFails(
+      getDocs(
+        query(
+          collection(as('enrolled'), 'evaluations'),
+          where('mentorshipIds', 'array-contains-any', ['m2']),
+        ),
+      ),
+    );
+    const attempt = (uid: string) => ({
+      uid,
+      userName: 'Ana',
+      symbol: 'XAUUSDT',
+      interval: '15m',
+      replayStart: 1_620_000_000_000,
+      startingBalance: 200,
+      balance: 200,
+      pnl: 0,
+      tradeCount: 0,
+      status: 'active',
+      startedAt: serverTimestamp(),
+      evaluationId: 'e1',
+      durationMinutes: 30,
+    });
+    await assertSucceeds(
+      setDoc(doc(as('enrolled'), 'practiceSessions/e1_enrolled'), attempt('enrolled')),
+    );
+    await assertFails(setDoc(doc(as('other'), 'practiceSessions/e1_other'), attempt('other')));
+  });
+
+  it('give their students the forms assigned to the mentorship', async () => {
+    await seed('examForms/x1', {
+      title: 'Fundamentos',
+      description: '',
+      totalPoints: 10,
+      passingPoints: 5,
+      durationMinutes: 0,
+      maxAttempts: 1,
+      audience: 'selected',
+      questions: [],
+      published: true,
+      resultsPublished: false,
+      showAnswers: false,
+      ...audience,
+    });
+    await assertSucceeds(getDoc(doc(as('enrolled'), 'examForms/x1')));
+    await assertFails(getDoc(doc(as('other'), 'examForms/x1')));
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(as('enrolled'), 'examForms'),
+          where('published', '==', true),
+          where('mentorshipIds', 'array-contains-any', ['m1']),
+        ),
+      ),
+    );
+    const submission = (uid: string) => ({
+      examId: 'x1',
+      uid,
+      userName: 'Ana',
+      attempt: 1,
+      status: 'inProgress',
+      answers: {},
+      startedAt: serverTimestamp(),
+      submittedAt: null,
+    });
+    await assertSucceeds(
+      setDoc(doc(as('enrolled'), 'examSubmissions/x1_enrolled_1'), submission('enrolled')),
+    );
+    await assertFails(setDoc(doc(as('other'), 'examSubmissions/x1_other_1'), submission('other')));
+  });
+
+  it('are an optional list on evaluations and forms', async () => {
+    await assertFails(
+      updateDoc(doc(as('trainer'), 'mentorships/m1'), { name: 'x', updatedAt: serverTimestamp() }),
+    );
+    await seed('examForms/x2', {
+      title: 'F',
+      description: '',
+      totalPoints: 10,
+      passingPoints: 5,
+      durationMinutes: 0,
+      maxAttempts: 1,
+      audience: 'selected',
+      questions: [],
+      published: false,
+      resultsPublished: false,
+      showAnswers: false,
+      ...audience,
+    });
+    await assertFails(
+      updateDoc(doc(as('trainer'), 'examForms/x2'), {
+        mentorshipIds: 'm1',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(as('trainer'), 'examForms/x2'), {
+        mentorshipIds: ['m1', 'm2'],
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+});
+
 describe('unknown collections', () => {
   it('are closed to everyone, admins included', async () => {
     await assertFails(getDoc(doc(as('admin'), 'secrets/s1')));

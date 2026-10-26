@@ -127,6 +127,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/users/users').then((m) => m.AdminUsers),
   },
   {
+    path: 'admin/mentorships',
+    title: 'adminMentorships',
+    canActivate: [staffGuard],
+    loadComponent: () =>
+      import('./features/admin/mentorships/admin-mentorships').then((m) => m.AdminMentorships),
+  },
+  {
     path: 'admin/practice',
     title: 'adminPractice',
     canActivate: [staffGuard],

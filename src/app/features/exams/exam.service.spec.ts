@@ -108,6 +108,9 @@ describe('ExamService', () => {
     expect((await service.assignedTo('jose')).map((e) => e.id)).toEqual(['mine', 'all']);
     expect(where).toHaveBeenCalledWith('published', '==', true);
     expect(where).toHaveBeenCalledWith('studentIds', 'array-contains', 'jose');
+    expect(where).not.toHaveBeenCalledWith('mentorshipIds', 'array-contains-any', []);
+    await service.assignedTo('jose', ['m1']);
+    expect(where).toHaveBeenCalledWith('mentorshipIds', 'array-contains-any', ['m1']);
   });
 
   it('starts, saves and hands in an attempt', async () => {

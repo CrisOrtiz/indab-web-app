@@ -148,35 +148,14 @@
         </label>
       </fieldset>
       @if (f.audience === 'selected') {
-        <fieldset>
-          <legend>{{ t.students(f.studentIds.length) }}</legend>
-          <div class="row">
-            <input
-              type="search"
-              [placeholder]="t.searchStudents"
-              [attr.aria-label]="t.searchStudents"
-              [value]="studentSearch()"
-              (input)="studentSearch.set($any($event.target).value)"
-            />
-            <button type="button" class="btn btn-outline" (click)="selectAll()">
-              {{ t.selectAll }}
-            </button>
-          </div>
-          <div class="student-list">
-            @for (s of visibleStudents(); track s.uid) {
-              <label class="check">
-                <input
-                  type="checkbox"
-                  [checked]="f.studentIds.includes(s.uid)"
-                  (change)="toggleStudent(s.uid, $any($event.target).checked)"
-                />
-                {{ s.name }} <span class="muted">{{ s.email }}</span>
-              </label>
-            } @empty {
-              <span class="muted">{{ t.noStudents }}</span>
-            }
-          </div>
-        </fieldset>
+        <app-audience-picker
+          [students]="students()"
+          [mentorships]="mentorships()"
+          [studentIds]="f.studentIds"
+          (studentIdsChange)="patch({ studentIds: $event })"
+          [mentorshipIds]="f.mentorshipIds"
+          (mentorshipIdsChange)="patch({ mentorshipIds: $event })"
+        />
       }
 
       <h3 class="questions-title">{{ t.questions }}</h3>
@@ -402,8 +381,13 @@
             {{ t.summary(exam.totalPoints, exam.passingPoints, exam.questions.length) }} ·
             {{ exam.durationMinutes ? t.minutes(exam.durationMinutes) : t.noLimit }} ·
             {{ t.attemptsCount(exam.maxAttempts) }} ·
-            {{ exam.audience === 'all' ? t.forAll : t.studentCount(exam.studentIds.length) }}
+            {{ exam.audience === 'all' ? t.forAll : t.studentCount(assignedCount(exam)) }}
           </p>
+          @if (exam.audience === 'selected' && exam.mentorshipIds?.length) {
+            <p class="muted">
+              {{ i18n.messages().audience.mentorshipList }}: {{ mentorshipList(exam) }}
+            </p>
+          }
           <p class="muted">
             {{
               t.window(

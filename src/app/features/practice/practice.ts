@@ -925,7 +925,10 @@ export class Practice {
       return;
     }
     try {
-      const evaluations = await this.evaluationService.assignedTo(uid);
+      const evaluations = await this.evaluationService.assignedTo(
+        uid,
+        this.auth.profile()?.mentorshipIds,
+      );
       const attempts = evaluations.length
         ? await this.practice.myAttempts(
             uid,

@@ -6,6 +6,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { Candle } from '../../../core/models/practice';
 import { HISTORY_BARS, MarketDataService } from '../../practice/market-data.service';
 import { EvaluationService } from '../../evaluations/evaluation.service';
+import { MentorshipService } from '../../mentorships/mentorship.service';
 import { PracticeService } from '../../practice/practice.service';
 import { ReplayChart } from '../../practice/replay-chart';
 import { SessionReview } from '../../practice/session-review';
@@ -48,10 +49,16 @@ describe('PracticeReview', () => {
   };
   const evaluations = {
     students: vi.fn(async () => [
-      { uid: 'ana', name: 'Ana' },
-      { uid: 'luis', name: 'Luis' },
+      { uid: 'ana', name: 'Ana', mentorshipIds: ['m1'] },
+      { uid: 'luis', name: 'Luis', mentorshipIds: [] },
     ]),
     all: vi.fn(async () => [{ id: 'e1', title: 'Evaluación de octubre' }]),
+  };
+  const mentorships = {
+    all: vi.fn(async () => [
+      { id: 'm1', name: 'Grupo oro', active: true },
+      { id: 'm2', name: 'Grupo vacío', active: true },
+    ]),
   };
   const market = { loadCandles: vi.fn(), loadHistory: vi.fn() };
   const isAdmin = signal(true);
@@ -63,6 +70,7 @@ describe('PracticeReview', () => {
         provideRouter([]),
         { provide: PracticeService, useValue: practice },
         { provide: EvaluationService, useValue: evaluations },
+        { provide: MentorshipService, useValue: mentorships },
         { provide: MarketDataService, useValue: market },
         { provide: AuthService, useValue: { isAdmin } },
       ],
@@ -191,6 +199,35 @@ describe('PracticeReview', () => {
     await fixture.whenStable();
     expect(practice.sessionsPage).toHaveBeenLastCalledWith({}, REVIEW_PAGE_SIZE, undefined);
     expect(el.textContent).toContain('No hay prácticas registradas.');
+  });
+
+  it("filters by a mentorship's students", async () => {
+    await render();
+    await change(select('Mentoría'), 'm1');
+    expect(practice.sessionsPage).toHaveBeenLastCalledWith(
+      { uids: ['ana'] },
+      REVIEW_PAGE_SIZE,
+      undefined,
+    );
+    expect(practice.sessionTotals).toHaveBeenLastCalledWith({ uids: ['ana'] });
+    // Only its students are offered; picking one narrows to them.
+    expect([...select('Estudiante').querySelectorAll('option')].map((o) => o.textContent)).toEqual([
+      'Todos los estudiantes',
+      'Ana',
+    ]);
+    await change(select('Estudiante'), 'ana');
+    expect(practice.sessionsPage).toHaveBeenLastCalledWith(
+      { uid: 'ana' },
+      REVIEW_PAGE_SIZE,
+      undefined,
+    );
+    // Another mentorship lets the student go.
+    await change(select('Mentoría'), 'm2');
+    expect(practice.sessionsPage).toHaveBeenLastCalledWith(
+      { uids: [] },
+      REVIEW_PAGE_SIZE,
+      undefined,
+    );
   });
 
   it('pages forward with the cursor and back to the first page', async () => {

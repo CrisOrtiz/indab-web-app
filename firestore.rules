@@ -3,7 +3,8 @@ rules_version = '2';
 // Data model
 //   users/{uid}                          profile; created by the user, who edits displayName,
 //                                        photoURL (a small data: URL image), birthDate and whatsapp;
-//                                        role changes by admins only
+//                                        role and mentorshipIds (the student's mentorships) change
+//                                        by admins only
 //   users/{uid}/sessions/{id}            browsers the user is signed in on; the owner signs one out
 //                                        by setting revoked, and that browser then signs itself out
 //   enrollments/{uid}                    { academy: bool, courses: [courseId], updatedAt, updatedBy };
@@ -12,10 +13,16 @@ rules_version = '2';
 //   courses/{courseId}/lessons/{id}      lesson content; enrolled users only
 //   materials/{materialId}               learning-material repository; enrolled users only
 //   investors/{uid}                      Eleva Inversiones investor account; owner reads, admins write
+//   mentorships/{id}                     a group of students with its mentors (trainers or admins),
+//                                        dates and active flag; admins manage them, staff read them
+//                                        and members read their own. Membership lives in the
+//                                        student's users/{uid}.mentorshipIds
 //   evaluations/{id}                     timed practice evaluation set up by trainers or admins:
 //                                        market, replay start, time limit, window, assigned students
+//                                        and mentorships
 //   examForms/{id}                       evaluation form (questions, points, window, attempts,
-//                                        audience) built by trainers or admins; no right answers
+//                                        audience: everyone, or chosen students and mentorships)
+//                                        built by trainers or admins; no right answers
 //   examKeys/{examId}                    right answers of a form; staff only, and assigned students
 //                                        once results are published with answers
 //   examSubmissions/{examId}_{uid}_{n}   a student's attempt n, saved as they answer until handed in
@@ -35,8 +42,8 @@ rules_version = '2';
 // their users/{uid} document in the Firebase console; after that, admins manage roles and
 // academy access from the /admin area. Admins cannot remove their own admin role, so the
 // last admin can never lock everyone out. Trainers (role == 'trainer') run evaluations and
-// review practice, but cannot change roles, academy access or delete anything but evaluations
-// and evaluation forms.
+// review practice, but cannot change roles, academy access or mentorships, or delete anything
+// but evaluations and evaluation forms.
 // Academy content also needs a verified email (emailVerified()), so an account registered with
 // someone else's address never opens it.
 service cloud.firestore {
@@ -82,6 +89,26 @@ service cloud.firestore {
       return emailVerified() && (isStaff() || (hasEnrollment() && enrollment().academy == true));
     }
 
+    // The mentorships the signed-in user belongs to.
+    function myMentorships() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('mentorshipIds', [])
+        : [];
+    }
+
+    // An evaluation or form given to the signed-in student by name or through a mentorship.
+    function assignedTo(data) {
+      return signedIn()
+        && (request.auth.uid in data.studentIds
+          || data.get('mentorshipIds', []).hasAny(myMentorships()));
+    }
+
+    // Optional list of mentorship ids on an evaluation or form.
+    function validMentorshipIds(data) {
+      return !('mentorshipIds' in data)
+        || (data.mentorshipIds is list && data.mentorshipIds.size() <= 50);
+    }
+
     function isEnrolledIn(courseId) {
       return hasAcademyAccess()
         || (emailVerified() && hasEnrollment()
@@ -118,11 +145,14 @@ service cloud.firestore {
             && data.photoURL.matches('data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+'));
       }
 
-      // Admins can change a user's role (never their own). Users can edit their own name, photo
-      // and details but never their role or identity fields.
+      // Admins change a user's role and mentorships (never their own). Users can edit their own
+      // name, photo and details but never their role, mentorships or identity fields.
       allow update: if (isAdmin()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'mentorshipIds'])
           && request.resource.data.role in ['student', 'trainer', 'admin']
+          && (!('mentorshipIds' in request.resource.data)
+            || (request.resource.data.mentorshipIds is list
+              && request.resource.data.mentorshipIds.size() <= 20))
           && !isOwner(uid))
         || (isOwner(uid)
           && request.resource.data.diff(resource.data).affectedKeys()
@@ -196,12 +226,48 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Practice evaluations: trainers and admins set them up; assigned students read them.
+    // Mentorships group students under one or more mentors. Admins manage them and assign
+    // students (users/{uid}.mentorshipIds); trainers read them to assign forms and evaluations
+    // to a whole group; students read the ones they belong to.
+    match /mentorships/{mentorshipId} {
+      function validDate(value) {
+        return value is string && value.matches('(19|20)[0-9]{2}-[01][0-9]-[0-3][0-9]');
+      }
+
+      function validMentorship(data) {
+        return data.keys().hasOnly(['name', 'description', 'mentorIds', 'startDate', 'endDate',
+            'active', 'createdBy', 'createdAt', 'updatedAt'])
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 80
+          && data.description is string && data.description.size() <= 1000
+          && data.mentorIds is list && data.mentorIds.size() <= 10
+          && validDate(data.startDate)
+          && (data.endDate == null || (validDate(data.endDate) && data.endDate >= data.startDate))
+          && data.active is bool
+          && data.updatedAt == request.time;
+      }
+
+      allow read: if isStaff() || (signedIn() && mentorshipId in myMentorships());
+
+      allow create: if isAdmin()
+        && validMentorship(request.resource.data)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if isAdmin()
+        && validMentorship(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if isAdmin();
+    }
+
+    // Practice evaluations: trainers and admins set them up; assigned students (by name or
+    // through a mentorship) read them.
     match /evaluations/{evaluationId} {
       function validEvaluation(data) {
         return data.keys().hasOnly(['title', 'description', 'symbol', 'replayStart', 'hideDates',
             'startingBalance', 'durationMinutes', 'opensAt', 'closesAt', 'studentIds',
-            'resultsPublished', 'createdBy', 'createdAt', 'updatedAt'])
+            'mentorshipIds', 'resultsPublished', 'createdBy', 'createdAt', 'updatedAt'])
           && data.title is string && data.title.size() > 0 && data.title.size() <= 120
           && data.description is string && data.description.size() <= 2000
           && data.symbol is string && data.symbol.size() <= 20
@@ -212,11 +278,12 @@ service cloud.firestore {
           && data.opensAt is timestamp && data.closesAt is timestamp
           && data.closesAt > data.opensAt
           && data.studentIds is list && data.studentIds.size() <= 500
+          && validMentorshipIds(data)
           && data.resultsPublished is bool
           && data.updatedAt == request.time;
       }
 
-      allow read: if isStaff() || (signedIn() && request.auth.uid in resource.data.studentIds);
+      allow read: if isStaff() || assignedTo(resource.data);
 
       allow create: if isStaff()
         && validEvaluation(request.resource.data)
@@ -240,13 +307,14 @@ service cloud.firestore {
 
     function assignedExam(exam) {
       return hasAcademyAccess() && exam.published == true
-        && (exam.audience == 'all' || request.auth.uid in exam.studentIds);
+        && (exam.audience == 'all' || assignedTo(exam));
     }
 
     match /examForms/{examId} {
       function validExam(data) {
         return data.keys().hasOnly(['title', 'description', 'totalPoints', 'passingPoints',
-            'durationMinutes', 'maxAttempts', 'audience', 'studentIds', 'opensAt', 'closesAt',
+            'durationMinutes', 'maxAttempts', 'audience', 'studentIds', 'mentorshipIds', 'opensAt',
+            'closesAt',
             'questions', 'published', 'resultsPublished', 'showAnswers', 'createdBy', 'createdAt',
             'updatedAt'])
           && data.title is string && data.title.size() > 0 && data.title.size() <= 120
@@ -258,6 +326,7 @@ service cloud.firestore {
           && data.maxAttempts is int && data.maxAttempts >= 1 && data.maxAttempts <= 3
           && data.audience in ['all', 'selected']
           && data.studentIds is list && data.studentIds.size() <= 500
+          && validMentorshipIds(data)
           && data.opensAt is timestamp && data.closesAt is timestamp
           && data.closesAt > data.opensAt
           && data.questions is list && data.questions.size() <= 100
@@ -399,7 +468,7 @@ service cloud.firestore {
       function validAttempt(data) {
         return sessionId == data.evaluationId + '_' + request.auth.uid
           && exists(/databases/$(database)/documents/evaluations/$(data.evaluationId))
-          && request.auth.uid in evaluation(data.evaluationId).studentIds
+          && assignedTo(evaluation(data.evaluationId))
           && request.time >= evaluation(data.evaluationId).opensAt
           && request.time < evaluation(data.evaluationId).closesAt
           && data.symbol == evaluation(data.evaluationId).symbol

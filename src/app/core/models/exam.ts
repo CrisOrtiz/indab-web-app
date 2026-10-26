@@ -17,7 +17,10 @@ export interface ExamQuestion {
   partial: boolean;
 }
 
-/** Who an exam is for: every student with academy access, or the ones in `studentIds`. */
+/**
+ * Who an exam is for: every student with academy access, or the ones in `studentIds` plus the
+ * members of `mentorshipIds`.
+ */
 export type ExamAudience = 'all' | 'selected';
 
 /**
@@ -36,6 +39,8 @@ export interface Exam {
   maxAttempts: number;
   audience: ExamAudience;
   studentIds: string[];
+  /** Mentorships whose students are also assigned (missing on older forms). */
+  mentorshipIds?: string[];
   /** Attempts can be started from `opensAt` until `closesAt`. */
   opensAt: Timestamp;
   closesAt: Timestamp;

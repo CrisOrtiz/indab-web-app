@@ -81,6 +81,11 @@ export class AdminService {
     return updateDoc(doc(this.firestore, 'users', uid), { role });
   }
 
+  /** Replaces the mentorships a student belongs to. */
+  setMentorships(uid: string, mentorshipIds: string[]): Promise<void> {
+    return updateDoc(doc(this.firestore, 'users', uid), { mentorshipIds });
+  }
+
   /** Grants or revokes academy access, keeping any per-course enrollments. */
   setAcademyAccess(uid: string, academy: boolean): Promise<void> {
     const current = this._enrollments().get(uid);

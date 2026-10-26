@@ -1,0 +1,58 @@
+@let t = i18n.messages().audience;
+<fieldset>
+  <legend>{{ t.mentorships(mentorshipIds().length) }}</legend>
+  <div class="option-list mentorship-list">
+    @for (m of offered(); track m.id) {
+      <label class="check">
+        <input
+          type="checkbox"
+          [checked]="mentorshipIds().includes(m.id)"
+          (change)="toggleMentorship(m.id, $any($event.target).checked)"
+        />
+        {{ m.name }}
+        <span class="muted">{{ t.members(memberCount(m.id)) }}</span>
+        @if (!m.active) {
+          <span class="badge">{{ t.inactive }}</span>
+        }
+      </label>
+    } @empty {
+      <span class="muted">{{ t.noMentorships }}</span>
+    }
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>{{ t.students(studentIds().length) }}</legend>
+  <div class="row">
+    <input
+      type="search"
+      [placeholder]="t.search"
+      [attr.aria-label]="t.search"
+      [value]="search()"
+      (input)="search.set($any($event.target).value)"
+    />
+    <button type="button" class="btn btn-outline" (click)="selectAll()">
+      {{ t.selectAll }}
+    </button>
+  </div>
+  <div class="option-list student-list">
+    @for (s of visible(); track s.uid) {
+      @let via = covered().get(s.uid);
+      <label class="check">
+        <input
+          type="checkbox"
+          [checked]="studentIds().includes(s.uid) || via !== undefined"
+          [disabled]="via !== undefined && !studentIds().includes(s.uid)"
+          (change)="toggleStudent(s.uid, $any($event.target).checked)"
+        />
+        {{ s.name }} <span class="muted">{{ s.email }}</span>
+        @if (via !== undefined) {
+          <span class="badge">{{ t.via(via) }}</span>
+        }
+      </label>
+    } @empty {
+      <span class="muted">{{ t.noStudents }}</span>
+    }
+  </div>
+</fieldset>
+<p class="total">{{ t.total(total()) }}</p>

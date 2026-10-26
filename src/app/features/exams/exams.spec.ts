@@ -33,7 +33,10 @@ describe('Exams', () => {
       providers: [
         provideRouter([]),
         { provide: ExamService, useValue: service },
-        { provide: AuthService, useValue: { user: signal({ uid: 'jose' }) } },
+        {
+          provide: AuthService,
+          useValue: { user: signal({ uid: 'jose' }), profile: signal({ mentorshipIds: ['m1'] }) },
+        },
       ],
     });
     fixture = TestBed.createComponent(Exams);
@@ -68,6 +71,7 @@ describe('Exams', () => {
       { id: 'done_jose_1', examId: 'done', attempt: 1, total: 85, passed: true },
     ]);
     await render();
+    expect(service.assignedTo).toHaveBeenCalledWith('jose', ['m1']);
 
     expect(service.myGrades).toHaveBeenCalledWith([expect.objectContaining({ examId: 'done' })]);
     expect(column('Pendientes')).toContain('Fundamentos');

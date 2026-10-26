@@ -38,11 +38,16 @@ export type SessionSummary = Pick<PracticeSession, 'balance' | 'pnl' | 'tradeCou
  */
 export interface SessionFilters {
   uid?: string;
+  /** Sessions of any of these students (a mentorship's), at most `MAX_IN_FILTER`. */
+  uids?: string[];
   evaluationId?: string | null;
   status?: PracticeSession['status'];
   from?: Date;
   to?: Date;
 }
+
+/** Most values a Firestore `in` filter takes. */
+export const MAX_IN_FILTER = 30;
 
 export type SessionCursor = QueryDocumentSnapshot;
 export type SessionPage = CursorPage<PracticeSession, SessionCursor>;
@@ -181,6 +186,9 @@ export class PracticeService {
     pageSize: number,
     after?: SessionCursor,
   ): Promise<SessionPage> {
+    if (filters.uids?.length === 0) {
+      return { items: [], last: undefined, hasMore: false };
+    }
     const constraints = [
       ...sessionFilters(filters),
       orderBy('startedAt', 'desc'),
@@ -199,6 +207,9 @@ export class PracticeService {
 
   /** How many sessions and trades match `filters`, read as one aggregation (not per session). */
   async sessionTotals(filters: SessionFilters): Promise<{ sessions: number; trades: number }> {
+    if (filters.uids?.length === 0) {
+      return { sessions: 0, trades: 0 };
+    }
     const snapshot = await getAggregateFromServer(
       query(this.sessions, ...sessionFilters(filters)),
       {
@@ -264,6 +275,8 @@ function sessionFilters(filters: SessionFilters): QueryConstraint[] {
   const constraints: QueryConstraint[] = [];
   if (filters.uid) {
     constraints.push(where('uid', '==', filters.uid));
+  } else if (filters.uids) {
+    constraints.push(where('uid', 'in', filters.uids.slice(0, MAX_IN_FILTER)));
   }
   if (filters.evaluationId !== undefined) {
     constraints.push(where('evaluationId', '==', filters.evaluationId));

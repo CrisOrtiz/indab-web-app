@@ -4,10 +4,12 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 import { I18n } from '../../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../../core/i18n/local-date.pipe';
+import { Mentorship } from '../../../core/models/mentorship';
 import { PracticeSession } from '../../../core/models/practice';
 import { CursorPages } from '../../../shared/pager/cursor-pages';
 import { Pager } from '../../../shared/pager/pager';
-import { EvaluationService } from '../../evaluations/evaluation.service';
+import { EvaluationService, StudentOption } from '../../evaluations/evaluation.service';
+import { MentorshipService } from '../../mentorships/mentorship.service';
 import { PracticeService, SessionCursor, SessionFilters } from '../../practice/practice.service';
 import { SessionFilterBar } from '../../practice/session-filters';
 import { SessionReview } from '../../practice/session-review';
@@ -30,6 +32,7 @@ export const REVIEW_PAGE_SIZE = 20;
 export class PracticeReview {
   private readonly practice = inject(PracticeService);
   private readonly evaluations = inject(EvaluationService);
+  private readonly mentorshipService = inject(MentorshipService);
 
   protected readonly i18n = inject(I18n);
   /** Trainers review; only admins delete. */
@@ -42,7 +45,8 @@ export class PracticeReview {
   );
   /** Sessions and trades matching the filters; null while counting or if it failed. */
   protected readonly totals = signal<{ sessions: number; trades: number } | null>(null);
-  protected readonly students = signal<{ uid: string; name: string }[]>([]);
+  protected readonly students = signal<StudentOption[]>([]);
+  protected readonly mentorships = signal<Mentorship[]>([]);
   protected readonly evaluationOptions = signal<{ id: string; title: string }[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -59,6 +63,10 @@ export class PracticeReview {
     this.evaluations
       .students()
       .then((students) => this.students.set(students))
+      .catch(() => undefined);
+    this.mentorshipService
+      .all()
+      .then((list) => this.mentorships.set(list))
       .catch(() => undefined);
     this.evaluations
       .all()

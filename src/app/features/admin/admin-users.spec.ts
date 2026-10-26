@@ -17,7 +17,8 @@ describe('admin users', () => {
     row('ana', 'Ana Gómez', 'admin'),
     row('luis', 'Luis Díaz', 'student', false),
   ];
-  const all = { search: '', role: 'all', access: 'all' } as const;
+  rows[0].profile.mentorshipIds = ['m1', 'm2'];
+  const all = { search: '', role: 'all', access: 'all', mentorship: '' } as const;
   const uids = (result: AdminUserRow[]) => result.map((r) => r.profile.uid);
 
   it('searches name, email and uid ignoring case and accents', () => {
@@ -31,6 +32,13 @@ describe('admin users', () => {
     expect(uids(filterUsers(rows, { ...all, role: 'admin' }))).toEqual(['ana']);
     expect(uids(filterUsers(rows, { ...all, access: 'granted' }))).toEqual(['jose']);
     expect(uids(filterUsers(rows, { ...all, access: 'pending' }))).toEqual(['ana', 'luis']);
+  });
+
+  it('filters by mentorship, or students in none', () => {
+    expect(uids(filterUsers(rows, { ...all, mentorship: 'm2' }))).toEqual(['jose']);
+    expect(uids(filterUsers(rows, { ...all, mentorship: 'm3' }))).toEqual([]);
+    // Only students can be in a mentorship, so "none" lists students only.
+    expect(uids(filterUsers(rows, { ...all, mentorship: 'none' }))).toEqual(['luis']);
   });
 
   it('sorts by name', () => {

@@ -11,6 +11,8 @@ export interface AdminUserFilter {
   search: string;
   role: 'all' | UserRole;
   access: 'all' | 'granted' | 'pending';
+  /** `''` for any, `none` for students in no mentorship, or a mentorship id. */
+  mentorship: string;
 }
 
 export const hasAcademyAccess = (row: AdminUserRow): boolean => row.enrollment?.academy === true;
@@ -27,6 +29,15 @@ export function filterUsers(rows: AdminUserRow[], filter: AdminUserFilter): Admi
     }
     const granted = enrollment?.academy === true;
     if ((filter.access === 'granted' && !granted) || (filter.access === 'pending' && granted)) {
+      return false;
+    }
+    const mentorships = profile.mentorshipIds ?? [];
+    if (
+      (filter.mentorship === 'none' && (profile.role !== 'student' || mentorships.length)) ||
+      (filter.mentorship &&
+        filter.mentorship !== 'none' &&
+        !mentorships.includes(filter.mentorship))
+    ) {
       return false;
     }
     const haystack = normalize(

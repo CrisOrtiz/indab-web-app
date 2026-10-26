@@ -50,7 +50,14 @@ describe('Ranking page', () => {
       imports: [Ranking],
       providers: [
         provideRouter([]),
-        { provide: AuthService, useValue: { user: signal({ uid: 'u1' }), isStaff } },
+        {
+          provide: AuthService,
+          useValue: {
+            user: signal({ uid: 'u1' }),
+            profile: signal({ mentorshipIds: ['m1'] }),
+            isStaff,
+          },
+        },
         { provide: PracticeService, useValue: practice },
         { provide: EvaluationService, useValue: evaluations },
       ],
@@ -64,7 +71,7 @@ describe('Ranking page', () => {
 
   it('shows students the published evaluations they took part in, and marks them', async () => {
     await render();
-    expect(evaluations.assignedTo).toHaveBeenCalledWith('u1');
+    expect(evaluations.assignedTo).toHaveBeenCalledWith('u1', ['m1']);
     const options = [...el.querySelectorAll('option')].map((o) => o.textContent?.trim());
     expect(options).toEqual(['Final de oro', 'Semana 2']);
     expect(rows()).toEqual([

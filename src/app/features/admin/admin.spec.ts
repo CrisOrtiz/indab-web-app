@@ -26,12 +26,14 @@ describe('Admin home', () => {
   it('opens each admin tool, users included, on its own page', () => {
     expect(titles()).toEqual([
       'Usuarios',
+      'Mentorías',
       'Formularios de evaluación',
       'Evaluaciones de práctica',
       'Revisar prácticas de trading',
     ]);
     expect(links()).toEqual([
       '/admin/users',
+      '/admin/mentorships',
       '/admin/forms',
       '/admin/evaluations',
       '/admin/practice',
@@ -43,7 +45,12 @@ describe('Admin home', () => {
     isAdmin.set(false);
     await fixture.whenStable();
     expect(el.textContent).toContain('Como entrenador puedes crear evaluaciones');
-    expect(links()).toEqual(['/admin/forms', '/admin/evaluations', '/admin/practice']);
-    expect(el.textContent).not.toContain('Roles y acceso a la academia');
+    expect(links()).toEqual([
+      '/admin/mentorships',
+      '/admin/forms',
+      '/admin/evaluations',
+      '/admin/practice',
+    ]);
+    expect(el.textContent).not.toContain('Rol, acceso a la academia y mentorías');
   });
 });

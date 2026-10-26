@@ -62,7 +62,7 @@ export class Exams {
     }
     try {
       const [exams, submissions] = await Promise.all([
-        this.service.assignedTo(uid),
+        this.service.assignedTo(uid, this.auth.profile()?.mentorshipIds),
         this.service.mySubmissions(uid),
       ]);
       const published = new Set(exams.filter((e) => e.resultsPublished).map((e) => e.id));
