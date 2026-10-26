@@ -1,3 +1,5 @@
+@use '../../../shared/icon/icon-button';
+
 .evaluation-form {
   display: grid;
   gap: 16px;
@@ -10,6 +12,10 @@
 
   h2 {
     margin: 0;
+  }
+
+  .clone-hint {
+    margin: -8px 0 0;
   }
 
   label {

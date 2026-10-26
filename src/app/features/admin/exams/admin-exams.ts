@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { Icon } from '../../../shared/icon/icon';
 import { I18n } from '../../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../../core/i18n/local-date.pipe';
 import {
@@ -15,6 +16,7 @@ import { ExamService } from '../../exams/exam.service';
 import {
   EditorQuestion,
   ExamForm,
+  cloneForm,
   formProblem,
   fromForm,
   newQuestion,
@@ -29,7 +31,7 @@ import {
  */
 @Component({
   selector: 'app-admin-exams',
-  imports: [LocalDatePipe, RouterLink],
+  imports: [Icon, LocalDatePipe, RouterLink],
   templateUrl: './admin-exams.html',
   styleUrls: ['../admin.scss', '../evaluations/admin-evaluations.scss', './admin-exams.scss'],
 })
@@ -50,6 +52,8 @@ export class AdminExams {
   /** The form being built (`editing` null for a new one). */
   protected readonly form = signal<ExamForm | null>(null);
   protected readonly editing = signal<Exam | null>(null);
+  /** The form being copied, while the editor holds its copy. */
+  protected readonly cloning = signal<Exam | null>(null);
   protected readonly saving = signal(false);
   protected readonly studentSearch = signal('');
 
@@ -73,6 +77,7 @@ export class AdminExams {
 
   protected create(): void {
     this.editing.set(null);
+    this.cloning.set(null);
     this.studentSearch.set('');
     this.form.set(toForm(null, null));
   }
@@ -81,6 +86,7 @@ export class AdminExams {
     try {
       const key = await this.service.key(exam.id);
       this.editing.set(exam);
+      this.cloning.set(null);
       this.studentSearch.set('');
       this.form.set(toForm(exam, key));
     } catch {
@@ -88,9 +94,25 @@ export class AdminExams {
     }
   }
 
+  /** Opens the editor with a copy of the form, to assign it to other students. */
+  protected async clone(exam: Exam): Promise<void> {
+    const t = this.i18n.messages().examAdmin;
+    try {
+      const key = await this.service.key(exam.id);
+      this.editing.set(null);
+      this.cloning.set(exam);
+      this.studentSearch.set('');
+      this.message.set(null);
+      this.form.set(cloneForm(exam, key, t.copyOf(exam.title)));
+    } catch {
+      this.message.set({ kind: 'error', text: t.loadFailed });
+    }
+  }
+
   protected cancel(): void {
     this.form.set(null);
     this.editing.set(null);
+    this.cloning.set(null);
   }
 
   protected patch(change: Partial<ExamForm>): void {

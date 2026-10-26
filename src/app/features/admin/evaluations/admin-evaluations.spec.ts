@@ -67,8 +67,11 @@ describe('AdminEvaluations', () => {
     await fixture.whenStable();
   });
 
+  // By its text, or the start of an icon button's label (`Editar: Final de oro`).
   const button = (name: string) =>
-    [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === name)!;
+    [...el.querySelectorAll('button')].find(
+      (b) => b.textContent?.trim() === name || b.getAttribute('aria-label')?.startsWith(name),
+    )!;
   const click = async (name: string) => {
     button(name).click();
     await fixture.whenStable();
@@ -159,6 +162,36 @@ describe('AdminEvaluations', () => {
     );
   });
 
+  it('duplicates an evaluation with the same replay for other students', async () => {
+    await click('Duplicar');
+    expect(el.textContent).toContain('Duplicar evaluación');
+    expect(el.querySelector<HTMLInputElement>('input[type=text]')!.value).toBe(
+      'Final de oro (copia)',
+    );
+    expect(el.querySelector<HTMLInputElement>('input[type=date]')!.value).toBe('2024-03-04');
+    expect(el.querySelectorAll('.student-list input:checked')).toHaveLength(0);
+    await submit();
+    expect(message()).toContain('Asigna al menos un estudiante');
+    el.querySelectorAll<HTMLInputElement>('.student-list input')[1].click();
+    await fixture.whenStable();
+    await submit();
+    expect(service.update).not.toHaveBeenCalled();
+    expect(service.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Final de oro (copia)',
+        symbol: 'PAXGUSDT',
+        replayStart: existing.replayStart,
+        hideDates: true,
+        durationMinutes: 45,
+        studentIds: ['luis'],
+        resultsPublished: false,
+      }),
+    );
+    const [input] = service.create.mock.calls[0] as unknown as [{ opensAt: Date; closesAt: Date }];
+    // The copy's window lasts at least a day from now.
+    expect(input.closesAt.getTime() - input.opensAt.getTime()).toBe(86_400_000);
+  });
+
   it('shows the results, with who has not taken it', async () => {
     await click('Ver resultados');
     expect(practice.evaluationSessions).toHaveBeenCalledWith('e1');
@@ -168,6 +201,19 @@ describe('AdminEvaluations', () => {
     expect(rows[0]).toContain('6.0%');
     expect(rows[1]).toContain('Luis Díaz');
     expect(rows[1]).toContain('Sin presentar');
+  });
+
+  it('shows each action as an icon button with a tooltip', () => {
+    const actions = [...el.querySelectorAll<HTMLButtonElement>('.card .icon-btn')];
+    expect(actions.map((b) => b.dataset['tip'])).toEqual([
+      'Ver resultados',
+      'Publicar resultados',
+      'Editar',
+      'Duplicar',
+      'Eliminar',
+    ]);
+    expect(actions[3].getAttribute('aria-label')).toBe('Duplicar: Final de oro');
+    expect(actions.every((b) => b.querySelector('svg[aria-hidden=true]'))).toBe(true);
   });
 
   it('publishes the results and deletes after confirming', async () => {

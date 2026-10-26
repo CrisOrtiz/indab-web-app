@@ -1,0 +1,108 @@
+// Square icon buttons (and links) with a tooltip from `data-tip`, shown on hover and keyboard
+// focus. The accessible name stays in `aria-label`. Use with `<app-icon>` inside. A row at the
+// right edge (`.tips-end`) opens every tooltip leftwards.
+.icon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    border-color: var(--color-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  &.primary,
+  &[aria-pressed='true'] {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    color: var(--color-accent-contrast);
+  }
+
+  &.danger:hover:not(:disabled),
+  &.danger:focus-visible {
+    border-color: var(--color-error);
+    color: var(--color-error);
+  }
+
+  &.small {
+    width: 32px;
+    height: 32px;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  &[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    z-index: 5;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--color-text);
+    color: var(--color-bg);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%);
+    transition: opacity 0.15s ease;
+  }
+
+  &[data-tip]:hover:not(:disabled)::after,
+  &[data-tip]:focus-visible::after {
+    opacity: 1;
+  }
+
+  // The first and last tooltips of a row line up with their button so they stay on screen.
+  &[data-tip]:first-child::after {
+    left: 0;
+    transform: none;
+  }
+
+  &[data-tip]:last-child:not(:first-child)::after,
+  .tips-end &[data-tip]::after {
+    right: 0;
+    left: auto;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &[data-tip]::after {
+      transition: none;
+    }
+  }
+}

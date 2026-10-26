@@ -395,6 +395,7 @@ export const pt: Messages = {
     granted: 'Com acesso',
     pendingFilter: 'Pendentes',
     close: 'Fechar',
+    itemAction: (action: string, title: string) => `${action}: ${title}`,
     loading: 'Carregando usuários…',
     count: (shown: number, total: number) => `${shown} de ${total} usuários`,
     user: 'Usuário',
@@ -705,6 +706,11 @@ export const pt: Messages = {
     edit: 'Editar',
     delete: 'Excluir',
     deleteLabel: (title: string) => `Excluir a avaliação ${title}`,
+    clone: 'Duplicar',
+    cloneTitle: 'Duplicar avaliação',
+    cloneHint:
+      'É uma cópia com o mesmo mercado, início do replay e tempo limite. Escolha os alunos e as datas, e salve como uma nova avaliação.',
+    copyOf: (title: string) => `${title} (cópia)`,
     student: 'Aluno',
     status: 'Status',
     pnl: 'Lucro / prejuízo',
@@ -805,6 +811,11 @@ export const pt: Messages = {
     edit: 'Editar',
     delete: 'Excluir',
     deleteLabel: (title: string) => `Excluir o formulário ${title}`,
+    clone: 'Duplicar',
+    cloneTitle: 'Duplicar formulário',
+    cloneHint:
+      'É uma cópia com as mesmas perguntas, respostas e pontuações. Escolha os alunos e as datas; fica como rascunho até você publicar.',
+    copyOf: (title: string) => `${title} (cópia)`,
     confirmDelete: (title: string) =>
       `Excluir o formulário ${title}? As entregas e as notas continuam salvas.`,
     titleRequired: 'Escreva um título para o formulário.',

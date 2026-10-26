@@ -157,3 +157,46 @@ test('forms for everyone reach every student, and drafts reach nobody', async ({
   await expect(page.getByRole('region', { name: 'Pendientes' })).toContainText('Gestión de riesgo');
   await expect(page.getByText('Borrador')).toHaveCount(0);
 });
+
+test('a trainer duplicates a form to give the same test to other students', async ({ page }) => {
+  await openForms(page);
+  await page.getByRole('button', { name: 'Nuevo formulario' }).click();
+  await page.getByLabel('Título').fill('Gestión de riesgo');
+  await page.getByLabel('Solo los alumnos que elija').check();
+  await page.getByRole('checkbox', { name: /José Pérez/ }).check();
+  await page.getByLabel('Texto de la pregunta').fill('El stop loss limita la pérdida');
+  await page.getByLabel('Tipo · Pregunta 1').selectOption('trueFalse');
+  await page.getByLabel('Puntos', { exact: true }).fill('100');
+  await page.getByLabel('Publicar para los alumnos').check();
+  await page.getByRole('button', { name: 'Guardar formulario' }).click();
+  await expect(page.locator('p.message')).toContainText('Se guardó el formulario');
+
+  // The copy keeps the questions and answers; the trainer picks Luis and publishes it.
+  await page.getByRole('button', { name: 'Duplicar: Gestión de riesgo' }).click();
+  await expect(page.getByRole('heading', { name: 'Duplicar formulario' })).toBeVisible();
+  await expect(page.getByLabel('Título')).toHaveValue('Gestión de riesgo (copia)');
+  await expect(page.getByLabel('Texto de la pregunta')).toHaveValue(
+    'El stop loss limita la pérdida',
+  );
+  await expect(page.getByRole('checkbox', { name: /José Pérez/ })).not.toBeChecked();
+  await page.getByRole('checkbox', { name: /Luis Díaz/ }).check();
+  await page.getByLabel('Publicar para los alumnos').check();
+  await page.getByRole('button', { name: 'Guardar formulario' }).click();
+  await expect(page.locator('p.message')).toContainText(
+    'Se guardó el formulario Gestión de riesgo (copia)',
+  );
+
+  const forms = await listDocuments('examForms');
+  const original = forms.find((f) => f['title'] === 'Gestión de riesgo')!;
+  const copy = forms.find((f) => f['title'] === 'Gestión de riesgo (copia)')!;
+  expect(copy['questions']).toEqual(original['questions']);
+  expect(copy['studentIds']).not.toEqual(original['studentIds']);
+  // The copy has its own answer key.
+  expect(await getDocument(`examKeys/${copy['id']}`)).not.toBeNull();
+
+  await signOut(page);
+  await openExams(page, 'luis@indab.test');
+  const pending = page.getByRole('region', { name: 'Pendientes' });
+  await expect(pending).toContainText('Gestión de riesgo (copia)');
+  await expect(pending.getByText('Gestión de riesgo', { exact: true })).toHaveCount(0);
+});

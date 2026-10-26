@@ -86,7 +86,9 @@ describe('AdminExams', () => {
     expect(cards[0]).toContain('100 puntos · aprueba con 70 · 1 pregunta');
     expect(cards[0]).toContain('1 alumno');
     expect(cards[1]).toContain('Borrador');
-    expect(el.querySelector('a.btn')?.getAttribute('href')).toBe('/admin/forms/x1');
+    const grade = byLabel('Calificar entregas: Fundamentos de trading');
+    expect(grade.getAttribute('href')).toBe('/admin/forms/x1');
+    expect(grade.dataset['tip']).toBe('Calificar entregas');
   });
 
   it('builds a form with points per question and saves its answer key apart', async () => {
@@ -154,7 +156,7 @@ describe('AdminExams', () => {
   });
 
   it('edits a form with its right answers and students', async () => {
-    button('Editar').click();
+    byLabel<HTMLButtonElement>('Editar: Fundamentos de trading').click();
     await fixture.whenStable();
     expect(service.key).toHaveBeenCalledWith('x1');
     expect(el.textContent).toContain('Editar formulario');
@@ -168,6 +170,40 @@ describe('AdminExams', () => {
     expect(service.save).toHaveBeenCalledWith(
       'x1',
       expect.objectContaining({ studentIds: ['jose'], maxAttempts: 2 }),
+      { answers: { q1: [1] } },
+    );
+  });
+
+  it('duplicates a form as a new draft to assign other students', async () => {
+    byLabel<HTMLButtonElement>('Duplicar: Fundamentos de trading').click();
+    await fixture.whenStable();
+    expect(service.key).toHaveBeenCalledWith('x1');
+    expect(el.textContent).toContain('Duplicar formulario');
+    expect(el.querySelector<HTMLInputElement>('input[type=text]')!.value).toBe(
+      'Fundamentos de trading (copia)',
+    );
+    expect(el.querySelector<HTMLInputElement>('.tf input:checked')).toBe(
+      el.querySelectorAll('.tf input')[1],
+    );
+    // The students are cleared, so the copy needs new ones.
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    expect(message()).toContain('Elige al menos un alumno');
+    el.querySelector<HTMLInputElement>('.student-list input')!.click();
+    await fixture.whenStable();
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    expect(service.save).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({
+        title: 'Fundamentos de trading (copia)',
+        studentIds: ['jose'],
+        maxAttempts: 2,
+        totalPoints: 100,
+        published: false,
+        resultsPublished: false,
+        questions: existing.questions,
+      }),
       { answers: { q1: [1] } },
     );
   });

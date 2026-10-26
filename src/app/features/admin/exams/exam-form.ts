@@ -109,6 +109,32 @@ export function toForm(exam: Exam | null, key: ExamKey | null, now = new Date())
   };
 }
 
+/**
+ * A copy of a form to assign to other students: same questions, answer key, points and
+ * settings, saved as a new draft. Its window opens now and lasts as long as the original's,
+ * and the chosen students are cleared so staff pick the new ones.
+ */
+export function cloneForm(
+  exam: Exam,
+  key: ExamKey | null,
+  title: string,
+  now = new Date(),
+): ExamForm {
+  const form = toForm(exam, key);
+  const opens = new Date(now);
+  opens.setSeconds(0, 0);
+  const length = Math.max(exam.closesAt.toMillis() - exam.opensAt.toMillis(), DAY);
+  return {
+    ...form,
+    title: title.slice(0, 120),
+    studentIds: [],
+    opensAt: toLocalInput(opens),
+    closesAt: toLocalInput(new Date(opens.getTime() + length)),
+    questions: form.questions.map((q) => ({ ...q, options: [...q.options] })),
+    published: false,
+  };
+}
+
 /** The first problem that keeps the form from being saved, or null. */
 export function formProblem(form: ExamForm, t: Messages['examAdmin']): string | null {
   const total = Number(form.totalPoints);

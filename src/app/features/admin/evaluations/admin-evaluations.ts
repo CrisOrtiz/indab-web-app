@@ -2,6 +2,7 @@ import { DecimalPipe, PercentPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { I18n } from '../../../core/i18n/i18n.service';
+import { Icon } from '../../../shared/icon/icon';
 import { LocalDatePipe } from '../../../core/i18n/local-date.pipe';
 import { Evaluation, evaluationWindow } from '../../../core/models/evaluation';
 import { EvaluationService, StudentOption } from '../../evaluations/evaluation.service';
@@ -50,7 +51,7 @@ const utcDay = (time: number) => new Date(time).toISOString().slice(0, 10);
  */
 @Component({
   selector: 'app-admin-evaluations',
-  imports: [DecimalPipe, PercentPipe, LocalDatePipe, RouterLink],
+  imports: [DecimalPipe, Icon, PercentPipe, LocalDatePipe, RouterLink],
   templateUrl: './admin-evaluations.html',
   styleUrls: ['../admin.scss', './admin-evaluations.scss'],
 })
@@ -72,6 +73,8 @@ export class AdminEvaluations {
   /** The form, while creating (`editing` null) or editing an evaluation. */
   protected readonly form = signal<EvaluationForm | null>(null);
   protected readonly editing = signal<Evaluation | null>(null);
+  /** The evaluation being copied, while the form holds its copy. */
+  protected readonly cloning = signal<Evaluation | null>(null);
   protected readonly saving = signal(false);
   protected readonly studentSearch = signal('');
 
@@ -102,6 +105,7 @@ export class AdminEvaluations {
     const opens = new Date();
     opens.setSeconds(0, 0);
     this.editing.set(null);
+    this.cloning.set(null);
     this.studentSearch.set('');
     this.form.set({
       title: '',
@@ -119,6 +123,7 @@ export class AdminEvaluations {
 
   protected edit(evaluation: Evaluation): void {
     this.editing.set(evaluation);
+    this.cloning.set(null);
     this.studentSearch.set('');
     this.form.set({
       title: evaluation.title,
@@ -134,9 +139,37 @@ export class AdminEvaluations {
     });
   }
 
+  /**
+   * Opens the form with a copy of the evaluation (same market, replay start, dates hidden or
+   * not and time limit) to assign it to other students. Its window opens now and lasts as long
+   * as the original's; the students are cleared so staff pick the new ones.
+   */
+  protected clone(evaluation: Evaluation): void {
+    const opens = new Date();
+    opens.setSeconds(0, 0);
+    const length = Math.max(evaluation.closesAt.toMillis() - evaluation.opensAt.toMillis(), DAY);
+    this.editing.set(null);
+    this.cloning.set(evaluation);
+    this.studentSearch.set('');
+    this.message.set(null);
+    this.form.set({
+      title: this.i18n.messages().evaluations.copyOf(evaluation.title).slice(0, 120),
+      description: evaluation.description,
+      symbol: evaluation.symbol,
+      randomStart: false,
+      startDate: utcDay(evaluation.replayStart),
+      hideDates: evaluation.hideDates,
+      durationMinutes: evaluation.durationMinutes,
+      opensAt: toLocalInput(opens),
+      closesAt: toLocalInput(new Date(opens.getTime() + length)),
+      studentIds: [],
+    });
+  }
+
   protected cancel(): void {
     this.form.set(null);
     this.editing.set(null);
+    this.cloning.set(null);
   }
 
   protected patch(change: Partial<EvaluationForm>): void {
@@ -179,13 +212,15 @@ export class AdminEvaluations {
       return;
     }
     const editing = this.editing();
+    // An edit or a copy keeps the exact replay start while its day and market stay the same.
+    const base = editing ?? this.cloning();
     const instrument = INSTRUMENTS.find((i) => i.symbol === form.symbol) ?? INSTRUMENTS[0];
     const keepStart =
-      editing && !form.randomStart && form.symbol === editing.symbol
-        ? utcDay(editing.replayStart) === form.startDate
+      base && !form.randomStart && form.symbol === base.symbol
+        ? utcDay(base.replayStart) === form.startDate
         : false;
     const replayStart = keepStart
-      ? editing!.replayStart
+      ? base!.replayStart
       : form.randomStart
         ? randomReplayStart(instrument)
         : replayStartAt(instrument, Date.parse(`${form.startDate}T00:00:00Z`));
@@ -195,7 +230,7 @@ export class AdminEvaluations {
       symbol: form.symbol,
       replayStart,
       hideDates: form.hideDates,
-      startingBalance: editing?.startingBalance ?? STARTING_BALANCE,
+      startingBalance: base?.startingBalance ?? STARTING_BALANCE,
       durationMinutes: duration,
       opensAt,
       closesAt,
