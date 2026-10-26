@@ -88,7 +88,8 @@ test('a trainer builds a scored form, the student answers it and sees the grade'
   // The trainer grades it: the closed question comes scored, the open one is theirs.
   await signOut(page);
   await openForms(page);
-  await page.getByRole('link', { name: 'Calificar entregas' }).click();
+  await page.getByRole('button', { name: 'Acciones: Fundamentos de trading' }).click();
+  await page.getByRole('menuitem', { name: 'Calificar entregas' }).click();
   await expect(page.getByRole('row', { name: /José Pérez/ })).toContainText('Por calificar');
   await page.getByRole('button', { name: 'Calificar a José Pérez, intento 1' }).click();
   await expect(page.getByText('Sugerido: 60 de 60')).toBeVisible();
@@ -106,7 +107,8 @@ test('a trainer builds a scored form, the student answers it and sees the grade'
 
   await signOut(page);
   await openForms(page);
-  await page.getByRole('link', { name: 'Calificar entregas' }).click();
+  await page.getByRole('button', { name: 'Acciones: Fundamentos de trading' }).click();
+  await page.getByRole('menuitem', { name: 'Calificar entregas' }).click();
   await page.getByRole('button', { name: 'Publicar resultados' }).click();
   await expect(page.getByRole('status')).toContainText('Los alumnos ya ven sus notas');
   await page.getByLabel('Mostrar las respuestas correctas a los alumnos').check();
@@ -172,7 +174,8 @@ test('a trainer duplicates a form to give the same test to other students', asyn
   await expect(page.locator('p.message')).toContainText('Se guardó el formulario');
 
   // The copy keeps the questions and answers; the trainer picks Luis and publishes it.
-  await page.getByRole('button', { name: 'Duplicar: Gestión de riesgo' }).click();
+  await page.getByRole('button', { name: 'Acciones: Gestión de riesgo' }).click();
+  await page.getByRole('menuitem', { name: 'Duplicar' }).click();
   await expect(page.getByRole('heading', { name: 'Duplicar formulario' })).toBeVisible();
   await expect(page.getByLabel('Título')).toHaveValue('Gestión de riesgo (copia)');
   await expect(page.getByLabel('Texto de la pregunta')).toHaveValue(

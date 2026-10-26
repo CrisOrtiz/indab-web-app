@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { I18n } from '../../../core/i18n/i18n.service';
+import { ActionsMenu, MenuAction } from '../../../shared/actions-menu/actions-menu';
 import { Icon } from '../../../shared/icon/icon';
 import { LocalDatePipe } from '../../../core/i18n/local-date.pipe';
 import { Evaluation, evaluationWindow } from '../../../core/models/evaluation';
@@ -51,7 +52,7 @@ const utcDay = (time: number) => new Date(time).toISOString().slice(0, 10);
  */
 @Component({
   selector: 'app-admin-evaluations',
-  imports: [EvaluationResults, Icon, LocalDatePipe, RouterLink],
+  imports: [ActionsMenu, EvaluationResults, Icon, LocalDatePipe, RouterLink],
   templateUrl: './admin-evaluations.html',
   styleUrls: ['../admin.scss', './admin-evaluations.scss'],
 })
@@ -93,8 +94,49 @@ export class AdminEvaluations {
     return term ? list.filter((s) => `${s.name} ${s.email}`.toLowerCase().includes(term)) : list;
   });
 
+  /** Each evaluation's card menu, by id. */
+  protected readonly menus = computed(() => {
+    const t = this.i18n.messages().evaluations;
+    const selected = this.selected();
+    return new Map(
+      this.evaluations().map((ev): [string, MenuAction[]] => [
+        ev.id,
+        [
+          {
+            id: 'results',
+            label: selected === ev.id ? t.hideResults : t.showResults,
+            icon: 'results',
+          },
+          {
+            id: 'publish',
+            label: ev.resultsPublished ? t.unpublish : t.publish,
+            icon: ev.resultsPublished ? 'eyeOff' : 'eye',
+          },
+          { id: 'edit', label: t.edit, icon: 'edit' },
+          { id: 'clone', label: t.clone, icon: 'copy' },
+          { id: 'delete', label: t.delete, icon: 'trash', danger: true },
+        ],
+      ]),
+    );
+  });
+
   constructor() {
     void this.load();
+  }
+
+  /** Runs an action picked from a card's menu. */
+  protected act(evaluation: Evaluation, action: string): void {
+    if (action === 'results') {
+      void this.toggleResults(evaluation);
+    } else if (action === 'publish') {
+      void this.togglePublished(evaluation);
+    } else if (action === 'edit') {
+      this.edit(evaluation);
+    } else if (action === 'clone') {
+      this.clone(evaluation);
+    } else if (action === 'delete') {
+      void this.remove(evaluation);
+    }
   }
 
   protected nameOf(uid: string): string {

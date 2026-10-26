@@ -1,0 +1,34 @@
+<button
+  type="button"
+  class="trigger"
+  aria-haspopup="menu"
+  [attr.aria-expanded]="open()"
+  [attr.aria-controls]="open() ? menuId : null"
+  [attr.aria-label]="label()"
+  [attr.title]="label()"
+  (click)="toggle()"
+>
+  <app-icon name="more" [size]="20" />
+</button>
+@if (open()) {
+  <div class="menu" role="menu" [id]="menuId" [attr.aria-label]="label()" (keydown)="move($event)">
+    @for (action of actions(); track action.id) {
+      @if (action.link) {
+        <a
+          role="menuitem"
+          [routerLink]="action.link"
+          [class.danger]="action.danger"
+          (click)="close()"
+        >
+          <app-icon [name]="action.icon" />
+          <span>{{ action.label }}</span>
+        </a>
+      } @else {
+        <button type="button" role="menuitem" [class.danger]="action.danger" (click)="pick(action)">
+          <app-icon [name]="action.icon" />
+          <span>{{ action.label }}</span>
+        </button>
+      }
+    }
+  </div>
+}

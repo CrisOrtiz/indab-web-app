@@ -85,11 +85,13 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
 
   await signOut(page);
   await openEvaluations(page);
-  await page.getByRole('button', { name: 'Ver resultados' }).click();
+  await page.getByRole('button', { name: 'Acciones: Evaluación semanal' }).click();
+  await page.getByRole('menuitem', { name: 'Ver resultados' }).click();
   const row = page.locator('.results tbody tr').first();
   await expect(row).toContainText('José Pérez');
   await expect(row).toContainText('1.00');
-  await page.getByRole('button', { name: 'Publicar resultados' }).click();
+  await page.getByRole('button', { name: 'Acciones: Evaluación semanal' }).click();
+  await page.getByRole('menuitem', { name: 'Publicar resultados' }).click();
   await expect(page.getByRole('status')).toContainText('Los estudiantes ya ven el ranking');
 
   await signOut(page);
@@ -134,10 +136,16 @@ test('a trainer duplicates an evaluation to give the same replay to other studen
   await page.getByRole('button', { name: 'Guardar evaluación' }).click();
   await expect(page.getByRole('status')).toContainText('Se guardó la evaluación');
 
-  // Each action is an icon button with its name for screen readers and a tooltip.
-  const copy = page.getByRole('button', { name: 'Duplicar: Evaluación semanal' });
-  await expect(copy).toHaveAttribute('data-tip', 'Duplicar');
-  await copy.click();
+  // The card's actions are in its three-dot menu.
+  await page.getByRole('button', { name: 'Acciones: Evaluación semanal' }).click();
+  await expect(page.getByRole('menuitem')).toHaveText([
+    'Ver resultados',
+    'Publicar resultados',
+    'Editar',
+    'Duplicar',
+    'Eliminar',
+  ]);
+  await page.getByRole('menuitem', { name: 'Duplicar' }).click();
   await expect(page.getByRole('heading', { name: 'Duplicar evaluación' })).toBeVisible();
   await expect(page.getByLabel('Nombre')).toHaveValue('Evaluación semanal (copia)');
   await expect(page.getByLabel('Tiempo límite (minutos)')).toHaveValue('20');

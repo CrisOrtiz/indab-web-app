@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { ActionsMenu, MenuAction } from '../../../shared/actions-menu/actions-menu';
 import { Icon } from '../../../shared/icon/icon';
 import { I18n } from '../../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../../core/i18n/local-date.pipe';
@@ -31,7 +32,7 @@ import {
  */
 @Component({
   selector: 'app-admin-exams',
-  imports: [Icon, LocalDatePipe, RouterLink],
+  imports: [ActionsMenu, Icon, LocalDatePipe, RouterLink],
   templateUrl: './admin-exams.html',
   styleUrls: ['../admin.scss', '../evaluations/admin-evaluations.scss', './admin-exams.scss'],
 })
@@ -67,8 +68,35 @@ export class AdminExams {
     return term ? list.filter((s) => `${s.name} ${s.email}`.toLowerCase().includes(term)) : list;
   });
 
+  /** Each form's card menu, by id. */
+  protected readonly menus = computed(() => {
+    const t = this.i18n.messages().examAdmin;
+    return new Map(
+      this.exams().map((exam): [string, MenuAction[]] => [
+        exam.id,
+        [
+          { id: 'grade', label: t.grade, icon: 'grade', link: ['/admin/forms', exam.id] },
+          { id: 'edit', label: t.edit, icon: 'edit' },
+          { id: 'clone', label: t.clone, icon: 'copy' },
+          { id: 'delete', label: t.delete, icon: 'trash', danger: true },
+        ],
+      ]),
+    );
+  });
+
   constructor() {
     void this.load();
+  }
+
+  /** Runs an action picked from a card's menu. */
+  protected act(exam: Exam, action: string): void {
+    if (action === 'edit') {
+      void this.edit(exam);
+    } else if (action === 'clone') {
+      void this.clone(exam);
+    } else if (action === 'delete') {
+      void this.remove(exam);
+    }
   }
 
   protected stateOf(exam: Exam): 'draft' | 'upcoming' | 'open' | 'closed' {

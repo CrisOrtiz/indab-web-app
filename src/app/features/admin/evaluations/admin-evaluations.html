@@ -180,6 +180,12 @@
       @for (ev of evaluations(); track ev.id) {
         @let state = windowOf(ev);
         <li class="card">
+          <app-actions-menu
+            class="card-menu"
+            [actions]="menus().get(ev.id) ?? []"
+            [label]="ta.itemAction(ta.actions, ev.title)"
+            (picked)="act(ev, $event)"
+          />
           <h3>
             {{ ev.title }}
             <span class="badge">{{ t.states[state] }}</span>
@@ -204,56 +210,6 @@
               )
             }}
           </p>
-          <div class="actions icon-actions">
-            @let resultsTip = selected() === ev.id ? t.hideResults : t.showResults;
-            @let publishTip = ev.resultsPublished ? t.unpublish : t.publish;
-            <button
-              type="button"
-              class="icon-btn"
-              [attr.aria-pressed]="selected() === ev.id"
-              [attr.aria-label]="ta.itemAction(resultsTip, ev.title)"
-              [attr.data-tip]="resultsTip"
-              (click)="toggleResults(ev)"
-            >
-              <app-icon name="results" />
-            </button>
-            <button
-              type="button"
-              class="icon-btn"
-              [attr.aria-label]="ta.itemAction(publishTip, ev.title)"
-              [attr.data-tip]="publishTip"
-              (click)="togglePublished(ev)"
-            >
-              <app-icon [name]="ev.resultsPublished ? 'eyeOff' : 'eye'" />
-            </button>
-            <button
-              type="button"
-              class="icon-btn"
-              [attr.aria-label]="ta.itemAction(t.edit, ev.title)"
-              [attr.data-tip]="t.edit"
-              (click)="edit(ev)"
-            >
-              <app-icon name="edit" />
-            </button>
-            <button
-              type="button"
-              class="icon-btn"
-              [attr.aria-label]="ta.itemAction(t.clone, ev.title)"
-              [attr.data-tip]="t.clone"
-              (click)="clone(ev)"
-            >
-              <app-icon name="copy" />
-            </button>
-            <button
-              type="button"
-              class="icon-btn danger"
-              [attr.aria-label]="t.deleteLabel(ev.title)"
-              [attr.data-tip]="t.delete"
-              (click)="remove(ev)"
-            >
-              <app-icon name="trash" />
-            </button>
-          </div>
 
           @if (selected() === ev.id) {
             @if (standings(); as rows) {

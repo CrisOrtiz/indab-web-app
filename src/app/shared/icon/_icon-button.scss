@@ -1,12 +1,6 @@
 // Square icon buttons (and links) with a tooltip from `data-tip`, shown on hover and keyboard
 // focus. The accessible name stays in `aria-label`. Use with `<app-icon>` inside. A row at the
 // right edge (`.tips-end`) opens every tooltip leftwards.
-.icon-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .icon-btn {
   position: relative;
   display: inline-flex;

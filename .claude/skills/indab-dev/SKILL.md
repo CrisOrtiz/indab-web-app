@@ -135,9 +135,12 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
   TikTok @indab.academy); `<app-social-links>` shows icons, `[labels]="true"` adds network and
   handle (landing contact section). Landing stats only show figures Cris confirmed; INDAB has no
   recorded courses yet, only study material. Email and WhatsApp are not public yet.
-- Admin list actions are icon buttons: `<app-icon>` (`shared/icon`, inline SVG paths in `ICONS`)
-  inside `.icon-btn` (`shared/icon/_icon-button.scss`), with `aria-label` naming the action and
-  the item (`admin.itemAction`) and a short tooltip in `data-tip`.
+- Card actions in admin lists (forms, evaluations) sit in a three-dot menu at the card's top right:
+  `<app-actions-menu>` (`shared/actions-menu`, Cris 2026-10-26) with `MenuAction`s (icon + text,
+  `link` for navigation, `danger` for delete), labelled `admin.itemAction(admin.actions, title)`.
+  Icons are `<app-icon>` (`shared/icon`, inline SVG paths in `ICONS`); small icon-only buttons
+  (question editor) use `.icon-btn` from `shared/icon/_icon-button.scss` with `aria-label` and a
+  `data-tip` tooltip.
 - Long lists: `CursorPages` (`shared/pager/cursor-pages.ts`) pages a Firestore query with
   cursors and `<app-pager>` shows previous/next; filters go in the query (each equality-filter
   combination needs its index in `firestore.indexes.json`). Lists already in memory use

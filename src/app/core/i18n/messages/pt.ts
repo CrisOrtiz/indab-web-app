@@ -398,6 +398,7 @@ export const pt: Messages = {
     pendingFilter: 'Pendentes',
     close: 'Fechar',
     itemAction: (action: string, title: string) => `${action}: ${title}`,
+    actions: 'Ações',
     loading: 'Carregando usuários…',
     count: (shown: number, total: number) => `${shown} de ${total} usuários`,
     user: 'Usuário',
@@ -704,7 +705,6 @@ export const pt: Messages = {
     unpublish: 'Ocultar resultados dos alunos',
     edit: 'Editar',
     delete: 'Excluir',
-    deleteLabel: (title: string) => `Excluir a avaliação ${title}`,
     clone: 'Duplicar',
     cloneTitle: 'Duplicar avaliação',
     cloneHint:
@@ -809,7 +809,6 @@ export const pt: Messages = {
     grade: 'Corrigir entregas',
     edit: 'Editar',
     delete: 'Excluir',
-    deleteLabel: (title: string) => `Excluir o formulário ${title}`,
     clone: 'Duplicar',
     cloneTitle: 'Duplicar formulário',
     cloneHint:
