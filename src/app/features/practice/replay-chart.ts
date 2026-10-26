@@ -271,6 +271,8 @@ const DRAWING_COLOR = DRAWING_COLORS[0];
 /** Id of the drawing shown while its second point is being placed. */
 const PREVIEW_ID = 0;
 const RSI_PANE_HEIGHT = 110;
+/** Fewest bars a finished replay is shown across, so a short one keeps some history. */
+const MIN_REPLAY_VIEW = 60;
 /** Length (px) of an arrow's head. */
 const ARROW_HEAD = 12;
 
@@ -576,6 +578,11 @@ export class ReplayChart {
     effect(() => this.draw(this.candles()));
     effect(() => this.applyDates(this.hideDates()));
     effect(() => {
+      // A start given after the bars frames the replay too.
+      this.startTime();
+      untracked(() => this.showReplay());
+    });
+    effect(() => {
       // Labels and markers are drawn in the current language.
       this.i18n.messages();
       this.drawTrades(this.trades(), this.draft(), this.drawings());
@@ -825,9 +832,13 @@ export class ReplayChart {
     } else {
       this.series.setData(candles.map((c) => this.point(c)));
       // A new set of bars (another timeframe) gets the price range fitted again, even if the
-      // student had dragged the price scale, and shows the latest bar.
+      // student had dragged the price scale, and shows the latest bar; a finished replay is
+      // shown whole instead, from its first bar.
       this.chart?.priceScale('right').applyOptions({ autoScale: true });
-      this.chart?.timeScale().scrollToRealTime();
+      this.drawn = candles;
+      if (!this.showReplay()) {
+        this.chart?.timeScale().scrollToRealTime();
+      }
       // Other bars: the focused trade is scrolled to again.
       this.shown = null;
     }
@@ -1163,13 +1174,42 @@ export class ReplayChart {
 
   /** The replay start line's x, half a bar before the first replayed bar. */
   private placeStart(): number | null {
+    const first = this.firstReplayed();
+    if (first === null || !this.chart) {
+      return null;
+    }
+    const x = this.chart.timeScale().logicalToCoordinate(first as Logical);
+    return x === null ? null : x - this.chart.timeScale().options().barSpacing / 2;
+  }
+
+  /**
+   * Index of the first bar the replay showed: the first at or after `startTime` (the market may
+   * have been closed at the start itself). Null without a start, or with no history before it.
+   */
+  private firstReplayed(): number | null {
     const start = untracked(this.startTime);
     const last = this.drawn.at(-1);
     if (start === null || !last || start > last.time || start <= this.drawn[0].time) {
       return null;
     }
-    const x = this.timeToX(start);
-    return x === null ? null : x - this.chart!.timeScale().options().barSpacing / 2;
+    const index = this.indexAt(start);
+    return this.drawn[index].time < start ? index + 1 : index;
+  }
+
+  /**
+   * Fits a finished replay in view, from a little before its first bar (with the start line)
+   * to its last, and at least `MIN_REPLAY_VIEW` bars wide. False when there is no start.
+   */
+  private showReplay(): boolean {
+    const first = this.firstReplayed();
+    if (first === null || !this.chart) {
+      return false;
+    }
+    const last = this.drawn.length - 1;
+    const pad = Math.max(3, Math.round((last - first) * 0.05));
+    const from = Math.min(first - pad, last - MIN_REPLAY_VIEW);
+    this.chart.timeScale().setVisibleLogicalRange({ from, to: last + pad });
+    return true;
   }
 
   /** Scrolls to a trade, from a little before its entry to a little after its exit. */

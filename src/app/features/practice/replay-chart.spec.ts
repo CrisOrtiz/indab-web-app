@@ -1110,4 +1110,31 @@ describe('ReplayChart', () => {
     await fixture.whenStable();
     expect(el.querySelector('.replay-start')).toBeNull();
   });
+
+  it('puts the replay start line before the first bar replayed when the start had none', async () => {
+    const { fixture, el, host } = await render();
+    // The market was closed from 5 to 8: the replay's first bar is 8, the fourth (x = 30).
+    host.candles.set([1, 2, 3, 8, 9].map((t) => c(t)));
+    host.start.set(5);
+    await fixture.whenStable();
+    expect(el.querySelector('.replay-start')!.getAttribute('x1')).toBe('25');
+  });
+
+  it('shows a finished replay whole, from a little before its first bar', async () => {
+    const { fixture, host } = await render();
+    host.start.set(101);
+    host.candles.set(Array.from({ length: 300 }, (_, i) => c(i + 1)));
+    await fixture.whenStable();
+    // Bars 100 to 299 were replayed: 5% of them as margin on each side.
+    expect(lw.timeScale.setVisibleLogicalRange).toHaveBeenLastCalledWith({ from: 90, to: 309 });
+  });
+
+  it('keeps some history in view around a short finished replay', async () => {
+    const { fixture, host } = await render();
+    host.candles.set(Array.from({ length: 300 }, (_, i) => c(i + 1)));
+    await fixture.whenStable();
+    host.start.set(291);
+    await fixture.whenStable();
+    expect(lw.timeScale.setVisibleLogicalRange).toHaveBeenLastCalledWith({ from: 239, to: 302 });
+  });
 });
