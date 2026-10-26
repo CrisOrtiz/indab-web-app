@@ -18,12 +18,13 @@ export class Academy {
   protected readonly auth = inject(AuthService);
   protected readonly i18n = inject(I18n);
 
-  protected readonly cards: { key: CardKey; link: string }[] = [
+  /** `open` cards work without academy access (the calendar is public). */
+  protected readonly cards: { key: CardKey; link: string; open?: boolean }[] = [
     { key: 'material', link: '/academy/material' },
     { key: 'practice', link: '/academy/practice' },
     { key: 'exams', link: '/academy/exams' },
     { key: 'ranking', link: '/academy/ranking' },
-    { key: 'calendar', link: '/academy/calendar' },
+    { key: 'calendar', link: '/academy/calendar', open: true },
   ];
 
   // Decorative candles in the greeting band: wick from hi to lo, body from top.

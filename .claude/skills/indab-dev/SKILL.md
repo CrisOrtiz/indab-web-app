@@ -268,8 +268,14 @@ Module notes:
   (`assignedTo(uid, profile.mentorshipIds)`). Staff lists filter with `<app-mentorship-filter>`;
   the practice review sends `uids` (`uid in`, 30 at most). Anything new that is assigned to
   students should accept mentorships too.
-- **Economic calendar (`/academy/calendar`, built)**: `features/calendar/`. TradingView's free
-  calendar widget (`widget.ts` builds its settings: locale, economies, impact); the page rebuilds
+- **Economic calendar (`/calendar`, public, built)**: `features/calendar/`, prerendered, linked in
+  the header (a calendar icon on phones so the links fit at 390 px). `/academy/calendar` (signed
+  in, route `data: { fromAcademy: true }`) is the same page with a link back to the academy; the
+  academy's calendar card is open to students without access. TradingView's free
+  calendar widget (`widget.ts` builds its settings: locale, economies, impact); impact is picked
+  with ForexFactory-style folders (red high, orange medium, yellow low; Cris 2026-10-26) and a
+  legend maps them to the widget's bars, which are inside TradingView's iframe and cannot be
+  restyled. The page rebuilds
   the embed when a filter or the language changes, keeps TradingView's credit link, and adds a
   translated guide to the news that moves gold, USD/JPY and the NASDAQ. Cris wants it free for
   life: no paid API, key or server function. E2e tests stub the widget script with `page.route`.

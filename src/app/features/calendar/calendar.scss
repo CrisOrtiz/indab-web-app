@@ -1,4 +1,8 @@
 :host {
+  // ForexFactory's impact folder colors.
+  --impact-high: #e53935;
+  --impact-medium: #fb8c00;
+  --impact-low: #fdd835;
   display: block;
   padding: 48px 0;
 }
@@ -64,21 +68,69 @@ legend {
   }
 }
 
-.importance {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-weight: 600;
+// Impact chips keep their folder's color when picked, on a light tint of it.
+.impact {
+  --level: var(--impact-high);
 
-  select {
-    padding: 8px 12px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    background: var(--color-bg);
-    color: var(--color-text);
-    font: inherit;
-    font-weight: normal;
+  &.medium {
+    --level: var(--impact-medium);
   }
+
+  &.low {
+    --level: var(--impact-low);
+  }
+
+  &:has(input:checked) {
+    border-color: var(--level);
+    background: color-mix(in srgb, var(--level) 14%, var(--color-bg));
+    color: var(--color-text);
+  }
+
+  input {
+    accent-color: var(--level);
+  }
+}
+
+.folder {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: var(--impact-high);
+  stroke: color-mix(in srgb, var(--impact-high) 70%, black);
+  stroke-width: 1;
+  stroke-linejoin: round;
+
+  &.medium {
+    fill: var(--impact-medium);
+    stroke: color-mix(in srgb, var(--impact-medium) 70%, black);
+  }
+
+  &.low {
+    fill: var(--impact-low);
+    stroke: color-mix(in srgb, var(--impact-low) 60%, black);
+  }
+
+  .tab {
+    fill: none;
+    stroke-opacity: 0.6;
+  }
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin: 0 0 16px;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text);
 }
 
 .widget {

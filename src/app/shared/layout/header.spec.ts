@@ -52,24 +52,31 @@ describe('Header', () => {
   };
 
   it('shows the login link to visitors, and no account menu', () => {
-    expect(links()).toEqual(['/#nosotros', '/#contacto', '/login']);
+    expect(links()).toEqual(['/#nosotros', '/#contacto', '/calendar', '/login']);
     expect(avatarButton()).toBeNull();
   });
 
   it('shows the academy to students, without a separate material link', async () => {
     await as({});
-    expect(links()).toEqual(['/#nosotros', '/#contacto', '/academy']);
+    expect(links()).toEqual(['/#nosotros', '/#contacto', '/calendar', '/academy']);
     await as({ academy: true });
-    expect(links()).toEqual(['/#nosotros', '/#contacto', '/academy']);
+    expect(links()).toEqual(['/#nosotros', '/#contacto', '/calendar', '/academy']);
   });
 
   it('shows the admin link to admins', async () => {
     await as({ academy: true, admin: true });
-    expect(links()).toEqual(['/#nosotros', '/#contacto', '/academy', '/admin']);
+    expect(links()).toEqual(['/#nosotros', '/#contacto', '/calendar', '/academy', '/admin']);
     // Phones show the short label; screen readers always get the full one.
     const admin = el().querySelector('nav a[href="/admin"]')!;
     expect(admin.getAttribute('aria-label')).toBe('Administración');
     expect(admin.querySelector('.short')!.textContent).toBe('Admin');
+  });
+
+  it('links everyone to the public calendar, an icon on phones', () => {
+    const calendar = el().querySelector('nav a[href="/calendar"]')!;
+    expect(calendar.getAttribute('aria-label')).toBe('Calendario');
+    expect(calendar.querySelector('.long')!.textContent).toBe('Calendario');
+    expect(calendar.querySelector('app-icon.short')).not.toBeNull();
   });
 
   it('marks the current section for the underline and screen readers', async () => {
@@ -98,7 +105,7 @@ describe('Header', () => {
 
   it('links to the about and contact sections of the landing, without Eleva', () => {
     const names = [...el().querySelectorAll('nav a')].map((a) => a.textContent?.trim());
-    expect(names).toEqual(['Nosotros', 'Contáctanos', 'Ingresar']);
+    expect(names).toEqual(['Nosotros', 'Contáctanos', 'Calendario', 'Ingresar']);
     expect(el().querySelector('nav a[href="/eleva"]')).toBeNull();
   });
 
@@ -150,7 +157,7 @@ describe('Header', () => {
 
   it('shows the admin link to trainers', async () => {
     await as({ academy: true, trainer: true });
-    expect(links()).toEqual(['/#nosotros', '/#contacto', '/academy', '/admin']);
+    expect(links()).toEqual(['/#nosotros', '/#contacto', '/calendar', '/academy', '/admin']);
   });
 
   it('shows the initials, the Google photo or the uploaded photo', async () => {
