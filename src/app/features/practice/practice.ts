@@ -70,6 +70,8 @@ const DEFAULT_TARGET_OFFSET = 0.02;
 const MIN_REPLAY_MINUTES = 60;
 /** Fetch the next chunk of minutes when fewer than this are left to replay. */
 const PREFETCH_MINUTES = 600;
+/** How long a refused one-click order says why on the chart. */
+export const QUICK_ERROR_MS = 6000;
 
 /** An evaluation assigned to the student, with their attempt if they took it. */
 export interface EvaluationCard {
@@ -230,6 +232,8 @@ export class Practice {
   protected readonly stopLoss = signal<number | null>(null);
   protected readonly takeProfit = signal<number | null>(null);
   protected readonly orderError = signal<string | null>(null);
+  /** Why the chart's one-click Buy/Sell was refused, shown under its buttons for a while. */
+  protected readonly quickError = signal<string | null>(null);
   protected readonly placing = signal(false);
   /** Whether the order being set up is on the chart. */
   protected readonly drafting = signal(false);
@@ -327,6 +331,7 @@ export class Practice {
   });
 
   private timer?: ReturnType<typeof setInterval>;
+  private quickErrorTimer?: ReturnType<typeof setTimeout>;
   private clock?: ReturnType<typeof setInterval>;
 
   constructor() {
@@ -335,6 +340,7 @@ export class Practice {
     inject(DestroyRef).onDestroy(() => {
       this.pause();
       clearInterval(this.clock);
+      clearTimeout(this.quickErrorTimer);
       // Leaving mid-replay ends the session, so open trades are not left dangling.
       if (this.phase() === 'playing') {
         void this.finish();
@@ -531,6 +537,12 @@ export class Practice {
     }
   }
 
+  /** The count of live trades on the chart: opens their list, positions first. */
+  protected showTrades(list: HTMLElement): void {
+    this.tab.set(this.replay()?.openTrades().length ? 'positions' : 'orders');
+    list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   /** Takes the order being set up off the chart and clears its exits. */
   protected discardDraft(): void {
     this.drafting.set(false);
@@ -542,20 +554,38 @@ export class Practice {
 
   /** One-click market order from the chart, with the ticket's size and no SL/TP. */
   protected async quickTrade(side: TradeSide): Promise<void> {
-    const placed = await this.place({
-      side,
-      orderType: 'market',
-      price: null,
-      lots: this.lots(),
-      stopLoss: null,
-      takeProfit: null,
-    });
+    const placed = await this.place(
+      {
+        side,
+        orderType: 'market',
+        price: null,
+        lots: this.lots(),
+        stopLoss: null,
+        takeProfit: null,
+      },
+      (message) => this.showQuickError(message),
+    );
     if (placed) {
       this.tab.set('positions');
     }
   }
 
-  private async place(input: OpenTradeInput): Promise<PracticeTrade | null> {
+  /**
+   * The one-click box sits on the chart, far from the ticket on a phone: its refusals show
+   * right under it, until the next try or a few seconds later.
+   */
+  private showQuickError(message: string | null): void {
+    clearTimeout(this.quickErrorTimer);
+    this.quickError.set(message);
+    if (message) {
+      this.quickErrorTimer = setTimeout(() => this.quickError.set(null), QUICK_ERROR_MS);
+    }
+  }
+
+  private async place(
+    input: OpenTradeInput,
+    report: (message: string | null) => void = (message) => this.orderError.set(message),
+  ): Promise<PracticeTrade | null> {
     const replay = this.replay();
     const sessionId = this.sessionId();
     const uid = this.auth.user()?.uid;
@@ -570,17 +600,17 @@ export class Practice {
         this.i18n.messages().orderErrors,
       );
     } catch (e) {
-      this.orderError.set((e as Error).message);
+      report((e as Error).message);
       return null;
     }
-    this.orderError.set(null);
+    report(null);
     this.placing.set(true);
     try {
       await this.practice.openTrade(sessionId, uid, trade);
       return trade;
     } catch {
       replay.discard(trade.id);
-      this.orderError.set(this.i18n.messages().practice.saveTradeFailed);
+      report(this.i18n.messages().practice.saveTradeFailed);
       return null;
     } finally {
       this.placing.set(false);

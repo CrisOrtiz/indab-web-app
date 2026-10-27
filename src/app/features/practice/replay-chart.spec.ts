@@ -3,7 +3,14 @@ import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { Candle, OrderType, PracticeTrade } from '../../core/models/practice';
 import { ThemeService } from '../../core/theme/theme.service';
-import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
+import {
+  LevelMove,
+  LevelRemove,
+  OrderAt,
+  OrderDraft,
+  ReplayChart,
+  stackLabels,
+} from './replay-chart';
 
 const lw = vi.hoisted(() => {
   const makeSeries = () => ({
@@ -311,16 +318,59 @@ describe('ReplayChart', () => {
     pointer('pointerup', 390);
     host.moves.pop();
 
-    // A label is a handle for its line too.
+    // A label is a handle for its line too, even when it is drawn below it so it covers no
+    // other label: the line moves as much as the pointer does.
     await new Promise((resolve) => setTimeout(resolve));
     await fixture.whenStable();
-    const label = [...el.querySelectorAll('.line-label')].find((l) =>
+    const label = [...el.querySelectorAll<HTMLElement>('.line-label')].find((l) =>
       l.textContent?.includes('Límite'),
     )!;
-    label.dispatchEvent(new MouseEvent('pointerdown', { clientY: 402, bubbles: true }));
-    canvas.dispatchEvent(new MouseEvent('pointermove', { clientY: 403, bubbles: true }));
-    canvas.dispatchEvent(new MouseEvent('pointerup', { clientY: 403, bubbles: true }));
+    const top = parseFloat(label.style.top);
+    expect(top).toBeGreaterThan(402);
+    label.dispatchEvent(new MouseEvent('pointerdown', { clientY: top, bubbles: true }));
+    canvas.dispatchEvent(new MouseEvent('pointermove', { clientY: top + 1, bubbles: true }));
+    canvas.dispatchEvent(new MouseEvent('pointerup', { clientY: top + 1, bubbles: true }));
     expect(host.moves.at(-1)).toEqual({ target: 'draft', field: 'price', price: 97 });
+  });
+
+  it('stacks the labels of positions and orders at about the same price, joined to their lines', async () => {
+    const { fixture, host, el } = await render();
+    // Three positions at 120 and a pending order a pixel lower (y = 380 and 381).
+    const open = { ...position, stopLoss: null };
+    host.trades.set([
+      open,
+      { ...open, id: 'b', side: 'short' },
+      { ...open, id: 'c' },
+      { ...open, id: 'd', orderType: 'limit', orderPrice: 119, entryPrice: 119, status: 'pending' },
+    ]);
+    await fixture.whenStable();
+    const tops = [...el.querySelectorAll<HTMLElement>('.line-label')]
+      .map((l) => parseFloat(l.style.top))
+      .sort((a, b) => a - b);
+    // The first stays on its line; each other goes below the one above and its TP/SL tabs.
+    expect(tops).toEqual([380, 424, 468, 512]);
+    // Each moved label has a leader back to its line.
+    expect(
+      [...el.querySelectorAll<HTMLElement>('.leader')].map((l) => [l.style.top, l.style.height]),
+    ).toEqual([
+      ['380px', '44px'],
+      ['380px', '88px'],
+      ['381px', '131px'],
+    ]);
+  });
+
+  it('works out where stacked labels go', () => {
+    expect(stackLabels([{ y: 100 }, { y: 50, tabs: true }, { y: 300 }]).map((l) => l.y)).toEqual([
+      100, 50, 300,
+    ]);
+    expect(stackLabels([{ y: 100 }, { y: 105 }, { y: 104, tabs: true }]).map((l) => l.y)).toEqual([
+      100, 168, 124,
+    ]);
+    // A pinned label keeps its place and the others ignore it.
+    const pinned = { y: 101 };
+    expect(stackLabels([{ y: 100 }, pinned], (l) => l === pinned).map((l) => l.y)).toEqual([
+      100, 101,
+    ]);
   });
 
   /** Drives drawings on the chart: menus, presses on the candles and the overlay. */

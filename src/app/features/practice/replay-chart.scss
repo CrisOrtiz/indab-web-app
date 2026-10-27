@@ -95,6 +95,21 @@
 }
 
 /* The boxes on order and position lines, as in TradingView. */
+.leader {
+  position: absolute;
+  z-index: 1;
+  width: 14px;
+  border-right: 1px dashed;
+  border-bottom: 1px dashed;
+  pointer-events: none;
+
+  // The dragged label can sit above its line: the joint is then at the top.
+  &.up {
+    border-top: 1px dashed;
+    border-bottom: 0;
+  }
+}
+
 .line-label {
   position: absolute;
   z-index: 2;

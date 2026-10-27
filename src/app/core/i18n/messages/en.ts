@@ -548,8 +548,12 @@ export const en: Messages = {
         below ? 'below' : 'above'
       } the current price.`,
     lotStep: (step) => `Enter a size in steps of ${step} lots.`,
-    margin: (needed, available) =>
-      `Not enough margin: the order needs ${needed} USD and you have ${available} USD free.`,
+    margin: (needed, available, maxLots) =>
+      `Not enough margin: the order needs ${needed} USD and you have ${available} USD free. ${
+        maxLots
+          ? `That margin is enough for up to ${maxLots} lots.`
+          : 'Close a position or cancel a pending order to open another.'
+      }`,
     closed: 'The trade is already closed.',
   },
 
@@ -592,6 +596,14 @@ export const en: Messages = {
     marginLevel: 'Margin level',
     trades: 'Trades',
     positions: (n) => `Positions (${n})`,
+    openCount: (positions, orders) =>
+      [
+        positions ? `${positions} ${positions === 1 ? 'position' : 'positions'}` : '',
+        orders ? `${orders} ${orders === 1 ? 'order' : 'orders'}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    showTrades: 'See your positions and orders',
     orders: (n) => `Orders (${n})`,
     history: (n) => `History (${n})`,
     stats: 'Statistics',

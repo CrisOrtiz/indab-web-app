@@ -546,8 +546,12 @@ export const pt: Messages = {
         below ? 'abaixo' : 'acima'
       } do preço atual.`,
     lotStep: (step) => `Digite um tamanho em lotes de ${step} em ${step}.`,
-    margin: (needed, available) =>
-      `Margem insuficiente: a ordem precisa de ${needed} USD e você tem ${available} USD livres.`,
+    margin: (needed, available, maxLots) =>
+      `Margem insuficiente: a ordem precisa de ${needed} USD e você tem ${available} USD livres. ${
+        maxLots
+          ? `Com essa margem você pode abrir até ${maxLots} lotes.`
+          : 'Feche uma posição ou cancele uma ordem pendente para abrir outra.'
+      }`,
     closed: 'A operação já está fechada.',
   },
 
@@ -590,6 +594,14 @@ export const pt: Messages = {
     marginLevel: 'Nível de margem',
     trades: 'Operações',
     positions: (n) => `Posições (${n})`,
+    openCount: (positions, orders) =>
+      [
+        positions ? `${positions} ${positions === 1 ? 'posição' : 'posições'}` : '',
+        orders ? `${orders} ${orders === 1 ? 'ordem' : 'ordens'}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    showTrades: 'Ver suas posições e ordens',
     orders: (n) => `Ordens (${n})`,
     history: (n) => `Histórico (${n})`,
     stats: 'Estatísticas',

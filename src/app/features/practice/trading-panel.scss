@@ -53,6 +53,23 @@
     background: var(--color-buy);
   }
 
+  .quick-error {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: max-content;
+    max-width: min(320px, calc(100vw - 48px));
+    margin: 0;
+    padding: 6px 10px;
+    border-radius: 4px;
+    background: var(--color-sell);
+    color: #fff;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+    animation: dropdown-in 0.15s ease-out;
+  }
+
   .quick-size {
     width: 4.2em;
     padding: 2px 4px;
@@ -63,6 +80,44 @@
     font: inherit;
     font-size: 0.75rem;
     text-align: center;
+  }
+}
+
+.open-count {
+  position: absolute;
+  top: 46px;
+  left: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 80px);
+  padding: 2px 8px 2px 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+
+  .count {
+    min-width: 1.5em;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--color-text);
+    color: var(--color-bg);
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .pnl {
+    font-variant-numeric: tabular-nums;
   }
 }
 

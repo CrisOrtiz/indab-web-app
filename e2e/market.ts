@@ -1,7 +1,7 @@
 import { Page } from '@playwright/test';
 
-// Binance is replaced by a fixed series: 100 before the replay start, then every minute of the
-// k-th 15-minute bar at 101 + k, so each step on 15 minutes raises the price by 1 and every
+// Binance is replaced by a fixed series: `base` (100 unless a test asks for gold-like prices)
+// before the replay start, then every minute of the k-th 15-minute bar at base + 1 + k, so each step on 15 minutes raises the price by 1 and every
 // entry and exit price below is predictable. The start is read off the first request. Replays
 // start on a 4-hour bar with gold open, at least an hour before its daily break, so the few
 // steps the tests take never cross a closed hour.
@@ -15,7 +15,7 @@ const SECONDS: Record<string, number> = {
 };
 
 /** Replaces Binance on `page`; each call starts a new series. */
-export function mockMarket(page: Page): Promise<void> {
+export function mockMarket(page: Page, base = 100): Promise<void> {
   let replayStart = 0;
   return page.route(/binance\.(vision|com)\/(api\/v3|fapi\/v1)\/klines/, (route) => {
     const params = new URL(route.request().url()).searchParams;
@@ -37,7 +37,7 @@ export function mockMarket(page: Page): Promise<void> {
     }
     const json = Array.from({ length: limit }, (_, i) => {
       const time = from + i * seconds;
-      const close = time < replayStart ? 100 : 101 + Math.floor((time - replayStart) / 900);
+      const close = time < replayStart ? base : base + 1 + Math.floor((time - replayStart) / 900);
       return [time * 1000, `${close}`, `${close}`, `${close}`, `${close}`, '1'];
     });
     return route.fulfill({ json, headers: { 'Access-Control-Allow-Origin': '*' } });

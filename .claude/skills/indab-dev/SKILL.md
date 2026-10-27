@@ -238,7 +238,8 @@ Module notes:
   chart to each (`focusTrade`, once per pick). Cris wants no navigator during a live session,
   only the boxes. Once a replay is over, a dotted line marks where it started (`startTime`). Admins delete a session with its trades (`PracticeService.deleteSession`).
   Cris wants the trading screen to look and work like TradingView, students to start with 200
-  USD and trade lots (100 oz) at 1:100 with a 50% stop out (`replay.ts` constants), and
+  USD and trade lots (100 oz) at 1:200 (Cris, 2026-10-27; was 1:100) with a 50% stop out
+  (`replay.ts` constants), and
   timeframes 1m-4h switchable mid-session, starting on 15m. The replay runs on 1m candles
   loaded in chunks; `BarBuilder` (`bars.ts`) builds the chart's bars. TradingView's own
   indicators/drawings are not available to us (Advanced Charts is for public sites only), so
