@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 import { EvaluationService } from '../../evaluations/evaluation.service';
 import { MentorshipService } from '../../mentorships/mentorship.service';
@@ -261,6 +261,17 @@ describe('AdminEvaluations', () => {
     await fixture.whenStable();
     const names = [...el.querySelectorAll('.results tbody td.name')].map((td) => td.textContent);
     expect(names).toEqual(['Ana Gómez']);
+  });
+
+  it('opens the results a link names (mentor dashboard)', async () => {
+    await TestBed.inject(Router).navigateByUrl('/?results=e1');
+    fixture = TestBed.createComponent(AdminEvaluations);
+    el = fixture.nativeElement;
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r));
+    await fixture.whenStable();
+    expect(practice.evaluationSessions).toHaveBeenCalledWith('e1');
+    expect(el.querySelector('.results')?.textContent).toContain('José Pérez');
   });
 
   it('keeps the actions in a three-dot menu that follows each evaluation', async () => {

@@ -1,6 +1,6 @@
 import { DecimalPipe, formatDate } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 import { I18n } from '../../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../../core/i18n/local-date.pipe';
@@ -38,7 +38,12 @@ export class PracticeReview {
   /** Trainers review; only admins delete. */
   protected readonly auth = inject(AuthService);
 
-  private readonly filters = signal<SessionFilters>({});
+  /** `?student=uid` (from the mentor dashboard) opens the list filtered to that student. */
+  protected readonly initialStudent =
+    inject(ActivatedRoute).snapshot.queryParamMap.get('student') ?? '';
+  private readonly filters = signal<SessionFilters>(
+    this.initialStudent ? { uid: this.initialStudent } : {},
+  );
   protected readonly filtered = computed(() => Object.keys(this.filters()).length > 0);
   protected readonly pages = new CursorPages<PracticeSession, SessionCursor>((after) =>
     this.practice.sessionsPage(this.filters(), REVIEW_PAGE_SIZE, after),

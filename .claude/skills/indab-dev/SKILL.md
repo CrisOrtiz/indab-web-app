@@ -62,7 +62,7 @@ otherwise create a feature service.
 | `investors/{uid}` (Eleva)                                        | owner, admins                                                               | admins                                                                                                                                                    |
 | `mentorships/{id}`                                               | staff; members (`users/{uid}.mentorshipIds`)                                | admins (shape validated)                                                                                                                                  |
 | `evaluations/{id}`                                               | staff, assigned students (by uid or mentorship)                             | staff (shape validated)                                                                                                                                   |
-| `practiceSessions/{id}` + `/trades/{id}`                         | owner, staff; attempts at published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
+| `practiceSessions/{id}` + `/trades/{id}`                         | owner, staff (trades also as a collection group); attempts at published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
 | `examForms/{id}`                                                 | staff; published + assigned to students                                     | staff (shape validated; no answers stored here)                                                                                                           |
 | `examKeys/{examId}`                                              | staff; students once `resultsPublished && showAnswers`                      | staff                                                                                                                                                     |
 | `examSubmissions/{examId}_{uid}_{n}`                             | owner, staff                                                                | owner (academy access): attempt n ≤ `maxAttempts`, in window, previous handed in; saves until deadline + 2 min                                            |
@@ -284,6 +284,14 @@ Module notes:
   (`assignedTo(uid, profile.mentorshipIds)`). Staff lists filter with `<app-mentorship-filter>`;
   the practice review sends `uids` (`uid in`, 30 at most). Anything new that is assigned to
   students should accept mentorships too.
+- **Mentor dashboard (`/admin/mentor`, built)**: `features/admin/mentor-dashboard/` (maths in
+  `dashboard.ts`, reads in `MentorDashboardService`), `staffGuard`, first card on `/admin`.
+  Trainers see the mentorships they lead (`mentorIds`), admins all. Per student it runs
+  aggregation queries (sessions count + `sum('pnl')` since the period start; closed trades and
+  winners via the staff-only `collectionGroup('trades')` rule and two composite indexes), never
+  reading every session or trade. Forms/evaluations: only published ones given to the members
+  whose window touched the period. Links: `/admin/practice?student=uid`, `/admin/forms/:id`,
+  `/admin/evaluations?results=id`.
 - **Economic calendar (`/calendar`, public, built)**: `features/calendar/`, prerendered, linked in
   the header (a calendar icon on phones so the links fit at 390 px). `/academy/calendar` (signed
   in, route `data: { fromAcademy: true }`) is the same page with a link back to the academy; the

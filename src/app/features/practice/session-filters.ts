@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { I18n } from '../../core/i18n/i18n.service';
 import { Mentorship, membersOf } from '../../core/models/mentorship';
 import { PracticeSession } from '../../core/models/practice';
@@ -39,7 +39,7 @@ export function dayStart(value: string, days = 0): Date | undefined {
           <select [value]="student()" (change)="set(student, $event)">
             <option value="">{{ t.allStudents }}</option>
             @for (s of studentOptions(); track s.uid) {
-              <option [value]="s.uid">{{ s.name }}</option>
+              <option [value]="s.uid" [selected]="s.uid === student()">{{ s.name }}</option>
             }
           </select>
         </label>
@@ -93,7 +93,7 @@ export function dayStart(value: string, days = 0): Date | undefined {
     }
   `,
 })
-export class SessionFilterBar {
+export class SessionFilterBar implements OnInit {
   protected readonly i18n = inject(I18n);
 
   /** Students to pick from; none hides the student filter (a student's own list). */
@@ -101,6 +101,8 @@ export class SessionFilterBar {
   /** Mentorships to pick from; none hides the mentorship filter. */
   readonly mentorships = input<Mentorship[]>([]);
   readonly evaluations = input<{ id: string; title: string }[]>([]);
+  /** A student picked from the start; the parent already lists their sessions. */
+  readonly initialStudent = input('');
   readonly filtersChange = output<SessionFilters>();
 
   protected readonly maxMembers = MAX_IN_FILTER;
@@ -148,6 +150,10 @@ export class SessionFilterBar {
       ...(this.to() ? { to: dayStart(this.to(), 1) } : {}),
     };
   });
+
+  ngOnInit(): void {
+    this.student.set(this.initialStudent());
+  }
 
   protected set(field: { set(value: string): void }, event: Event): void {
     field.set((event.target as HTMLInputElement | HTMLSelectElement).value);

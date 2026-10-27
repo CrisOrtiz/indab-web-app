@@ -6,6 +6,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   collection,
+  collectionGroup,
   deleteDoc,
   deleteField,
   doc,
@@ -710,6 +711,34 @@ describe('trading practice', () => {
     await assertSucceeds(getDocs(collection(as('admin'), 'practiceSessions/s1/trades')));
     await assertFails(getDocs(collection(as('other'), 'practiceSessions/s1/trades')));
     await assertFails(getDoc(tradeRef(null)));
+  });
+
+  it('lets only staff count trades across sessions (mentor dashboard)', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const closed = { ...trade('enrolled'), status: 'closed', closedAt: new Date() };
+      await setDoc(doc(db, 'practiceSessions/done/trades/w1'), { ...closed, pnl: 12 });
+      await setDoc(doc(db, 'practiceSessions/done/trades/l1'), { ...closed, pnl: -5 });
+    });
+    const closedTrades = (uid: string) =>
+      query(
+        collectionGroup(as(uid), 'trades'),
+        where('uid', '==', 'enrolled'),
+        where('status', '==', 'closed'),
+        where('closedAt', '>=', new Date(Date.now() - 86_400_000)),
+      );
+    for (const uid of ['trainer', 'admin']) {
+      const closed = await assertSucceeds(
+        getAggregateFromServer(closedTrades(uid), { n: count() }),
+      );
+      const won = await assertSucceeds(
+        getAggregateFromServer(query(closedTrades(uid), where('pnl', '>', 0)), { n: count() }),
+      );
+      expect([closed.data().n, won.data().n]).toEqual([2, 1]);
+    }
+    await assertFails(getDocs(closedTrades('enrolled')));
+    await assertFails(getDocs(collectionGroup(as('student'), 'trades')));
+    await assertFails(getDocs(collectionGroup(as(null), 'trades')));
   });
 
   it('moves stops of an open trade, closes it once and never edits its entry', async () => {

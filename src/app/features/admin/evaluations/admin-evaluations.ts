@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { I18n } from '../../../core/i18n/i18n.service';
 import { ActionsMenu, MenuAction } from '../../../shared/actions-menu/actions-menu';
 import { Icon } from '../../../shared/icon/icon';
@@ -64,6 +64,7 @@ export class AdminEvaluations {
   private readonly service = inject(EvaluationService);
   private readonly practice = inject(PracticeService);
   private readonly mentorshipService = inject(MentorshipService);
+  private readonly route = inject(ActivatedRoute);
   protected readonly i18n = inject(I18n);
 
   protected readonly instruments = INSTRUMENTS;
@@ -365,6 +366,12 @@ export class AdminEvaluations {
       ]);
       this.students.set(students);
       this.mentorships.set(mentorships);
+      // `?results=id` (from the mentor dashboard) opens that evaluation's results.
+      const results = this.route.snapshot.queryParamMap.get('results');
+      const evaluation = this.evaluations().find((e) => e.id === results);
+      if (evaluation) {
+        void this.toggleResults(evaluation);
+      }
     } catch {
       this.message.set({ kind: 'error', text: this.i18n.messages().evaluations.loadFailed });
     } finally {
