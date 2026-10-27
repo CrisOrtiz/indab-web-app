@@ -66,6 +66,8 @@ export const es = {
     currentLanguage: (name: string) => `Idioma: ${name}`,
     account: 'Tu cuenta',
     profile: 'Mi perfil',
+    theme: 'Tema',
+    themes: { system: 'Sistema', light: 'Claro', dark: 'Oscuro' },
   },
 
   // Copyright strip at the bottom of every page.

@@ -1,6 +1,9 @@
 // Global design tokens. The INDAB brand is monochrome (black on white), so the palette
-// stays neutral with a single accent used for calls to action.
+// stays neutral with a single accent used for calls to action. Dark mode (white on black) swaps
+// them: `ThemeService` (src/app/core/theme) sets `data-theme` on <html>, and a script in
+// index.html sets it before the first paint so prerendered pages do not flash.
 :root {
+  color-scheme: light;
   --color-bg: #ffffff;
   --color-surface: #f5f5f5;
   --color-text: #111111;
@@ -16,9 +19,47 @@
   // Candle bodies, in TradingView's colors so the practice chart looks like the real one.
   --color-candle-up: #089981;
   --color-candle-down: #f23645;
+  // Black bands (landing sections, the academy and admin greetings) and their text.
+  --color-band: #111111;
+  --color-band-text: #ffffff;
+  --color-band-muted: #dcdcdc;
   --radius: 8px;
   --max-width: 1120px;
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@mixin dark-tokens {
+  color-scheme: dark;
+  --color-bg: #121212;
+  --color-surface: #1e1e1e;
+  --color-text: #f2f2f2;
+  --color-muted: #a3a3a3;
+  --color-border: #333333;
+  --color-accent: #f2f2f2;
+  --color-accent-contrast: #121212;
+  --color-error: #f2726a;
+  --color-up: #3fbf86;
+  --color-down: #f2726a;
+  --color-warning: #e0a43a;
+  --color-band: #000000;
+  --color-band-text: #f2f2f2;
+  --color-band-muted: #a3a3a3;
+}
+
+:root[data-theme='dark'] {
+  @include dark-tokens;
+}
+
+// Without the script (no JavaScript), follow the system.
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    @include dark-tokens;
+  }
+}
+
+// The logo is black on white: on dark pages it turns white on black.
+:root[data-theme='dark'] img[src$='logo.jpg'] {
+  filter: invert(1);
 }
 
 *,

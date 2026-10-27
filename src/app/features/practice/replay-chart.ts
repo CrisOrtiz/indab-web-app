@@ -29,6 +29,7 @@ import {
   createSeriesMarkers,
 } from 'lightweight-charts';
 import { I18n } from '../../core/i18n/i18n.service';
+import { ThemeService } from '../../core/theme/theme.service';
 import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/practice';
 import { DEFAULT_INDICATORS, INDICATORS, RSI_LEVELS, computeIndicator } from './indicators';
 import { formatLots, priceDecimals, priceDigits, roundPrice, signedMoney } from './practice-format';
@@ -437,6 +438,7 @@ export class ReplayChart {
   readonly symbol = input('');
 
   protected readonly i18n = inject(I18n);
+  private readonly theme = inject(ThemeService);
   protected readonly indicators = INDICATORS;
   protected readonly signed = signedMoney;
   protected readonly priceDigits = priceDigits;
@@ -553,39 +555,14 @@ export class ReplayChart {
 
   constructor() {
     afterNextRender(() => {
-      const css = getComputedStyle(this.host);
-      const color = (name: string, fallback: string) =>
-        css.getPropertyValue(name).trim() || fallback;
-      this.colors = {
-        up: color('--color-up', '#0f7b4d'),
-        down: color('--color-down', '#b3261e'),
-        text: color('--color-text', '#111111'),
-        muted: color('--color-muted', '#5f5f5f'),
-      };
-      const up = color('--color-candle-up', '#089981');
-      const down = color('--color-candle-down', '#f23645');
-
       this.chart = createChart(this.canvas().nativeElement, {
         autoSize: true,
-        layout: {
-          background: { color: color('--color-bg', '#ffffff') },
-          textColor: this.colors.text,
-        },
-        grid: {
-          vertLines: { color: color('--color-surface', '#f5f5f5') },
-          horzLines: { color: color('--color-surface', '#f5f5f5') },
-        },
         timeScale: { timeVisible: true, rightOffset: 8 },
       });
       this.series = this.chart.addSeries(CandlestickSeries, {
-        upColor: up,
-        downColor: down,
-        borderUpColor: up,
-        borderDownColor: down,
-        wickUpColor: up,
-        wickDownColor: down,
         autoscaleInfoProvider: (base: () => AutoscaleInfo | null) => this.autoscale(base()),
       });
+      this.applyColors();
       this.markers = createSeriesMarkers(this.series, []);
       this.draw(untracked(this.candles));
       this.applyDates(untracked(this.hideDates));
@@ -601,6 +578,17 @@ export class ReplayChart {
     });
 
     effect(() => this.draw(this.candles()));
+    effect(() => {
+      // Light or dark mode: the canvas takes the page's colors again, and the lines and labels
+      // drawn with them are redrawn.
+      this.theme.theme();
+      untracked(() => {
+        if (this.chart) {
+          this.applyColors();
+          this.drawTrades(this.trades(), this.draft(), this.drawings());
+        }
+      });
+    });
     effect(() => this.applyDates(this.hideDates()));
     effect(() => {
       // A start given after the bars frames the replay too.
@@ -1567,6 +1555,36 @@ export class ReplayChart {
       }
     }
     return low;
+  }
+
+  /** Reads the color tokens of the current theme (styles.scss) into the chart. */
+  private applyColors(): void {
+    const css = getComputedStyle(this.host);
+    const color = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
+    this.colors = {
+      up: color('--color-up', '#0f7b4d'),
+      down: color('--color-down', '#b3261e'),
+      text: color('--color-text', '#111111'),
+      muted: color('--color-muted', '#5f5f5f'),
+    };
+    const up = color('--color-candle-up', '#089981');
+    const down = color('--color-candle-down', '#f23645');
+    const grid = color('--color-surface', '#f5f5f5');
+    this.chart?.applyOptions({
+      layout: {
+        background: { color: color('--color-bg', '#ffffff') },
+        textColor: this.colors.text,
+      },
+      grid: { vertLines: { color: grid }, horzLines: { color: grid } },
+    });
+    this.series?.applyOptions({
+      upColor: up,
+      downColor: down,
+      borderUpColor: up,
+      borderDownColor: down,
+      wickUpColor: up,
+      wickDownColor: down,
+    });
   }
 
   private drawIndicators(candles: Candle[], active: ReadonlySet<string>): void {

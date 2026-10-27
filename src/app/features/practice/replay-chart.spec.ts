@@ -2,6 +2,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { Candle, OrderType, PracticeTrade } from '../../core/models/practice';
+import { ThemeService } from '../../core/theme/theme.service';
 import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
 
 const lw = vi.hoisted(() => {
@@ -13,6 +14,7 @@ const lw = vi.hoisted(() => {
     priceToCoordinate: vi.fn((price: number) => 500 - price),
     coordinateToPrice: vi.fn((y: number) => 500 - y),
     removePriceLine: vi.fn(),
+    applyOptions: vi.fn(),
   });
   const series = makeSeries();
   const lines: ReturnType<typeof makeSeries>[] = [];
@@ -166,6 +168,30 @@ describe('ReplayChart', () => {
 
     fixture.destroy();
     expect(lw.chart.remove).toHaveBeenCalled();
+  });
+
+  it('takes the colors of the light or dark theme, and again when it changes', async () => {
+    document.documentElement.style.setProperty('--color-bg', '#ffffff');
+    const { fixture } = await render();
+    expect(lw.chart.applyOptions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        layout: expect.objectContaining({ background: { color: '#ffffff' } }),
+      }),
+    );
+    expect(lw.series.applyOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ upColor: '#089981', downColor: '#f23645' }),
+    );
+
+    document.documentElement.style.setProperty('--color-bg', '#121212');
+    TestBed.inject(ThemeService).use('dark');
+    await fixture.whenStable();
+    expect(lw.chart.applyOptions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        layout: expect.objectContaining({ background: { color: '#121212' } }),
+      }),
+    );
+    document.documentElement.style.removeProperty('--color-bg');
+    TestBed.inject(ThemeService).use('system');
   });
 
   it('hides dates while asked to', async () => {
