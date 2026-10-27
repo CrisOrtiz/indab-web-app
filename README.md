@@ -322,6 +322,8 @@ saved in the browser (`localStorage` key `indab.theme`), not in Firestore.
   in `index.html` catches it before the app starts) and shows "Instalar app" in the account menu
   and the footer. On iPhone/iPad, which have no prompt, it opens Share > Add to Home Screen
   instructions (`shared/pwa/install-help`). Inside the installed app the option is hidden.
+  **Switched off for now** (Cris, 2026-10-27: not until INDAB really needs an app):
+  `INSTALL_OFFER_ENABLED` is `false`; provide it as `true` to bring the option back.
 - **Testing it**: `ng serve` has no service worker. Run `npm run build` and serve
   `dist/indab-web-app/browser` with `npx firebase emulators:start --only hosting`, then open
   http://localhost:5000 (Chrome DevTools > Application shows the manifest and worker).

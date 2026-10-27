@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 import { AuthService } from '../../core/auth/auth.service';
+import { INSTALL_OFFER_ENABLED } from '../../core/pwa/app-install.service';
 import { Header } from './header';
 import { LandingSections } from './landing-sections';
 import { quietNotifications } from '../../features/notifications/testing';
@@ -32,6 +33,8 @@ describe('Header', () => {
         ...quietNotifications().providers,
         provideRouter([]),
         { provide: AuthService, useValue: auth },
+        // The option is off on the site for now; these tests cover it switched on.
+        { provide: INSTALL_OFFER_ENABLED, useValue: true },
       ],
     });
     fixture = TestBed.createComponent(Header);

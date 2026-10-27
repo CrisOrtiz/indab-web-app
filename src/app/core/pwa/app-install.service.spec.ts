@@ -1,6 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
-import { AppInstall, InstallPromptEvent, isIosDevice } from './app-install.service';
+import {
+  AppInstall,
+  INSTALL_OFFER_ENABLED,
+  InstallPromptEvent,
+  isIosDevice,
+} from './app-install.service';
 
 type TestWindow = Window & { indabInstallPrompt?: InstallPromptEvent | null };
 
@@ -20,6 +25,9 @@ describe('AppInstall', () => {
 
   beforeEach(() => {
     standalone = false;
+    TestBed.configureTestingModule({
+      providers: [{ provide: INSTALL_OFFER_ENABLED, useValue: true }],
+    });
     win.indabInstallPrompt = null;
     vi.stubGlobal(
       'matchMedia',
@@ -35,6 +43,12 @@ describe('AppInstall', () => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     delete win.indabInstallPrompt;
+  });
+
+  it('offers nothing while the option is switched off (the default for now)', () => {
+    TestBed.resetTestingModule();
+    win.indabInstallPrompt = promptEvent();
+    expect(TestBed.inject(AppInstall).available()).toBe(false);
   });
 
   it('offers nothing on browsers without an install prompt', () => {
