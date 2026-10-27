@@ -6,6 +6,7 @@ import {
   count,
   doc,
   getAggregateFromServer,
+  getDoc,
   getDocs,
   limit,
   orderBy,
@@ -165,6 +166,12 @@ export class PracticeService {
       pnl: trade.pnl,
       closedAt: serverTimestamp(),
     });
+  }
+
+  /** One session (its owner or staff), or null if it does not exist. */
+  async getSession(id: string): Promise<PracticeSession | null> {
+    const snapshot = await this.loading.track(getDoc(doc(this.sessions, id)));
+    return snapshot.exists() ? { ...(snapshot.data() as PracticeSession), id: snapshot.id } : null;
   }
 
   /** The student's most recent sessions (the profile's P/L summary). */

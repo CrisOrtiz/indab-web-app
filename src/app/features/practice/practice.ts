@@ -32,6 +32,7 @@ import {
 import { formatLots, priceDigits, roundPrice, signedMoney } from './practice-format';
 import { CursorPages } from '../../shared/pager/cursor-pages';
 import { Pager } from '../../shared/pager/pager';
+import { NotificationService } from '../notifications/notification.service';
 import { PracticeService, SessionCursor, SessionFilters } from './practice.service';
 import {
   LEVERAGE,
@@ -126,6 +127,7 @@ export class Practice {
   private readonly auth = inject(AuthService);
   private readonly market = inject(MarketDataService);
   private readonly practice = inject(PracticeService);
+  private readonly notifications = inject(NotificationService);
   private readonly evaluationService = inject(EvaluationService);
   private readonly locale = inject(LOCALE_ID);
   protected readonly i18n = inject(I18n);
@@ -753,6 +755,14 @@ export class Practice {
         ...closed.map((trade) => this.practice.closeTrade(sessionId, trade)),
       ]);
       await this.practice.finishSession(sessionId, this.summary(replay));
+      const evaluation = this.evaluation();
+      void this.notifications.notifyActivity({
+        type: evaluation ? 'evaluationFinished' : 'practiceFinished',
+        kind: evaluation ? 'evaluation' : 'practice',
+        refId: sessionId,
+        contextId: evaluation?.id ?? null,
+        title: evaluation?.title ?? '',
+      });
     } catch {
       this.error.set(this.i18n.messages().practice.finishFailed);
     }

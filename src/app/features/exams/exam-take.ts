@@ -22,6 +22,9 @@ import {
   attemptDeadline,
   examWindow,
 } from '../../core/models/exam';
+import { NoteTarget } from '../../core/models/mentor-note';
+import { MentorNotes } from '../notes/mentor-notes';
+import { NotificationService } from '../notifications/notification.service';
 import { ExamService } from './exam.service';
 import { optionLabels } from './exam-labels';
 import { attemptStatus, studentExamState } from './exam-status';
@@ -42,17 +45,19 @@ export function clock(ms: number): string {
 /**
  * One evaluation form for a student: its details and attempts, answering an attempt one
  * question at a time (saved as they go, handed in by them or when the time runs out), and,
- * once staff publish the results, the grade per question with the trainer's comments.
+ * once staff publish the results, the grade per question with the trainer's comments. Mentors'
+ * notes on each attempt show as soon as they are written.
  */
 @Component({
   selector: 'app-exam-take',
-  imports: [LocalDatePipe, RouterLink],
+  imports: [LocalDatePipe, MentorNotes, RouterLink],
   templateUrl: './exam-take.html',
   styleUrl: './exam-take.scss',
 })
 export class ExamTake {
   private readonly service = inject(ExamService);
   private readonly auth = inject(AuthService);
+  private readonly notifications = inject(NotificationService);
   protected readonly i18n = inject(I18n);
 
   /** The form id, from the route. */
@@ -94,6 +99,25 @@ export class ExamTake {
   protected readonly timeLeft = computed(() => {
     const deadline = this.deadline();
     return deadline === null ? null : deadline - this.now();
+  });
+  /** Where the mentors' notes on each attempt are (not on the one being answered). */
+  protected readonly noteTargets = computed(() => {
+    const exam = this.exam();
+    const uid = this.auth.user()?.uid ?? '';
+    return exam
+      ? this.submissions()
+          .filter((s) => s.id !== this.attempt()?.id)
+          .map((s) => ({
+            attempt: s.attempt,
+            target: {
+              studentId: uid,
+              kind: 'exam',
+              targetId: s.id,
+              contextId: exam.id,
+              title: exam.title,
+            } satisfies NoteTarget as NoteTarget,
+          }))
+      : [];
   });
   protected readonly question = computed(() => this.exam()?.questions[this.index()] ?? null);
   protected readonly unanswered = computed(
@@ -218,6 +242,16 @@ export class ExamTake {
     try {
       await this.service.submit(attempt.id, this.answers());
       this.finish(attempt, timeUp ? t.timeUp : t.submitted, 'submitted');
+      const exam = this.exam();
+      if (exam) {
+        void this.notifications.notifyActivity({
+          type: 'examSubmitted',
+          kind: 'exam',
+          refId: attempt.id,
+          contextId: exam.id,
+          title: exam.title,
+        });
+      }
     } catch {
       if (timeUp) {
         // Too late for the rules: the last saved answers are what staff will grade.

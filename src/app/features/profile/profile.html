@@ -302,4 +302,7 @@
       <p class="muted">{{ t.sessionsLoading }}</p>
     }
   </div>
+  @if (auth.isStaff()) {
+    <app-notification-settings id="notifications" />
+  }
 </section>

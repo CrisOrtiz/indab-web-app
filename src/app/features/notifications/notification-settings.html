@@ -1,0 +1,140 @@
+@let t = i18n.messages().notifications.settings;
+<div class="card">
+  <h2>{{ t.title }}</h2>
+  <p class="muted">{{ t.intro }}</p>
+  @if (loading()) {
+    <p class="muted">{{ t.loading }}</p>
+  } @else {
+    <h3>{{ t.typesTitle }}</h3>
+    <div class="checks">
+      @for (type of types; track type) {
+        <label class="check">
+          <input
+            type="checkbox"
+            [checked]="hasType(type)"
+            (change)="toggleType(type, $any($event.target).checked)"
+          />
+          {{ t.types[type] }}
+        </label>
+      }
+    </div>
+
+    <h3>{{ t.followTitle }}</h3>
+    <label class="check">
+      <input
+        type="checkbox"
+        [checked]="draft().all"
+        (change)="setAll($any($event.target).checked)"
+      />
+      {{ t.all }}
+    </label>
+    @if (draft().all) {
+      <p class="hint">{{ t.allHint }}</p>
+    }
+
+    <fieldset>
+      <legend>{{ t.mentorships }}</legend>
+      <div class="options">
+        @for (m of mentorships(); track m.id) {
+          <label class="check">
+            <input
+              type="checkbox"
+              [checked]="has('mentorshipIds', m.id)"
+              (change)="toggle('mentorshipIds', m.id, $any($event.target).checked)"
+            />
+            {{ m.name }}
+            @if (leads(m)) {
+              <span class="tag">{{ t.mentorTag }}</span>
+            }
+          </label>
+        } @empty {
+          <p class="muted">{{ t.noneYet }}</p>
+        }
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>{{ t.students }}</legend>
+      <div class="add-student">
+        <select #student [attr.aria-label]="t.pickStudent">
+          <option value="">{{ t.pickStudent }}</option>
+          @for (s of otherStudents(); track s.uid) {
+            <option [value]="s.uid">{{ s.name }}</option>
+          }
+        </select>
+        <button type="button" class="btn btn-outline small" (click)="addStudent(student)">
+          {{ t.addStudent }}
+        </button>
+      </div>
+      @if (followedStudents().length) {
+        <ul class="chips">
+          @for (s of followedStudents(); track s.uid) {
+            <li>
+              {{ s.name }}
+              <button
+                type="button"
+                [attr.aria-label]="t.removeStudent(s.name)"
+                (click)="toggle('studentIds', s.uid, false)"
+              >
+                ×
+              </button>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="muted">{{ t.noStudents }}</p>
+      }
+    </fieldset>
+
+    <fieldset>
+      <legend>{{ t.evaluations }}</legend>
+      <div class="options">
+        @for (e of evaluations(); track e.id) {
+          <label class="check">
+            <input
+              type="checkbox"
+              [checked]="has('evaluationIds', e.id)"
+              (change)="toggle('evaluationIds', e.id, $any($event.target).checked)"
+            />
+            {{ e.title }}
+          </label>
+        } @empty {
+          <p class="muted">{{ t.noneYet }}</p>
+        }
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>{{ t.exams }}</legend>
+      <div class="options">
+        @for (f of forms(); track f.id) {
+          <label class="check">
+            <input
+              type="checkbox"
+              [checked]="has('examIds', f.id)"
+              (change)="toggle('examIds', f.id, $any($event.target).checked)"
+            />
+            {{ f.title }}
+          </label>
+        } @empty {
+          <p class="muted">{{ t.noneYet }}</p>
+        }
+      </div>
+    </fieldset>
+
+    @if (nothingFollowed()) {
+      <p class="hint warn">{{ t.nothingFollowed }}</p>
+    } @else if (!draft().types.length) {
+      <p class="hint warn">{{ t.noTypes }}</p>
+    }
+    <p class="hint">{{ t.studentsGetAll }}</p>
+    <div class="save">
+      <button type="button" class="btn" [disabled]="saving() || !dirty()" (click)="save()">
+        {{ saving() ? t.saving : t.save }}
+      </button>
+    </div>
+  }
+  @if (status(); as s) {
+    <p [class]="s.kind" [attr.role]="s.kind === 'error' ? 'alert' : 'status'">{{ s.text }}</p>
+  }
+</div>

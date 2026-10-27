@@ -2,7 +2,9 @@ import { DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { I18n } from '../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../core/i18n/local-date.pipe';
+import { NoteTarget } from '../../core/models/mentor-note';
 import { Candle, PracticeSession, PracticeTrade } from '../../core/models/practice';
+import { MentorNotes } from '../notes/mentor-notes';
 import { HISTORY_BARS, MarketDataService, intervalMs } from './market-data.service';
 import { priceDigits } from './practice-format';
 import { PracticeService } from './practice.service';
@@ -15,16 +17,26 @@ import { TradeNavigator } from './trade-navigator';
 /**
  * A finished (or abandoned) practice session to look back on, for staff and for the student:
  * its trades drawn as TradingView's position boxes on the candles it was practised on, a
- * navigator that steps through them, its statistics and the list of every order.
+ * navigator that steps through them, the mentors' notes, its statistics and the list of every
+ * order.
  */
 @Component({
   selector: 'app-session-review',
-  imports: [DecimalPipe, LocalDatePipe, ReplayChart, SessionStatsPanel, TradeNavigator],
+  imports: [
+    DecimalPipe,
+    LocalDatePipe,
+    MentorNotes,
+    ReplayChart,
+    SessionStatsPanel,
+    TradeNavigator,
+  ],
   templateUrl: './session-review.html',
   styleUrl: './session-review.scss',
 })
 export class SessionReview {
   readonly session = input.required<PracticeSession>();
+  /** The evaluation's title for an attempt, shown in the student's note notification. */
+  readonly evaluationTitle = input('');
 
   private readonly practice = inject(PracticeService);
   private readonly market = inject(MarketDataService);
@@ -43,6 +55,18 @@ export class SessionReview {
   /** The trade the navigator and the chart show. */
   protected readonly selected = signal<string | null>(null);
   protected readonly filled = computed(() => filledTrades(this.trades() ?? []));
+  /** Where the mentors' notes on this session go. */
+  protected readonly noteTarget = computed<NoteTarget>(() => {
+    const session = this.session();
+    const evaluationId = session.evaluationId ?? null;
+    return {
+      studentId: session.uid,
+      kind: evaluationId ? 'evaluation' : 'practice',
+      targetId: session.id,
+      contextId: evaluationId,
+      title: evaluationId ? this.evaluationTitle() : '',
+    };
+  });
 
   constructor() {
     effect(() => {

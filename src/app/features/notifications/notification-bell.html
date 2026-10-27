@@ -1,0 +1,53 @@
+@let t = i18n.messages().notifications;
+@let count = unread().length;
+<button
+  type="button"
+  class="bell"
+  aria-haspopup="true"
+  aria-controls="notifications-panel"
+  [attr.aria-expanded]="open()"
+  [attr.aria-label]="count ? t.bellUnread(count) : t.bell"
+  [title]="t.bell"
+  (click)="toggle()"
+>
+  <app-icon name="bell" [size]="20" />
+  @if (count) {
+    <span class="badge" aria-hidden="true">{{ badge() }}</span>
+  }
+</button>
+@if (open()) {
+  <div class="panel" id="notifications-panel" role="region" [attr.aria-label]="t.bell">
+    <div class="panel-head">
+      <strong>{{ t.bell }}</strong>
+      @if (count) {
+        <button type="button" class="link" (click)="markAllRead()">{{ t.markAll }}</button>
+      }
+    </div>
+    @if (failed()) {
+      <p class="muted state">{{ t.loadFailed }}</p>
+    }
+    <ul>
+      @for (n of items(); track n.id) {
+        <li>
+          <button type="button" class="item" [class.unread]="!n.read" (click)="go(n)">
+            <span class="kind"><app-icon [name]="icon(n)" [size]="18" /></span>
+            <span class="body">
+              <span class="text">{{ text(n) }}</span>
+              <span class="when">{{ n.createdAt?.toDate() | localDate: 'd MMM, HH:mm' }}</span>
+            </span>
+            @if (!n.read) {
+              <span class="dot" [attr.aria-label]="t.unread"></span>
+            }
+          </button>
+        </li>
+      } @empty {
+        @if (!failed()) {
+          <li class="muted state">{{ t.empty }}</li>
+        }
+      }
+    </ul>
+    @if (auth.isStaff()) {
+      <a class="settings" routerLink="/profile" fragment="notifications">{{ t.settingsLink }}</a>
+    }
+  </div>
+}

@@ -1,0 +1,114 @@
+@let t = i18n.messages().notes;
+@if (visible()) {
+  <section class="notes" [attr.aria-label]="staff() ? t.title : t.studentTitle">
+    <h3>
+      <app-icon name="note" [size]="18" />
+      {{ staff() ? t.title : t.studentTitle }}
+      @if (label()) {
+        <span class="muted">· {{ label() }}</span>
+      }
+    </h3>
+    @if (failed()) {
+      <p class="error" role="alert">{{ t.loadFailed }}</p>
+    }
+    @if (notes(); as list) {
+      <ul>
+        @for (note of list; track note.id) {
+          <li class="note">
+            <div class="meta">
+              <strong>{{ note.authorName }}</strong>
+              <span class="muted">
+                {{ note.createdAt?.toDate() | localDate: 'd MMM y, HH:mm' }}
+                @if (edited(note)) {
+                  · {{ t.edited }}
+                }
+              </span>
+              @if (staff() && (mine(note) || auth.isAdmin())) {
+                <span class="tools tips-end">
+                  @if (mine(note) && access()?.canWrite) {
+                    <button
+                      type="button"
+                      class="icon-btn"
+                      [attr.aria-label]="t.edit"
+                      [attr.data-tip]="t.edit"
+                      (click)="editing.set({ id: note.id, text: note.text })"
+                    >
+                      <app-icon name="edit" [size]="16" />
+                    </button>
+                  }
+                  <button
+                    type="button"
+                    class="icon-btn danger"
+                    [attr.aria-label]="t.remove"
+                    [attr.data-tip]="t.remove"
+                    (click)="remove(note)"
+                  >
+                    <app-icon name="trash" [size]="16" />
+                  </button>
+                </span>
+              }
+            </div>
+            @if (editing()?.id === note.id) {
+              <form class="write" (submit)="$event.preventDefault(); saveEdit()">
+                <textarea
+                  rows="3"
+                  [attr.aria-label]="t.edit"
+                  [attr.maxlength]="maxLength"
+                  [value]="editing()!.text"
+                  (input)="editing.set({ id: note.id, text: $any($event.target).value })"
+                ></textarea>
+                <div class="actions">
+                  <button type="button" class="btn btn-outline" (click)="editing.set(null)">
+                    {{ t.cancel }}
+                  </button>
+                  <button
+                    type="submit"
+                    class="btn"
+                    [disabled]="saving() || !editing()!.text.trim()"
+                  >
+                    {{ t.save }}
+                  </button>
+                </div>
+              </form>
+            } @else {
+              <p class="text">{{ note.text }}</p>
+            }
+          </li>
+        } @empty {
+          <li class="muted empty">{{ t.none }}</li>
+        }
+      </ul>
+    } @else {
+      <p class="muted">{{ t.loading }}</p>
+    }
+    @if (staff()) {
+      @if (access(); as a) {
+        @if (a.canWrite) {
+          <form class="write" (submit)="$event.preventDefault(); add()">
+            <label>
+              {{ t.label }}
+              <textarea
+                rows="3"
+                [placeholder]="t.placeholder"
+                [attr.maxlength]="maxLength"
+                [value]="draft()"
+                (input)="draft.set($any($event.target).value)"
+              ></textarea>
+            </label>
+            <div class="actions">
+              <span class="muted hint">{{ t.visibleToStudent }}</span>
+              <button type="submit" class="btn" [disabled]="saving() || !draft().trim()">
+                {{ saving() ? t.saving : t.add }}
+              </button>
+            </div>
+          </form>
+        } @else {
+          <p class="muted hint">{{ t.notMentor }}</p>
+        }
+      }
+    }
+    @if (error(); as message) {
+      <p class="error" role="alert">{{ message }}</p>
+    }
+  </section>
+}

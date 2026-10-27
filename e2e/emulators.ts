@@ -25,7 +25,7 @@ export async function resetEmulators(): Promise<void> {
   );
 }
 
-type Value = string | boolean | number | Date | null | Value[];
+type Value = string | boolean | number | Date | null | Value[] | { [key: string]: Value };
 
 const toField = (value: Value): object => {
   if (value === null) return { nullValue: null };
@@ -34,6 +34,13 @@ const toField = (value: Value): object => {
   if (typeof value === 'boolean') return { booleanValue: value };
   if (typeof value === 'number') {
     return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  }
+  if (typeof value === 'object') {
+    return {
+      mapValue: {
+        fields: Object.fromEntries(Object.entries(value).map(([k, v]) => [k, toField(v)])),
+      },
+    };
   }
   return { stringValue: value };
 };
@@ -44,6 +51,11 @@ const fromField = (field: any): unknown => {
   if ('integerValue' in field) return Number(field.integerValue);
   if ('doubleValue' in field) return field.doubleValue;
   if ('nullValue' in field) return null;
+  if ('mapValue' in field) {
+    return Object.fromEntries(
+      Object.entries(field.mapValue.fields ?? {}).map(([k, v]) => [k, fromField(v)]),
+    );
+  }
   return field.stringValue ?? field.timestampValue;
 };
 

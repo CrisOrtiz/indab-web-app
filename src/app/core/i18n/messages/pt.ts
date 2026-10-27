@@ -1,4 +1,5 @@
 import type { Messages } from './es';
+import type { WorkKind } from '../../models/notification';
 
 /** Brazilian Portuguese. Same keys as `es.ts`. */
 export const pt: Messages = {
@@ -24,6 +25,7 @@ export const pt: Messages = {
     adminExams: 'Formulários de avaliação | INDAB',
     adminExamResults: 'Corrigir formulário | INDAB',
     adminMentorships: 'Mentorias | INDAB',
+    practiceSession: 'Prática | INDAB',
     adminMentor: 'Painel do mentor | INDAB',
   },
 
@@ -1346,5 +1348,102 @@ export const pt: Messages = {
     next: 'Próxima',
     page: (n: number) => `Página ${n}`,
     pageOf: (n: number, total: number) => `Página ${n} de ${total}`,
+  },
+
+  // The bell in the header and what trainers and admins follow (in /profile).
+  notifications: {
+    bell: 'Notificações',
+    bellUnread: (n: number) => `Notificações, ${n} não lidas`,
+    unread: 'Não lida',
+    empty: 'Você não tem notificações.',
+    markAll: 'Marcar tudo como lido',
+    loadFailed: 'Não foi possível carregar as notificações.',
+    settingsLink: 'Escolher o que seguir',
+    text: {
+      note: (actor: string, kind: WorkKind, title: string) =>
+        kind === 'practice'
+          ? `${actor} deixou uma nota na sua prática`
+          : kind === 'evaluation'
+            ? `${actor} deixou uma nota na sua avaliação “${title}”`
+            : `${actor} deixou uma nota na sua prova “${title}”`,
+      assigned: (kind: WorkKind, title: string) =>
+        kind === 'exam'
+          ? `Você tem uma prova nova: “${title}”`
+          : `Você tem uma avaliação de prática nova: “${title}”`,
+      results: (title: string) => `Os resultados de “${title}” já saíram`,
+      practiceFinished: (actor: string) => `${actor} terminou uma prática livre`,
+      evaluationFinished: (actor: string, title: string) =>
+        `${actor} terminou a avaliação “${title}”`,
+      examSubmitted: (actor: string, title: string) => `${actor} entregou o formulário “${title}”`,
+    },
+    settings: {
+      title: 'Notificações',
+      intro:
+        'Escolha de quem você quer receber avisos no sino. Só chega a atividade do que você segue, assim ele não se enche de avisos.',
+      loading: 'Carregando suas preferências…',
+      typesTitle: 'Quais avisos receber',
+      types: {
+        practiceFinished: 'Um aluno terminou uma prática livre',
+        evaluationFinished: 'Um aluno terminou uma avaliação de prática',
+        examSubmitted: 'Um aluno entregou um formulário de avaliação',
+      },
+      followTitle: 'Quem seguir',
+      all: 'Todos os alunos',
+      allHint: 'Você receberá a atividade de toda a academia: podem ser muitos avisos.',
+      mentorships: 'Mentorias',
+      mentorTag: 'Você é mentor',
+      students: 'Alunos',
+      pickStudent: 'Escolha um aluno',
+      addStudent: 'Seguir',
+      removeStudent: (name: string) => `Deixar de seguir ${name}`,
+      noStudents: 'Você não segue nenhum aluno pelo nome.',
+      evaluations: 'Avaliações de prática',
+      exams: 'Formulários de avaliação',
+      noneYet: 'Ainda não há nenhuma.',
+      nothingFollowed: 'Você ainda não segue nada: não chegarão avisos da atividade dos alunos.',
+      noTypes: 'Nenhum tipo de aviso marcado: não chegará atividade mesmo que você siga alguém.',
+      studentsGetAll:
+        'Os alunos sempre recebem as notas dos mentores, as avaliações e provas novas e seus resultados.',
+      tooMany: (max: number) => `Você pode seguir até ${max} por lista.`,
+      save: 'Salvar preferências',
+      saving: 'Salvando…',
+      saved: 'Preferências salvas.',
+      saveFailed: 'Não foi possível salvar suas preferências.',
+      loadFailed: 'Não foi possível carregar suas preferências.',
+    },
+  },
+
+  // Mentors' notes on a student's practice, evaluation attempts and forms.
+  notes: {
+    title: 'Notas do mentor',
+    studentTitle: 'Notas do seu mentor',
+    loading: 'Carregando notas…',
+    none: 'Ainda não há notas.',
+    label: 'Nova nota',
+    placeholder: 'Escreva uma nota para o aluno…',
+    add: 'Deixar nota',
+    saving: 'Salvando…',
+    edit: 'Editar nota',
+    save: 'Salvar',
+    cancel: 'Cancelar',
+    remove: 'Excluir nota',
+    confirmRemove: 'Excluir esta nota? O aluno não a verá mais.',
+    edited: 'editada',
+    visibleToStudent: 'O aluno verá a nota e receberá um aviso.',
+    notMentor:
+      'Só os mentores de uma mentoria deste aluno e os administradores podem deixar notas.',
+    saveFailed: 'Não foi possível salvar a nota.',
+    removeFailed: 'Não foi possível excluir a nota.',
+    loadFailed: 'Não foi possível carregar as notas.',
+  },
+
+  // One practice session on its own page (notifications link here).
+  sessionPage: {
+    back: '← Voltar à prática',
+    backStaff: '← Voltar às práticas',
+    loading: 'Carregando a prática…',
+    notFound: 'Não encontramos esta prática.',
+    free: 'Prática livre',
+    evaluation: 'Avaliação de prática',
   },
 };

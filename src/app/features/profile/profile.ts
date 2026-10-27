@@ -15,6 +15,7 @@ import {
   today,
 } from '../../shared/personal-details/personal-details';
 import { authErrorMessage } from '../auth/auth-errors';
+import { NotificationSettingsPanel } from '../notifications/notification-settings';
 import { signedMoney } from '../practice/practice-format';
 import { PracticeService } from '../practice/practice.service';
 import { summarizePractice } from './practice-summary';
@@ -32,11 +33,11 @@ type Status = { kind: 'error' | 'notice'; text: string };
 
 /**
  * `/profile`: the signed-in user's photo, name and details, password, open sessions, language
- * and practice results.
+ * and practice results; trainers and admins also choose what they get notified of.
  */
 @Component({
   selector: 'app-profile',
-  imports: [ReactiveFormsModule, RouterLink, Avatar, LocalDatePipe],
+  imports: [ReactiveFormsModule, RouterLink, Avatar, LocalDatePipe, NotificationSettingsPanel],
   templateUrl: './profile.html',
   styleUrl: './profile.scss',
 })

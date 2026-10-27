@@ -8,6 +8,7 @@ import { Evaluation, evaluationWindow } from '../../../core/models/evaluation';
 import { Mentorship, audienceIds } from '../../../core/models/mentorship';
 import { EvaluationService, StudentOption } from '../../evaluations/evaluation.service';
 import { MentorshipService } from '../../mentorships/mentorship.service';
+import { NotificationService } from '../../notifications/notification.service';
 import { AudiencePicker } from '../audience/audience-picker';
 import {
   INSTRUMENTS,
@@ -64,6 +65,7 @@ export class AdminEvaluations {
   private readonly service = inject(EvaluationService);
   private readonly practice = inject(PracticeService);
   private readonly mentorshipService = inject(MentorshipService);
+  private readonly notifications = inject(NotificationService);
   private readonly route = inject(ActivatedRoute);
   protected readonly i18n = inject(I18n);
 
@@ -290,11 +292,18 @@ export class AdminEvaluations {
     };
     this.saving.set(true);
     try {
+      const id = editing ? editing.id : await this.service.create(input);
       if (editing) {
         await this.service.update(editing.id, input);
-      } else {
-        await this.service.create(input);
       }
+      // Students who were not given it before hear of it once.
+      const before = new Set(editing ? this.assigned(editing) : []);
+      void this.notifications.notifyStudents(
+        'assigned',
+        'evaluation',
+        { id, title: input.title },
+        audienceIds(input, this.students()).filter((uid) => !before.has(uid)),
+      );
       this.message.set({ kind: 'ok', text: t.saved(input.title) });
       this.cancel();
       await this.reload();
@@ -326,6 +335,9 @@ export class AdminEvaluations {
     const published = !evaluation.resultsPublished;
     try {
       await this.service.setResultsPublished(evaluation.id, published);
+      if (published) {
+        void this.notifyResults(evaluation);
+      }
       this.evaluations.update((list) =>
         list.map((e) => (e.id === evaluation.id ? { ...e, resultsPublished: published } : e)),
       );
@@ -335,6 +347,21 @@ export class AdminEvaluations {
       });
     } catch {
       this.message.set({ kind: 'error', text: t.saveFailed });
+    }
+  }
+
+  /** Tells the students who took it that the ranking is out. */
+  private async notifyResults(evaluation: Evaluation): Promise<void> {
+    try {
+      const sessions = await this.practice.evaluationSessions(evaluation.id);
+      await this.notifications.notifyStudents(
+        'results',
+        'evaluation',
+        evaluation,
+        sessions.map((s) => s.uid),
+      );
+    } catch {
+      // The ranking is published all the same; students find it in the academy.
     }
   }
 

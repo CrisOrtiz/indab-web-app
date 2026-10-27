@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 import { AuthService } from '../../core/auth/auth.service';
 import { ExamService } from './exam.service';
 import { ExamTake, clock } from './exam-take';
+import { quietNotifications } from '../notifications/testing';
 
 const hour = 3_600_000;
 const at = (ms: number) => ({ toMillis: () => ms, toDate: () => new Date(ms) });
@@ -58,6 +59,8 @@ const attempt = (extra: object = {}) => ({
 });
 
 describe('ExamTake', () => {
+  const quiet = quietNotifications();
+  quiet.notifications.notifyActivity = vi.fn(async (..._args: unknown[]) => 0);
   let fixture: ComponentFixture<ExamTake>;
   let el: HTMLElement;
   const service = {
@@ -75,9 +78,17 @@ describe('ExamTake', () => {
     TestBed.configureTestingModule({
       imports: [ExamTake],
       providers: [
+        ...quiet.providers,
         provideRouter([]),
         { provide: ExamService, useValue: service },
-        { provide: AuthService, useValue: { user: signal({ uid: 'jose' }) } },
+        {
+          provide: AuthService,
+          useValue: {
+            user: signal({ uid: 'jose' }),
+            isStaff: signal(false),
+            isAdmin: signal(false),
+          },
+        },
       ],
     });
     fixture = TestBed.createComponent(ExamTake);
@@ -133,6 +144,13 @@ describe('ExamTake', () => {
       q2: { choices: [], text: 'Bajo el mínimo' },
     });
     expect(el.textContent).toContain('¡Entregado!');
+    expect(quiet.notifications.notifyActivity).toHaveBeenCalledWith({
+      type: 'examSubmitted',
+      kind: 'exam',
+      refId: 'x1_jose_1',
+      contextId: 'x1',
+      title: expect.any(String),
+    });
     expect(button('Comenzar intento 2')).toBeTruthy();
   });
 

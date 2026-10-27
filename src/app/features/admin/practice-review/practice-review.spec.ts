@@ -11,6 +11,7 @@ import { PracticeService } from '../../practice/practice.service';
 import { ReplayChart } from '../../practice/replay-chart';
 import { SessionReview } from '../../practice/session-review';
 import { PracticeReview, REVIEW_PAGE_SIZE } from './practice-review';
+import { quietNotifications } from '../../notifications/testing';
 
 // The real chart needs a canvas; the review only passes it data.
 @Component({ selector: 'app-replay-chart', template: '' })
@@ -67,12 +68,16 @@ describe('PracticeReview', () => {
     TestBed.configureTestingModule({
       imports: [PracticeReview],
       providers: [
+        ...quietNotifications().providers,
         provideRouter([]),
         { provide: PracticeService, useValue: practice },
         { provide: EvaluationService, useValue: evaluations },
         { provide: MentorshipService, useValue: mentorships },
         { provide: MarketDataService, useValue: market },
-        { provide: AuthService, useValue: { isAdmin } },
+        {
+          provide: AuthService,
+          useValue: { isAdmin, isStaff: signal(true), user: signal({ uid: 'coach' }) },
+        },
       ],
     });
     TestBed.overrideComponent(SessionReview, {

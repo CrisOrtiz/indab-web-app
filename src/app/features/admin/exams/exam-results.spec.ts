@@ -1,3 +1,5 @@
+import { signal } from '@angular/core';
+import { AuthService } from '../../../core/auth/auth.service';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
@@ -5,6 +7,7 @@ import { EvaluationService } from '../../evaluations/evaluation.service';
 import { ExamService } from '../../exams/exam.service';
 import { MentorshipService } from '../../mentorships/mentorship.service';
 import { ExamResults, resultState } from './exam-results';
+import { quietNotifications } from '../../notifications/testing';
 
 const at = (ms: number) => ({ toMillis: () => ms, toDate: () => new Date(ms) });
 const exam = {
@@ -59,6 +62,8 @@ const submission = (uid: string, extra: object = {}) => ({
 });
 
 describe('ExamResults', () => {
+  const quiet = quietNotifications();
+  quiet.notifications.notifyStudents = vi.fn(async (..._args: unknown[]) => 0);
   let fixture: ComponentFixture<ExamResults>;
   let el: HTMLElement;
   const service = {
@@ -93,8 +98,17 @@ describe('ExamResults', () => {
     TestBed.configureTestingModule({
       imports: [ExamResults],
       providers: [
+        ...quiet.providers,
         provideRouter([]),
         { provide: ExamService, useValue: service },
+        {
+          provide: AuthService,
+          useValue: {
+            user: signal({ uid: 'coach' }),
+            isStaff: signal(true),
+            isAdmin: signal(true),
+          },
+        },
         { provide: EvaluationService, useValue: evaluations },
         { provide: MentorshipService, useValue: mentorships },
       ],
@@ -210,12 +224,28 @@ describe('ExamResults', () => {
       resultsPublished: true,
       showAnswers: false,
     });
+    // Those who took it hear the results are out.
+    expect(quiet.notifications.notifyStudents).toHaveBeenCalledWith(
+      'results',
+      'exam',
+      expect.objectContaining({ id: 'x1' }),
+      ['jose', 'luis'],
+    );
     el.querySelector<HTMLInputElement>('.publish input')!.click();
     await fixture.whenStable();
     expect(service.setResults).toHaveBeenLastCalledWith('x1', {
       resultsPublished: true,
       showAnswers: true,
     });
+  });
+
+  it('opens the attempt a notification points to, with the mentor notes', async () => {
+    fixture.componentRef.setInput('submission', 'x1_jose_1');
+    fixture.componentRef.setInput('id', 'x2');
+    await fixture.whenStable();
+    await fixture.whenStable();
+    expect(el.querySelector('.grading h2')?.textContent).toContain('José Pérez');
+    expect(el.querySelector('app-mentor-notes')?.textContent).toContain('Notas del mentor');
   });
 
   it('marks unfinished attempts whose time ran out', () => {
