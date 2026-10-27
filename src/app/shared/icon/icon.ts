@@ -75,6 +75,18 @@ export const ICONS = {
     'M8 21h8',
     'M12 17v4',
   ],
+  download: ['M12 3v12', 'm7 10 5 5 5-5', 'M5 21h14'],
+  // iOS Share button and "Add to Home Screen" (install instructions).
+  share: [
+    'M12 3v12',
+    'm8 7 4-4 4 4',
+    'M8 10H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-2',
+  ],
+  addSquare: [
+    'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z',
+    'M12 8v8',
+    'M8 12h8',
+  ],
 } satisfies Record<string, string[]>;
 
 export type IconName = keyof typeof ICONS;

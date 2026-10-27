@@ -1,0 +1,85 @@
+.backdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  background: rgb(0 0 0 / 45%);
+}
+
+// A bottom sheet on phones, near the Share button of Safari's toolbar.
+.dialog {
+  position: fixed;
+  z-index: 31;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 32px));
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius) * 2);
+  background: var(--color-bg);
+  color: var(--color-text);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 30%);
+  outline: none;
+  animation: sheet-in 0.2s ease-out;
+}
+
+.head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+
+  img {
+    flex: none;
+    border-radius: 12px;
+  }
+
+  h2 {
+    margin: 0 0 2px;
+    font-size: 1.1rem;
+  }
+
+  p {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.9rem;
+  }
+}
+
+ol {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+  padding: 0;
+  list-style: none;
+}
+
+li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  font-size: 0.95rem;
+
+  app-icon {
+    flex: none;
+  }
+}
+
+.btn {
+  width: 100%;
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog {
+    animation: none;
+  }
+}

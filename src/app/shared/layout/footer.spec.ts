@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { I18n } from '../../core/i18n/i18n.service';
+import { AppInstall } from '../../core/pwa/app-install.service';
 import { Footer } from './footer';
 
 describe('Footer', () => {
@@ -29,5 +30,17 @@ describe('Footer', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('INDAB and crisortizdev. All rights reserved.');
     expect(el.textContent).toContain('Built by');
+  });
+
+  it('offers "Install app" only where the browser can install the site', async () => {
+    const fixture = await render();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.install')).toBeNull();
+
+    TestBed.inject(AppInstall).ios.set(true);
+    await fixture.whenStable();
+    el.querySelector<HTMLButtonElement>('.install')!.click();
+    expect(el.querySelector('.install')?.textContent?.trim()).toBe('Instalar app');
+    expect(TestBed.inject(AppInstall).helpOpen()).toBe(true);
   });
 });

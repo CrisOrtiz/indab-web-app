@@ -130,6 +130,10 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
   `begin()`/end for listeners until their first snapshot); leave background work untracked
   (e.g. `loadCandles(..., { background: true })` for the replay's next chunk). Favicons and app
   icons in `public/` are cut from the logo's mark (the M with the arrow).
+- Installable app (PWA, README "Installable app"): service worker in production builds only;
+  `ngsw-config.json` caches the app's own files, never Firestore/Auth/market data. Keep new
+  public files cacheable by its globs and keep `ngsw-worker.js`/`ngsw.json` `no-cache` in
+  `firebase.json`. `AppInstall` and `AppUpdates` live in `core/pwa`, their UI in `shared/pwa`.
 - SEO: public pages are prerendered at build time (`outputMode: "static"`, `@angular/ssr`, no
   hydration) and `Seo` (`core/seo`) sets meta, canonical, `hreflang` (`?lang=es|en|pt` links) and
   Open Graph tags per route and language. Code on public pages runs once in Node at build time:

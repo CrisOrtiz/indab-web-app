@@ -1,0 +1,55 @@
+// Above the page (and the practice chart), under the header's dropdowns.
+.banner {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 10px 10px 10px 16px;
+  border-radius: var(--radius);
+  background: var(--color-band);
+  color: var(--color-band-text);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+  font-size: 0.9rem;
+  animation: banner-in 0.25s ease-out;
+}
+
+.btn {
+  padding: 6px 14px;
+  border-color: var(--color-band-text);
+  background: var(--color-band-text);
+  color: var(--color-band);
+  white-space: nowrap;
+}
+
+.close {
+  display: inline-flex;
+  padding: 4px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-band-muted);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-band-text);
+  }
+}
+
+@keyframes banner-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner {
+    animation: none;
+  }
+}

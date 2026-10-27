@@ -240,4 +240,24 @@ describe('Header', () => {
     expect(navigate).toHaveBeenCalledWith('/');
     expect(menu()).toBeNull();
   });
+
+  it('offers "Install app" in the menu when the browser can install the site', async () => {
+    await as();
+    const event = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
+      prompt: vi.fn(async () => undefined),
+      userChoice: Promise.resolve({ outcome: 'accepted' as const }),
+    });
+    window.dispatchEvent(event);
+    await openMenu();
+    const items = [...menu()!.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+    expect(items.map((i) => i.textContent?.trim())).toEqual([
+      'Mi perfil',
+      'Instalar app',
+      'Cerrar sesión',
+    ]);
+    items[1].click();
+    await fixture.whenStable();
+    expect(event.prompt).toHaveBeenCalled();
+    expect(menu()).toBeNull();
+  });
 });

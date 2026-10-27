@@ -303,6 +303,30 @@ saved in the browser (`localStorage` key `indab.theme`), not in Firestore.
   services of signed-in pages can still `inject(FIRESTORE)`. A public page that needs Firestore
   must `await inject(FIRESTORE_LOADER).load()` instead.
 
+## Installable app (PWA)
+
+- **Manifest**: `public/manifest.webmanifest` (`display: standalone`, icons cut from the logo's
+  mark, a maskable one for Android). iOS reads the `apple-touch-icon` and the
+  `apple-mobile-web-app-*` tags in `src/index.html`.
+- **Service worker**: production builds only (`serviceWorker` in `angular.json`,
+  `provideServiceWorker` in `app.config.ts`, registered once the app is stable).
+  `ngsw-config.json` caches the app's own files: the JS/CSS and `index.csr.html` up front (the
+  app shell for every page, also offline), images on first use. Firestore, Auth, Binance candles
+  and the TradingView widget are other origins and always go to the network; nothing is cached as
+  data. Navigation never captures `/__/*` (Firebase's reserved URLs).
+- **Updates**: `AppUpdates` (`core/pwa`) checks for a new deploy when the app comes back to the
+  screen and every 30 minutes; once it is downloaded, a banner (`shared/pwa/update-banner`) offers
+  to reload. Hosting serves `ngsw-worker.js`, `ngsw.json` and the manifest with `no-cache`, and
+  only hashed bundles (`name-XXXXXXXX.js|css`) as immutable (`firebase.json`).
+- **Install option**: `AppInstall` keeps Chrome/Edge/Android's install prompt (an early listener
+  in `index.html` catches it before the app starts) and shows "Instalar app" in the account menu
+  and the footer. On iPhone/iPad, which have no prompt, it opens Share > Add to Home Screen
+  instructions (`shared/pwa/install-help`). Inside the installed app the option is hidden.
+- **Testing it**: `ng serve` has no service worker. Run `npm run build` and serve
+  `dist/indab-web-app/browser` with `npx firebase emulators:start --only hosting`, then open
+  http://localhost:5000 (Chrome DevTools > Application shows the manifest and worker).
+- Push notifications are not set up (they need a server to send them).
+
 ## Trading practice (chart replay)
 
 `/academy/practice` replays real historical candles bar by bar. For now the only market is

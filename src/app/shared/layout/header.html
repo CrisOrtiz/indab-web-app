@@ -1,4 +1,5 @@
 @let t = i18n.messages().header;
+@let pwa = i18n.messages().pwa;
 <header class="header">
   <div class="container header-inner">
     <a routerLink="/" class="brand">
@@ -78,6 +79,11 @@
             </div>
             <a role="menuitem" routerLink="/profile">{{ t.profile }}</a>
             <app-theme-options />
+            @if (install.available()) {
+              <button role="menuitem" type="button" (click)="installApp()">
+                {{ pwa.install }}
+              </button>
+            }
             <button role="menuitem" type="button" (click)="signOut()">{{ t.signOut }}</button>
           </div>
         }
