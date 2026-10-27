@@ -257,6 +257,9 @@
             </button>
           </div>
         </form>
+        @if (noteTarget(); as target) {
+          <app-mentor-notes class="grading-notes" [target]="target" />
+        }
       }
     }
   }

@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   query,
   serverTimestamp,
@@ -73,6 +74,12 @@ export class EvaluationService {
     );
     const byId = new Map(snapshots.flatMap((s) => this.read(s)).map((e) => [e.id, e]));
     return sortByWindow([...byId.values()]);
+  }
+
+  /** One evaluation (staff, or a student it is assigned to), or null if missing. */
+  async get(id: string): Promise<Evaluation | null> {
+    const snapshot = await getDoc(doc(this.evaluations, id));
+    return snapshot.exists() ? { ...(snapshot.data() as Evaluation), id: snapshot.id } : null;
   }
 
   async create(input: EvaluationInput): Promise<string> {

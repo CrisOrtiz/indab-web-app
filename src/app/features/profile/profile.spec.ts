@@ -12,6 +12,7 @@ import { SessionsService } from './sessions.service';
 import { DeviceSession } from '../../core/models/user-profile';
 
 import { PhotoError } from '../../shared/avatar/resize-image';
+import { quietNotifications } from '../notifications/testing';
 
 type FakeUser = {
   uid: string;
@@ -36,6 +37,7 @@ describe('Profile', () => {
     user: signal<FakeUser | null>(null),
     profile: signal<Record<string, unknown> | null>(null),
     isAdmin: signal(false),
+    isStaff: signal(false),
     hasAcademyAccess: signal(false),
     sessionId: signal<string | null>('here'),
     whenReady: () => Promise.resolve(),
@@ -101,6 +103,7 @@ describe('Profile', () => {
     TestBed.configureTestingModule({
       imports: [Profile],
       providers: [
+        ...quietNotifications().providers,
         provideRouter([]),
         { provide: AuthService, useValue: auth },
         { provide: ProfileService, useValue: profiles },

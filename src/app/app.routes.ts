@@ -87,6 +87,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/practice/practice').then((m) => m.Practice),
   },
   {
+    // One session or evaluation attempt, for its student or staff (notifications link here).
+    path: 'academy/practice/sessions/:id',
+    title: 'practiceSession',
+    canActivate: [enrolledGuard],
+    loadComponent: () => import('./features/practice/session-page').then((m) => m.SessionPage),
+  },
+  {
     path: 'academy/ranking',
     title: 'ranking',
     canActivate: [enrolledGuard],

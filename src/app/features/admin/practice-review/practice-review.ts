@@ -91,6 +91,10 @@ export class PracticeReview {
     void this.show(this.pages.previous());
   }
 
+  protected evaluationTitle(id: string | null | undefined): string {
+    return this.evaluationOptions().find((e) => e.id === id)?.title ?? '';
+  }
+
   protected toggle(session: PracticeSession): void {
     this.selected.set(this.selected() === session.id ? null : session.id);
   }

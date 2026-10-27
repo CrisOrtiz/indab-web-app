@@ -15,6 +15,7 @@ import {
 import { Mentorship, audienceIds } from '../../../core/models/mentorship';
 import { EvaluationService, StudentOption } from '../../evaluations/evaluation.service';
 import { MentorshipService } from '../../mentorships/mentorship.service';
+import { NotificationService } from '../../notifications/notification.service';
 import { AudiencePicker } from '../audience/audience-picker';
 import { ExamService } from '../../exams/exam.service';
 import {
@@ -43,6 +44,7 @@ export class AdminExams {
   private readonly service = inject(ExamService);
   private readonly evaluations = inject(EvaluationService);
   private readonly mentorshipService = inject(MentorshipService);
+  private readonly notifications = inject(NotificationService);
   protected readonly i18n = inject(I18n);
 
   protected readonly types: QuestionType[] = ['single', 'multiple', 'trueFalse', 'open'];
@@ -254,7 +256,17 @@ export class AdminExams {
     const { input, key } = fromForm(form, editing);
     this.saving.set(true);
     try {
-      await this.service.save(editing?.id ?? null, input, key);
+      const id = await this.service.save(editing?.id ?? null, input, key);
+      // Once published, students who were not given it before hear of it once.
+      const before = new Set(editing?.published ? this.recipients(editing) : []);
+      if (input.published) {
+        void this.notifications.notifyStudents(
+          'assigned',
+          'exam',
+          { id, title: input.title },
+          this.recipients(input).filter((uid) => !before.has(uid)),
+        );
+      }
       this.message.set({ kind: 'ok', text: t.saved(input.title) });
       this.cancel();
       await this.reload();
@@ -263,6 +275,15 @@ export class AdminExams {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  /** The students a form is given to: everyone with academy access, or its audience. */
+  private recipients(exam: Pick<Exam, 'audience' | 'studentIds' | 'mentorshipIds'>): string[] {
+    return exam.audience === 'all'
+      ? this.students()
+          .filter((s) => s.academy)
+          .map((s) => s.uid)
+      : audienceIds(exam, this.students());
   }
 
   protected async remove(exam: Exam): Promise<void> {

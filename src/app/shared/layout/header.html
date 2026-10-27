@@ -49,6 +49,12 @@
     </nav>
     <app-language-switcher class="language" />
     @if (auth.isLoggedIn()) {
+      <!-- The bell needs Firestore, loaded once the profile is: its code downloads only then. -->
+      @if (auth.profile()) {
+        @defer (on immediate) {
+          <app-notification-bell class="notifications" />
+        }
+      }
       <div class="account">
         <button
           type="button"

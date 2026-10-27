@@ -11,6 +11,7 @@ import { EvaluationService } from '../evaluations/evaluation.service';
 import { Evaluation } from '../../core/models/evaluation';
 import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
 import { SessionReview } from './session-review';
+import { quietNotifications } from '../notifications/testing';
 
 // The real chart needs a canvas; the page only passes it data.
 @Component({ selector: 'app-replay-chart', template: '<ng-content />' })
@@ -68,6 +69,8 @@ const history = async (_symbol: string, interval: string, endTime: number, limit
 };
 
 describe('Practice page', () => {
+  const quiet = quietNotifications();
+  quiet.notifications.notifyActivity = vi.fn(async (..._args: unknown[]) => 0);
   let fixture: ComponentFixture<Practice>;
   let el: HTMLElement;
   const market = { loadCandles: vi.fn(), loadHistory: vi.fn() };
@@ -89,6 +92,8 @@ describe('Practice page', () => {
   const auth = {
     user: signal({ uid: 'u1', email: 'ana@indab.co' }),
     profile: signal({ displayName: 'Ana' }),
+    isStaff: signal(false),
+    isAdmin: signal(false),
   };
 
   beforeEach(async () => {
@@ -122,6 +127,7 @@ describe('Practice page', () => {
     TestBed.configureTestingModule({
       imports: [Practice],
       providers: [
+        ...quiet.providers,
         provideRouter([]),
         { provide: AuthService, useValue: auth },
         { provide: MarketDataService, useValue: market },
@@ -273,6 +279,14 @@ describe('Practice page', () => {
       expect.objectContaining({ exitReason: 'sessionEnd' }),
     );
     expect(practice.finishSession).toHaveBeenCalled();
+    expect(quiet.notifications.notifyActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'evaluationFinished',
+        kind: 'evaluation',
+        refId: 'session-1',
+        contextId: expect.any(String),
+      }),
+    );
     expect(el.textContent).toContain('Sesión terminada');
     // The card now shows it as taken.
     expect(evaluations.assignedTo).toHaveBeenCalledTimes(loads + 1);
@@ -601,6 +615,14 @@ describe('Practice page', () => {
       balance: 199,
       pnl: -1,
       tradeCount: 1,
+    });
+    // Staff who follow the student hear of it.
+    expect(quiet.notifications.notifyActivity).toHaveBeenCalledWith({
+      type: 'practiceFinished',
+      kind: 'practice',
+      refId: 'session-1',
+      contextId: null,
+      title: '',
     });
     expect(el.textContent).toContain('Sesión terminada');
     expect(el.querySelector('app-session-stats svg')?.getAttribute('aria-label')).toBe(

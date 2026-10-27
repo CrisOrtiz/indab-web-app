@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 import { AuthService } from '../../core/auth/auth.service';
 import { Header } from './header';
 import { LandingSections } from './landing-sections';
+import { quietNotifications } from '../../features/notifications/testing';
 
 describe('Header', () => {
   let fixture: ComponentFixture<Header>;
@@ -27,7 +28,11 @@ describe('Header', () => {
     auth.isStaff.set(false);
     TestBed.configureTestingModule({
       imports: [Header],
-      providers: [provideRouter([]), { provide: AuthService, useValue: auth }],
+      providers: [
+        ...quietNotifications().providers,
+        provideRouter([]),
+        { provide: AuthService, useValue: auth },
+      ],
     });
     fixture = TestBed.createComponent(Header);
     await fixture.whenStable();

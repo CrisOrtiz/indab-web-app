@@ -22,6 +22,7 @@ import {
   sum,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -1472,6 +1473,402 @@ describe('mentorships', () => {
         updatedAt: serverTimestamp(),
       }),
     );
+  });
+});
+
+describe('mentor notes and notifications', () => {
+  const hour = 60 * 60 * 1000;
+  const seed = (path: string, data: Record<string, unknown>) =>
+    env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), path), data));
+  const stamps = { createdBy: 'trainer', createdAt: new Date(), updatedAt: new Date() };
+
+  beforeEach(async () => {
+    // `trainer` mentors m1, whose student is `ana`; `coach` is a trainer who mentors nobody.
+    await seed('users/coach', { uid: 'coach', role: 'trainer' });
+    await seed('users/ana', { uid: 'ana', role: 'student', mentorshipIds: ['m1'] });
+    await seed('users/other', { uid: 'other', role: 'student' });
+    await seed('enrollments/ana', { academy: true, courses: [] });
+    await seed('enrollments/other', { academy: true, courses: [] });
+    await seed('mentorships/m1', { name: 'Oro', mentorIds: ['trainer'], active: true });
+    await seed('mentorships/m2', { name: 'Otra', mentorIds: ['coach'], active: true });
+    await seed('practiceSessions/s1', { uid: 'ana', status: 'finished', evaluationId: null });
+    await seed('practiceSessions/s2', { uid: 'ana', status: 'active', evaluationId: null });
+    await seed('practiceSessions/s3', { uid: 'other', status: 'finished', evaluationId: null });
+    await seed('evaluations/e1', {
+      title: 'Evaluación oro',
+      studentIds: [],
+      mentorshipIds: ['m1'],
+      resultsPublished: true,
+      opensAt: new Date(Date.now() - hour),
+      closesAt: new Date(Date.now() + hour),
+      ...stamps,
+    });
+    await seed('practiceSessions/e1_ana', { uid: 'ana', status: 'finished', evaluationId: 'e1' });
+    await seed('examForms/x1', {
+      title: 'Examen 1',
+      published: true,
+      resultsPublished: false,
+      audience: 'selected',
+      studentIds: ['ana'],
+      opensAt: new Date(Date.now() - hour),
+      closesAt: new Date(Date.now() + hour),
+      ...stamps,
+    });
+    await seed('examSubmissions/x1_ana_1', {
+      examId: 'x1',
+      uid: 'ana',
+      attempt: 1,
+      status: 'submitted',
+    });
+  });
+
+  const note = (extra: Record<string, unknown> = {}) => ({
+    studentId: 'ana',
+    kind: 'practice',
+    targetId: 's1',
+    contextId: null,
+    mentorshipId: 'm1',
+    text: 'Buen manejo del stop loss.',
+    authorId: 'trainer',
+    authorName: 'Coach',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const noteRef = (uid: string | null, id = 'n1') => doc(as(uid), `mentorNotes/${id}`);
+
+  describe('mentor notes', () => {
+    it('are written by mentors of one of the student’s mentorships, and by admins', async () => {
+      await assertSucceeds(setDoc(noteRef('trainer'), note()));
+      await assertSucceeds(
+        setDoc(noteRef('admin', 'n2'), note({ authorId: 'admin', mentorshipId: null })),
+      );
+      // Not a mentor of ana's mentorship, or naming one she is not in.
+      await assertFails(setDoc(noteRef('coach', 'n3'), note({ authorId: 'coach' })));
+      await assertFails(
+        setDoc(noteRef('coach', 'n3'), note({ authorId: 'coach', mentorshipId: 'm2' })),
+      );
+      await assertFails(setDoc(noteRef('trainer', 'n3'), note({ mentorshipId: null })));
+      await assertFails(setDoc(noteRef('ana', 'n3'), note({ authorId: 'ana' })));
+      await assertFails(setDoc(noteRef('trainer', 'n3'), note({ authorId: 'admin' })));
+    });
+
+    it('belong to the student’s own work and say what it is', async () => {
+      await assertFails(
+        setDoc(noteRef('admin', 'n3'), note({ authorId: 'admin', targetId: 's3' })),
+      );
+      await assertFails(setDoc(noteRef('trainer', 'n3'), note({ targetId: 'missing' })));
+      // An evaluation attempt is not free practice, and names its evaluation.
+      await assertFails(setDoc(noteRef('trainer', 'n3'), note({ targetId: 'e1_ana' })));
+      await assertFails(
+        setDoc(
+          noteRef('trainer', 'n3'),
+          note({ kind: 'evaluation', targetId: 'e1_ana', contextId: 'e2' }),
+        ),
+      );
+      await assertSucceeds(
+        setDoc(
+          noteRef('trainer', 'n3'),
+          note({ kind: 'evaluation', targetId: 'e1_ana', contextId: 'e1' }),
+        ),
+      );
+      await assertFails(
+        setDoc(noteRef('trainer', 'n4'), note({ kind: 'exam', targetId: 'x1_ana_1' })),
+      );
+      await assertSucceeds(
+        setDoc(
+          noteRef('trainer', 'n4'),
+          note({ kind: 'exam', targetId: 'x1_ana_1', contextId: 'x1' }),
+        ),
+      );
+      await assertFails(setDoc(noteRef('trainer', 'n5'), note({ text: '  ' })));
+      await assertFails(setDoc(noteRef('trainer', 'n5'), note({ text: 'x'.repeat(2001) })));
+      await assertFails(setDoc(noteRef('trainer', 'n5'), note({ extra: true })));
+    });
+
+    it('are read by staff and by their student only', async () => {
+      await seed('mentorNotes/n1', { ...note(), createdAt: new Date(), updatedAt: new Date() });
+      const mine = (uid: string) =>
+        getDocs(
+          query(
+            collection(as(uid), 'mentorNotes'),
+            where('studentId', '==', uid),
+            where('targetId', '==', 's1'),
+          ),
+        );
+      await assertSucceeds(mine('ana'));
+      await assertSucceeds(getDoc(noteRef('ana')));
+      await assertSucceeds(getDoc(noteRef('coach')));
+      await assertSucceeds(
+        getDocs(query(collection(as('coach'), 'mentorNotes'), where('targetId', '==', 's1'))),
+      );
+      await assertFails(getDoc(noteRef('other')));
+      await assertFails(
+        getDocs(query(collection(as('ana'), 'mentorNotes'), where('targetId', '==', 's1'))),
+      );
+      await assertFails(getDoc(noteRef(null)));
+    });
+
+    it('are edited by their author and deleted by them or an admin', async () => {
+      await seed('mentorNotes/n1', { ...note(), createdAt: new Date(), updatedAt: new Date() });
+      await assertSucceeds(
+        updateDoc(noteRef('trainer'), { text: 'Mejor así.', updatedAt: serverTimestamp() }),
+      );
+      await assertFails(
+        updateDoc(noteRef('trainer'), { studentId: 'other', updatedAt: serverTimestamp() }),
+      );
+      await assertFails(
+        updateDoc(noteRef('admin'), { text: 'Otra cosa', updatedAt: serverTimestamp() }),
+      );
+      await assertFails(deleteDoc(noteRef('ana')));
+      await assertFails(deleteDoc(noteRef('coach')));
+      await assertSucceeds(deleteDoc(noteRef('admin')));
+    });
+  });
+
+  describe('notifications', () => {
+    const notice = (extra: Record<string, unknown> = {}) => ({
+      type: 'assigned',
+      kind: 'evaluation',
+      refId: 'e1',
+      contextId: 'e1',
+      title: 'Evaluación oro',
+      actorId: 'trainer',
+      actorName: 'Coach',
+      studentId: 'ana',
+      read: false,
+      createdAt: serverTimestamp(),
+      ...extra,
+    });
+    const box = (uid: string | null, owner: string, id: string) =>
+      doc(as(uid), `users/${owner}/notifications/${id}`);
+
+    it('tell a student of a mentor’s new note, in the same batch', async () => {
+      const db = as('trainer');
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'mentorNotes/n9'), note());
+      batch.set(
+        doc(db, 'users/ana/notifications/note_n9'),
+        notice({ type: 'note', kind: 'practice', refId: 's1', contextId: null, noteId: 'n9' }),
+      );
+      await assertSucceeds(batch.commit());
+      // Nobody else can claim that note, nor send one for a note that does not exist.
+      await assertFails(
+        setDoc(
+          box('coach', 'ana', 'note_n9'),
+          notice({
+            type: 'note',
+            kind: 'practice',
+            refId: 's1',
+            contextId: null,
+            noteId: 'n9',
+            actorId: 'coach',
+          }),
+        ),
+      );
+      await assertFails(
+        setDoc(
+          box('trainer', 'ana', 'note_n8'),
+          notice({ type: 'note', kind: 'practice', refId: 's1', contextId: null, noteId: 'n8' }),
+        ),
+      );
+    });
+
+    it('tell students of evaluations and forms given to them and of their results', async () => {
+      await assertSucceeds(setDoc(box('trainer', 'ana', 'assigned_e1'), notice()));
+      await assertSucceeds(
+        setDoc(box('trainer', 'ana', 'results_e1'), notice({ type: 'results' })),
+      );
+      await assertSucceeds(
+        setDoc(
+          box('trainer', 'ana', 'assigned_x1'),
+          notice({ kind: 'exam', refId: 'x1', contextId: 'x1', title: 'Examen 1' }),
+        ),
+      );
+      // Not in the audience, results not published, a wrong id, or sent by a student.
+      await assertFails(
+        setDoc(box('trainer', 'other', 'assigned_e1'), notice({ studentId: 'other' })),
+      );
+      await assertFails(
+        setDoc(
+          box('trainer', 'ana', 'results_x1'),
+          notice({ type: 'results', kind: 'exam', refId: 'x1', contextId: 'x1' }),
+        ),
+      );
+      await assertFails(setDoc(box('trainer', 'ana', 'assigned_e1x'), notice()));
+      await assertFails(setDoc(box('other', 'ana', 'assigned_e1'), notice({ actorId: 'other' })));
+      await assertFails(setDoc(box('trainer', 'ana', 'assigned_e1'), notice({ actorId: 'admin' })));
+    });
+
+    it('are read, marked as read and deleted by their owner only', async () => {
+      await seed('users/ana/notifications/assigned_e1', { ...notice(), createdAt: new Date() });
+      await assertSucceeds(getDocs(collection(as('ana'), 'users/ana/notifications')));
+      await assertFails(getDocs(collection(as('trainer'), 'users/ana/notifications')));
+      await assertFails(getDoc(box('admin', 'ana', 'assigned_e1')));
+      await assertFails(updateDoc(box('ana', 'ana', 'assigned_e1'), { title: 'Otra' }));
+      await assertFails(updateDoc(box('trainer', 'ana', 'assigned_e1'), { read: true }));
+      await assertSucceeds(updateDoc(box('ana', 'ana', 'assigned_e1'), { read: true }));
+      // Sent once: the same event cannot be sent again.
+      await assertFails(setDoc(box('trainer', 'ana', 'assigned_e1'), notice()));
+      await assertSucceeds(deleteDoc(box('ana', 'ana', 'assigned_e1')));
+    });
+
+    describe('of student activity', () => {
+      const follow = (kind: string, id: string, staff: string, types: string[]) =>
+        seed(`follows/${kind}/subjects/${id}/followers/${staff}`, { types, updatedAt: new Date() });
+      const activity = (extra: Record<string, unknown> = {}) =>
+        notice({
+          type: 'practiceFinished',
+          kind: 'practice',
+          refId: 's1',
+          contextId: null,
+          actorId: 'ana',
+          actorName: 'Ana',
+          title: '',
+          followKind: 'student',
+          followId: 'ana',
+          ...extra,
+        });
+
+      it('reach only the staff who follow the student, for the activity they chose', async () => {
+        await follow('student', 'ana', 'trainer', ['practiceFinished']);
+        await assertSucceeds(setDoc(box('ana', 'trainer', 'practiceFinished_s1'), activity()));
+        await assertFails(setDoc(box('ana', 'coach', 'practiceFinished_s1'), activity()));
+        // Once per session, and only for the student's own finished sessions.
+        await assertFails(setDoc(box('ana', 'trainer', 'practiceFinished_s1'), activity()));
+        await assertFails(
+          setDoc(box('ana', 'trainer', 'practiceFinished_s2'), activity({ refId: 's2' })),
+        );
+        await assertFails(
+          setDoc(box('ana', 'trainer', 'practiceFinished_s3'), activity({ refId: 's3' })),
+        );
+        await assertFails(
+          setDoc(
+            box('other', 'trainer', 'practiceFinished_s1'),
+            activity({ actorId: 'other', studentId: 'other', followId: 'other' }),
+          ),
+        );
+        // The trainer did not ask to hear of evaluations.
+        await assertFails(
+          setDoc(
+            box('ana', 'trainer', 'evaluationFinished_e1_ana'),
+            activity({
+              type: 'evaluationFinished',
+              kind: 'evaluation',
+              refId: 'e1_ana',
+              contextId: 'e1',
+            }),
+          ),
+        );
+      });
+
+      it('reach followers of a mentorship, an evaluation, a form or everyone', async () => {
+        await follow('mentorship', 'm1', 'trainer', ['evaluationFinished']);
+        await follow('mentorship', 'm2', 'coach', ['evaluationFinished']);
+        await follow('exam', 'x1', 'coach', ['examSubmitted']);
+        await follow('all', 'all', 'admin', ['practiceFinished']);
+        const evaluationDone = activity({
+          type: 'evaluationFinished',
+          kind: 'evaluation',
+          refId: 'e1_ana',
+          contextId: 'e1',
+          followKind: 'mentorship',
+          followId: 'm1',
+        });
+        await assertSucceeds(
+          setDoc(box('ana', 'trainer', 'evaluationFinished_e1_ana'), evaluationDone),
+        );
+        // Ana is not in m2.
+        await assertFails(
+          setDoc(
+            box('ana', 'coach', 'evaluationFinished_e1_ana'),
+            activity({ ...evaluationDone, followId: 'm2' }),
+          ),
+        );
+        await assertSucceeds(
+          setDoc(
+            box('ana', 'coach', 'examSubmitted_x1_ana_1'),
+            activity({
+              type: 'examSubmitted',
+              kind: 'exam',
+              refId: 'x1_ana_1',
+              contextId: 'x1',
+              followKind: 'exam',
+              followId: 'x1',
+            }),
+          ),
+        );
+        await assertSucceeds(
+          setDoc(
+            box('ana', 'admin', 'practiceFinished_s1'),
+            activity({ followKind: 'all', followId: 'all' }),
+          ),
+        );
+      });
+    });
+  });
+
+  describe('follows', () => {
+    const follower = (uid: string | null, kind: string, id: string, staff: string) =>
+      doc(as(uid), `follows/${kind}/subjects/${id}/followers/${staff}`);
+    const data = (types: unknown = ['practiceFinished']) => ({
+      types,
+      updatedAt: serverTimestamp(),
+    });
+
+    it('are written by trainers and admins for themselves only', async () => {
+      await assertSucceeds(setDoc(follower('trainer', 'student', 'ana', 'trainer'), data()));
+      await assertSucceeds(setDoc(follower('admin', 'all', 'all', 'admin'), data()));
+      await assertFails(setDoc(follower('trainer', 'student', 'ana', 'coach'), data()));
+      await assertFails(setDoc(follower('ana', 'student', 'ana', 'ana'), data()));
+      await assertFails(setDoc(follower('admin', 'all', 'ana', 'admin'), data()));
+      await assertFails(setDoc(follower('admin', 'course', 'c1', 'admin'), data()));
+      await assertFails(setDoc(follower('trainer', 'student', 'ana', 'trainer'), data([])));
+      await assertFails(setDoc(follower('trainer', 'student', 'ana', 'trainer'), data(['spam'])));
+      await assertSucceeds(deleteDoc(follower('trainer', 'student', 'ana', 'trainer')));
+    });
+
+    it('are listed by the students they concern', async () => {
+      const list = (uid: string, kind: string, id: string) =>
+        getDocs(collection(as(uid), `follows/${kind}/subjects/${id}/followers`));
+      await assertSucceeds(list('ana', 'student', 'ana'));
+      await assertSucceeds(list('ana', 'mentorship', 'm1'));
+      await assertSucceeds(list('ana', 'evaluation', 'e1'));
+      await assertSucceeds(list('ana', 'exam', 'x1'));
+      await assertSucceeds(list('ana', 'all', 'all'));
+      await assertFails(list('other', 'student', 'ana'));
+      await assertFails(list('ana', 'mentorship', 'm2'));
+      await assertFails(list('other', 'evaluation', 'e1'));
+      await assertFails(list('other', 'exam', 'x1'));
+    });
+  });
+
+  describe('notification settings', () => {
+    const settings = (uid: string | null, owner: string) =>
+      doc(as(uid), `users/${owner}/settings/notifications`);
+    const data = (extra: Record<string, unknown> = {}) => ({
+      types: ['practiceFinished', 'examSubmitted'],
+      all: false,
+      studentIds: ['ana'],
+      mentorshipIds: ['m1'],
+      evaluationIds: [],
+      examIds: ['x1'],
+      updatedAt: serverTimestamp(),
+      ...extra,
+    });
+
+    it('belong to each trainer or admin', async () => {
+      await assertSucceeds(setDoc(settings('trainer', 'trainer'), data()));
+      await assertSucceeds(getDoc(settings('trainer', 'trainer')));
+      await assertFails(getDoc(settings('admin', 'trainer')));
+      await assertFails(setDoc(settings('admin', 'trainer'), data()));
+      await assertFails(setDoc(settings('ana', 'ana'), data()));
+      await assertFails(setDoc(settings('trainer', 'trainer'), data({ types: ['note'] })));
+      await assertFails(
+        setDoc(settings('trainer', 'trainer'), data({ studentIds: Array(101).fill('x') })),
+      );
+      await assertFails(setDoc(doc(as('trainer'), 'users/trainer/settings/other'), data()));
+    });
   });
 });
 

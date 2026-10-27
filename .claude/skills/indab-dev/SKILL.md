@@ -51,22 +51,26 @@ otherwise create a feature service.
 
 ## Access model
 
-| Collection                                                       | Read                                                                        | Write                                                                                                                                                     |
-| ---------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `users/{uid}`                                                    | owner, staff                                                                | owner creates as `student`, edits `displayName`, `photoURL`, `birthDate`, `whatsapp`; admins change `role` and `mentorshipIds` of others only             |
-| `users/{uid}/sessions/{id}`                                      | owner                                                                       | each browser records itself; owner sets `revoked` once, deletes; admins delete                                                                            |
-| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, staff                                                                | admins (shape validated)                                                                                                                                  |
-| `courses/{id}`                                                   | everyone if `published`, admins                                             | admins                                                                                                                                                    |
-| `courses/{id}/lessons/{id}`                                      | enrolled in course or academy access                                        | admins                                                                                                                                                    |
-| `materials/{id}`                                                 | academy access                                                              | admins                                                                                                                                                    |
-| `investors/{uid}` (Eleva)                                        | owner, admins                                                               | admins                                                                                                                                                    |
-| `mentorships/{id}`                                               | staff; members (`users/{uid}.mentorshipIds`)                                | admins (shape validated)                                                                                                                                  |
-| `evaluations/{id}`                                               | staff, assigned students (by uid or mentorship)                             | staff (shape validated)                                                                                                                                   |
-| `practiceSessions/{id}` + `/trades/{id}`                         | owner, staff; attempts at published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete |
-| `examForms/{id}`                                                 | staff; published + assigned to students                                     | staff (shape validated; no answers stored here)                                                                                                           |
-| `examKeys/{examId}`                                              | staff; students once `resultsPublished && showAnswers`                      | staff                                                                                                                                                     |
-| `examSubmissions/{examId}_{uid}_{n}`                             | owner, staff                                                                | owner (academy access): attempt n ≤ `maxAttempts`, in window, previous handed in; saves until deadline + 2 min                                            |
-| `examGrades/{submissionId}`                                      | staff; student once `resultsPublished`                                      | staff, for an existing submission                                                                                                                         |
+| Collection                                                       | Read                                                                        | Write                                                                                                                                                           |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users/{uid}`                                                    | owner, staff                                                                | owner creates as `student`, edits `displayName`, `photoURL`, `birthDate`, `whatsapp`; admins change `role` and `mentorshipIds` of others only                   |
+| `users/{uid}/sessions/{id}`                                      | owner                                                                       | each browser records itself; owner sets `revoked` once, deletes; admins delete                                                                                  |
+| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, staff                                                                | admins (shape validated)                                                                                                                                        |
+| `courses/{id}`                                                   | everyone if `published`, admins                                             | admins                                                                                                                                                          |
+| `courses/{id}/lessons/{id}`                                      | enrolled in course or academy access                                        | admins                                                                                                                                                          |
+| `materials/{id}`                                                 | academy access                                                              | admins                                                                                                                                                          |
+| `investors/{uid}` (Eleva)                                        | owner, admins                                                               | admins                                                                                                                                                          |
+| `mentorships/{id}`                                               | staff; members (`users/{uid}.mentorshipIds`)                                | admins (shape validated)                                                                                                                                        |
+| `evaluations/{id}`                                               | staff, assigned students (by uid or mentorship)                             | staff (shape validated)                                                                                                                                         |
+| `practiceSessions/{id}` + `/trades/{id}`                         | owner, staff; attempts at published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit; trades closed once; admins delete       |
+| `examForms/{id}`                                                 | staff; published + assigned to students                                     | staff (shape validated; no answers stored here)                                                                                                                 |
+| `examKeys/{examId}`                                              | staff; students once `resultsPublished && showAnswers`                      | staff                                                                                                                                                           |
+| `examSubmissions/{examId}_{uid}_{n}`                             | owner, staff                                                                | owner (academy access): attempt n ≤ `maxAttempts`, in window, previous handed in; saves until deadline + 2 min                                                  |
+| `examGrades/{submissionId}`                                      | staff; student once `resultsPublished`                                      | staff, for an existing submission                                                                                                                               |
+| `mentorNotes/{id}`                                               | staff; the student it is about                                              | admins; staff who mentor one of the student's mentorships (`mentorshipId`); on the student's own session or form attempt; author edits, author or admin deletes |
+| `users/{uid}/notifications/{id}`                                 | owner                                                                       | the sender, once per event (id `{type}_{refId}`, `note_{noteId}`); rules check the event and that the sender may tell the owner; owner marks read, deletes      |
+| `users/{uid}/settings/notifications`                             | owner                                                                       | trainers and admins, their own                                                                                                                                  |
+| `follows/{kind}/subjects/{id}/followers/{uid}`                   | that staff member; students, the lists that concern them                    | that staff member (`types` of activity)                                                                                                                         |
 
 Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`, `isStaff()`
 (trainers and admins), `emailVerified()`, `hasAcademyAccess()` (staff count as having it; needs
@@ -125,7 +129,8 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
   sliding underline (`placeIndicator`). Its links: `Nosotros` and `Contáctanos` (`/#nosotros`,
   `/#contacto`, landing sections; `LandingSections` in `shared/layout` scrolls to them and the
   landing reports the section on screen so the underline follows the scroll), then Academia and
-  Admin (short label on phones, so the row fits at 390 px). Eleva Inversiones is out of the header
+  Admin (short label on phones, so the row fits at 390 px). Signed-in users get the notification
+  bell between the language picker and the avatar. Eleva Inversiones is out of the header
   for now (Cris, 2026-10-24); `/eleva` and the landing's Eleva section still link to it. The language picker is a flag menu (`shared/language`:
   Mexico = es-419, USA = en-US, Brazil = pt-BR, inline SVG because Windows has no flag emoji).
   Dropdowns use the global `dropdown-in` keyframes; respect `prefers-reduced-motion`.
@@ -274,6 +279,25 @@ Module notes:
   (`assignedTo(uid, profile.mentorshipIds)`). Staff lists filter with `<app-mentorship-filter>`;
   the practice review sends `uids` (`uid in`, 30 at most). Anything new that is assigned to
   students should accept mentorships too.
+- **Mentor notes and notifications (built)**: `core/models/mentor-note.ts`,
+  `core/models/notification.ts` (types, `notificationLink`, `followedSubjects`).
+  `<app-mentor-notes [target]>` (`features/notes/`, `MentorNotesService`) sits in `SessionReview`
+  (practice and evaluation attempts), the grading panel of `/admin/forms/:id` (outside its form)
+  and under each attempt in `/academy/exams/:id`; pass it a stable target (a `computed`), or it
+  reloads. Admins write on anyone's work, trainers on students of the mentorships they lead
+  (`access()` finds the shared one). A note and its notification are one batch. The bell
+  (`features/notifications/notification-bell.ts`) is `@defer`red in the header once the profile is
+  loaded, so its Firestore code stays out of the main bundle. Spark plan, no functions: senders
+  write into `users/{uid}/notifications` from the browser (`NotificationService.notifyStudents`
+  for `assigned`/`results`, `notifyActivity` for a student's finished practice, evaluation or
+  handed-in form), each id names the event so it goes once, and a repeat is refused and skipped.
+  Staff choose what they follow in `/profile` (`NotificationSettingsPanel`); nothing by default
+  (Cris, 2026-10-27: no spam for mentors and admins). `saveSettings` mirrors it into
+  `follows/.../followers/{uid}`, which students read to find recipients. Deep links:
+  `/academy/practice/sessions/:id` (`SessionPage`) and `/admin/forms/:id?submission=`. Specs fake
+  both services with `quietNotifications()` (`features/notifications/testing.ts`). A new kind of
+  notification needs its case in the rules' `notifications` match, a text in
+  `notifications.text` and a link in `notificationLink`.
 - **Economic calendar (`/calendar`, public, built)**: `features/calendar/`, prerendered, linked in
   the header (a calendar icon on phones so the links fit at 390 px). `/academy/calendar` (signed
   in, route `data: { fromAcademy: true }`) is the same page with a link back to the academy; the

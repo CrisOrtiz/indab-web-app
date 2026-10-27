@@ -24,6 +24,7 @@
   } @else if (list.length) {
     <p class="muted">{{ t.noFilled }}</p>
   }
+  <app-mentor-notes [target]="noteTarget()" />
   <app-session-stats [trades]="list" [startingBalance]="session().startingBalance" />
   <div class="table-scroll">
     <table class="trades">

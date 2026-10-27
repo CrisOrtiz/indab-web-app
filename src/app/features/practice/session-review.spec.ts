@@ -1,11 +1,13 @@
 import { Component, input, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
+import { AuthService } from '../../core/auth/auth.service';
 import { Candle, PracticeSession, PracticeTrade } from '../../core/models/practice';
 import { MarketDataService } from './market-data.service';
 import { PracticeService } from './practice.service';
 import { ReplayChart } from './replay-chart';
 import { SessionReview } from './session-review';
+import { quietNotifications } from '../notifications/testing';
 
 // The real chart needs a canvas; the review only passes it data.
 @Component({ selector: 'app-replay-chart', template: '' })
@@ -66,7 +68,16 @@ describe('SessionReview', () => {
     TestBed.configureTestingModule({
       imports: [Host],
       providers: [
+        ...quietNotifications().providers,
         { provide: PracticeService, useValue: practice },
+        {
+          provide: AuthService,
+          useValue: {
+            user: signal({ uid: 'coach' }),
+            isStaff: signal(true),
+            isAdmin: signal(false),
+          },
+        },
         { provide: MarketDataService, useValue: market },
       ],
     });

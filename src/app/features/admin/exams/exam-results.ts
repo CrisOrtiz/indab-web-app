@@ -14,7 +14,10 @@ import {
   bestGrade,
   suggestScore,
 } from '../../../core/models/exam';
+import { NoteTarget } from '../../../core/models/mentor-note';
 import { Mentorship, audienceIds, membersOf } from '../../../core/models/mentorship';
+import { MentorNotes } from '../../notes/mentor-notes';
+import { NotificationService } from '../../notifications/notification.service';
 import { EvaluationService, StudentOption } from '../../evaluations/evaluation.service';
 import { MentorshipService } from '../../mentorships/mentorship.service';
 import { MentorshipFilter } from '../audience/mentorship-filter';
@@ -68,7 +71,7 @@ export function resultState(
  */
 @Component({
   selector: 'app-exam-results',
-  imports: [DecimalPipe, LocalDatePipe, MentorshipFilter, Pager, RouterLink],
+  imports: [DecimalPipe, LocalDatePipe, MentorNotes, MentorshipFilter, Pager, RouterLink],
   templateUrl: './exam-results.html',
   styleUrls: [
     '../admin.scss',
@@ -83,8 +86,12 @@ export class ExamResults {
   private readonly mentorshipService = inject(MentorshipService);
   protected readonly i18n = inject(I18n);
 
+  private readonly notifications = inject(NotificationService);
+
   /** The form id, from the route. */
   readonly id = input.required<string>();
+  /** An attempt to open for grading once loaded (`?submission=`, from a notification). */
+  readonly submission = input<string>();
 
   protected readonly exam = signal<Exam | null>(null);
   protected readonly key = signal<ExamKey>({ answers: {} });
@@ -180,6 +187,21 @@ export class ExamResults {
   protected readonly current = computed(() =>
     this.rows().find((r) => r.submission?.id === this.selected()),
   );
+
+  /** Where the mentors' notes on the attempt being graded go. */
+  protected readonly noteTarget = computed<NoteTarget | null>(() => {
+    const submission = this.current()?.submission;
+    const exam = this.exam();
+    return submission && exam
+      ? {
+          studentId: submission.uid,
+          kind: 'exam',
+          targetId: submission.id,
+          contextId: exam.id,
+          title: exam.title,
+        }
+      : null;
+  });
 
   /** The draft's total and whether it passes. */
   protected readonly draftTotal = computed(() => {
@@ -315,6 +337,14 @@ export class ExamResults {
     try {
       await this.service.setResults(exam.id, next);
       this.exam.set({ ...exam, ...next });
+      if (next.resultsPublished && !exam.resultsPublished) {
+        void this.notifications.notifyStudents(
+          'results',
+          'exam',
+          exam,
+          this.submissions().map((s) => s.uid),
+        );
+      }
       const text =
         change.resultsPublished !== undefined
           ? next.resultsPublished
@@ -347,6 +377,10 @@ export class ExamResults {
       this.grades.set(grades);
       this.students.set(students);
       this.mentorships.set(mentorships);
+      const opened = this.rows().find((r) => r.submission?.id === this.submission());
+      if (opened) {
+        this.open(opened);
+      }
     } catch {
       this.message.set({ kind: 'error', text: this.i18n.messages().examAdmin.results.loadFailed });
     } finally {

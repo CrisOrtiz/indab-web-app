@@ -5,6 +5,7 @@ import { EvaluationService } from '../../evaluations/evaluation.service';
 import { ExamService } from '../../exams/exam.service';
 import { MentorshipService } from '../../mentorships/mentorship.service';
 import { AdminExams } from './admin-exams';
+import { quietNotifications } from '../../notifications/testing';
 
 const at = (ms: number) => ({ toMillis: () => ms, toDate: () => new Date(ms) });
 const existing = {
@@ -37,6 +38,8 @@ const existing = {
 };
 
 describe('AdminExams', () => {
+  const quiet = quietNotifications();
+  quiet.notifications.notifyStudents = vi.fn(async (..._args: unknown[]) => 0);
   let fixture: ComponentFixture<AdminExams>;
   let el: HTMLElement;
   const service = {
@@ -63,6 +66,7 @@ describe('AdminExams', () => {
     TestBed.configureTestingModule({
       imports: [AdminExams],
       providers: [
+        ...quiet.providers,
         provideRouter([]),
         { provide: ExamService, useValue: service },
         { provide: EvaluationService, useValue: evaluations },
@@ -146,6 +150,13 @@ describe('AdminExams', () => {
     expect(el.querySelector('.sum')?.textContent).toContain('Suma: 100 de 100 puntos');
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
     await fixture.whenStable();
+    // A published form for everyone tells every student with academy access.
+    expect(quiet.notifications.notifyStudents).toHaveBeenCalledWith(
+      'assigned',
+      'exam',
+      { id: 'new', title: 'Velas' },
+      expect.arrayContaining(['jose']),
+    );
     expect(service.save).toHaveBeenCalledWith(
       null,
       expect.objectContaining({

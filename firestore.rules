@@ -37,6 +37,18 @@ rules_version = '2';
 //   practiceSessions/{id}/trades/{id}    simulated orders of that session: market orders open at
 //                                        once, limit/stop orders fill or are cancelled once; open
 //                                        trades close once; only SL/TP (and a pending price) move
+//   mentorNotes/{id}                     a mentor's note on a student's practice session, evaluation
+//                                        attempt or form attempt; written by admins or by a mentor of
+//                                        one of the student's mentorships; staff and the student read
+//   users/{uid}/notifications/{id}       the bell in the header: notes, assignments and results for
+//                                        students; activity of the students a trainer or admin follows.
+//                                        Senders write them (no server); each id names its event, so
+//                                        an event notifies each person once
+//   users/{uid}/settings/notifications   what a trainer or admin follows and which activity they hear of
+//   follows/{kind}/subjects/{id}/followers/{uid}
+//                                        a trainer or admin following a student, a mentorship, an
+//                                        evaluation, a form or everyone ('all'); students read the
+//                                        followers of what concerns them to notify them
 //
 // Admins are users whose profile has role == 'admin'. Promote the first admin by editing
 // their users/{uid} document in the Firebase console; after that, admins manage roles and
@@ -194,6 +206,253 @@ service cloud.firestore {
 
         allow delete: if isOwner(uid) || isAdmin();
       }
+
+      // What a trainer or admin follows (the follower documents below mirror it, so students can
+      // find whom to notify) and which activity they want to hear of.
+      match /settings/{setting} {
+        function validIds(value) {
+          return value is list && value.size() <= 100;
+        }
+
+        allow read: if isOwner(uid);
+        allow write: if isOwner(uid) && isStaff() && setting == 'notifications'
+          && request.resource.data.keys().hasOnly(['types', 'all', 'studentIds', 'mentorshipIds',
+            'evaluationIds', 'examIds', 'updatedAt'])
+          && request.resource.data.types is list
+          && request.resource.data.types.hasOnly(activityTypes())
+          && request.resource.data.all is bool
+          && validIds(request.resource.data.studentIds)
+          && validIds(request.resource.data.mentorshipIds)
+          && validIds(request.resource.data.evaluationIds)
+          && validIds(request.resource.data.examIds)
+          && request.resource.data.updatedAt == request.time;
+      }
+
+      // The bell. Nobody but the owner reads, marks as read or deletes them. Each kind of event
+      // checks that it happened and that the sender may tell the owner about it; the id names
+      // the event, so it is sent once.
+      match /notifications/{notificationId} {
+        function data() {
+          return request.resource.data;
+        }
+
+        // A mentor's new note on the owner's work, written in the same batch as the note.
+        function noteNotice() {
+          return data().type == 'note'
+            && data().noteId is string
+            && notificationId == 'note_' + data().noteId
+            && data().studentId == uid
+            && getAfter(/databases/$(database)/documents/mentorNotes/$(data().noteId)).data.authorId == request.auth.uid
+            && getAfter(/databases/$(database)/documents/mentorNotes/$(data().noteId)).data.studentId == uid
+            && getAfter(/databases/$(database)/documents/mentorNotes/$(data().noteId)).data.targetId == data().refId
+            && getAfter(/databases/$(database)/documents/mentorNotes/$(data().noteId)).data.kind == data().kind;
+        }
+
+        // The owner, a student, among those an evaluation or form is given to.
+        function inAudience(item) {
+          return uid in item.studentIds
+            || item.get('mentorshipIds', []).hasAny(
+              get(/databases/$(database)/documents/users/$(uid)).data.get('mentorshipIds', []));
+        }
+
+        function evaluationDoc() {
+          return get(/databases/$(database)/documents/evaluations/$(data().refId)).data;
+        }
+
+        function examDoc() {
+          return get(/databases/$(database)/documents/examForms/$(data().refId)).data;
+        }
+
+        // Staff tell students of an evaluation or form given to them, and of published results
+        // (only to those who took it).
+        function staffNotice() {
+          return isStaff()
+            && data().type in ['assigned', 'results']
+            && notificationId == data().type + '_' + data().refId
+            && data().studentId == uid
+            && data().contextId == data().refId
+            && ((data().kind == 'evaluation'
+                && exists(/databases/$(database)/documents/evaluations/$(data().refId))
+                && ((data().type == 'assigned' && inAudience(evaluationDoc()))
+                  || (data().type == 'results' && evaluationDoc().resultsPublished == true
+                    && exists(/databases/$(database)/documents/practiceSessions/$(data().refId + '_' + uid)))))
+              || (data().kind == 'exam'
+                && exists(/databases/$(database)/documents/examForms/$(data().refId))
+                && ((data().type == 'assigned' && examDoc().published == true
+                    && (examDoc().audience == 'all' || inAudience(examDoc())))
+                  || (data().type == 'results' && examDoc().resultsPublished == true
+                    && exists(/databases/$(database)/documents/examSubmissions/$(data().refId + '_' + uid + '_1'))))));
+        }
+
+        function followerPath() {
+          return /databases/$(database)/documents/follows/$(data().followKind)/subjects/$(data().followId)/followers/$(uid);
+        }
+
+        // The owner follows the sender (by name, mentorship, the evaluation or form, or everyone)
+        // for this kind of activity.
+        function follows() {
+          return data().followKind is string && data().followId is string
+            && exists(followerPath())
+            && data().type in get(followerPath()).data.types
+            && ((data().followKind == 'student' && data().followId == request.auth.uid)
+              || (data().followKind == 'all' && data().followId == 'all')
+              || (data().followKind == 'mentorship' && data().followId in myMentorships())
+              || (data().followKind == 'evaluation' && data().type == 'evaluationFinished'
+                && data().followId == data().contextId)
+              || (data().followKind == 'exam' && data().type == 'examSubmitted'
+                && data().followId == data().contextId));
+        }
+
+        function sessionDoc() {
+          return get(/databases/$(database)/documents/practiceSessions/$(data().refId)).data;
+        }
+
+        function submissionDoc() {
+          return get(/databases/$(database)/documents/examSubmissions/$(data().refId)).data;
+        }
+
+        // A student tells the staff who follow them that they finished something.
+        function activityNotice() {
+          return data().studentId == request.auth.uid
+            && notificationId == data().type + '_' + data().refId
+            && follows()
+            && ((data().type == 'practiceFinished' && data().kind == 'practice'
+                && data().contextId == null
+                && sessionDoc().uid == request.auth.uid && sessionDoc().status == 'finished'
+                && sessionDoc().get('evaluationId', null) == null)
+              || (data().type == 'evaluationFinished' && data().kind == 'evaluation'
+                && data().contextId is string
+                && sessionDoc().uid == request.auth.uid && sessionDoc().status == 'finished'
+                && sessionDoc().get('evaluationId', null) == data().contextId)
+              || (data().type == 'examSubmitted' && data().kind == 'exam'
+                && submissionDoc().uid == request.auth.uid
+                && submissionDoc().status == 'submitted'
+                && submissionDoc().examId == data().contextId));
+        }
+
+        allow read: if isOwner(uid);
+
+        allow create: if signedIn() && !isOwner(uid)
+          && data().keys().hasOnly(['type', 'kind', 'refId', 'contextId', 'noteId', 'title',
+            'actorId', 'actorName', 'studentId', 'followKind', 'followId', 'read', 'createdAt'])
+          && data().kind in ['practice', 'evaluation', 'exam']
+          && data().refId is string
+          && (data().contextId == null || data().contextId is string)
+          && data().title is string && data().title.size() <= 120
+          && data().actorId == request.auth.uid
+          && data().actorName is string && data().actorName.size() <= 120
+          && data().read == false
+          && data().createdAt == request.time
+          && (noteNotice() || staffNotice() || activityNotice());
+
+        allow update: if isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+          && request.resource.data.read == true;
+
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // Student activity a trainer or admin can be told of.
+    function activityTypes() {
+      return ['practiceFinished', 'evaluationFinished', 'examSubmitted'];
+    }
+
+    // Followers of a subject: a student (by uid), a mentorship, an evaluation, a form, or 'all'.
+    // A student lists the followers of what concerns them, to notify them when they finish
+    // something; nobody else learns who follows whom.
+    match /follows/{kind}/subjects/{subjectId}/followers/{staffUid} {
+      allow read: if isOwner(staffUid)
+        || (kind == 'student' && isOwner(subjectId))
+        || (kind == 'all' && subjectId == 'all' && signedIn())
+        || (kind == 'mentorship' && subjectId in myMentorships())
+        || (kind == 'evaluation' && signedIn()
+          && exists(/databases/$(database)/documents/evaluations/$(subjectId))
+          && assignedTo(get(/databases/$(database)/documents/evaluations/$(subjectId)).data))
+        || (kind == 'exam' && signedIn()
+          && exists(/databases/$(database)/documents/examForms/$(subjectId))
+          && assignedExam(examForm(subjectId)));
+
+      allow create, update: if isOwner(staffUid) && isStaff()
+        && kind in ['student', 'mentorship', 'evaluation', 'exam', 'all']
+        && (kind != 'all' || subjectId == 'all')
+        && request.resource.data.keys().hasOnly(['types', 'updatedAt'])
+        && request.resource.data.types is list
+        && request.resource.data.types.size() > 0
+        && request.resource.data.types.hasOnly(activityTypes())
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if isOwner(staffUid) || isAdmin();
+    }
+
+    // A mentor's note on a student's practice session, evaluation attempt or form attempt.
+    // Admins write on anyone's; trainers (and admins) who mentor one of the student's
+    // mentorships write on its students', naming that mentorship. The student reads them.
+    match /mentorNotes/{noteId} {
+      function practiceSession(id) {
+        return get(/databases/$(database)/documents/practiceSessions/$(id)).data;
+      }
+
+      function submission(id) {
+        return get(/databases/$(database)/documents/examSubmissions/$(id)).data;
+      }
+
+      // The note is on the student's own work, and says what it belongs to.
+      function validTarget(data) {
+        return (data.kind == 'practice'
+            && exists(/databases/$(database)/documents/practiceSessions/$(data.targetId))
+            && practiceSession(data.targetId).uid == data.studentId
+            && practiceSession(data.targetId).get('evaluationId', null) == null
+            && data.contextId == null)
+          || (data.kind == 'evaluation'
+            && exists(/databases/$(database)/documents/practiceSessions/$(data.targetId))
+            && practiceSession(data.targetId).uid == data.studentId
+            && data.contextId is string
+            && practiceSession(data.targetId).get('evaluationId', null) == data.contextId)
+          || (data.kind == 'exam'
+            && exists(/databases/$(database)/documents/examSubmissions/$(data.targetId))
+            && submission(data.targetId).uid == data.studentId
+            && submission(data.targetId).examId == data.contextId);
+      }
+
+      // Admins, or a mentor of a mentorship the student belongs to.
+      function mentorOf(data) {
+        return isAdmin()
+          || (isStaff() && data.mentorshipId is string
+            && data.mentorshipId in get(/databases/$(database)/documents/users/$(data.studentId)).data.get('mentorshipIds', [])
+            && request.auth.uid in get(/databases/$(database)/documents/mentorships/$(data.mentorshipId)).data.mentorIds);
+      }
+
+      function validText(data) {
+        return data.text is string && data.text.trim().size() > 0 && data.text.size() <= 2000;
+      }
+
+      allow read: if isStaff() || (signedIn() && resource.data.studentId == request.auth.uid);
+
+      allow create: if isStaff()
+        && request.resource.data.keys().hasOnly(['studentId', 'kind', 'targetId', 'contextId',
+          'mentorshipId', 'text', 'authorId', 'authorName', 'createdAt', 'updatedAt'])
+        && request.resource.data.studentId is string
+        && request.resource.data.studentId != request.auth.uid
+        && request.resource.data.targetId is string
+        && (request.resource.data.mentorshipId == null || request.resource.data.mentorshipId is string)
+        && validText(request.resource.data)
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.authorName is string
+        && request.resource.data.authorName.size() <= 120
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validTarget(request.resource.data)
+        && mentorOf(request.resource.data);
+
+      // The author edits the text while they still mentor the student.
+      allow update: if resource.data.authorId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'updatedAt'])
+        && validText(request.resource.data)
+        && request.resource.data.updatedAt == request.time
+        && mentorOf(request.resource.data);
+
+      allow delete: if (signedIn() && resource.data.authorId == request.auth.uid) || isAdmin();
     }
 
     match /enrollments/{uid} {

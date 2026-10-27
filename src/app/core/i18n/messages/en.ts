@@ -1,4 +1,5 @@
 import type { Messages } from './es';
+import type { WorkKind } from '../../models/notification';
 
 /** English (United States). Same keys as `es.ts`. */
 export const en: Messages = {
@@ -24,6 +25,7 @@ export const en: Messages = {
     adminExams: 'Evaluation forms | INDAB',
     adminExamResults: 'Grade form | INDAB',
     adminMentorships: 'Mentorships | INDAB',
+    practiceSession: 'Practice | INDAB',
   },
 
   seo: {
@@ -1273,5 +1275,102 @@ export const en: Messages = {
     next: 'Next',
     page: (n: number) => `Page ${n}`,
     pageOf: (n: number, total: number) => `Page ${n} of ${total}`,
+  },
+
+  // The bell in the header and what trainers and admins follow (in /profile).
+  notifications: {
+    bell: 'Notifications',
+    bellUnread: (n: number) => `Notifications, ${n} unread`,
+    unread: 'Unread',
+    empty: 'You have no notifications.',
+    markAll: 'Mark all as read',
+    loadFailed: 'Notifications could not be loaded.',
+    settingsLink: 'Choose what to follow',
+    text: {
+      note: (actor: string, kind: WorkKind, title: string) =>
+        kind === 'practice'
+          ? `${actor} left a note on your practice`
+          : kind === 'evaluation'
+            ? `${actor} left a note on your evaluation “${title}”`
+            : `${actor} left a note on your exam “${title}”`,
+      assigned: (kind: WorkKind, title: string) =>
+        kind === 'exam'
+          ? `You have a new exam: “${title}”`
+          : `You have a new practice evaluation: “${title}”`,
+      results: (title: string) => `The results of “${title}” are out`,
+      practiceFinished: (actor: string) => `${actor} finished a free practice`,
+      evaluationFinished: (actor: string, title: string) =>
+        `${actor} finished the evaluation “${title}”`,
+      examSubmitted: (actor: string, title: string) => `${actor} handed in the form “${title}”`,
+    },
+    settings: {
+      title: 'Notifications',
+      intro:
+        'Choose whose activity reaches your bell. You only hear of what you follow, so it never fills up with noise.',
+      loading: 'Loading your preferences…',
+      typesTitle: 'What to be notified of',
+      types: {
+        practiceFinished: 'A student finished a free practice',
+        evaluationFinished: 'A student finished a practice evaluation',
+        examSubmitted: 'A student handed in an evaluation form',
+      },
+      followTitle: 'Whom to follow',
+      all: 'All students',
+      allHint: 'You will hear of the whole academy’s activity: it can be a lot.',
+      mentorships: 'Mentorships',
+      mentorTag: 'You mentor it',
+      students: 'Students',
+      pickStudent: 'Pick a student',
+      addStudent: 'Follow',
+      removeStudent: (name: string) => `Stop following ${name}`,
+      noStudents: 'You follow no student by name.',
+      evaluations: 'Practice evaluations',
+      exams: 'Evaluation forms',
+      noneYet: 'None yet.',
+      nothingFollowed: 'You follow nothing yet: no student activity will reach you.',
+      noTypes:
+        'No kind of notification is ticked: no activity will reach you even if you follow someone.',
+      studentsGetAll:
+        'Students always get their mentors’ notes, new evaluations and exams, and their results.',
+      tooMany: (max: number) => `You can follow up to ${max} per list.`,
+      save: 'Save preferences',
+      saving: 'Saving…',
+      saved: 'Preferences saved.',
+      saveFailed: 'Your preferences could not be saved.',
+      loadFailed: 'Your preferences could not be loaded.',
+    },
+  },
+
+  // Mentors' notes on a student's practice, evaluation attempts and forms.
+  notes: {
+    title: 'Mentor notes',
+    studentTitle: 'Notes from your mentor',
+    loading: 'Loading notes…',
+    none: 'No notes yet.',
+    label: 'New note',
+    placeholder: 'Write a note for the student…',
+    add: 'Leave note',
+    saving: 'Saving…',
+    edit: 'Edit note',
+    save: 'Save',
+    cancel: 'Cancel',
+    remove: 'Delete note',
+    confirmRemove: 'Delete this note? The student will no longer see it.',
+    edited: 'edited',
+    visibleToStudent: 'The student will see the note and get a notification.',
+    notMentor: 'Only mentors of one of this student’s mentorships and admins can leave notes.',
+    saveFailed: 'The note could not be saved.',
+    removeFailed: 'The note could not be deleted.',
+    loadFailed: 'Notes could not be loaded.',
+  },
+
+  // One practice session on its own page (notifications link here).
+  sessionPage: {
+    back: '← Back to practice',
+    backStaff: '← Back to practice sessions',
+    loading: 'Loading the practice…',
+    notFound: 'We could not find this practice.',
+    free: 'Free practice',
+    evaluation: 'Practice evaluation',
   },
 };

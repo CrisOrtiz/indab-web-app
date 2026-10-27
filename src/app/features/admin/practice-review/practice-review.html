@@ -90,7 +90,12 @@
           </tr>
           @if (selected() === s.id) {
             <tr class="detail">
-              <td colspan="8"><app-session-review [session]="s" /></td>
+              <td colspan="8">
+                <app-session-review
+                  [session]="s"
+                  [evaluationTitle]="evaluationTitle(s.evaluationId)"
+                />
+              </td>
             </tr>
           }
         } @empty {

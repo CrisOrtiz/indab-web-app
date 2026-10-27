@@ -184,6 +184,10 @@
         </ul>
       }
 
+      @for (n of noteTargets(); track n.target.targetId) {
+        <app-mentor-notes [target]="n.target" [label]="t.attempt(n.attempt)" />
+      }
+
       @if (reviewing(); as g) {
         <section class="review" [attr.aria-label]="t.review(g.attempt)">
           <h2>{{ t.review(g.attempt) }}</h2>

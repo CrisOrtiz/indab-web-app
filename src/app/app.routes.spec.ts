@@ -18,6 +18,7 @@ import { AccountSetup } from './features/account-setup/account-setup';
 import { en } from './core/i18n/messages/en';
 import { es } from './core/i18n/messages/es';
 import { pt } from './core/i18n/messages/pt';
+import { quietNotifications } from './features/notifications/testing';
 
 describe('app routes', () => {
   const auth = {
@@ -44,6 +45,7 @@ describe('app routes', () => {
     auth.setupStep.set(null);
     TestBed.configureTestingModule({
       providers: [
+        ...quietNotifications().providers,
         provideRouter(routes),
         { provide: AuthService, useValue: auth },
         { provide: FIRESTORE_LOADER, useValue: firestore },
@@ -74,7 +76,10 @@ describe('app routes', () => {
     TestBed.overrideComponent(AccountSetup, { set: { template: '' } });
     // The users page would open Firestore listeners; only the routing matters here.
     TestBed.overrideComponent(AdminUsers, {
-      set: { providers: [{ provide: AdminService, useValue: {} }], template: '' },
+      set: {
+        providers: [...quietNotifications().providers, { provide: AdminService, useValue: {} }],
+        template: '',
+      },
     });
   });
 

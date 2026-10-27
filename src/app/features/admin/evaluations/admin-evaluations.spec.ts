@@ -5,6 +5,7 @@ import { EvaluationService } from '../../evaluations/evaluation.service';
 import { MentorshipService } from '../../mentorships/mentorship.service';
 import { PracticeService } from '../../practice/practice.service';
 import { AdminEvaluations, toLocalInput } from './admin-evaluations';
+import { quietNotifications } from '../../notifications/testing';
 
 const at = (ms: number) => ({ toMillis: () => ms, toDate: () => new Date(ms) });
 const existing = {
@@ -25,6 +26,8 @@ const existing = {
 };
 
 describe('AdminEvaluations', () => {
+  const quiet = quietNotifications();
+  quiet.notifications.notifyStudents = vi.fn(async (..._args: unknown[]) => 0);
   let fixture: ComponentFixture<AdminEvaluations>;
   let el: HTMLElement;
   const service = {
@@ -79,6 +82,7 @@ describe('AdminEvaluations', () => {
     TestBed.configureTestingModule({
       imports: [AdminEvaluations],
       providers: [
+        ...quiet.providers,
         provideRouter([]),
         { provide: EvaluationService, useValue: service },
         { provide: PracticeService, useValue: practice },
@@ -144,6 +148,13 @@ describe('AdminEvaluations', () => {
         studentIds: ['jose'],
         resultsPublished: false,
       }),
+    );
+    // The new student hears of it.
+    expect(quiet.notifications.notifyStudents).toHaveBeenCalledWith(
+      'assigned',
+      'evaluation',
+      { id: 'new', title: 'Semana 1' },
+      ['jose'],
     );
     const [input] = service.create.mock.calls[0] as unknown as [
       { replayStart: number; opensAt: Date; closesAt: Date },
@@ -288,8 +299,16 @@ describe('AdminEvaluations', () => {
   });
 
   it('publishes the results and deletes after confirming', async () => {
+    practice.evaluationSessions.mockResolvedValue([{ uid: 'jose' }, { uid: 'luis' }]);
     await click('Publicar resultados');
     expect(service.setResultsPublished).toHaveBeenCalledWith('e1', true);
+    await fixture.whenStable();
+    expect(quiet.notifications.notifyStudents).toHaveBeenCalledWith(
+      'results',
+      'evaluation',
+      expect.objectContaining({ id: 'e1' }),
+      ['jose', 'luis'],
+    );
     expect(el.textContent).toContain('Resultados publicados');
 
     vi.spyOn(window, 'confirm').mockReturnValue(false);
