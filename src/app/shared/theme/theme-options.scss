@@ -1,0 +1,53 @@
+:host {
+  display: block;
+  margin: 4px 0;
+  padding: 8px 10px;
+  border-block: 1px solid var(--color-border);
+}
+
+.label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+// A segmented control: the three choices side by side, the current one raised.
+.options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: none;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--color-text);
+  }
+
+  &.selected {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+  }
+}

@@ -1,6 +1,6 @@
 import { Component, input, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 import { AuthService } from '../../../core/auth/auth.service';
 import { Candle } from '../../../core/models/practice';
@@ -64,7 +64,7 @@ describe('PracticeReview', () => {
   const market = { loadCandles: vi.fn(), loadHistory: vi.fn() };
   const isAdmin = signal(true);
 
-  const render = async () => {
+  const render = async (url?: string) => {
     TestBed.configureTestingModule({
       imports: [PracticeReview],
       providers: [
@@ -84,6 +84,9 @@ describe('PracticeReview', () => {
       remove: { imports: [ReplayChart] },
       add: { imports: [FakeChart] },
     });
+    if (url) {
+      await TestBed.inject(Router).navigateByUrl(url);
+    }
     fixture = TestBed.createComponent(PracticeReview);
     el = fixture.nativeElement;
     await fixture.whenStable();
@@ -164,6 +167,15 @@ describe('PracticeReview', () => {
     expect(el.textContent).toContain('10 may 2021');
     // A single page needs no pager.
     expect(el.querySelector('.pager')).toBeNull();
+  });
+
+  it('opens filtered to the student a link names (mentor dashboard)', async () => {
+    await render('/?student=ana');
+    await new Promise((r) => setTimeout(r));
+    await fixture.whenStable();
+    expect(practice.sessionsPage).toHaveBeenCalledWith({ uid: 'ana' }, REVIEW_PAGE_SIZE, undefined);
+    expect(practice.sessionTotals).toHaveBeenCalledWith({ uid: 'ana' });
+    expect(select('Estudiante').value).toBe('ana');
   });
 
   it('queries again with the student, type, status and dates picked', async () => {

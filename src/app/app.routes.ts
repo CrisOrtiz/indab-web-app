@@ -128,6 +128,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/admin').then((m) => m.Admin),
   },
   {
+    path: 'admin/mentor',
+    title: 'adminMentor',
+    canActivate: [staffGuard],
+    loadComponent: () =>
+      import('./features/admin/mentor-dashboard/mentor-dashboard').then((m) => m.MentorDashboard),
+  },
+  {
     path: 'admin/users',
     title: 'adminUsers',
     canActivate: [adminGuard],

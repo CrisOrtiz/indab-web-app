@@ -229,6 +229,7 @@ Changing the password does revoke every other session, since Firebase ends them 
 | `/academy/calendar`              | signed-in users (same page as `/calendar`, with a link back to the academy)                                                                     |
 | `/academy/exams`                 | enrolled users (assigned evaluation forms: answer, see grades; `/academy/exams/:id` takes one)                                                  |
 | `/admin`                         | trainers and admins (a card per tool; trainers do not get the users card)                                                                       |
+| `/admin/mentor`                  | trainers and admins (mentor dashboard: practice, averages and pending work of each mentorship they lead; admins see all)                        |
 | `/admin/users`                   | admins (users, roles, academy access and each student's mentorships)                                                                            |
 | `/admin/mentorships`             | trainers and admins (admins create, edit, pause and delete mentorships; trainers see them and their students)                                   |
 | `/admin/practice`                | trainers and admins (review students' practice sessions on the chart; admins delete them)                                                       |
@@ -264,6 +265,18 @@ which complicates the single Firebase Hosting site and its rewrites. No i18n lib
 To add a text: add it to `es.ts`, then to `en.ts` and `pt.ts` (the build tells you if one is
 missing). To add a language: a new file in `messages/`, an entry in `LANGUAGES` and `loaders` in
 `i18n.service.ts`, and its Angular locale data in `local-date.pipe.ts`.
+
+## Light and dark mode
+
+Signed-in users pick **Sistema / Claro / Oscuro** in the account menu (their photo in the
+header). Visitors and anyone on "Sistema" follow the device's setting, live. The choice is
+saved in the browser (`localStorage` key `indab.theme`), not in Firestore.
+
+- `ThemeService` (`src/app/core/theme`) sets `data-theme="light|dark"` on `<html>`;
+  `src/styles.scss` redefines the color tokens for dark. Use the tokens, never fixed colors.
+- A small script in `src/index.html` sets the attribute before the page paints, so prerendered
+  pages do not flash white.
+- The practice chart re-reads the tokens when the theme changes; the logo is inverted.
 
 ## SEO and loading speed
 
@@ -398,6 +411,19 @@ nobody gets notifications they did not ask for. There is no server on the free p
 causes an event writes the notification into each recipient's list from the browser: the rules
 check that the event happened and that the sender may tell that person (e.g. the recipient
 follows them), and the notification's id names the event, so each one arrives once.
+
+### Mentor dashboard
+
+`/admin/mentor` (the first `/admin` card) shows one mentorship at a time: trainers pick among the
+ones they lead, admins among all. For a period (this week from Monday, the last 30 or 90 days) it
+shows who practised, each student's sessions, closed trades, winning share and P/L, the group's
+averages (P/L per active student, winning trades, form grades, evaluation P/L), and the published
+forms and practice evaluations given to the group whose window touched the period, with who has
+not handed them in. Practice is counted with aggregation queries per student (sessions: count and
+sum of `pnl`; trades: a staff-only collection group query on `trades` by `uid`, `status` and
+`closedAt`, with and without `pnl > 0`), so reads stay a handful per student however much they
+traded. Links open the practice review filtered to the student (`?student=uid`), a form's results
+and an evaluation's results (`/admin/evaluations?results=id`).
 
 ### Evaluation forms
 

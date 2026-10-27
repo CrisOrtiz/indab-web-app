@@ -25,6 +25,7 @@ describe('Admin home', () => {
 
   it('opens each admin tool, users included, on its own page', () => {
     expect(titles()).toEqual([
+      'Panel del mentor',
       'Usuarios',
       'Mentorías',
       'Formularios de evaluación',
@@ -32,6 +33,7 @@ describe('Admin home', () => {
       'Revisar prácticas de trading',
     ]);
     expect(links()).toEqual([
+      '/admin/mentor',
       '/admin/users',
       '/admin/mentorships',
       '/admin/forms',
@@ -46,6 +48,7 @@ describe('Admin home', () => {
     await fixture.whenStable();
     expect(el.textContent).toContain('Como entrenador puedes crear evaluaciones');
     expect(links()).toEqual([
+      '/admin/mentor',
       '/admin/mentorships',
       '/admin/forms',
       '/admin/evaluations',

@@ -1,0 +1,239 @@
+@let t = i18n.messages().mentorDashboard;
+@let ta = i18n.messages().admin;
+@let s = summary();
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/admin" class="back">{{ ta.back }}</a>
+    <h1>{{ t.title }}</h1>
+    <p>{{ t.intro }}</p>
+  </header>
+
+  @if (error(); as message) {
+    <p class="message error" role="alert">{{ message }}</p>
+  }
+
+  @if (mentorships().length) {
+    <div class="list-filters" role="group" [attr.aria-label]="i18n.messages().lists.filters">
+      <label>
+        {{ t.mentorship }}
+        <select (change)="pickMentorship($any($event.target).value)">
+          @for (m of mentorships(); track m.id) {
+            <option [value]="m.id" [selected]="m.id === mentorshipId()">
+              {{ m.name }}{{ m.active ? '' : ' · ' + t.inactive }}
+            </option>
+          }
+        </select>
+      </label>
+      <label>
+        {{ t.period }}
+        <select (change)="pickPeriod($any($event.target).value)">
+          @for (p of periods; track p) {
+            <option [value]="p" [selected]="p === period()">{{ t.periods[p] }}</option>
+          }
+        </select>
+      </label>
+    </div>
+  } @else if (!loading() && !error()) {
+    <p class="muted empty-state">{{ t.noMentorships }}</p>
+  }
+
+  @if (mentorship() && !loading()) {
+    <div class="stats">
+      <div class="stat">
+        <strong>{{ s.practiced }} / {{ s.students }}</strong>
+        <span>{{ t.practiced }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ s.sessions }}</strong>
+        <span>{{ t.sessions }}</span>
+      </div>
+      <div class="stat">
+        <strong [class.up]="(s.averagePnl ?? 0) > 0" [class.down]="(s.averagePnl ?? 0) < 0">{{
+          s.averagePnl === null ? '—' : (s.averagePnl | number: '1.2-2')
+        }}</strong>
+        <span>{{ t.averagePnl }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ s.winRate === null ? '—' : (s.winRate | percent: '1.0-0') }}</strong>
+        <span>{{ t.winRate }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ s.examAverage === null ? '—' : (s.examAverage | percent: '1.0-0') }}</strong>
+        <span>{{ t.examAverage }}</span>
+      </div>
+      <div class="stat">
+        <strong
+          [class.up]="(s.evaluationAverage ?? 0) > 0"
+          [class.down]="(s.evaluationAverage ?? 0) < 0"
+          >{{
+            s.evaluationAverage === null ? '—' : (s.evaluationAverage | number: '1.2-2')
+          }}</strong
+        >
+        <span>{{ t.evaluationAverage }}</span>
+      </div>
+      <div class="stat" [class.alert]="s.pending > 0">
+        <strong>{{ loadingDeliveries() ? '…' : s.pending }}</strong>
+        <span>{{ t.pending }}</span>
+      </div>
+    </div>
+    @if (pendingActivity() > 0) {
+      <p class="muted note" role="status">{{ t.counting(pendingActivity()) }}</p>
+    }
+
+    <h2>{{ t.students }}</h2>
+    <div class="list-filters" role="group" [attr.aria-label]="t.students">
+      <label>
+        {{ t.show }}
+        <select (change)="pickFilter($any($event.target).value)">
+          <option value="all" [selected]="filter() === 'all'">{{ t.filters.all }}</option>
+          <option value="idle" [selected]="filter() === 'idle'">{{ t.filters.idle }}</option>
+          <option value="pending" [selected]="filter() === 'pending'">
+            {{ t.filters.pending }}
+          </option>
+        </select>
+      </label>
+    </div>
+
+    <table class="users dashboard">
+      <thead>
+        <tr>
+          <th>{{ t.student }}</th>
+          <th>{{ t.lastPractice }}</th>
+          <th>{{ t.sessions }}</th>
+          <th>{{ t.trades }}</th>
+          <th>{{ t.winRate }}</th>
+          <th>{{ t.pnl }}</th>
+          <th>{{ t.forms }}</th>
+          <th>{{ t.pendingCol }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of visible(); track r.uid) {
+          @let a = r.activity;
+          <tr [class.idle]="a?.sessions === 0">
+            <td [attr.data-label]="t.student">
+              <span class="name">{{ r.name }}</span>
+              @if (a?.sessions === 0) {
+                <span class="tag warn">{{ t.noPractice }}</span>
+              }
+              <span class="email muted">{{ r.email }}</span>
+            </td>
+            <td [attr.data-label]="t.lastPractice" class="date">
+              {{ a ? (a.lastPractice ? (a.lastPractice | localDate: 'd MMM y') : t.never) : '—' }}
+            </td>
+            <td [attr.data-label]="t.sessions">{{ a?.sessions ?? '—' }}</td>
+            <td [attr.data-label]="t.trades">{{ a?.closedTrades ?? '—' }}</td>
+            <td [attr.data-label]="t.winRate">
+              @if (a && winRate(a.wins, a.closedTrades) !== null) {
+                {{ winRate(a.wins, a.closedTrades) | percent: '1.0-0' }}
+              } @else {
+                —
+              }
+            </td>
+            <td
+              [attr.data-label]="t.pnl"
+              [class.up]="(a?.pnl ?? 0) > 0"
+              [class.down]="(a?.pnl ?? 0) < 0"
+            >
+              {{ a?.sessions ? (a.pnl | number: '1.2-2') : '—' }}
+            </td>
+            <td [attr.data-label]="t.forms">
+              {{ r.examAverage === null ? '—' : (r.examAverage | percent: '1.0-0') }}
+            </td>
+            <td [attr.data-label]="t.pendingCol">
+              @if (loadingDeliveries()) {
+                <span class="muted">…</span>
+              } @else if (r.pending.length) {
+                <ul class="pending-list">
+                  @for (d of r.pending; track d.kind + d.id) {
+                    <li [class.missed]="!d.open">
+                      {{ d.title }}
+                      <span class="muted">· {{ d.open ? t.due : t.missed }}</span>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <span class="muted">{{ t.upToDate }}</span>
+              }
+            </td>
+            <td class="actions">
+              <a
+                class="btn btn-outline small"
+                routerLink="/admin/practice"
+                [queryParams]="{ student: r.uid }"
+                [attr.aria-label]="t.practiceOf(r.name)"
+                >{{ t.viewPractice }}</a
+              >
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="9" class="muted empty">
+              {{ members().length ? i18n.messages().lists.noMatches : t.noStudents }}
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    @if (pages() > 1) {
+      <app-pager
+        [page]="page()"
+        [pages]="pages()"
+        [hasNext]="page() + 1 < pages()"
+        (previous)="page.set(page() - 1)"
+        (next)="page.set(page() + 1)"
+      />
+    }
+
+    <h2>{{ t.deliveries }}</h2>
+    <p class="muted">{{ t.deliveriesIntro }}</p>
+    <ul class="deliveries">
+      @for (d of deliveries(); track d.kind + d.id) {
+        @let absent = missing(d);
+        @let avg = averageOf(d);
+        <li class="delivery">
+          <div class="delivery-head">
+            <span class="tag">{{ d.kind === 'form' ? t.form : t.evaluation }}</span>
+            <h3>{{ d.title }}</h3>
+          </div>
+          <p class="muted">
+            {{ d.open ? t.closes : t.closed }} {{ d.closesAt | localDate: 'd MMM y, HH:mm' }}
+          </p>
+          <p>
+            <strong>{{ t.handedIn(d.done.length, d.assigned.length) }}</strong>
+            @if (avg !== null) {
+              ·
+              {{ d.kind === 'form' ? t.averageGrade : t.averageResult }}
+              <span
+                [class.up]="d.kind === 'evaluation' && avg > 0"
+                [class.down]="d.kind === 'evaluation' && avg < 0"
+                >{{ d.kind === 'form' ? (avg | percent: '1.0-0') : (avg | number: '1.2-2') }}</span
+              >
+            }
+          </p>
+          @if (absent.length) {
+            <p class="missing">
+              <span class="muted">{{ d.open ? t.stillMissing : t.didNotHandIn }}</span>
+              {{ absent.join(', ') }}
+            </p>
+          }
+          @if (d.kind === 'form') {
+            <a class="btn btn-outline small" [routerLink]="['/admin/forms', d.id]">{{
+              t.openResults
+            }}</a>
+          } @else {
+            <a
+              class="btn btn-outline small"
+              routerLink="/admin/evaluations"
+              [queryParams]="{ results: d.id }"
+              >{{ t.openResults }}</a
+            >
+          }
+        </li>
+      } @empty {
+        <li class="muted">{{ loadingDeliveries() ? t.loadingDeliveries : t.noDeliveries }}</li>
+      }
+    </ul>
+  }
+</section>

@@ -15,6 +15,19 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <link rel="manifest" href="manifest.webmanifest" />
     <meta name="theme-color" content="#ffffff" />
+    <!-- Light or dark mode before the first paint, so pages do not flash (ThemeService). -->
+    <script>
+      try {
+        var theme = localStorage.getItem('indab.theme');
+        if (theme !== 'light' && theme !== 'dark') {
+          theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.dataset.theme = theme;
+        if (theme === 'dark') {
+          document.querySelector('meta[name="theme-color"]').content = '#121212';
+        }
+      } catch (e) {}
+    </script>
     <!-- Page-specific description, canonical and Open Graph tags are set by Seo (core/seo). -->
     <script type="application/ld+json">
       {

@@ -26,6 +26,7 @@ export const pt: Messages = {
     adminExamResults: 'Corrigir formulário | INDAB',
     adminMentorships: 'Mentorias | INDAB',
     practiceSession: 'Prática | INDAB',
+    adminMentor: 'Painel do mentor | INDAB',
   },
 
   seo: {
@@ -62,6 +63,8 @@ export const pt: Messages = {
     currentLanguage: (name: string) => `Idioma: ${name}`,
     account: 'Sua conta',
     profile: 'Meu perfil',
+    theme: 'Tema',
+    themes: { system: 'Sistema', light: 'Claro', dark: 'Escuro' },
   },
 
   // Copyright strip at the bottom of every page.
@@ -368,6 +371,10 @@ export const pt: Messages = {
     eyebrow: 'Painel INDAB',
     open: 'Abrir',
     cards: {
+      mentor: {
+        title: 'Painel do mentor',
+        text: 'Quem praticou, médias do grupo e entregas pendentes das suas mentorias.',
+      },
       users: {
         title: 'Usuários',
         text: 'Função, acesso à academia e mentorias de cada pessoa.',
@@ -1261,6 +1268,58 @@ export const pt: Messages = {
     deleted: 'Mentoria excluída',
     added: (name: string, mentorship: string) => `${name} agora está em ${mentorship}.`,
     removed: (name: string, mentorship: string) => `${name} saiu de ${mentorship}.`,
+  },
+
+  mentorDashboard: {
+    title: 'Painel do mentor',
+    intro:
+      'Como vai cada mentoria: quem praticou, as médias do grupo e quem ainda não entregou seus formulários ou avaliações.',
+    loadFailed: 'Não foi possível carregar o painel. Tente novamente.',
+    mentorship: 'Mentoria',
+    inactive: 'inativa',
+    period: 'Período',
+    periods: { week: 'Esta semana', month: 'Últimos 30 dias', quarter: 'Últimos 90 dias' },
+    noMentorships:
+      'Você ainda não lidera nenhuma mentoria. Um administrador pode adicionar você como mentor em Mentorias.',
+    practiced: 'Praticaram',
+    sessions: 'Sessões',
+    averagePnl: 'P/L médio por aluno (USD)',
+    winRate: 'Operações vencedoras',
+    examAverage: 'Média nos formulários',
+    evaluationAverage: 'P/L médio nas avaliações (USD)',
+    pending: 'Entregas pendentes',
+    counting: (n: number) => `Contando a prática de ${n} alunos…`,
+    students: 'Alunos',
+    show: 'Mostrar',
+    filters: { all: 'Todos', idle: 'Sem prática no período', pending: 'Com entregas pendentes' },
+    student: 'Aluno',
+    lastPractice: 'Última prática',
+    trades: 'Operações',
+    pnl: 'P/L (USD)',
+    forms: 'Formulários',
+    pendingCol: 'Pendente',
+    noPractice: 'Sem prática',
+    never: 'Nunca',
+    due: 'aberta',
+    missed: 'não entregou',
+    upToDate: 'Em dia',
+    practiceOf: (name: string) => `Ver as práticas de ${name}`,
+    viewPractice: 'Ver práticas',
+    noStudents: 'Esta mentoria ainda não tem alunos.',
+    deliveries: 'Formulários e avaliações',
+    deliveriesIntro: 'Os atribuídos ao grupo que estiveram abertos no período.',
+    form: 'Formulário',
+    evaluation: 'Avaliação de prática',
+    closes: 'Fecha em',
+    closed: 'Fechou em',
+    handedIn: (done: number, total: number) => `${done} de ${total} entregaram`,
+    averageGrade: 'média',
+    averageResult: 'P/L médio',
+    stillMissing: 'Faltam:',
+    didNotHandIn: 'Não entregaram:',
+    openResults: 'Ver resultados',
+    noDeliveries: 'Não há formulários nem avaliações do grupo neste período.',
+    loadingDeliveries: 'Carregando formulários e avaliações…',
   },
 
   lists: {
