@@ -89,3 +89,17 @@ test('a student pages and filters their own sessions', async ({ page }) => {
   await expect(rows).toHaveCount(9);
   await expect(pager).toHaveCount(0);
 });
+
+test('the date filters fit side by side on a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, 'jose@indab.test');
+  await expect(page).toHaveURL('/academy');
+  await page.goto('/academy/practice');
+  const from = (await page.getByLabel('Desde').boundingBox())!;
+  const to = (await page.getByLabel('Hasta').boundingBox())!;
+  // One row, a gap between them and both inside the screen.
+  expect(Math.abs(from.y - to.y)).toBeLessThan(1);
+  expect(to.x - (from.x + from.width)).toBeGreaterThanOrEqual(8);
+  expect(from.x).toBeGreaterThanOrEqual(0);
+  expect(to.x + to.width).toBeLessThanOrEqual(390);
+});
