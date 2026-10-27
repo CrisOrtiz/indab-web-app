@@ -191,6 +191,20 @@ describe('Header', () => {
     expect(items[0].getAttribute('href')).toBe('/profile');
   });
 
+  it('switches light and dark mode from the menu, keeping it open', async () => {
+    localStorage.clear();
+    await as();
+    await openMenu();
+    const options = [...menu()!.querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
+    expect(options.map((o) => o.textContent?.trim())).toEqual(['Sistema', 'Claro', 'Oscuro']);
+    options[2].click();
+    await fixture.whenStable();
+    expect(document.documentElement.dataset['theme']).toBe('dark');
+    expect(menu()).not.toBeNull();
+    options[1].click();
+    expect(document.documentElement.dataset['theme']).toBe('light');
+  });
+
   it('closes the menu on Escape, an outside click or a second click', async () => {
     await as();
     await openMenu();
@@ -215,7 +229,7 @@ describe('Header', () => {
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     await as();
     await openMenu();
-    menu()!.querySelector<HTMLButtonElement>('button')!.click();
+    menu()!.querySelector<HTMLButtonElement>('button[role="menuitem"]')!.click();
     await fixture.whenStable();
     expect(auth.signOut).toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith('/');

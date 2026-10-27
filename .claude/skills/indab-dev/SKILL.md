@@ -104,6 +104,16 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
 - Model types: `Timestamp` from `firebase/firestore` for dates; write with `serverTimestamp()`.
 - Styling: black and white brand (logo `public/logo.jpg`, tagline "Conocimiento. Disciplina.
   Estrategia. Resultados."). Use the CSS variables in `src/styles.scss`, not hard-coded colors.
+- Light and dark mode (Cris, 2026-10-27): `ThemeService` (`core/theme`) puts `data-theme` on
+  `<html>` and `styles.scss` swaps the tokens under `:root[data-theme='dark']`. Users pick
+  device / light / dark in the header's account menu (`<app-theme-options>`, `shared/theme`);
+  the choice is kept in localStorage (`indab.theme`) and a script in `index.html` applies it
+  before the first paint (no flash on prerendered pages). Visitors follow their device. Every
+  new color must work in both: use the tokens (`--color-band*` for black bands, which stay black
+  in dark mode); a component style that needs its own dark rule uses
+  `:host-context([data-theme='dark'])`. Canvas code reads the tokens with `getComputedStyle`
+  and re-reads them when `ThemeService.theme()` changes (see `ReplayChart.applyColors`). The
+  logo image is inverted in dark mode.
 - UI text is translated: es-419 (default), en-US, pt-BR. Never hard-code copy in a template or
   component. Add each text to `core/i18n/messages/es.ts` and its translation to `en.ts` and `pt.ts`
   (same keys, or the build fails); read it with `inject(I18n).messages()` (`@let t = ...` in

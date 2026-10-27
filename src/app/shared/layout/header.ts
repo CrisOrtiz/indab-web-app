@@ -16,11 +16,12 @@ import { I18n } from '../../core/i18n/i18n.service';
 import { Avatar } from '../avatar/avatar';
 import { Icon } from '../icon/icon';
 import { LanguageSwitcher } from '../language/language-switcher';
+import { ThemeOptions } from '../theme/theme-options';
 import { LandingSections } from './landing-sections';
 
 @Component({
   selector: 'app-header',
-  imports: [RouterLink, RouterLinkActive, Avatar, Icon, LanguageSwitcher],
+  imports: [RouterLink, RouterLinkActive, Avatar, Icon, LanguageSwitcher, ThemeOptions],
   templateUrl: './header.html',
   styleUrl: './header.scss',
   host: {

@@ -42,14 +42,14 @@ ol {
   background: var(--color-surface);
 }
 
-// Black band: swaps the text and background tokens.
+// Black band (black in dark mode too, on a slightly lighter page).
 .inverted {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-band);
+  color: var(--color-band-text);
 
   p,
   .eyebrow {
-    color: var(--color-border);
+    color: var(--color-band-muted);
   }
 }
 
@@ -63,15 +63,15 @@ ol {
 }
 
 .btn-light {
-  background: var(--color-bg);
-  border-color: var(--color-bg);
-  color: var(--color-text);
+  background: var(--color-band-text);
+  border-color: var(--color-band-text);
+  color: var(--color-band);
 }
 
 .btn-ghost {
   background: transparent;
-  border-color: var(--color-bg);
-  color: var(--color-bg);
+  border-color: var(--color-band-text);
+  color: var(--color-band-text);
 }
 
 // Hero
@@ -95,7 +95,7 @@ ol {
   font-size: 1.15rem;
   font-weight: 600;
   letter-spacing: 0.05em;
-  color: var(--color-bg);
+  color: var(--color-band-text);
 }
 
 .lead {
@@ -113,7 +113,7 @@ ol {
 .hero-visual svg {
   width: 100%;
   height: auto;
-  color: var(--color-bg);
+  color: var(--color-band-text);
 }
 
 // Hero entrance on load
@@ -151,7 +151,7 @@ ol {
     z-index: 10;
     height: 3px;
     // White under the blend mode, so the bar shows on black and white bands alike.
-    background: var(--color-bg);
+    background: #ffffff;
     transform-origin: left;
     animation: progress linear both;
     animation-timeline: scroll(root);

@@ -60,6 +60,8 @@ export const pt: Messages = {
     currentLanguage: (name: string) => `Idioma: ${name}`,
     account: 'Sua conta',
     profile: 'Meu perfil',
+    theme: 'Tema',
+    themes: { system: 'Sistema', light: 'Claro', dark: 'Escuro' },
   },
 
   // Copyright strip at the bottom of every page.

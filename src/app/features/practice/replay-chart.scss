@@ -88,6 +88,12 @@
   user-select: none;
 }
 
+// The logo turns white on black in dark mode (styles.scss), so it lightens the chart instead.
+:host-context([data-theme='dark']) .watermark {
+  opacity: 0.06;
+  mix-blend-mode: screen;
+}
+
 /* The boxes on order and position lines, as in TradingView. */
 .line-label {
   position: absolute;

@@ -260,6 +260,18 @@ To add a text: add it to `es.ts`, then to `en.ts` and `pt.ts` (the build tells y
 missing). To add a language: a new file in `messages/`, an entry in `LANGUAGES` and `loaders` in
 `i18n.service.ts`, and its Angular locale data in `local-date.pipe.ts`.
 
+## Light and dark mode
+
+Signed-in users pick **Sistema / Claro / Oscuro** in the account menu (their photo in the
+header). Visitors and anyone on "Sistema" follow the device's setting, live. The choice is
+saved in the browser (`localStorage` key `indab.theme`), not in Firestore.
+
+- `ThemeService` (`src/app/core/theme`) sets `data-theme="light|dark"` on `<html>`;
+  `src/styles.scss` redefines the color tokens for dark. Use the tokens, never fixed colors.
+- A small script in `src/index.html` sets the attribute before the page paints, so prerendered
+  pages do not flash white.
+- The practice chart re-reads the tokens when the theme changes; the logo is inverted.
+
 ## SEO and loading speed
 
 - **Prerendering**: `ng build` renders the public pages (`/`, `/eleva`, `/calendar`, `/login`, `/register`,

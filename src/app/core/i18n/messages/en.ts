@@ -60,6 +60,8 @@ export const en: Messages = {
     currentLanguage: (name: string) => `Language: ${name}`,
     account: 'Your account',
     profile: 'My profile',
+    theme: 'Theme',
+    themes: { system: 'System', light: 'Light', dark: 'Dark' },
   },
 
   // Copyright strip at the bottom of every page.
