@@ -566,8 +566,12 @@ export const es = {
         below ? 'debajo' : 'encima'
       } del precio actual.`,
     lotStep: (step: number) => `Ingresa un tamaño en lotes de ${step} en ${step}.`,
-    margin: (needed: string, available: string) =>
-      `Margen insuficiente: la orden necesita ${needed} USD y tienes ${available} USD libres.`,
+    margin: (needed: string, available: string, maxLots: string | null) =>
+      `Margen insuficiente: la orden necesita ${needed} USD y tienes ${available} USD libres. ${
+        maxLots
+          ? `Con ese margen puedes abrir hasta ${maxLots} lotes.`
+          : 'Cierra una posición o cancela una orden pendiente para abrir otra.'
+      }`,
     closed: 'La operación ya está cerrada.',
   },
 

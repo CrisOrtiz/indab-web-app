@@ -5,7 +5,7 @@ import { vi } from 'vitest';
 import { AuthService } from '../../core/auth/auth.service';
 import { Candle, OrderType } from '../../core/models/practice';
 import { HISTORY_BARS, MarketDataService, REPLAY_BARS } from './market-data.service';
-import { Practice, SESSIONS_PAGE_SIZE, formatCountdown } from './practice';
+import { Practice, QUICK_ERROR_MS, SESSIONS_PAGE_SIZE, formatCountdown } from './practice';
 import { PracticeService } from './practice.service';
 import { EvaluationService } from '../evaluations/evaluation.service';
 import { Evaluation } from '../../core/models/evaluation';
@@ -639,6 +639,61 @@ describe('Practice page', () => {
 
     await click('Nueva práctica');
     expect(el.querySelector('form')).not.toBeNull();
+  });
+
+  it('holds several positions and pending orders at once, as far as the margin goes', async () => {
+    await start();
+    // 0.5 lots at 100 tie up 50 USD of the 200 (49.50 for the limit at 99): four fit, five do not.
+    chart().lotsChanged.emit('0.5');
+    await fixture.whenStable();
+    await pressed('.quick-buy');
+    await pressed('.quick-sell');
+    chart().orderAt.emit({ side: 'long', orderType: 'limit', price: 99 });
+    await fixture.whenStable();
+    chart().draftSubmitted.emit();
+    await fixture.whenStable();
+    expect(practice.openTrade).toHaveBeenCalledTimes(3);
+    expect(el.textContent).toContain('Posiciones (2)');
+    expect(el.textContent).toContain('Órdenes (1)');
+
+    await pressed('.quick-buy');
+    expect(el.textContent).toContain('Posiciones (3)');
+    expect(el.querySelector('.quick-error')).toBeNull();
+
+    // Out of margin, the one-click box says why right under its buttons, not in the ticket.
+    await pressed('.quick-buy');
+    expect(practice.openTrade).toHaveBeenCalledTimes(4);
+    expect(el.querySelector('.quick-error')?.textContent).toBe(
+      'Margen insuficiente: la orden necesita 50.00 USD y tienes 0.50 USD libres. ' +
+        'Cierra una posición o cancela una orden pendiente para abrir otra.',
+    );
+    expect(el.querySelector('.order-error')).toBeNull();
+
+    // Cancelling the pending order frees its margin for one more.
+    await click('Órdenes (1)');
+    await click('Cancelar');
+    await pressed('.quick-buy');
+    expect(practice.openTrade).toHaveBeenCalledTimes(5);
+    expect(el.textContent).toContain('Posiciones (4)');
+    expect(el.querySelector('.quick-error')).toBeNull();
+  });
+
+  it('hides the one-click refusal after a few seconds', async () => {
+    await start();
+    chart().lotsChanged.emit('3');
+    await fixture.whenStable();
+    vi.useFakeTimers();
+    try {
+      // The refusal comes before any wait, so the click shows it at once.
+      el.querySelector<HTMLButtonElement>('.quick-sell')!.click();
+      fixture.detectChanges();
+      expect(el.querySelector('.quick-error')?.textContent).toContain('hasta 2.00 lotes');
+      vi.advanceTimersByTime(QUICK_ERROR_MS);
+      fixture.detectChanges();
+      expect(el.querySelector('.quick-error')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('opens a past session for review', async () => {

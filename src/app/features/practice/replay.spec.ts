@@ -4,6 +4,7 @@ import {
   Replay,
   fillsBelow,
   marginFor,
+  maxLots,
   orderFill,
   stopHit,
   tradeLots,
@@ -65,6 +66,14 @@ describe('lots and margin', () => {
     expect(tradeLots(trade({ quantity: 5 }))).toBe(0.05);
     expect(marginFor(0.05, 4000)).toBe(200);
     expect(marginFor(0.01, 100)).toBe(1);
+  });
+
+  it('works out the largest size the free margin can open', () => {
+    // 200 USD at 4,000 USD an ounce: 0.05 lots, so one 0.03 position leaves room for 0.02.
+    expect(maxLots(200, 4000)).toBe(0.05);
+    expect(maxLots(80, 4000)).toBe(0.02);
+    expect(maxLots(39.99, 4000)).toBe(0);
+    expect(maxLots(-5, 4000)).toBe(0);
   });
 });
 
@@ -142,7 +151,11 @@ describe('validateOrder', () => {
     expect(validateOrder(order({ lots: 0 }), 100, 1000)).toContain('lotes de 0.01 en 0.01');
     expect(validateOrder(order({ lots: 0.015 }), 100, 1000)).toContain('lotes de 0.01 en 0.01');
     expect(validateOrder(order({ lots: 20 }), 100, 1000)).toBe(
-      'Margen insuficiente: la orden necesita 2000.00 USD y tienes 1000.00 USD libres.',
+      'Margen insuficiente: la orden necesita 2000.00 USD y tienes 1000.00 USD libres. ' +
+        'Con ese margen puedes abrir hasta 10.00 lotes.',
+    );
+    expect(validateOrder(order({ lots: 0.01 }), 100, 0.5)).toContain(
+      'Cierra una posición o cancela una orden pendiente',
     );
     expect(validateOrder(order({ stopLoss: 101 }), 100, 1000)).toContain('por debajo');
     expect(validateOrder(order({ takeProfit: 99 }), 100, 1000)).toContain('por encima');

@@ -112,6 +112,9 @@
                 <strong>{{ r.current().close | number: priceDigits(r.current().close) }}</strong>
                 <span>{{ t.buyCaps }}</span>
               </button>
+              @if (quickError(); as message) {
+                <p class="quick-error" role="alert">{{ message }}</p>
+              }
             </div>
           </app-replay-chart>
 

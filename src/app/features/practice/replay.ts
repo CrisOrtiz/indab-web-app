@@ -51,6 +51,14 @@ export function marginFor(lots: number, price: number): number {
   return round((lots * LOT_SIZE * price) / LEVERAGE, 2);
 }
 
+/** The largest size, in whole lot steps, that `available` margin can open at `price`. */
+export function maxLots(available: number, price: number): number {
+  const perStep = marginFor(LOT_STEP, price);
+  return perStep > 0 && available > 0
+    ? round(Math.floor(available / perStep + 1e-9) * LOT_STEP, 2)
+    : 0;
+}
+
 /** Profit or loss (USD) of a trade if it closed at `exitPrice`. */
 export function tradePnl(trade: PracticeTrade, exitPrice: number): number {
   const direction = trade.side === 'long' ? 1 : -1;
@@ -171,9 +179,11 @@ export function validateOrder(
     return t.lotStep(LOT_STEP);
   }
   const market = input.orderType === 'market';
-  const margin = marginFor(input.lots, market || !(input.price! > 0) ? current : input.price!);
+  const at = market || !(input.price! > 0) ? current : input.price!;
+  const margin = marginFor(input.lots, at);
   if (margin > available) {
-    return t.margin(margin.toFixed(2), available.toFixed(2));
+    const lots = maxLots(available, at);
+    return t.margin(margin.toFixed(2), available.toFixed(2), lots ? lots.toFixed(2) : null);
   }
   return (
     validateOrderPrice(input.side, input.orderType, input.price, current, t) ??

@@ -53,6 +53,23 @@
     background: var(--color-buy);
   }
 
+  .quick-error {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: max-content;
+    max-width: min(320px, calc(100vw - 48px));
+    margin: 0;
+    padding: 6px 10px;
+    border-radius: 4px;
+    background: var(--color-sell);
+    color: #fff;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+    animation: dropdown-in 0.15s ease-out;
+  }
+
   .quick-size {
     width: 4.2em;
     padding: 2px 4px;
