@@ -15,6 +15,12 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <link rel="manifest" href="manifest.webmanifest" />
     <meta name="theme-color" content="#ffffff" />
+    <!-- Installed app (PWA): name and status bar on the iPhone home screen. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="INDAB" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="application-name" content="INDAB" />
     <!-- Light or dark mode before the first paint, so pages do not flash (ThemeService). -->
     <script>
       try {
@@ -27,6 +33,11 @@
           document.querySelector('meta[name="theme-color"]').content = '#121212';
         }
       } catch (e) {}
+      // Chrome can offer the install prompt before the app starts; AppInstall (core/pwa) uses it.
+      addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        window.indabInstallPrompt = event;
+      });
     </script>
     <!-- Page-specific description, canonical and Open Graph tags are set by Seo (core/seo). -->
     <script type="application/ld+json">

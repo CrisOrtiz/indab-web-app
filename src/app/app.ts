@@ -3,9 +3,11 @@ import { RouterOutlet } from '@angular/router';
 import { Footer } from './shared/layout/footer';
 import { Header } from './shared/layout/header';
 import { AppLoader } from './shared/loader/loader';
+import { InstallHelp } from './shared/pwa/install-help';
+import { UpdateBanner } from './shared/pwa/update-banner';
 
 @Component({
-  imports: [RouterOutlet, Header, Footer, AppLoader],
+  imports: [RouterOutlet, Header, Footer, AppLoader, UpdateBanner, InstallHelp],
   selector: 'app-root',
   templateUrl: './app.html',
   // The footer stays at the bottom of the window on short pages.

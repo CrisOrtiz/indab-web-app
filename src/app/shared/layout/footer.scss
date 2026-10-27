@@ -15,7 +15,8 @@ footer {
   padding-bottom: 12px;
 }
 
-a {
+a,
+.install {
   color: var(--color-text);
   font-weight: 600;
   text-decoration: none;
@@ -23,6 +24,17 @@ a {
   &:hover {
     text-decoration: underline;
   }
+}
+
+.install {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
 }
 
 @media (max-width: 600px) {

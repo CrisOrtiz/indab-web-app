@@ -13,6 +13,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationStart, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
+import { AppInstall } from '../../core/pwa/app-install.service';
 import { NotificationBell } from '../../features/notifications/notification-bell';
 import { Avatar } from '../avatar/avatar';
 import { Icon } from '../icon/icon';
@@ -42,6 +43,7 @@ import { LandingSections } from './landing-sections';
 export class Header {
   protected readonly auth = inject(AuthService);
   protected readonly i18n = inject(I18n);
+  protected readonly install = inject(AppInstall);
   private readonly router = inject(Router);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly landingSections = inject(LandingSections);
@@ -147,6 +149,11 @@ export class Header {
     if (this.menuOpen() && !account?.contains(event.target as Node)) {
       this.closeMenu();
     }
+  }
+
+  protected installApp(): void {
+    this.closeMenu();
+    void this.install.install();
   }
 
   protected async signOut(): Promise<void> {

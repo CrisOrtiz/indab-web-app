@@ -73,6 +73,19 @@ export const pt: Messages = {
     builtBy: 'Desenvolvido por',
   },
 
+  pwa: {
+    install: 'Instalar app',
+    iosTitle: 'Instale o app do INDAB',
+    iosIntro: 'Abra pela tela de início, como um app.',
+    iosStepShare: 'Toque no botão Compartilhar na barra do navegador.',
+    iosStepAdd: 'Escolha “Adicionar à Tela de Início”.',
+    iosStepConfirm: 'Toque em “Adicionar” para concluir.',
+    gotIt: 'Entendi',
+    updateReady: 'Há uma nova versão do INDAB.',
+    reload: 'Atualizar',
+    later: 'Mais tarde',
+  },
+
   landing: {
     eyebrow: 'Academia de trading',
     tagline: 'Conhecimento. Disciplina. Estratégia. Resultados.',
