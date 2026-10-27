@@ -596,6 +596,14 @@ export const en: Messages = {
     marginLevel: 'Margin level',
     trades: 'Trades',
     positions: (n) => `Positions (${n})`,
+    openCount: (positions, orders) =>
+      [
+        positions ? `${positions} ${positions === 1 ? 'position' : 'positions'}` : '',
+        orders ? `${orders} ${orders === 1 ? 'order' : 'orders'}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    showTrades: 'See your positions and orders',
     orders: (n) => `Orders (${n})`,
     history: (n) => `History (${n})`,
     stats: 'Statistics',

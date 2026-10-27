@@ -220,7 +220,7 @@ test('a student adds an order from the chart menu and sets it up on its line', a
 test('a student holds several positions and orders at gold prices, up to the margin', async ({
   page,
 }) => {
-  // Gold near 4,000 USD: 0.01 lots (1 oz) tie up 40 USD of the 200, so four orders fit.
+  // Gold near 4,000 USD at 1:200: 0.02 lots (2 oz) tie up 40 USD of the 200, so four orders fit.
   await page.unrouteAll();
   await mockMarket(page, 4000);
   await page.setViewportSize({ width: 1280, height: 1000 });
@@ -228,32 +228,43 @@ test('a student holds several positions and orders at gold prices, up to the mar
   await page.getByRole('link', { name: 'Práctica de trading' }).click();
   await page.getByRole('button', { name: 'Comenzar práctica' }).click();
   await expect(page.locator('.market .price')).toHaveText('4,000.00');
+  await page.getByRole('spinbutton', { name: /Lotes \(tamaño/ }).fill('0.02');
 
-  await page.getByRole('button', { name: 'Comprar 0.01 XAUUSDT MERCADO' }).click();
-  await page.getByRole('button', { name: 'Vender 0.01 lotes a mercado' }).click();
-  await page.getByRole('button', { name: 'Comprar 0.01 lotes a mercado' }).click();
+  await page.getByRole('button', { name: 'Comprar 0.02 XAUUSDT MERCADO' }).click();
+  await page.getByRole('button', { name: 'Vender 0.02 lotes a mercado' }).click();
+  await page.getByRole('button', { name: 'Comprar 0.02 lotes a mercado' }).click();
   await expect(page.getByRole('button', { name: 'Posiciones (3)' })).toBeVisible();
   // A sell limit at 4,100 (41 USD of margin) waits next to them.
   await page.getByRole('button', { name: 'Vender 4,000.00' }).click();
   await page.getByRole('button', { name: 'Límite' }).click();
   await page.getByLabel('Precio de la orden').fill('4100');
-  await page.getByRole('button', { name: 'Vender 0.01 XAUUSDT LÍMITE 4,100.00' }).click();
+  await page.getByRole('button', { name: 'Vender 0.02 XAUUSDT LÍMITE 4,100.00' }).click();
   await expect(page.getByRole('button', { name: 'Órdenes (1)' })).toBeVisible();
 
   // 39 USD are left, so a fifth does not fit: the chart's one-click box says why, right under it.
-  await page.getByRole('button', { name: 'Vender 0.01 lotes a mercado' }).click();
+  await page.getByRole('button', { name: 'Vender 0.02 lotes a mercado' }).click();
   const refusal = page
     .getByRole('group', { name: 'Operación rápida a mercado' })
     .getByRole('alert');
   await expect(refusal).toBeVisible();
   await expect(refusal).toContainText('Margen insuficiente: la orden necesita 40.00 USD');
-  await expect(refusal).toContainText('Cierra una posición o cancela una orden pendiente');
+  await expect(refusal).toContainText('Con ese margen puedes abrir hasta 0.01 lotes.');
   await expect(page.getByRole('button', { name: 'Posiciones (3)' })).toBeVisible();
+  // The chart counts them, and their labels, all at 4,000, are stacked so each can be read.
+  const chart = page.locator('.workspace app-replay-chart');
+  await expect(chart.locator('.open-count')).toContainText('3 posiciones · 1 orden');
+  const tops = await chart
+    .locator('.line-label', { has: page.locator('.badge') })
+    .evaluateAll((labels) => labels.map((l) => l.getBoundingClientRect().top).filter((y) => y > 0));
+  // (The limit at 4,100 is off the price scale.)
+  expect(tops).toHaveLength(3);
+  expect(new Set(tops).size).toBe(3);
+  await expect(chart.locator('.leader')).toHaveCount(2);
 
   // Closing one position frees room for another.
   await page.getByRole('button', { name: 'Posiciones (3)' }).click();
   await page.getByRole('button', { name: 'Cerrar', exact: true }).first().click();
-  await page.getByRole('button', { name: 'Vender 0.01 lotes a mercado' }).click();
+  await page.getByRole('button', { name: 'Vender 0.02 lotes a mercado' }).click();
   await expect(page.getByRole('button', { name: 'Posiciones (3)' })).toBeVisible();
   await expect(refusal).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Historial (1)' })).toBeVisible();

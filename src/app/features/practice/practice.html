@@ -116,6 +116,27 @@
                 <p class="quick-error" role="alert">{{ message }}</p>
               }
             </div>
+            @if (r.openTrades().length + r.pendingOrders().length; as open) {
+              <!-- How many trades are live, at a glance; a tap goes to their list. -->
+              <button
+                type="button"
+                class="open-count"
+                [title]="t.showTrades"
+                (click)="showTrades(book)"
+              >
+                <span class="count" aria-hidden="true">{{ open }}</span>
+                <span>{{ t.openCount(r.openTrades().length, r.pendingOrders().length) }}</span>
+                @if (r.openTrades().length) {
+                  <span
+                    class="pnl"
+                    [class.up]="r.unrealized() > 0"
+                    [class.down]="r.unrealized() < 0"
+                  >
+                    {{ signed(r.unrealized()) }} USD
+                  </span>
+                }
+              </button>
+            }
           </app-replay-chart>
 
           <!-- Working on the order panel shows its order on the chart. -->
@@ -282,7 +303,7 @@
           </div>
         </div>
 
-        <div class="tabs panel-tabs" role="group" [attr.aria-label]="t.trades">
+        <div class="tabs panel-tabs" role="group" [attr.aria-label]="t.trades" #book>
           <button
             type="button"
             [class.selected]="tab() === 'positions'"

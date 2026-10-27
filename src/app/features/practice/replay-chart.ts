@@ -137,7 +137,10 @@ interface Line {
 interface PlacedLabel extends LineLabel {
   key: string;
   color: string;
+  /** Where the label is drawn: on its line, or below it when it would cover another label. */
   y: number;
+  /** Where its line is. */
+  lineY: number;
   line: Line;
 }
 
@@ -288,6 +291,34 @@ export const FIB_LEVELS: { ratio: number; color: string | null }[] = [
 /** How close (px) the pointer must be to a line to grab it; a finger needs more room. */
 const GRAB_DISTANCE = 6;
 const TOUCH_GRAB_DISTANCE = 16;
+/** Height (px) of a line label, of the TP/SL tabs under it, and the room kept between labels. */
+const LABEL_HEIGHT = 22;
+const TABS_HEIGHT = 20;
+const LABEL_GAP = 2;
+
+/**
+ * Moves labels down, from the top of the chart, until none covers another (or the TP/SL tabs
+ * of another), so several positions and orders at about the same price can all be read and
+ * reached. Each label keeps `lineY`, its line, so a leader can join them. `pinned` (the label
+ * being dragged) stays where it is and the others ignore it.
+ */
+export function stackLabels<T extends { y: number; tabs?: unknown }>(
+  labels: T[],
+  pinned?: (label: T) => boolean,
+): (T & { lineY: number })[] {
+  let bottom = -Infinity;
+  const stacked = new Map<T, number>();
+  for (const label of [...labels].sort((a, b) => a.y - b.y)) {
+    if (pinned?.(label)) {
+      continue;
+    }
+    const y = Math.max(label.y, bottom + LABEL_GAP + LABEL_HEIGHT / 2);
+    stacked.set(label, y);
+    bottom = y + LABEL_HEIGHT / 2 + (label.tabs ? TABS_HEIGHT : 0);
+  }
+  return labels.map((label) => ({ ...label, lineY: label.y, y: stacked.get(label) ?? label.y }));
+}
+
 /** How far (px) a press moves before it is a drag rather than a tap. */
 const TAP_SLOP = 4;
 const TOUCH_TAP_SLOP = 8;
@@ -540,6 +571,8 @@ export class ReplayChart {
     origin: number;
     /** The TP/SL tab it was pulled from: a click without moving adds that level. */
     tab?: ExitField;
+    /** How far (px) below its line the grabbed label is drawn, which the pointer keeps. */
+    offset?: number;
   };
   private gesture?: Gesture;
   private drawn: Candle[] = [];
@@ -812,7 +845,7 @@ export class ReplayChart {
   protected grab(label: PlacedLabel, event: PointerEvent): void {
     const entry = this.priceLines.find((p) => p.line === label.line);
     if (entry && (entry.line.drag || entry.line.bracket)) {
-      this.startDrag(entry, event);
+      this.startDrag(entry, event, label.y - label.lineY);
     }
   }
 
@@ -1095,7 +1128,7 @@ export class ReplayChart {
     }
     const close = this.lastClose;
     this.drawnClose.set(close ?? null);
-    const placed: PlacedLabel[] = [];
+    const placed: Omit<PlacedLabel, 'lineY'>[] = [];
     const zones: Zone[] = [];
     for (const { line, api } of this.priceLines) {
       // The market order being set up follows the price.
@@ -1128,9 +1161,19 @@ export class ReplayChart {
       } else if (line.pnlAt) {
         pnl = line.pnlAt(price);
       }
-      placed.push({ ...line.label, pnl, key: line.key, color: line.color, y, line });
+      const offset = this.dragging?.line === line ? (this.dragging.offset ?? 0) : 0;
+      placed.push({ ...line.label, pnl, key: line.key, color: line.color, y: y + offset, line });
     }
-    this.labels.set(placed);
+    const dragged = this.dragging?.line;
+    const stacked = stackLabels(placed, (label) => label.line === dragged);
+    if (dragged) {
+      // The dragged label stays under the pointer; its line is where the pointer moves it.
+      const label = stacked.find((l) => l.line === dragged);
+      if (label) {
+        label.lineY = label.y - (this.dragging!.offset ?? 0);
+      }
+    }
+    this.labels.set(stacked);
     this.zones.set(zones);
     this.boxes.set(this.placeBoxes());
     this.startX.set(this.placeStart());
@@ -1856,7 +1899,7 @@ export class ReplayChart {
     return moved;
   }
 
-  private startDrag(entry: { line: Line; api: IPriceLine }, event: PointerEvent): void {
+  private startDrag(entry: { line: Line; api: IPriceLine }, event: PointerEvent, offset = 0): void {
     const bracket = entry.line.drag ? undefined : entry.line.bracket;
     if (bracket) {
       // Dragging away from an entry pulls out a new take profit or stop loss.
@@ -1864,7 +1907,7 @@ export class ReplayChart {
       return;
     }
     this.holdPointer(event);
-    this.dragging = { ...entry, price: entry.line.price, origin: entry.line.price };
+    this.dragging = { ...entry, price: entry.line.price, origin: entry.line.price, offset };
   }
 
   /** Starts pulling a new TP/SL out of the entry at `price`, from the line or one of its tabs. */
@@ -2000,7 +2043,7 @@ export class ReplayChart {
           return;
         }
         event.stopPropagation();
-        const price = this.series!.coordinateToPrice(y(event));
+        const price = this.series!.coordinateToPrice(y(event) - (this.dragging.offset ?? 0));
         if (price !== null && price > 0) {
           this.dragging.price = roundPrice(price);
           this.dragging.api.applyOptions({ price: this.dragging.price });

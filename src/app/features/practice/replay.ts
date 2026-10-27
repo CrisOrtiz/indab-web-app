@@ -13,8 +13,8 @@ export const STARTING_BALANCE = 200;
 export const LOT_SIZE = 100;
 /** Smallest lot step. */
 export const LOT_STEP = 0.01;
-/** 1:100: a position needs margin of 1% of its value. */
-export const LEVERAGE = 100;
+/** 1:200: a position needs margin of 0.5% of its value. */
+export const LEVERAGE = 200;
 /** Positions are closed when equity falls below this share of the margin in use. */
 export const STOP_OUT_LEVEL = 0.5;
 

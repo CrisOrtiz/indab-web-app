@@ -594,6 +594,14 @@ export const pt: Messages = {
     marginLevel: 'Nível de margem',
     trades: 'Operações',
     positions: (n) => `Posições (${n})`,
+    openCount: (positions, orders) =>
+      [
+        positions ? `${positions} ${positions === 1 ? 'posição' : 'posições'}` : '',
+        orders ? `${orders} ${orders === 1 ? 'ordem' : 'ordens'}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    showTrades: 'Ver suas posições e ordens',
     orders: (n) => `Ordens (${n})`,
     history: (n) => `Histórico (${n})`,
     stats: 'Estatísticas',

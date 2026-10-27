@@ -358,6 +358,17 @@
     ></div>
   }
   @for (label of labels(); track label.key) {
+    @if (label.y !== label.lineY) {
+      <!-- A label moved off its line, so it covers no other, is joined back to it. -->
+      <div
+        class="leader"
+        [class.up]="label.y < label.lineY"
+        [style.top.px]="label.y < label.lineY ? label.y : label.lineY"
+        [style.height.px]="label.y < label.lineY ? label.lineY - label.y : label.y - label.lineY"
+        [style.right.px]="scaleWidth() + 14"
+        [style.border-color]="label.color"
+      ></div>
+    }
     <div
       class="line-label"
       [class.draggable]="!!label.line.drag"

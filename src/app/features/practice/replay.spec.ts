@@ -62,17 +62,17 @@ describe('tradePnl', () => {
 });
 
 describe('lots and margin', () => {
-  it('counts 100 units per lot and asks 1% of the position as margin (1:100)', () => {
+  it('counts 100 units per lot and asks 0.5% of the position as margin (1:200)', () => {
     expect(tradeLots(trade({ quantity: 5 }))).toBe(0.05);
-    expect(marginFor(0.05, 4000)).toBe(200);
-    expect(marginFor(0.01, 100)).toBe(1);
+    expect(marginFor(0.05, 4000)).toBe(100);
+    expect(marginFor(0.01, 100)).toBe(0.5);
   });
 
   it('works out the largest size the free margin can open', () => {
-    // 200 USD at 4,000 USD an ounce: 0.05 lots, so one 0.03 position leaves room for 0.02.
-    expect(maxLots(200, 4000)).toBe(0.05);
-    expect(maxLots(80, 4000)).toBe(0.02);
-    expect(maxLots(39.99, 4000)).toBe(0);
+    // 200 USD at 4,000 USD an ounce: 0.10 lots, so one 0.06 position leaves room for 0.04.
+    expect(maxLots(200, 4000)).toBe(0.1);
+    expect(maxLots(80, 4000)).toBe(0.04);
+    expect(maxLots(19.99, 4000)).toBe(0);
     expect(maxLots(-5, 4000)).toBe(0);
   });
 });
@@ -150,11 +150,11 @@ describe('validateOrder', () => {
   it('rejects bad sizes, too little margin and levels on the wrong side of the price', () => {
     expect(validateOrder(order({ lots: 0 }), 100, 1000)).toContain('lotes de 0.01 en 0.01');
     expect(validateOrder(order({ lots: 0.015 }), 100, 1000)).toContain('lotes de 0.01 en 0.01');
-    expect(validateOrder(order({ lots: 20 }), 100, 1000)).toBe(
-      'Margen insuficiente: la orden necesita 2000.00 USD y tienes 1000.00 USD libres. ' +
-        'Con ese margen puedes abrir hasta 10.00 lotes.',
+    expect(validateOrder(order({ lots: 30 }), 100, 1000)).toBe(
+      'Margen insuficiente: la orden necesita 1500.00 USD y tienes 1000.00 USD libres. ' +
+        'Con ese margen puedes abrir hasta 20.00 lotes.',
     );
-    expect(validateOrder(order({ lots: 0.01 }), 100, 0.5)).toContain(
+    expect(validateOrder(order({ lots: 0.01 }), 100, 0.4)).toContain(
       'Cierra una posición o cancela una orden pendiente',
     );
     expect(validateOrder(order({ stopLoss: 101 }), 100, 1000)).toContain('por debajo');
@@ -222,17 +222,17 @@ describe('Replay', () => {
     const replay = new Replay(series(candle(3, 100, 111, 99, 110)), 2, 1000);
     const t = replay.open('a', order({ lots: 0.05 }));
     expect(t).toMatchObject({ entryPrice: 100, entryTime: 2, quantity: 5, status: 'open' });
-    expect(replay.usedMargin()).toBe(5);
-    expect(replay.available()).toBe(995);
-    expect(() => replay.open('b', order({ side: 'short', lots: 10 }))).toThrow(
+    expect(replay.usedMargin()).toBe(2.5);
+    expect(replay.available()).toBe(997.5);
+    expect(() => replay.open('b', order({ side: 'short', lots: 20 }))).toThrow(
       'Margen insuficiente',
     );
 
     replay.step();
     expect(replay.unrealized()).toBe(50);
     expect(replay.equity()).toBe(1050);
-    expect(replay.available()).toBe(1045);
-    expect(replay.marginLevel()).toBe(210);
+    expect(replay.available()).toBe(1047.5);
+    expect(replay.marginLevel()).toBe(420);
 
     const closed = replay.close('a');
     expect(closed).toMatchObject({ status: 'closed', exitPrice: 110, exitTime: 3, pnl: 50 });
@@ -273,7 +273,7 @@ describe('Replay', () => {
       order({ orderType: 'limit', price: 96, lots: 0.05, stopLoss: 91 }),
     );
     expect(limit).toMatchObject({ status: 'pending', orderPrice: 96, entryPrice: 96, quantity: 5 });
-    expect(replay.available()).toBe(995.2);
+    expect(replay.available()).toBe(997.6);
     expect(replay.filledCount()).toBe(0);
 
     expect(replay.step()!.filled).toEqual([]);
@@ -290,21 +290,21 @@ describe('Replay', () => {
 
   it('stops out every position when equity falls below half the margin in use', () => {
     const replay = new Replay(
-      series(candle(3, 100, 100, 99, 99), candle(4, 99, 99, 98.4, 98.4)),
+      series(candle(3, 100, 100, 99, 99), candle(4, 99, 99, 98.2, 98.2)),
       2,
       200,
     );
     replay.open('a', order({ lots: 1 }));
-    expect(replay.usedMargin()).toBe(100);
-    // Equity 100 against 100 of margin: 100%, still open.
+    expect(replay.usedMargin()).toBe(50);
+    // Equity 100 against 50 of margin: 200%, still open.
     expect(replay.step()!.closed).toEqual([]);
-    expect(replay.marginLevel()).toBe(1);
-    // Equity 40: 40% < 50%.
+    expect(replay.marginLevel()).toBe(2);
+    // Equity 20: 40% < 50%.
     const { closed } = replay.step()!;
     expect(closed).toEqual([
-      expect.objectContaining({ id: 'a', exitReason: 'stopOut', exitPrice: 98.4, pnl: -160 }),
+      expect.objectContaining({ id: 'a', exitReason: 'stopOut', exitPrice: 98.2, pnl: -180 }),
     ]);
-    expect(replay.balance()).toBe(40);
+    expect(replay.balance()).toBe(20);
     expect(replay.marginLevel()).toBeNull();
   });
 

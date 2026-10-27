@@ -614,6 +614,14 @@ export const es = {
     marginLevel: 'Nivel de margen',
     trades: 'Operaciones',
     positions: (n: number) => `Posiciones (${n})`,
+    openCount: (positions: number, orders: number) =>
+      [
+        positions ? `${positions} ${positions === 1 ? 'posición' : 'posiciones'}` : '',
+        orders ? `${orders} ${orders === 1 ? 'orden' : 'órdenes'}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    showTrades: 'Ver tus posiciones y órdenes',
     orders: (n: number) => `Órdenes (${n})`,
     history: (n: number) => `Historial (${n})`,
     stats: 'Estadísticas',

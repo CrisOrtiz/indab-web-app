@@ -537,6 +537,12 @@ export class Practice {
     }
   }
 
+  /** The count of live trades on the chart: opens their list, positions first. */
+  protected showTrades(list: HTMLElement): void {
+    this.tab.set(this.replay()?.openTrades().length ? 'positions' : 'orders');
+    list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   /** Takes the order being set up off the chart and clears its exits. */
   protected discardDraft(): void {
     this.drafting.set(false);

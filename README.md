@@ -350,15 +350,19 @@ bars, the bar in the making included); a test in `practice.spec.ts` checks this 
 "Siguiente vela" shows the next bar of that timeframe, and orders, stops and the stop out are
 checked minute by minute.
 
-Students start with 200 virtual USD and trade in lots (1 lot = 100 oz) with 1:100 leverage: a
-position ties up 1% of its value as margin, and every position is closed (stop out) when equity
+Students start with 200 virtual USD and trade in lots (1 lot = 100 oz) with 1:200 leverage: a
+position ties up 0.5% of its value as margin (about 20 USD per 0.01 lots with gold near 4,000), and every position is closed (stop out) when equity
 falls below 50% of the margin in use. Orders are market, limit or stop, with optional stop loss
 and take profit. The screen follows TradingView: one-click Buy/Sell over the chart, an order
 panel with Market/Limit/Stop tabs, lots with their margin, and take profit / stop loss switches
 that show their P/L and the reward to risk, plus an account summary and Positions / Orders /
 History tabs under the chart. Every order, position, stop loss and take profit is a line on the
 chart with a label showing its size and P/L and a × to close, cancel or remove it; order prices
-and stops can be dragged by the line or the label. As in TradingView, nothing is on the chart
+and stops can be dragged by the line or the label. Students can hold several positions and
+pending orders at once, as far as the margin goes: labels that would cover each other are
+stacked below their lines with a dashed leader, and a chip under the one-click box counts the
+live positions and orders (a tap opens their list). A refused one-click order says why right
+under the box, with the lots the free margin still covers. As in TradingView, nothing is on the chart
 until the student adds an order: the "+" next to the price scale (under the pointer, or where a
 finger taps on a phone) offers a buy or sell limit/stop at that price, "add order" or a
 horizontal line. The order then shows as a line with its Buy/Sell button (off, with a "!" saying

@@ -306,7 +306,7 @@ describe('Practice page', () => {
     expect(el.querySelector('h1')?.textContent).toContain('Práctica de trading');
     // Only the market: the practice starts on 15 minutes and switches inside.
     expect(el.querySelectorAll('form select')).toHaveLength(1);
-    expect(el.textContent).toContain('Empiezas con 200 USD virtuales y apalancamiento 1:100');
+    expect(el.textContent).toContain('Empiezas con 200 USD virtuales y apalancamiento 1:200');
     expect(practice.sessionsPage).toHaveBeenCalledWith(
       { uid: 'u1' },
       SESSIONS_PAGE_SIZE,
@@ -577,11 +577,11 @@ describe('Practice page', () => {
     await toggle('Take profit');
     expect(el.querySelector('.ratio')).toBeNull();
 
-    // 200 USD of free margin at 1 USD per 0.01 lots.
+    // 200 USD of free margin at 0.50 USD per 0.01 lots.
     await click('50%');
-    expect(submitLabel()).toBe('Comprar 1.00 XAUUSDT MERCADO');
-    await click('Máx.');
     expect(submitLabel()).toBe('Comprar 2.00 XAUUSDT MERCADO');
+    await click('Máx.');
+    expect(submitLabel()).toBe('Comprar 4.00 XAUUSDT MERCADO');
   });
 
   it('drops a trade that could not be logged', async () => {
@@ -643,8 +643,8 @@ describe('Practice page', () => {
 
   it('holds several positions and pending orders at once, as far as the margin goes', async () => {
     await start();
-    // 0.5 lots at 100 tie up 50 USD of the 200 (49.50 for the limit at 99): four fit, five do not.
-    chart().lotsChanged.emit('0.5');
+    // 1 lot at 100 ties up 50 USD of the 200 (49.50 for the limit at 99): four fit, five do not.
+    chart().lotsChanged.emit('1');
     await fixture.whenStable();
     await pressed('.quick-buy');
     await pressed('.quick-sell');
@@ -659,13 +659,25 @@ describe('Practice page', () => {
     await pressed('.quick-buy');
     expect(el.textContent).toContain('Posiciones (3)');
     expect(el.querySelector('.quick-error')).toBeNull();
+    // The chart says how many trades are live; a tap opens their list.
+    const count = el.querySelector<HTMLButtonElement>('.open-count')!;
+    expect(count.querySelector('.count')!.textContent!.trim()).toBe('4');
+    expect(count.textContent).toContain('3 posiciones · 1 orden');
+    expect(count.querySelector('.pnl')!.textContent!.trim()).toBe('0.00 USD');
+    await click('Órdenes (1)');
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    count.click();
+    await fixture.whenStable();
+    expect(button('Posiciones (3)').getAttribute('aria-pressed')).toBe('true');
+    expect(scroll).toHaveBeenCalled();
 
     // Out of margin, the one-click box says why right under its buttons, not in the ticket.
     await pressed('.quick-buy');
     expect(practice.openTrade).toHaveBeenCalledTimes(4);
     expect(el.querySelector('.quick-error')?.textContent).toBe(
       'Margen insuficiente: la orden necesita 50.00 USD y tienes 0.50 USD libres. ' +
-        'Cierra una posición o cancela una orden pendiente para abrir otra.',
+        'Con ese margen puedes abrir hasta 0.01 lotes.',
     );
     expect(el.querySelector('.order-error')).toBeNull();
 
@@ -680,14 +692,15 @@ describe('Practice page', () => {
 
   it('hides the one-click refusal after a few seconds', async () => {
     await start();
-    chart().lotsChanged.emit('3');
+    expect(el.querySelector('.open-count')).toBeNull();
+    chart().lotsChanged.emit('5');
     await fixture.whenStable();
     vi.useFakeTimers();
     try {
       // The refusal comes before any wait, so the click shows it at once.
       el.querySelector<HTMLButtonElement>('.quick-sell')!.click();
       fixture.detectChanges();
-      expect(el.querySelector('.quick-error')?.textContent).toContain('hasta 2.00 lotes');
+      expect(el.querySelector('.quick-error')?.textContent).toContain('hasta 4.00 lotes');
       vi.advanceTimersByTime(QUICK_ERROR_MS);
       fixture.detectChanges();
       expect(el.querySelector('.quick-error')).toBeNull();
