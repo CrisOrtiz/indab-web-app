@@ -5,7 +5,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
 import { Reveal } from '../../shared/reveal/reveal';
 
-type AdminCard = 'users' | 'mentorships' | 'exams' | 'evaluations' | 'practice';
+type AdminCard = 'mentor' | 'users' | 'mentorships' | 'exams' | 'evaluations' | 'practice';
 
 // Admin home: a card per tool, each opening its own page.
 @Component({
@@ -18,8 +18,12 @@ export class Admin {
   protected readonly auth = inject(AuthService);
   protected readonly i18n = inject(I18n);
 
-  /** A card per admin tool; trainers do not get the users card (mentorships are read-only). */
+  /**
+   * A card per admin tool, the mentor dashboard first; trainers do not get the users card
+   * (mentorships are read-only).
+   */
   protected readonly cards = computed<{ key: AdminCard; link: string }[]>(() => [
+    { key: 'mentor', link: '/admin/mentor' },
     ...(this.auth.isAdmin() ? [{ key: 'users' as const, link: '/admin/users' }] : []),
     { key: 'mentorships', link: '/admin/mentorships' },
     { key: 'exams', link: '/admin/forms' },

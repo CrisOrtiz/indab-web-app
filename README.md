@@ -224,6 +224,7 @@ Changing the password does revoke every other session, since Firebase ends them 
 | `/academy/calendar`   | signed-in users (same page as `/calendar`, with a link back to the academy)                                                                     |
 | `/academy/exams`      | enrolled users (assigned evaluation forms: answer, see grades; `/academy/exams/:id` takes one)                                                  |
 | `/admin`              | trainers and admins (a card per tool; trainers do not get the users card)                                                                       |
+| `/admin/mentor`       | trainers and admins (mentor dashboard: practice, averages and pending work of each mentorship they lead; admins see all)                        |
 | `/admin/users`        | admins (users, roles, academy access and each student's mentorships)                                                                            |
 | `/admin/mentorships`  | trainers and admins (admins create, edit, pause and delete mentorships; trainers see them and their students)                                   |
 | `/admin/practice`     | trainers and admins (review students' practice sessions on the chart; admins delete them)                                                       |
@@ -376,6 +377,19 @@ can check it. The staff lists (practice review, evaluation results and form resu
 mentorship; the practice review filters the first 30 students of a mentorship (Firestore's `in`
 limit), or one student. Inactive mentorships keep their students but are not offered for new
 assignments. Trainers see the mentorships and their students but only admins change them.
+
+### Mentor dashboard
+
+`/admin/mentor` (the first `/admin` card) shows one mentorship at a time: trainers pick among the
+ones they lead, admins among all. For a period (this week from Monday, the last 30 or 90 days) it
+shows who practised, each student's sessions, closed trades, winning share and P/L, the group's
+averages (P/L per active student, winning trades, form grades, evaluation P/L), and the published
+forms and practice evaluations given to the group whose window touched the period, with who has
+not handed them in. Practice is counted with aggregation queries per student (sessions: count and
+sum of `pnl`; trades: a staff-only collection group query on `trades` by `uid`, `status` and
+`closedAt`, with and without `pnl > 0`), so reads stay a handful per student however much they
+traded. Links open the practice review filtered to the student (`?student=uid`), a form's results
+and an evaluation's results (`/admin/evaluations?results=id`).
 
 ### Evaluation forms
 

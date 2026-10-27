@@ -32,6 +32,18 @@
 <ng-template #body let-card let-c="c">
   <span class="art" [attr.data-art]="card.key" aria-hidden="true">
     @switch (card.key) {
+      @case ('mentor') {
+        <svg viewBox="0 0 96 72">
+          <rect x="6" y="8" width="84" height="56" rx="6" />
+          <path class="thin" d="M6 22h84" />
+          <rect class="solid" x="16" y="42" width="8" height="14" rx="2" />
+          <rect class="solid" x="30" y="34" width="8" height="22" rx="2" />
+          <rect class="solid" x="44" y="38" width="8" height="18" rx="2" />
+          <circle cx="72" cy="40" r="8" />
+          <path d="M62 56c2-6 6-8 10-8s8 2 10 8" />
+          <path class="thin" d="M14 15h20" />
+        </svg>
+      }
       @case ('users') {
         <svg viewBox="0 0 96 72">
           <circle class="solid" cx="36" cy="22" r="11" />

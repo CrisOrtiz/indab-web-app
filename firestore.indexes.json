@@ -117,6 +117,46 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "trades",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "closedAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "trades",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "closedAt",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "pnl",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

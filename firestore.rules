@@ -36,7 +36,8 @@ rules_version = '2';
 //                                        evaluation's results are published
 //   practiceSessions/{id}/trades/{id}    simulated orders of that session: market orders open at
 //                                        once, limit/stop orders fill or are cancelled once; open
-//                                        trades close once; only SL/TP (and a pending price) move
+//                                        trades close once; only SL/TP (and a pending price) move;
+//                                        staff also read them all as a collection group
 //
 // Admins are users whose profile has role == 'admin'. Promote the first admin by editing
 // their users/{uid} document in the Firebase console; after that, admins manage roles and
@@ -615,6 +616,12 @@ service cloud.firestore {
 
         allow delete: if isAdmin();
       }
+    }
+
+    // Trades of every session at once (a collection group query), for the mentor dashboard's
+    // win rates. Staff only: students read their own through their session.
+    match /{path=**}/trades/{tradeId} {
+      allow read: if isStaff();
     }
 
     // Everything else is closed by default.
