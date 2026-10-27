@@ -17,7 +17,8 @@
   padding: 0 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  background: var(--color-bg);
+  // Not the `background` shorthand, which would drop the iOS date icon (src/styles.scss).
+  background-color: var(--color-bg);
   color: var(--color-text);
   font: inherit;
   font-size: 0.95rem;
@@ -37,6 +38,13 @@
   input,
   select {
     @include filter-input;
+  }
+
+  // Room for the calendar icon iOS date inputs get in src/styles.scss.
+  @supports (-webkit-touch-callout: none) {
+    input[type='date'] {
+      padding-right: 36px;
+    }
   }
 
   .clear {
