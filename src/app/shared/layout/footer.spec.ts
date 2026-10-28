@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { I18n } from '../../core/i18n/i18n.service';
-import { AppInstall } from '../../core/pwa/app-install.service';
+import { AppInstall, INSTALL_OFFER_ENABLED } from '../../core/pwa/app-install.service';
 import { Footer } from './footer';
 
 describe('Footer', () => {
@@ -32,7 +32,17 @@ describe('Footer', () => {
     expect(el.textContent).toContain('Built by');
   });
 
+  it('hides "Install app" while the option is switched off', async () => {
+    const fixture = await render();
+    TestBed.inject(AppInstall).ios.set(true);
+    await fixture.whenStable();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.install')).toBeNull();
+  });
+
   it('offers "Install app" only where the browser can install the site', async () => {
+    TestBed.configureTestingModule({
+      providers: [{ provide: INSTALL_OFFER_ENABLED, useValue: true }],
+    });
     const fixture = await render();
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('.install')).toBeNull();

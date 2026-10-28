@@ -1,11 +1,28 @@
 import { DOCUMENT, isPlatformBrowser } from '@angular/common';
-import { DestroyRef, Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import {
+  DestroyRef,
+  Injectable,
+  InjectionToken,
+  PLATFORM_ID,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 
 /** Chrome's install prompt (`beforeinstallprompt`), not in the DOM typings yet. */
 export interface InstallPromptEvent extends Event {
   prompt(): Promise<void>;
   readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
+
+/**
+ * Whether the site offers "Install app" (account menu, footer). Off for now (Cris, 2026-10-27:
+ * not until INDAB really needs an app); the PWA itself (manifest, service worker) stays.
+ */
+export const INSTALL_OFFER_ENABLED = new InjectionToken<boolean>('INSTALL_OFFER_ENABLED', {
+  providedIn: 'root',
+  factory: () => false,
+});
 
 /** Where the early listener in index.html keeps a prompt fired before the app started. */
 type InstallWindow = Window & { indabInstallPrompt?: InstallPromptEvent | null };
@@ -29,13 +46,16 @@ export class AppInstall {
   private readonly browser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly prompt = signal<InstallPromptEvent | null>(null);
   private readonly installed = signal(false);
+  private readonly enabled = inject(INSTALL_OFFER_ENABLED);
 
   /** True on iPhone and iPad, where installing is done by hand from the Share menu. */
   readonly ios = signal(false);
   /** The iOS instructions dialog. */
   readonly helpOpen = signal(false);
   /** Whether to show the "Install app" option. */
-  readonly available = computed(() => !this.installed() && (!!this.prompt() || this.ios()));
+  readonly available = computed(
+    () => this.enabled && !this.installed() && (!!this.prompt() || this.ios()),
+  );
 
   constructor() {
     const win = this.window;

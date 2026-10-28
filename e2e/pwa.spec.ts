@@ -21,28 +21,24 @@ test('the site links a manifest for an installable app', async ({ page, request 
   await expect(page.getByRole('button', { name: 'Instalar app' })).toHaveCount(0);
 });
 
+// "Install app" is switched off for now (INSTALL_OFFER_ENABLED, Cris 2026-10-27): neither iPhone
+// visitors nor browsers with an install prompt get the option.
 test.describe('on iPhone', () => {
   test.use({ userAgent: IPHONE, viewport: { width: 390, height: 844 }, hasTouch: true });
 
-  test('visitors get Add to Home Screen instructions from the footer', async ({ page }) => {
+  test('visitors get no install option', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Instalar app' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Instala la app de INDAB' });
-    await expect(dialog).toContainText('Toca el botón Compartir');
-    await expect(dialog).toContainText('Elige «Agregar a inicio».');
-    await dialog.getByRole('button', { name: 'Entendido' }).click();
-    await expect(dialog).toBeHidden();
+    await expect(page.locator('app-footer')).toContainText('Desarrollado por');
+    await expect(page.getByRole('button', { name: 'Instalar app' })).toHaveCount(0);
   });
 });
 
-test('signed-in users install the app from the account menu', async ({ page }) => {
+test('signed-in users get no install option in the account menu', async ({ page }) => {
   // Chromium fires its install prompt only for a served, installable build; fake it here.
   await page.addInitScript(() => {
-    const w = window as unknown as { prompted: boolean };
-    w.prompted = false;
     addEventListener('load', () => {
       const event = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
-        prompt: async () => void (w.prompted = true),
+        prompt: async () => undefined,
         userChoice: Promise.resolve({ outcome: 'accepted' }),
       });
       dispatchEvent(event);
@@ -53,12 +49,7 @@ test('signed-in users install the app from the account menu', async ({ page }) =
   await expect(page).toHaveURL('/academy');
 
   await page.getByRole('button', { name: 'Tu cuenta' }).click();
-  await page.getByRole('menuitem', { name: 'Instalar app' }).click();
-  await expect
-    .poll(() => page.evaluate(() => (window as unknown as { prompted: boolean }).prompted))
-    .toBe(true);
-  // Installed: the option is gone from the menu and the footer.
-  await page.getByRole('button', { name: 'Tu cuenta' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Cerrar sesión' })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: 'Instalar app' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Instalar app' })).toHaveCount(0);
 });

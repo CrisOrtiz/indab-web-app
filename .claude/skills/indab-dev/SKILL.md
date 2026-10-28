@@ -133,7 +133,8 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
 - Installable app (PWA, README "Installable app"): service worker in production builds only;
   `ngsw-config.json` caches the app's own files, never Firestore/Auth/market data. Keep new
   public files cacheable by its globs and keep `ngsw-worker.js`/`ngsw.json` `no-cache` in
-  `firebase.json`. `AppInstall` and `AppUpdates` live in `core/pwa`, their UI in `shared/pwa`.
+  `firebase.json`. `AppInstall` and `AppUpdates` live in `core/pwa`, their UI in `shared/pwa`. The "Instalar app"
+  option is off (`INSTALL_OFFER_ENABLED` = false) until Cris wants an app.
 - SEO: public pages are prerendered at build time (`outputMode: "static"`, `@angular/ssr`, no
   hydration) and `Seo` (`core/seo`) sets meta, canonical, `hreflang` (`?lang=es|en|pt` links) and
   Open Graph tags per route and language. Code on public pages runs once in Node at build time:
