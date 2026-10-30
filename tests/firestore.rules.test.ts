@@ -1901,6 +1901,34 @@ describe('mentor notes and notifications', () => {
   });
 });
 
+describe('chart settings', () => {
+  const chart = (uid: string | null, owner: string) =>
+    doc(as(uid), `users/${owner}/settings/chart`);
+  const data = (extra: Record<string, unknown> = {}) => ({
+    indicators: ['ema100', 'rsi14'],
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+
+  it('belong to each user, students included', async () => {
+    await assertSucceeds(setDoc(chart('ana', 'ana'), data()));
+    await assertSucceeds(getDoc(chart('ana', 'ana')));
+    await assertSucceeds(setDoc(chart('ana', 'ana'), data({ indicators: [] })));
+    await assertSucceeds(setDoc(chart('admin', 'admin'), data({ indicators: ['volume'] })));
+    await assertFails(getDoc(chart('admin', 'ana')));
+    await assertFails(setDoc(chart('admin', 'ana'), data()));
+    await assertFails(getDoc(chart(null, 'ana')));
+    await assertFails(setDoc(chart(null, 'ana'), data()));
+  });
+
+  it('only keep known indicators', async () => {
+    await assertFails(setDoc(chart('ana', 'ana'), data({ indicators: ['macd'] })));
+    await assertFails(setDoc(chart('ana', 'ana'), data({ indicators: 'rsi14' })));
+    await assertFails(setDoc(chart('ana', 'ana'), data({ theme: 'dark' })));
+    await assertFails(setDoc(chart('ana', 'ana'), data({ updatedAt: 1 })));
+  });
+});
+
 describe('unknown collections', () => {
   it('are closed to everyone, admins included', async () => {
     await assertFails(getDoc(doc(as('admin'), 'secrets/s1')));

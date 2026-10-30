@@ -8,6 +8,7 @@ import {
   effect,
   inject,
   input,
+  linkedSignal,
   output,
   signal,
   untracked,
@@ -16,22 +17,37 @@ import {
 import {
   AutoscaleInfo,
   CandlestickSeries,
+  HistogramSeries,
   IChartApi,
   IPriceLine,
   ISeriesApi,
   ISeriesMarkersPluginApi,
+  LineData,
   LineSeries,
   LineStyle,
   Logical,
   SeriesMarker,
   Time,
+  WhitespaceData,
   createChart,
   createSeriesMarkers,
 } from 'lightweight-charts';
 import { I18n } from '../../core/i18n/i18n.service';
 import { ThemeService } from '../../core/theme/theme.service';
 import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/practice';
-import { DEFAULT_INDICATORS, INDICATORS, RSI_LEVELS, computeIndicator } from './indicators';
+import {
+  DEFAULT_INDICATORS,
+  INDICATORS,
+  Indicator,
+  RSI_COLORS,
+  RSI_LEVELS,
+  RSI_SMOOTHING,
+  Divergence,
+  IndicatorPoint,
+  rsiDivergences,
+  sma,
+  computeIndicator,
+} from './indicators';
 import { formatLots, priceDecimals, priceDigits, roundPrice, signedMoney } from './practice-format';
 import { LOT_SIZE, LOT_STEP, tradeLots } from './replay';
 import { filledTrades, tradeBox } from './trade-boxes';
@@ -79,6 +95,11 @@ type LabelAction =
 interface LineLabel {
   /** The side, at the start of the box; on the order being set up, a button that places it. */
   badge?: { text: string; side: TradeSide; submit: boolean };
+  /**
+   * Size of a placed order or open position, filled with its side's color (blue buy, red
+   * sell): once placed, the line no longer names the side, as in TradingView.
+   */
+  qty?: { text: string; side: TradeSide; title: string };
   /** Lots of the order being set up: a button that opens the quantity pad. */
   lots?: number;
   /** The text is the order type, a button that opens the order type menu. */
@@ -157,7 +178,10 @@ export type Tool =
   | 'fib'
   | 'long'
   | 'short'
-  | 'range';
+  | 'range'
+  | 'vprofile'
+  | 'elliott'
+  | 'abc';
 /** Drawings on the overlay: every tool but the horizontal line, which is a price line. */
 type ShapeKind = Exclude<Tool, 'hline'>;
 interface ShapeDrawing {
@@ -226,7 +250,27 @@ interface PlacedShape {
   };
   /** Price range: its label, where it goes and whether the price went up. */
   range?: { text: string; y: number; up: boolean };
+  /** Elliott waves: the line through their points and each point's label. */
+  wave?: { path: string; labels: { key: string; x: number; y: number; text: string }[] };
+  /** Fixed range volume profile: its rows, point of control and value area, in pixels. */
+  profile?: PlacedProfile;
   handles: Handle[];
+}
+
+/** A volume profile row: its height, and its buy and sell volume as bar widths. */
+interface ProfileRow {
+  top: number;
+  height: number;
+  up: number;
+  down: number;
+  /** Inside the value area, where 70% of the volume traded. */
+  value: boolean;
+}
+
+interface PlacedProfile {
+  rows: ProfileRow[];
+  /** Y of the point of control, the price with the most volume; null without volume. */
+  pocY: number | null;
 }
 
 /** A trade drawn as TradingView's long/short position box, in pixels of the candles' pane. */
@@ -259,6 +303,9 @@ interface Gesture {
 
 /** Lot shortcuts of the quantity pad. */
 export const LOT_PRESETS = [0.01, 0.05, 0.1, 0.5, 1];
+
+/** Lines and buttons of buys and sells, in TradingView's blue and red. */
+export const SIDE_COLORS: Record<TradeSide, string> = { long: '#2962ff', short: '#f23645' };
 
 const FIB_RED = '#f23645';
 const FIB_PURPLE = '#9c27b0';
@@ -333,13 +380,15 @@ const MIN_REPLAY_VIEW = 60;
 /** Length (px) of an arrow's head. */
 const ARROW_HEAD = 12;
 
-export type ToolGroup = 'lines' | 'shapes' | 'fibonacci' | 'projection';
+export type ToolGroup = 'lines' | 'shapes' | 'fibonacci' | 'patterns' | 'projection' | 'volume';
 /** The drawings menu, in sections as TradingView groups its tools. */
 export const TOOL_GROUPS: { group: ToolGroup; tools: Tool[] }[] = [
   { group: 'lines', tools: ['trend', 'ray', 'extended', 'arrow', 'hline', 'hray', 'vline'] },
   { group: 'shapes', tools: ['channel', 'rect'] },
   { group: 'fibonacci', tools: ['fib'] },
+  { group: 'patterns', tools: ['elliott', 'abc'] },
   { group: 'projection', tools: ['long', 'short', 'range'] },
+  { group: 'volume', tools: ['vprofile'] },
 ];
 
 /** Points a drawing takes: a channel's third sets its width. */
@@ -357,7 +406,25 @@ const POINTS: Record<Tool, number> = {
   long: 2,
   short: 2,
   range: 2,
+  vprofile: 2,
+  // Elliott impulse wave: its start (0) and the ends of waves 1 to 5.
+  elliott: 6,
+  // Elliott correction: its start and the ends of waves A, B and C.
+  abc: 4,
 };
+
+/** Labels of the points of each Elliott wave; its start has none. */
+const WAVE_LABELS: Partial<Record<Tool, string[]>> = {
+  elliott: ['', '1', '2', '3', '4', '5'],
+  abc: ['', 'A', 'B', 'C'],
+};
+
+/** Rows of a volume profile (TradingView's default) and the share of volume in its value area. */
+export const PROFILE_ROWS = 24;
+const VALUE_AREA = 0.7;
+/** Widest a profile's bars get: this share of its range, but at least `PROFILE_MIN_WIDTH` px. */
+const PROFILE_WIDTH = 0.3;
+const PROFILE_MIN_WIDTH = 40;
 
 /** Drawings whose two points must be on different bars, as they are lines through them. */
 const LINE_KINDS: ReadonlySet<Tool> = new Set([
@@ -368,6 +435,9 @@ const LINE_KINDS: ReadonlySet<Tool> = new Set([
   'channel',
   'long',
   'short',
+  'vprofile',
+  'elliott',
+  'abc',
 ]);
 
 const DECIMALS = new Map<number, Intl.NumberFormat>();
@@ -407,9 +477,10 @@ function formatPercent(value: number, of: number, signed = false): string {
  * quantity pad, an order type menu, TP/SL tabs to drag out and a × to discard it.
  *
  * A toolbar on top (content marked `chartToolbar`, such as the timeframes, goes first) has a
- * menu of indicators (EMA 100 and 200, on from the start, and the RSI in its own pane) and one
- * of drawings, in TradingView's sections (`TOOL_GROUPS`): lines, rays and arrows, parallel
- * channels and rectangles, Fibonacci retracements, long/short positions and price ranges.
+ * menu of indicators (EMA 100 and 200, volume, and the RSI in its own pane; the RSI alone until
+ * the user saves their own, see `indicators`) and one of drawings, in TradingView's sections
+ * (`TOOL_GROUPS`): lines, rays and arrows, parallel channels and rectangles, Fibonacci
+ * retracements, Elliott waves, long/short positions, price ranges and volume profiles.
  * Indicators only use the candles shown, so they never peek ahead.
  *
  * Drawings work as in TradingView's app: a click or tap puts each point, and on a phone the
@@ -426,7 +497,7 @@ function formatPercent(value: number, of: number, signed = false): string {
     '(document:keydown)': 'onKey($event)',
   },
   templateUrl: './replay-chart.html',
-  styleUrls: ['./replay-chart.scss', './chart-tools.scss'],
+  styleUrls: ['./replay-chart.scss', './chart-tools.scss', './chart-studies.scss'],
 })
 export class ReplayChart {
   readonly candles = input.required<Candle[]>();
@@ -467,16 +538,23 @@ export class ReplayChart {
   readonly orderAt = output<OrderAt>();
   /** Symbol named in the "+" menu. */
   readonly symbol = input('');
+  /** The indicators the user keeps on (`ChartSettingsService`); null shows the defaults. */
+  readonly indicators = input<readonly string[] | null>(null);
+  /** The indicators after the user switched one on or off, to keep for their next sessions. */
+  readonly indicatorsChange = output<string[]>();
 
   protected readonly i18n = inject(I18n);
   private readonly theme = inject(ThemeService);
-  protected readonly indicators = INDICATORS;
+  protected readonly indicatorList = INDICATORS;
   protected readonly signed = signedMoney;
   protected readonly priceDigits = priceDigits;
   protected readonly formatLots = formatLots;
   protected readonly lotPresets = LOT_PRESETS;
   protected readonly orderTypes: OrderType[] = ['market', 'limit', 'stop'];
-  protected readonly active = signal<ReadonlySet<string>>(new Set(DEFAULT_INDICATORS));
+  /** Indicators switched on: the user's saved ones, or the defaults until they pick any. */
+  protected readonly active = linkedSignal<ReadonlySet<string>>(
+    () => new Set(this.indicators() ?? DEFAULT_INDICATORS),
+  );
   protected readonly toolGroups = TOOL_GROUPS;
   protected readonly drawingColors = DRAWING_COLORS;
   protected readonly tool = signal<Tool | null>(null);
@@ -576,9 +654,17 @@ export class ReplayChart {
   };
   private gesture?: Gesture;
   private drawn: Candle[] = [];
-  private indicatorSeries = new Map<string, ISeriesApi<'Line'>>();
+  private indicatorSeries = new Map<string, ISeriesApi<'Line'> | ISeriesApi<'Histogram'>>();
+  /** The RSI's smoothing average and divergence lines, in its pane while it is on. */
+  private rsiExtras?: {
+    smoothing: ISeriesApi<'Line'>;
+    bull: ISeriesApi<'Line'>;
+    bear: ISeriesApi<'Line'>;
+    bullMarks: ISeriesMarkersPluginApi<Time>;
+    bearMarks: ISeriesMarkersPluginApi<Time>;
+  };
   private nextDrawingId = PREVIEW_ID + 1;
-  private colors = { up: '', down: '', text: '', muted: '' };
+  private colors = { up: '', down: '', text: '', muted: '', candleUp: '', candleDown: '' };
   /** Prices of the focused trade, kept inside the price scale. */
   private focusLevels: number[] = [];
   /** The trade the chart last scrolled to, so it scrolls once per pick, not on every bar. */
@@ -664,13 +750,12 @@ export class ReplayChart {
   }
 
   protected toggleIndicator(id: string): void {
-    this.active.update((active) => {
-      const next = new Set(active);
-      if (!next.delete(id)) {
-        next.add(id);
-      }
-      return next;
-    });
+    const next = new Set(this.active());
+    if (!next.delete(id)) {
+      next.add(id);
+    }
+    this.active.set(next);
+    this.indicatorsChange.emit(INDICATORS.map((i) => i.id).filter((i) => next.has(i)));
   }
 
   /** Opens the indicators or drawings menu below its button, or closes it. */
@@ -956,24 +1041,24 @@ export class ReplayChart {
   }
 
   private lines(trades: PracticeTrade[], draft: OrderDraft | null, drawings: Drawing[]): Line[] {
-    const { text, muted } = this.colors;
     const { chart, trading: tr } = untracked(this.i18n.messages);
     const lines: Line[] = [];
     for (const t of trades) {
       const lots = formatLots(tradeLots(t));
-      const badge = { text: t.side === 'long' ? tr.long : tr.short, side: t.side, submit: false };
+      const color = SIDE_COLORS[t.side];
+      const qty = { text: lots, side: t.side, title: t.side === 'long' ? tr.long : tr.short };
       if (t.status === 'open') {
         const bracket = { target: t.id, side: t.side, quantity: t.quantity };
         lines.push({
           key: t.id,
           price: t.entryPrice,
-          color: text,
+          color,
           style: LineStyle.Solid,
           position: t,
           bracket,
           label: {
-            badge,
-            text: lots,
+            qty,
+            text: '',
             pnl: null,
             tabs: this.tabs(bracket, t),
             action: { kind: 'close', tradeId: t.id, label: chart.closePosition },
@@ -984,12 +1069,12 @@ export class ReplayChart {
         lines.push({
           key: t.id,
           price: t.orderPrice!,
-          color: text,
+          color,
           style: LineStyle.Dashed,
           drag: { target: t.id, field: 'price' },
           label: {
-            badge,
-            text: `${lots} ${tr.orderTypes[t.orderType]}`,
+            qty,
+            text: tr.orderTypes[t.orderType],
             pnl: null,
             tabs: this.tabs({ target: t.id, side: t.side, quantity: t.quantity }, t),
             action: { kind: 'close', tradeId: t.id, label: chart.cancelOrder },
@@ -1020,7 +1105,7 @@ export class ReplayChart {
         lines.push({
           key: 'draft:market',
           price: close,
-          color: muted,
+          color: SIDE_COLORS[draft.side],
           style: LineStyle.Dotted,
           atClose: true,
           bracket,
@@ -1030,7 +1115,7 @@ export class ReplayChart {
         lines.push({
           key: 'draft:price',
           price: draft.price,
-          color: muted,
+          color: SIDE_COLORS[draft.side],
           style: LineStyle.Dotted,
           drag: { target: 'draft', field: 'price' },
           label,
@@ -1456,6 +1541,36 @@ export class ReplayChart {
         ];
         break;
       }
+      case 'elliott':
+      case 'abc': {
+        const names = WAVE_LABELS[d.kind]!;
+        shape.left = Math.min(...pixels.map((p) => p.x));
+        shape.right = Math.max(...pixels.map((p) => p.x));
+        shape.top = Math.min(...pixels.map((p) => p.y));
+        shape.bottom = Math.max(...pixels.map((p) => p.y));
+        shape.wave = {
+          path: this.polygon(...pixels),
+          // A label sits above a point higher than the one before it, below a lower one.
+          labels: pixels.slice(1).map((p, i) => ({
+            key: names[i + 1],
+            x: p.x,
+            y: p.y < pixels[i].y ? p.y - 8 : p.y + 16,
+            text: names[i + 1],
+          })),
+        };
+        shape.handles = pixels.map((p, i) => ({ key: `p${i}`, ...p, timeOf: i, priceOf: i }));
+        break;
+      }
+      case 'vprofile': {
+        const profile = this.placeProfile(d.points[0].time, d.points[1].time, shape);
+        shape.profile = profile;
+        const middle = (shape.top + shape.bottom) / 2;
+        shape.handles = [
+          { key: 'a', x: a.x, y: middle, timeOf: 0, priceOf: null },
+          { key: 'b', x: b.x, y: middle, timeOf: 1, priceOf: null },
+        ];
+        break;
+      }
       case 'range': {
         const [from, to] = d.points;
         const change = to.price - from.price;
@@ -1479,6 +1594,44 @@ export class ReplayChart {
       }
     }
     return shape;
+  }
+
+  /**
+   * The volume profile of the bars from `from` to `to`, laid over `shape` (whose top and bottom
+   * become the profile's): bars from its left edge, their width by volume.
+   */
+  private placeProfile(
+    from: number,
+    to: number,
+    shape: Pick<PlacedShape, 'left' | 'right' | 'top' | 'bottom'>,
+  ): PlacedProfile {
+    const series = this.series!;
+    const first = this.indexAt(Math.min(from, to));
+    const last = this.indexAt(Math.max(from, to));
+    const profile = volumeProfile(this.drawn.slice(first, last + 1), PROFILE_ROWS);
+    if (!profile) {
+      return { rows: [], pocY: null };
+    }
+    const top = series.priceToCoordinate(profile.high) ?? shape.top;
+    const bottom = series.priceToCoordinate(profile.low) ?? shape.bottom;
+    shape.top = Math.min(top, bottom);
+    shape.bottom = Math.max(top, bottom);
+    const width = Math.max(PROFILE_MIN_WIDTH, (shape.right - shape.left) * PROFILE_WIDTH);
+    const most = Math.max(...profile.rows.map((r) => r.up + r.down)) || 1;
+    const rows = profile.rows.map((row) => {
+      const rowTop = series.priceToCoordinate(row.high) ?? 0;
+      const rowBottom = series.priceToCoordinate(row.low) ?? 0;
+      return {
+        top: Math.min(rowTop, rowBottom),
+        // A pixel apart, as TradingView draws them.
+        height: Math.max(1, Math.abs(rowBottom - rowTop) - 1),
+        up: (row.up / most) * width,
+        down: (row.down / most) * width,
+        value: row.value,
+      };
+    });
+    const poc = profile.rows[profile.poc];
+    return { rows, pocY: series.priceToCoordinate((poc.low + poc.high) / 2) };
   }
 
   /** A rectangle's corners and the middle of its sides, each moving what it sits on. */
@@ -1604,14 +1757,16 @@ export class ReplayChart {
   private applyColors(): void {
     const css = getComputedStyle(this.host);
     const color = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
+    const up = color('--color-candle-up', '#089981');
+    const down = color('--color-candle-down', '#f23645');
     this.colors = {
       up: color('--color-up', '#0f7b4d'),
       down: color('--color-down', '#b3261e'),
       text: color('--color-text', '#111111'),
       muted: color('--color-muted', '#5f5f5f'),
+      candleUp: up,
+      candleDown: down,
     };
-    const up = color('--color-candle-up', '#089981');
-    const down = color('--color-candle-down', '#f23645');
     const grid = color('--color-surface', '#f5f5f5');
     this.chart?.applyOptions({
       layout: {
@@ -1641,45 +1796,152 @@ export class ReplayChart {
         if (series) {
           chart.removeSeries(series);
           this.indicatorSeries.delete(indicator.id);
+          if (indicator.kind === 'rsi') {
+            this.removeRsiExtras(chart);
+          }
         }
         continue;
       }
       if (!series) {
-        const rsi = indicator.kind === 'rsi';
-        series = chart.addSeries(
-          LineSeries,
-          {
-            color: indicator.color,
-            lineWidth: rsi ? 1 : 2,
-            priceLineVisible: false,
-            lastValueVisible: rsi,
-            crosshairMarkerVisible: false,
-          },
-          rsi ? 1 : 0,
-        );
-        if (rsi) {
-          RSI_LEVELS.forEach((price) =>
-            series!.createPriceLine({
-              price,
-              color: this.colors.muted,
-              lineStyle: LineStyle.Dashed,
-              lineWidth: 1,
-              axisLabelVisible: false,
-              title: '',
-            }),
-          );
-          chart.panes()[1]?.setHeight(RSI_PANE_HEIGHT);
-        }
+        series =
+          indicator.kind === 'volume' ? this.addVolume(chart) : this.addLine(chart, indicator);
         this.indicatorSeries.set(indicator.id, series);
       }
+      const points = computeIndicator(indicator, candles);
+      if (indicator.kind === 'volume') {
+        // Each bar in its candle's color, faded so the candles stay in front.
+        const { candleUp, candleDown } = this.colors;
+        series.setData(
+          points.map((p, i) => ({
+            time: p.time as Time,
+            value: p.value,
+            color: fade(candles[i].close >= candles[i].open ? candleUp : candleDown),
+          })),
+        );
+        continue;
+      }
+      if (indicator.kind === 'rsi') {
+        this.drawRsiExtras(chart, candles, points);
+      }
       series.setData(
-        computeIndicator(indicator, candles).map((p) => ({
+        points.map((p) => ({
           time: p.time as Time,
           // Averages at price precision: float noise on flat prices would stretch the scale.
           value: indicator.kind === 'rsi' ? p.value : roundPrice(p.value),
         })),
       );
     }
+  }
+
+  /**
+   * The RSI's smoothing average and its divergences, as Cris has TradingView set up: an SMA 14
+   * and green "Bull" / red "Bear" lines between the RSI pivots that diverge from the price.
+   */
+  private drawRsiExtras(chart: IChartApi, candles: Candle[], points: IndicatorPoint[]): void {
+    if (!this.rsiExtras) {
+      const line = (color: string, width: 1 | 2) =>
+        chart.addSeries(
+          LineSeries,
+          {
+            color,
+            lineWidth: width,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+            // The RSI alone sets its pane's scale, not these lines or their labels.
+            autoscaleInfoProvider: () => null,
+          },
+          1,
+        );
+      const smoothing = line(RSI_COLORS.smoothing, 1);
+      const bull = line(RSI_COLORS.bull, 2);
+      const bear = line(RSI_COLORS.bear, 2);
+      this.rsiExtras = {
+        smoothing,
+        bull,
+        bear,
+        bullMarks: createSeriesMarkers(bull, []),
+        bearMarks: createSeriesMarkers(bear, []),
+      };
+    }
+    const extras = this.rsiExtras;
+    extras.smoothing.setData(
+      sma(points, RSI_SMOOTHING).map((p) => ({ time: p.time as Time, value: p.value })),
+    );
+    const divergences = rsiDivergences(candles, points);
+    for (const kind of ['bull', 'bear'] as const) {
+      const list = divergences.filter((d) => d.kind === kind);
+      extras[kind].setData(
+        divergenceSegments(
+          list,
+          points.map((p) => p.time),
+        ),
+      );
+      extras[kind === 'bull' ? 'bullMarks' : 'bearMarks'].setMarkers(
+        list.map((d) => ({
+          time: d.to.time as Time,
+          position: kind === 'bull' ? 'belowBar' : 'aboveBar',
+          shape: 'square',
+          size: 0,
+          color: RSI_COLORS[kind],
+          text: kind === 'bull' ? 'Bull' : 'Bear',
+        })),
+      );
+    }
+  }
+
+  private removeRsiExtras(chart: IChartApi): void {
+    const extras = this.rsiExtras;
+    if (extras) {
+      [extras.smoothing, extras.bull, extras.bear].forEach((s) => chart.removeSeries(s));
+      this.rsiExtras = undefined;
+    }
+  }
+
+  /** An average on the candles, or the RSI in its own pane with its dotted guides. */
+  private addLine(chart: IChartApi, indicator: Indicator): ISeriesApi<'Line'> {
+    const rsi = indicator.kind === 'rsi';
+    const series = chart.addSeries(
+      LineSeries,
+      {
+        color: indicator.color,
+        lineWidth: rsi ? 1 : 2,
+        priceLineVisible: false,
+        lastValueVisible: rsi,
+        crosshairMarkerVisible: false,
+      },
+      rsi ? 1 : 0,
+    );
+    if (rsi) {
+      RSI_LEVELS.forEach((price) =>
+        series.createPriceLine({
+          price,
+          color: this.colors.muted,
+          lineStyle: LineStyle.Dotted,
+          lineWidth: 1,
+          axisLabelVisible: false,
+          title: '',
+        }),
+      );
+      chart.panes()[1]?.setHeight(RSI_PANE_HEIGHT);
+    }
+    return series;
+  }
+
+  /** Volume bars along the foot of the candles, on a scale of their own, as in TradingView. */
+  private addVolume(chart: IChartApi): ISeriesApi<'Histogram'> {
+    const series = chart.addSeries(
+      HistogramSeries,
+      {
+        priceScaleId: 'volume',
+        priceFormat: { type: 'volume' },
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      0,
+    );
+    series.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+    return series;
   }
 
   /** Maps a time to the start of its bar. */
@@ -1726,6 +1988,9 @@ export class ReplayChart {
       }
       if (['trend', 'ray', 'extended', 'arrow', 'hray', 'vline'].includes(s.kind)) {
         return distanceToSegment(p, ...s.segment) <= reach;
+      }
+      if (s.wave) {
+        return s.pixels.some((a, i) => i > 0 && distanceToSegment(p, s.pixels[i - 1], a) <= reach);
       }
       const ys = s.kind === 'fib' ? s.levels.map((l) => l.y) : [s.top, s.bottom];
       return (
@@ -1845,7 +2110,8 @@ export class ReplayChart {
       // The click that put the first point: the next one comes with the next click.
       return;
     }
-    const last = anchors.length === 1 ? anchors[0] : null;
+    // A channel's width may be set on its second point's bar; a wave's next point may not.
+    const last = anchors.length === 1 || WAVE_LABELS[tool] ? (anchors.at(-1) ?? null) : null;
     if (last && last.time === point.time && (LINE_KINDS.has(tool) || last.price === point.price)) {
       return;
     }
@@ -1857,7 +2123,13 @@ export class ReplayChart {
     }
     // Lines, channels and rectangles go left to right; rays, arrows, retracements, positions
     // and measures keep the direction they were drawn in.
-    if (tool === 'trend' || tool === 'extended' || tool === 'channel' || tool === 'rect') {
+    if (
+      tool === 'trend' ||
+      tool === 'extended' ||
+      tool === 'channel' ||
+      tool === 'rect' ||
+      tool === 'vprofile'
+    ) {
       points.splice(0, 2, ...points.slice(0, 2).sort((p, q) => p.time - q.time));
     }
     const id = this.nextDrawingId++;
@@ -2203,4 +2475,116 @@ function distanceToSegment(p: Pixel, a: Pixel, b: Pixel): number {
   const length = dx * dx + dy * dy;
   const t = length ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / length)) : 0;
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/** A hex color at 50% opacity, for volume bars behind the candles; others stay as they are. */
+export function fade(color: string): string {
+  const hex = /^#([0-9a-f]{6})$/i.exec(color)?.[1];
+  if (!hex) {
+    return color;
+  }
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return `rgba(${r}, ${g}, ${b}, 0.5)`;
+}
+
+/** A price row of a volume profile: its prices and the volume of rising and falling bars. */
+export interface ProfileBin {
+  low: number;
+  high: number;
+  up: number;
+  down: number;
+  value: boolean;
+}
+
+/**
+ * TradingView's fixed range volume profile of `candles` in `rows` price rows, from the lowest
+ * low to the highest high. Each bar's volume is spread evenly over its range (the closest the
+ * bars allow) and counts as buying when it closed up; `poc` is the row with the most volume and
+ * the value area grows from it, row by row towards the side with more volume, to 70% of it.
+ * Null when there are no bars or no volume.
+ */
+export function volumeProfile(
+  candles: Candle[],
+  rows: number,
+): { low: number; high: number; rows: ProfileBin[]; poc: number } | null {
+  if (!candles.length) {
+    return null;
+  }
+  const low = Math.min(...candles.map((c) => c.low));
+  const high = Math.max(...candles.map((c) => c.high));
+  const step = (high - low) / rows || 1;
+  const bins: ProfileBin[] = Array.from({ length: rows }, (_, i) => ({
+    low: low + i * step,
+    high: low + (i + 1) * step,
+    up: 0,
+    down: 0,
+    value: false,
+  }));
+  let total = 0;
+  for (const c of candles) {
+    const volume = c.volume ?? 0;
+    if (!volume) {
+      continue;
+    }
+    total += volume;
+    const side = c.close >= c.open ? 'up' : 'down';
+    const span = c.high - c.low;
+    const from = Math.min(rows - 1, Math.floor((c.low - low) / step));
+    const to = Math.min(rows - 1, Math.floor((c.high - low) / step));
+    for (let i = from; i <= to; i++) {
+      const overlap = span
+        ? (Math.min(c.high, bins[i].high) - Math.max(c.low, bins[i].low)) / span
+        : 1;
+      bins[i][side] += volume * (span ? Math.max(0, overlap) : 1 / (to - from + 1));
+    }
+  }
+  if (!total) {
+    return null;
+  }
+  const size = (i: number) => (i >= 0 && i < rows ? bins[i].up + bins[i].down : -1);
+  let poc = 0;
+  for (let i = 1; i < rows; i++) {
+    if (size(i) > size(poc)) {
+      poc = i;
+    }
+  }
+  let below = poc - 1;
+  let above = poc + 1;
+  let inside = size(poc);
+  bins[poc].value = true;
+  while (inside < total * VALUE_AREA && (below >= 0 || above < rows)) {
+    const next = size(above) >= size(below) ? above++ : below--;
+    inside += size(next);
+    bins[next].value = true;
+  }
+  return { low, high, rows: bins, poc };
+}
+
+/**
+ * The divergences as one line series: each one a segment between its two pivots, with a gap
+ * (a bar of `times` without value) before the next, or joined to it when they share a pivot. One that
+ * starts before the previous ends is left out, as a series' times must go forward.
+ */
+export function divergenceSegments(
+  list: Divergence[],
+  times: number[],
+): (LineData<Time> | WhitespaceData<Time>)[] {
+  const data: (LineData<Time> | WhitespaceData<Time>)[] = [];
+  let end = -Infinity;
+  for (const { from, to } of list) {
+    if (from.time < end) {
+      continue;
+    }
+    if (from.time > end) {
+      // Pivots of one kind are over 5 bars apart, so there is a bar between them.
+      const gap = times.find((t) => t > end && t < from.time);
+      if (data.length && gap !== undefined) {
+        data.push({ time: gap as Time });
+      }
+      data.push({ time: from.time as Time, value: from.value });
+    }
+    data.push({ time: to.time as Time, value: to.value });
+    end = to.time;
+  }
+  return data;
 }

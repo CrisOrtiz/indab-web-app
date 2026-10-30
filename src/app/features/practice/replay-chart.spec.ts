@@ -9,7 +9,10 @@ import {
   OrderAt,
   OrderDraft,
   ReplayChart,
+  fade,
+  divergenceSegments,
   stackLabels,
+  volumeProfile,
 } from './replay-chart';
 
 const lw = vi.hoisted(() => {
@@ -24,7 +27,7 @@ const lw = vi.hoisted(() => {
     applyOptions: vi.fn(),
   });
   const series = makeSeries();
-  const lines: ReturnType<typeof makeSeries>[] = [];
+  const lines: (ReturnType<typeof makeSeries> & { type: string })[] = [];
   const timeScale = {
     scrollToRealTime: vi.fn(),
     subscribeVisibleLogicalRangeChange: vi.fn(),
@@ -43,7 +46,7 @@ const lw = vi.hoisted(() => {
       if (type === 'Candlestick') {
         return series;
       }
-      const line = makeSeries();
+      const line = { ...makeSeries(), type, priceScale: () => ({ applyOptions: vi.fn() }) };
       lines.push(line);
       return line;
     }),
@@ -62,6 +65,7 @@ const lw = vi.hoisted(() => {
 vi.mock('lightweight-charts', () => ({
   CandlestickSeries: 'Candlestick',
   LineSeries: 'Line',
+  HistogramSeries: 'Histogram',
   LineStyle: { Solid: 0, Dotted: 1, Dashed: 2 },
   createChart: vi.fn(() => lw.chart),
   createSeriesMarkers: vi.fn(() => lw.markers),
@@ -105,6 +109,8 @@ const position: PracticeTrade = {
     (draftTypeChanged)="types.push($event)"
     (orderAt)="orders.push($event)"
     (lotsChanged)="lots.push($event)"
+    [indicators]="indicators()"
+    (indicatorsChange)="picked.push($event)"
     symbol="PAXGUSDT"
   />`,
 })
@@ -125,6 +131,8 @@ class Host {
   readonly closed: string[] = [];
   readonly orders: OrderAt[] = [];
   readonly lots: string[] = [];
+  readonly indicators = signal<readonly string[] | null>(null);
+  readonly picked: string[][] = [];
   submitted = () => {};
 }
 
@@ -212,7 +220,7 @@ describe('ReplayChart', () => {
   });
 
   it('marks entries and exits on their bar and labels positions with size and live P/L', async () => {
-    const { fixture, host, labels } = await render();
+    const { fixture, host, labels, el } = await render();
     host.barSeconds.set(2);
     host.trades.set([
       position,
@@ -239,17 +247,54 @@ describe('ReplayChart', () => {
     expect(lw.series.createPriceLine).toHaveBeenCalledTimes(2);
     // 0.05 lots bought at 120, last close 1.5; stop loss at 110.
     // The position has no take profit yet: its TP tab hangs under the label.
-    expect(labels()).toEqual(['Compra 0.05 -592.50 USD × TP', 'SL 0.05 -50.00 USD ×']);
+    // Once placed, the side is no longer named: the size is filled in blue for a buy.
+    expect(labels()).toEqual(['0.05 -592.50 USD × TP', 'SL 0.05 -50.00 USD ×']);
+    const qty = el.querySelector('.line-label .qty')!;
+    expect(qty.classList).toContain('buy');
+    expect(qty.getAttribute('title')).toBe('Compra');
+    expect(el.querySelector('.line-label .badge')).toBeNull();
+    expect(lw.series.createPriceLine.mock.calls[0][0].color).toBe('#2962ff');
 
     // A new candle refreshes the position's P/L.
     host.candles.update((list) => [...list, c(3, 130)]);
     await fixture.whenStable();
-    expect(labels()[0]).toBe('Compra 0.05 +50.00 USD × TP');
+    expect(labels()[0]).toBe('0.05 +50.00 USD × TP');
 
     host.trades.set([]);
     await fixture.whenStable();
     expect(lw.series.removePriceLine).toHaveBeenCalledTimes(2);
     expect(labels()).toEqual([]);
+  });
+
+  it('draws pending sell orders in red, by their size and type', async () => {
+    const { fixture, host, labels, el } = await render();
+    host.trades.set([
+      {
+        ...position,
+        side: 'short',
+        orderType: 'limit',
+        orderPrice: 130,
+        stopLoss: null,
+        status: 'pending',
+      },
+    ]);
+    await fixture.whenStable();
+    expect(labels()).toEqual(['0.05 Límite × TP SL']);
+    expect(el.querySelector('.line-label .qty')!.classList).toContain('sell');
+    expect(lw.series.createPriceLine.mock.calls.at(-1)![0].color).toBe('#f23645');
+
+    // The order being set up keeps its Buy/Sell button, on a line of its side's color.
+    host.trades.set([]);
+    host.draft.set({
+      side: 'short',
+      orderType: 'limit',
+      price: 90,
+      stopLoss: null,
+      takeProfit: null,
+    });
+    await fixture.whenStable();
+    expect(el.querySelector('.line-label .badge')!.textContent!.trim()).toBe('Vender');
+    expect(lw.series.createPriceLine.mock.calls.at(-1)![0].color).toBe('#f23645');
   });
 
   it('closes positions and removes levels from the × of their labels', async () => {
@@ -419,48 +464,90 @@ describe('ReplayChart', () => {
     return { canvas, openMenu, item, pick, pointer, press, rect, handles, levels, settle };
   };
 
-  it('starts with the EMA 100 and 200, and switches indicators from their menu', async () => {
+  it('starts with the RSI only, and switches indicators from their menu', async () => {
     const r = await render();
     const { fixture, host, el } = r;
     const { openMenu, item } = drawing(r);
     host.candles.set(Array.from({ length: 250 }, (_, i) => c(i + 1, 100 + i)));
     await fixture.whenStable();
 
-    // Both averages are on the candles' pane from the start.
-    expect(lw.lines).toHaveLength(2);
-    expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 0);
-    const [ema100, ema200] = lw.lines;
-    // 250 closes: 151 values of the 100-candle average, 51 of the 200-candle one.
-    expect(ema100.setData.mock.calls.at(-1)![0]).toHaveLength(151);
-    expect(ema200.setData.mock.calls.at(-1)![0]).toHaveLength(51);
-    // The 200 average starts at bar 200 with the mean of the first 200 closes.
-    expect(ema200.setData.mock.calls.at(-1)![0][0]).toEqual({ time: 200, value: 199.5 });
+    // The RSI, in its own pane with its dotted guides, smoothing average and divergence lines;
+    // no averages on the candles until the user wants them.
+    expect(lw.lines).toHaveLength(4);
+    expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 1);
+    expect(lw.pane.setHeight).toHaveBeenCalled();
+    const [rsi, smoothing] = lw.lines;
+    expect(rsi.createPriceLine.mock.calls.map(([line]) => line.price)).toEqual([
+      70, 60, 50, 40, 30,
+    ]);
+    // 250 RSI values (from bar 15) averaged over 14: 223 values.
+    expect(smoothing.setData.mock.calls.at(-1)![0]).toHaveLength(223);
 
     await openMenu('Indicadores');
     expect(
       [...el.querySelectorAll('.tool-menu button')].map((b) =>
         b.textContent!.replace(/\s+/g, ' ').trim(),
       ),
-    ).toEqual(['EMA 100 ✓', 'EMA 200 ✓', 'RSI 14']);
-    expect(el.querySelector('.menu-trigger .count')!.textContent).toBe('2');
+    ).toEqual(['EMA 100', 'EMA 200', 'RSI 14 ✓', 'Volumen']);
+    expect(el.querySelector('.menu-trigger .count')!.textContent).toBe('1');
 
-    // The menu stays open to pick several.
+    // The menu stays open to pick several; each change is reported, to be kept.
+    item('EMA 200').click();
+    await fixture.whenStable();
+    expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 0);
+    const ema200 = lw.lines[4];
+    // 250 closes: 51 values of the 200-candle average, from bar 200 with the mean of the first.
+    expect(ema200.setData.mock.calls.at(-1)![0]).toHaveLength(51);
+    expect(ema200.setData.mock.calls.at(-1)![0][0]).toEqual({ time: 200, value: 199.5 });
+    expect(item('EMA 200').getAttribute('aria-checked')).toBe('true');
+    expect(host.picked.at(-1)).toEqual(['ema200', 'rsi14']);
+
     item('RSI 14').click();
     await fixture.whenStable();
-    expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 1);
-    expect(lw.pane.setHeight).toHaveBeenCalled();
-    expect(lw.lines[2].createPriceLine).toHaveBeenCalledTimes(2);
-    expect(item('RSI 14').getAttribute('aria-checked')).toBe('true');
-
-    item('EMA 100').click();
-    await fixture.whenStable();
-    expect(lw.chart.removeSeries).toHaveBeenCalledWith(ema100);
-    expect(el.querySelector('.menu-trigger .count')!.textContent).toBe('2');
+    expect(lw.chart.removeSeries).toHaveBeenCalledWith(rsi);
+    expect(lw.chart.removeSeries).toHaveBeenCalledWith(smoothing);
+    expect(host.picked.at(-1)).toEqual(['ema200']);
+    expect(el.querySelector('.menu-trigger .count')!.textContent).toBe('1');
 
     // A press outside closes it.
     document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
     await fixture.whenStable();
     expect(el.querySelector('.tool-menu')).toBeNull();
+  });
+
+  it("opens with the user's saved indicators", async () => {
+    const { fixture, host } = await render();
+    host.indicators.set(['ema100', 'ema200']);
+    await fixture.whenStable();
+    // The RSI and its three lines go, the two averages come.
+    expect(lw.chart.removeSeries).toHaveBeenCalledTimes(4);
+    expect(lw.lines.slice(4).map((line) => line.type)).toEqual(['Line', 'Line']);
+    // Nothing was picked: nothing to save.
+    expect(host.picked).toEqual([]);
+  });
+
+  it('draws volume bars at the foot of the candles, in their color', async () => {
+    const r = await render();
+    const { fixture, host } = r;
+    const { openMenu, item } = drawing(r);
+    host.candles.set([
+      { time: 1, open: 1, high: 2, low: 0.5, close: 1.5, volume: 10 },
+      { time: 2, open: 1.5, high: 2, low: 0.5, close: 1, volume: 4 },
+    ]);
+    await openMenu('Indicadores');
+    item('Volumen').click();
+    await fixture.whenStable();
+    const volume = lw.lines.at(-1)!;
+    expect(volume.type).toBe('Histogram');
+    expect(lw.chart.addSeries).toHaveBeenLastCalledWith(
+      'Histogram',
+      expect.objectContaining({ priceScaleId: 'volume' }),
+      0,
+    );
+    expect(volume.setData.mock.calls.at(-1)![0]).toEqual([
+      { time: 1, value: 10, color: 'rgba(8, 153, 129, 0.5)' },
+      { time: 2, value: 4, color: 'rgba(242, 54, 69, 0.5)' },
+    ]);
   });
 
   it('draws horizontal and trend lines where the student clicks, and erases them', async () => {
@@ -594,13 +681,105 @@ describe('ReplayChart', () => {
       'Rectángulo',
       'Fibonacci',
       'Retroceso de Fibonacci',
+      'Ondas de Elliott',
+      'Onda de impulso de Elliott (12345)',
+      'Onda de corrección de Elliott (ABC)',
       'Proyección y medición',
       'Posición larga',
       'Posición corta',
       'Rango de precio',
+      'Volumen',
+      'Perfil de volumen de rango fijo',
       '',
       'Borrar dibujos',
     ]);
+  });
+
+  it('draws Elliott impulse and correction waves point by point, labelled', async () => {
+    const r = await render();
+    const { fixture, host, el } = r;
+    const { pick, press, handles } = drawing(r);
+    host.candles.set(Array.from({ length: 60 }, (_, i) => c(i + 1)));
+    await fixture.whenStable();
+    const wave = () => el.querySelector('svg.shapes polyline.wave')?.getAttribute('points');
+    const texts = () =>
+      [...el.querySelectorAll('svg.shapes .wave-text')].map(
+        (t) => `${t.textContent!.trim()}@${t.getAttribute('y')}`,
+      );
+
+    await pick('Onda de impulso de Elliott (12345)');
+    // Prices 100, 200, 150, 300, 250, 350 (y = 500 - price), one bar apart by 5.
+    const points: [number, number][] = [
+      [0, 400],
+      [50, 300],
+      [100, 350],
+      [150, 200],
+      [200, 250],
+      [250, 150],
+    ];
+    for (const [i, [x, y]] of points.entries()) {
+      await press(x, y);
+      if (i === 2) {
+        // While being placed, the wave follows its points so far.
+        expect(el.querySelector('.tool-hint')!.textContent).toContain(
+          'Marca el final de la onda 3.',
+        );
+      }
+    }
+    expect(el.querySelector('.tool-hint')).toBeNull();
+    expect(wave()).toBe('0,400 50,300 100,350 150,200 200,250 250,150');
+    // Labels above the highs and below the lows.
+    expect(texts()).toEqual(['(1)@292', '(2)@366', '(3)@192', '(4)@266', '(5)@142']);
+    expect(handles()).toHaveLength(6);
+
+    await press(600, 50);
+    await pick('Onda de corrección de Elliott (ABC)');
+    for (const [x, y] of [
+      [300, 150],
+      [350, 300],
+      [400, 250],
+      [450, 400],
+    ]) {
+      await press(x, y);
+    }
+    expect(texts().slice(5)).toEqual(['(A)@316', '(B)@242', '(C)@416']);
+    expect(handles()).toHaveLength(4);
+  });
+
+  it('draws a fixed range volume profile over the bars it spans', async () => {
+    const r = await render();
+    const { fixture, host, el } = r;
+    const { pick, press } = drawing(r);
+    host.candles.set(
+      Array.from({ length: 30 }, (_, i) => ({
+        time: i + 1,
+        open: 100,
+        high: 200,
+        low: 100,
+        close: 150,
+        volume: 1,
+      })),
+    );
+    await fixture.whenStable();
+    await pick('Perfil de volumen de rango fijo');
+    await press(0, 350);
+    await press(90, 350);
+
+    // From the lowest low to the highest high of bars 0 to 9, in 24 rows.
+    const range = el.querySelector('svg.shapes rect.profile-range')!;
+    expect(['x', 'y', 'width', 'height'].map((a) => Number(range.getAttribute(a)))).toEqual([
+      0, 300, 90, 100,
+    ]);
+    expect(el.querySelectorAll('svg.shapes rect.vp-up')).toHaveLength(24);
+    expect(el.querySelectorAll('svg.shapes rect.vp-down')).toHaveLength(24);
+    // All volume was buying, spread evenly: every row is as wide as the widest (40 px at least).
+    expect(Number(el.querySelector('svg.shapes rect.vp-up')!.getAttribute('width'))).toBeCloseTo(
+      40,
+    );
+    expect(el.querySelector('svg.shapes rect.vp-down')!.getAttribute('width')).toBe('0');
+    expect(el.querySelector('svg.shapes line.poc')).not.toBeNull();
+    // Its colors are fixed, as TradingView's: the bar only erases it.
+    expect(el.querySelectorAll('.drawing-bar .color')).toHaveLength(0);
   });
 
   it('draws rays, extended lines, arrows and horizontal rays and vertical lines', async () => {
@@ -1231,5 +1410,72 @@ describe('ReplayChart', () => {
     host.start.set(291);
     await fixture.whenStable();
     expect(lw.timeScale.setVisibleLogicalRange).toHaveBeenLastCalledWith({ from: 239, to: 302 });
+  });
+});
+
+describe('volumeProfile', () => {
+  const bar = (low: number, high: number, up: boolean, volume?: number): Candle => ({
+    time: 1,
+    open: up ? low : high,
+    high,
+    low,
+    close: up ? high : low,
+    volume,
+  });
+
+  it('spreads each bar over its rows, finds the point of control and the value area', () => {
+    const profile = volumeProfile([bar(0, 10, true, 100), bar(0, 2, false, 50)], 5)!;
+    expect(profile.low).toBe(0);
+    expect(profile.high).toBe(10);
+    expect(profile.rows.map((r) => [r.up, r.down])).toEqual([
+      [20, 50],
+      [20, 0],
+      [20, 0],
+      [20, 0],
+      [20, 0],
+    ]);
+    expect(profile.poc).toBe(0);
+    // 70% of 150 is 105: rows 0 (70), 1 (90) and 2 (110).
+    expect(profile.rows.map((r) => r.value)).toEqual([true, true, true, false, false]);
+  });
+
+  it('is null without bars or volume', () => {
+    expect(volumeProfile([], 24)).toBeNull();
+    expect(volumeProfile([bar(0, 10, true)], 24)).toBeNull();
+  });
+});
+
+describe('divergenceSegments', () => {
+  const at = (time: number, value = time) => ({ time, value });
+  const times = Array.from({ length: 40 }, (_, i) => i);
+
+  it('draws each divergence from pivot to pivot, with gaps between them', () => {
+    expect(
+      divergenceSegments(
+        [
+          { kind: 'bull', from: at(2), to: at(10) },
+          { kind: 'bull', from: at(10), to: at(20) },
+          { kind: 'bull', from: at(15), to: at(25) },
+          { kind: 'bull', from: at(30), to: at(38) },
+        ],
+        times,
+      ),
+    ).toEqual([
+      { time: 2, value: 2 },
+      { time: 10, value: 10 },
+      // Shares its pivot with the one before: joined.
+      { time: 20, value: 20 },
+      // (Starting before the previous ended: left out.) A gap, then the next.
+      { time: 21 },
+      { time: 30, value: 30 },
+      { time: 38, value: 38 },
+    ]);
+  });
+});
+
+describe('fade', () => {
+  it('halves the opacity of hex colors and leaves others alone', () => {
+    expect(fade('#089981')).toBe('rgba(8, 153, 129, 0.5)');
+    expect(fade('red')).toBe('red');
   });
 });

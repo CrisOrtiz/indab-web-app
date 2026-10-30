@@ -13,6 +13,7 @@ import {
   TradeSide,
 } from '../../core/models/practice';
 import { EvaluationService } from '../evaluations/evaluation.service';
+import { ChartSettingsService } from './chart-settings.service';
 import { BarBuilder, formatElapsed, nextBarEnd } from './bars';
 import {
   DEFAULT_TIMEFRAME,
@@ -131,6 +132,8 @@ export class Practice {
   private readonly practice = inject(PracticeService);
   private readonly notifications = inject(NotificationService);
   private readonly evaluationService = inject(EvaluationService);
+  /** The indicators the user keeps on the chart. */
+  protected readonly chartSettings = inject(ChartSettingsService);
   private readonly locale = inject(LOCALE_ID);
   protected readonly i18n = inject(I18n);
 
@@ -335,6 +338,7 @@ export class Practice {
   private clock?: ReturnType<typeof setInterval>;
 
   constructor() {
+    void this.chartSettings.load();
     this.loadSessions();
     this.loadEvaluations();
     inject(DestroyRef).onDestroy(() => {

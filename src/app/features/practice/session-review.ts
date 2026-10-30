@@ -5,6 +5,7 @@ import { LocalDatePipe } from '../../core/i18n/local-date.pipe';
 import { NoteTarget } from '../../core/models/mentor-note';
 import { Candle, PracticeSession, PracticeTrade } from '../../core/models/practice';
 import { MentorNotes } from '../notes/mentor-notes';
+import { ChartSettingsService } from './chart-settings.service';
 import { HISTORY_BARS, MarketDataService, intervalMs } from './market-data.service';
 import { priceDigits } from './practice-format';
 import { PracticeService } from './practice.service';
@@ -40,6 +41,8 @@ export class SessionReview {
 
   private readonly practice = inject(PracticeService);
   private readonly market = inject(MarketDataService);
+  /** The indicators the user keeps on the chart. */
+  protected readonly chartSettings = inject(ChartSettingsService);
 
   protected readonly i18n = inject(I18n);
   protected readonly priceDigits = priceDigits;
@@ -69,6 +72,7 @@ export class SessionReview {
   });
 
   constructor() {
+    void this.chartSettings.load();
     effect(() => {
       const session = this.session();
       untracked(() => this.load(session));

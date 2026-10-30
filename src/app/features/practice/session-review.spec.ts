@@ -1,4 +1,4 @@
-import { Component, input, signal } from '@angular/core';
+import { Component, input, output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { AuthService } from '../../core/auth/auth.service';
@@ -8,6 +8,7 @@ import { PracticeService } from './practice.service';
 import { ReplayChart } from './replay-chart';
 import { SessionReview } from './session-review';
 import { quietNotifications } from '../notifications/testing';
+import { quietChartSettings } from './testing';
 
 // The real chart needs a canvas; the review only passes it data.
 @Component({ selector: 'app-replay-chart', template: '' })
@@ -17,6 +18,8 @@ class FakeChart {
   readonly barSeconds = input(0);
   readonly focusTrade = input<string | null>(null);
   readonly startTime = input<number | null>(null);
+  readonly indicators = input<readonly string[] | null>(null);
+  readonly indicatorsChange = output<string[]>();
 }
 
 @Component({
@@ -64,11 +67,15 @@ describe('SessionReview', () => {
   const market = { loadCandles: vi.fn(), loadHistory: vi.fn() };
   const candle: Candle = { time: 1_772_409_600, open: 1, high: 2, low: 0.5, close: 1.5 };
 
+  let chartSettings: ReturnType<typeof quietChartSettings>;
+
   const render = async () => {
+    chartSettings = quietChartSettings();
     TestBed.configureTestingModule({
       imports: [Host],
       providers: [
         ...quietNotifications().providers,
+        ...chartSettings.providers,
         { provide: PracticeService, useValue: practice },
         {
           provide: AuthService,
@@ -125,6 +132,18 @@ describe('SessionReview', () => {
     rows[1].click();
     await fixture.whenStable();
     expect(chart()?.focusTrade()).toBe('first');
+  });
+
+  it("shows the chart with the user's indicators and keeps the ones they pick", async () => {
+    await render();
+    expect(chart()?.indicators()).toBeNull();
+    chartSettings.settings.indicators.set(['ema100']);
+    await fixture.whenStable();
+    expect(chart()?.indicators()).toEqual(['ema100']);
+
+    const save = vi.spyOn(chartSettings.settings, 'saveIndicators');
+    chart()!.indicatorsChange.emit(['ema100', 'volume']);
+    expect(save).toHaveBeenCalledWith(['ema100', 'volume']);
   });
 
   it('says when no order was filled and when the trades cannot load', async () => {

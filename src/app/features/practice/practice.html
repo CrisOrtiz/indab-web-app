@@ -57,6 +57,8 @@
             [hideDates]="datesHidden()"
             [barSeconds]="barSeconds()"
             [trading]="true"
+            [indicators]="chartSettings.indicators()"
+            (indicatorsChange)="chartSettings.saveIndicators($event)"
             [lots]="lots()"
             (levelMoved)="onLevelMoved($event)"
             (levelRemoved)="onLevelRemoved($event)"
@@ -550,6 +552,8 @@
             [barSeconds]="barSeconds()"
             [focusTrade]="focused()"
             [startTime]="replayStart() / 1000"
+            [indicators]="chartSettings.indicators()"
+            (indicatorsChange)="chartSettings.saveIndicators($event)"
           />
           @if (filledTrades().length) {
             <app-trade-navigator [trades]="filledTrades()" [(selected)]="focused" />

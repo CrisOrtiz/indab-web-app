@@ -41,7 +41,7 @@
       [style.top.px]="open.top"
     >
       @if (open.kind === 'indicators') {
-        @for (indicator of indicators; track indicator.id) {
+        @for (indicator of indicatorList; track indicator.id) {
           <button
             type="button"
             role="menuitemcheckbox"
@@ -50,7 +50,7 @@
             (click)="toggleIndicator(indicator.id)"
           >
             <span class="swatch" [style.background]="indicator.color"></span>
-            {{ indicator.label }}
+            {{ indicator.kind === 'volume' ? t.volume : indicator.label }}
             <span class="check" aria-hidden="true">{{
               active().has(indicator.id) ? '✓' : ''
             }}</span>
@@ -217,6 +217,50 @@
             </text>
           } @else {
             @switch (shape.kind) {
+              @case ('vprofile') {
+                <rect
+                  class="profile-range"
+                  [attr.x]="shape.left"
+                  [attr.y]="shape.top"
+                  [attr.width]="shape.right - shape.left"
+                  [attr.height]="shape.bottom - shape.top"
+                />
+                @if (shape.profile; as profile) {
+                  @for (row of profile.rows; track $index) {
+                    <rect
+                      class="vp-up"
+                      [class.outside]="!row.value"
+                      [attr.x]="shape.left"
+                      [attr.y]="row.top"
+                      [attr.width]="row.up"
+                      [attr.height]="row.height"
+                    />
+                    <rect
+                      class="vp-down"
+                      [class.outside]="!row.value"
+                      [attr.x]="shape.left + row.up"
+                      [attr.y]="row.top"
+                      [attr.width]="row.down"
+                      [attr.height]="row.height"
+                    />
+                  }
+                  @if (profile.pocY !== null) {
+                    <line
+                      class="poc"
+                      [attr.x1]="shape.left"
+                      [attr.x2]="shape.right"
+                      [attr.y1]="profile.pocY"
+                      [attr.y2]="profile.pocY"
+                    />
+                  }
+                }
+              }
+              @case ('elliott') {
+                <ng-container *ngTemplateOutlet="wave; context: { $implicit: shape }" />
+              }
+              @case ('abc') {
+                <ng-container *ngTemplateOutlet="wave; context: { $implicit: shape }" />
+              }
               @case ('rect') {
                 <rect
                   class="rect"
@@ -323,7 +367,7 @@
       ></span>
     }
     <div class="drawing-bar" role="toolbar" [attr.aria-label]="t.drawingOptions">
-      @if (!shape.position) {
+      @if (!shape.position && !shape.profile) {
         @for (color of drawingColors; track color; let i = $index) {
           <button
             type="button"
@@ -402,6 +446,16 @@
             {{ badge.text }}
           </span>
         }
+      }
+      @if (label.qty; as qty) {
+        <span
+          class="qty"
+          [class.buy]="qty.side === 'long'"
+          [class.sell]="qty.side === 'short'"
+          [title]="qty.title"
+        >
+          {{ qty.text }}
+        </span>
       }
       @if (label.lots !== undefined) {
         <button
@@ -578,6 +632,18 @@
   <ng-content />
 </div>
 
+<!-- An Elliott wave, inside the drawings' SVG (hence the svg: prefixes). -->
+<ng-template #wave let-shape>
+  @if (shape.wave; as wave) {
+    <svg:polyline class="wave" [attr.points]="wave.path" />
+    @for (label of wave.labels; track label.key) {
+      <svg:text class="wave-text" [attr.x]="label.x" [attr.y]="label.y">
+        ({{ label.text }})
+      </svg:text>
+    }
+  }
+</ng-template>
+
 <ng-template #icon let-name>
   <svg class="icon" viewBox="0 0 18 18" aria-hidden="true">
     @switch (name) {
@@ -628,6 +694,15 @@
       }
       @case ('range') {
         <path d="M2 2h14M2 16h14M9 4v10M6.5 6.5 9 4l2.5 2.5M6.5 11.5 9 14l2.5-2.5" />
+      }
+      @case ('vprofile') {
+        <path d="M2 2v14M2 4h5M2 7h9M2 10h12M2 13h6" />
+      }
+      @case ('elliott') {
+        <path d="M1 14 4 8l2 3 5-9 2 5 4-4" />
+      }
+      @case ('abc') {
+        <path d="M2 4l5 10 4-6 5 8" />
       }
       @case ('indicators') {
         <path d="M1 14l5-6 3 3 8-8" />

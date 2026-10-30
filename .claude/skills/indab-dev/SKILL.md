@@ -70,6 +70,7 @@ otherwise create a feature service.
 | `mentorNotes/{id}`                                               | staff; the student it is about                                                                                  | admins; staff who mentor one of the student's mentorships (`mentorshipId`); on the student's own session or form attempt; author edits, author or admin deletes |
 | `users/{uid}/notifications/{id}`                                 | owner                                                                                                           | the sender, once per event (id `{type}_{refId}`, `note_{noteId}`); rules check the event and that the sender may tell the owner; owner marks read, deletes      |
 | `users/{uid}/settings/notifications`                             | owner                                                                                                           | trainers and admins, their own                                                                                                                                  |
+| `users/{uid}/settings/chart`                                     | owner                                                                                                           | everyone, their own                                                                                                                                             |
 | `follows/{kind}/subjects/{id}/followers/{uid}`                   | that staff member; students, the lists that concern them                                                        | that staff member (`types` of activity)                                                                                                                         |
 
 Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`, `isStaff()`
@@ -250,12 +251,21 @@ Module notes:
   or click puts each point, a finger can drag a crosshair and let go, a tap selects a drawing
   (handles reshape it, a drag moves it, a bar recolors or deletes it). The chart's top bar holds
   the timeframes (projected with `chartToolbar`) and one menu each for indicators and drawings.
-  Indicators are only EMA 100 and EMA 200 (on from the start) and RSI 14 (Cris, 2026-10-26: no
-  other moving averages). The drawings menu has TradingView's sections (`TOOL_GROUPS`): trend
+  Indicators are only EMA 100, EMA 200, volume and RSI 14 (Cris, 2026-10-26: no other moving
+  averages). The RSI follows Cris's TradingView settings (2026-10-30): SMA 14 smoothing, dotted
+  levels 70/60/50/40/30 and Bull/Bear divergences (`rsiDivergences`, pivots 5 bars each side,
+  5-60 bars apart). Defaults are RSI only (`DEFAULT_INDICATORS`); a user's own pick is saved in
+  `users/{uid}/settings/chart` by `ChartSettingsService` and passed to the chart's `indicators`
+  input by the pages (specs fake it with `quietChartSettings()` from `practice/testing.ts`).
+  Placed orders and positions show their size filled in `SIDE_COLORS` (blue buy, red sell) and
+  no Buy/Sell text; only the order being set up keeps its Buy/Sell button (Cris, 2026-10-30).
+  The drawings menu has TradingView's sections (`TOOL_GROUPS`): trend
   line, ray, extended line, arrow, horizontal line/ray, vertical line, parallel channel (three
   points), rectangle, Fibonacci (Cris's TradingView levels and colors in `FIB_LEVELS`, -1 to 4.236,
-  no background, ratio-only labels), long/short position (entry, target, stop with risk/reward) and
-  price range; `POINTS` says how many points each takes and `build` turns them into a drawing.
+  no background, ratio-only labels), Elliott impulse (6 points) and correction (ABC, 4 points)
+  waves, long/short position (entry, target, stop with risk/reward), price range and fixed range
+  volume profile (`volumeProfile`: 24 rows, 70% value area, point of control; candles carry
+  Binance's `volume`); `POINTS` says how many points each takes and `build` turns them into a drawing.
   Cris chose to grow this with FX Replay's best ideas rather than clone it: session
   stats (`stats.ts`, `SessionStatsPanel`), rectangle/Fibonacci, picking the start date.
   Gold is Binance Futures' XAUUSDT perpetual (PAXGUSDT, a thin token, looked nothing like the

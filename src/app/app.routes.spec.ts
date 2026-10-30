@@ -19,6 +19,7 @@ import { en } from './core/i18n/messages/en';
 import { es } from './core/i18n/messages/es';
 import { pt } from './core/i18n/messages/pt';
 import { quietNotifications } from './features/notifications/testing';
+import { quietChartSettings } from './features/practice/testing';
 
 describe('app routes', () => {
   const auth = {
@@ -46,6 +47,7 @@ describe('app routes', () => {
     TestBed.configureTestingModule({
       providers: [
         ...quietNotifications().providers,
+        ...quietChartSettings().providers,
         provideRouter(routes),
         { provide: AuthService, useValue: auth },
         { provide: FIRESTORE_LOADER, useValue: firestore },

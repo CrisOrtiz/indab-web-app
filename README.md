@@ -190,6 +190,7 @@ The service account needs the _Firebase Admin_ and _Service Usage Consumer_ role
 | `mentorNotes/{id}` (a mentor's note)                             | trainers, admins; the student it is about                                                                                            | admins on any student's work; trainers and admins who mentor one of the student's mentorships (named in `mentorshipId`); on the student's own practice session, evaluation attempt or form attempt; the author edits, the author or an admin deletes                                                                   |
 | `users/{uid}/notifications/{id}` (the bell)                      | owner                                                                                                                                | the sender, once per event (the id names it): a note's author in the same batch as the note; staff for an evaluation or form given to the student or its published results; a student for their own finished practice, evaluation or handed-in form, to staff who follow them for it; the owner marks read and deletes |
 | `users/{uid}/settings/notifications`                             | owner                                                                                                                                | trainers and admins, their own (what they follow and which activity they hear of)                                                                                                                                                                                                                                      |
+| `users/{uid}/settings/chart`                                     | owner                                                                                                                                | everyone, their own (the practice chart's indicators, known ids only)                                                                                                                                                                                                                                                  |
 | `follows/{kind}/subjects/{id}/followers/{uid}`                   | that trainer or admin; students, the lists of what concerns them (themselves, their mentorships, their evaluations and forms, `all`) | that trainer or admin (`types`: `practiceFinished`, `evaluationFinished`, `examSubmitted`)                                                                                                                                                                                                                             |
 
 A user gets access to the academy and the material repository when an admin turns on
@@ -372,11 +373,15 @@ why, while it cannot be placed), its lots (a quantity pad), its order type (a Ma
 menu), TP and SL tabs to drag out (or click for a default distance) with the profit or loss band
 shaded, and a × to discard it. Dragging a TP/SL back onto its entry removes it; dragging up or
 down from an open position pulls out a new one. Working on the order panel shows its order on
-the chart too. The bar on top of the chart has the timeframes and two menus: indicators (EMA 100
-and EMA 200, shown from the start, and RSI 14 in its own pane, computed only from the bars shown)
-and drawings in TradingView's sections (trend line, ray, extended line, arrow, horizontal line and
-ray, vertical line, parallel channel, rectangle, Fibonacci retracement, long and short positions
-with target, stop and risk/reward, and price range). Drawings work as in
+the chart too. Once placed, an order or position line no longer names its side: its size is
+filled blue for a buy and red for a sell, as in TradingView. The bar on top of the chart has the
+timeframes and two menus: indicators (EMA 100, EMA 200, volume, and RSI 14 in its own pane with
+its SMA 14, dotted 70/60/50/40/30 levels and Bull/Bear divergences; all computed only from the bars
+shown) and drawings in TradingView's sections (trend line, ray, extended line, arrow, horizontal
+line and ray, vertical line, parallel channel, rectangle, Fibonacci retracement, Elliott impulse
+and correction waves, long and short positions with target, stop and risk/reward, price range,
+and fixed range volume profile). The RSI alone is on until a user picks their own indicators,
+which are kept in `users/{uid}/settings/chart` for their next sessions. Drawings work as in
 TradingView's app: tap or click each point, or on a phone drag the crosshair and let go; tap a
 drawing to select it, drag its handles or body to adjust it, and recolor or delete it from its bar. A Statistics tab, the end screen and the admin
 review show the session's win rate, profit factor, average win and loss, maximum drawdown and
