@@ -377,8 +377,7 @@ the chart too. Once placed, an order or position line no longer names its side: 
 filled blue for a buy and red for a sell, as in TradingView. The bar on top of the chart has the
 timeframes and two menus: indicators (EMA 100, EMA 200, volume, and RSI 14 in its own pane with
 its SMA 14, dotted 70/60/50/40/30 levels, overbought/oversold shading above 70 and below 30, and
-green bullish / red bearish divergences labelled strong, medium, weak or hidden; all computed only
-from the bars shown) and drawings in TradingView's sections (trend line, ray, extended line, arrow, horizontal
+TradingView's own regular Bull/Bear divergences; all computed only from the bars shown) and drawings in TradingView's sections (trend line, ray, extended line, arrow, horizontal
 line and ray, vertical line, parallel channel, rectangle, Fibonacci retracement, Elliott impulse
 and correction waves, long and short positions with target, stop and risk/reward, price range,
 and fixed range volume profile). The RSI alone is on until a user picks their own indicators,

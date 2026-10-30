@@ -63,63 +63,59 @@ describe('indicators', () => {
   });
 
   describe('rsiDivergences', () => {
-    // Price swing lows at bars 10 and 20 and swing highs at 30 and 40 (each the extreme of 5
-    // bars each side); every bar 10 high otherwise, so prices within 2.5 count as equal. The RSI
-    // turns at the given bars (within 2 of the swing) and sits at 50 elsewhere.
-    const series = (prices: Record<number, number>, rsi: Record<number, number>) => {
-      const candles: Candle[] = Array.from({ length: 50 }, (_, i) => {
-        const low = i === 10 || i === 20 ? prices[i] : 95;
-        const high = i === 30 || i === 40 ? prices[i] : 105;
-        return { time: i * 60, open: 100, high: Math.max(high, low + 10), low, close: 100 };
-      });
+    // A V in the RSI at bars 6 and 16 (lowest within 5 bars each side), and a peak at 26.
+    const rsiAt = (i: number) =>
+      i === 6 ? 20 : i === 16 ? 30 : i === 26 ? 80 : i === 36 ? 70 : 50;
+    const series = (lows: Record<number, number>, highs: Record<number, number>) => {
+      const candles: Candle[] = Array.from({ length: 45 }, (_, i) => ({
+        time: i * 60,
+        open: 100,
+        high: highs[i] ?? 105,
+        low: lows[i] ?? 95,
+        close: 100,
+      }));
       return {
         candles,
-        points: candles.map((c, i) => ({ time: c.time, value: rsi[i] ?? 50 })),
+        points: candles.map((c, i) => ({ time: c.time, value: rsiAt(i) })),
       };
     };
-    const lows = (a: number, b: number, rsiA: number, rsiB: number, at = 20) =>
-      series({ 10: a, 20: b, 30: 110, 40: 110 }, { 10: rsiA, [at]: rsiB });
-    const highs = (a: number, b: number, rsiA: number, rsiB: number) =>
-      series({ 10: 80, 20: 80, 30: a, 40: b }, { 30: rsiA, 40: rsiB });
-    const found = ({ candles, points }: ReturnType<typeof series>) =>
-      rsiDivergences(candles, points).map((d) => `${d.kind} ${d.strength}`);
 
-    it('reads bullish ones at swing lows: strong, medium, weak and hidden', () => {
-      // Lower price low, higher RSI low.
-      expect(rsiDivergences(lows(90, 85, 20, 30).candles, lows(90, 85, 20, 30).points)).toEqual([
-        {
-          kind: 'bull',
-          strength: 'strong',
-          from: { time: 600, value: 20 },
-          to: { time: 1200, value: 30 },
-        },
+    it('finds a bullish one where the price makes a lower low and the RSI a higher one', () => {
+      const { candles, points } = series({ 6: 90, 16: 85 }, {});
+      expect(rsiDivergences(candles, points)).toEqual([
+        { kind: 'bull', from: { time: 360, value: 20 }, to: { time: 960, value: 30 } },
       ]);
-      // Equal price low, higher RSI low.
-      expect(found(lows(90, 89, 20, 30))).toEqual(['bull medium']);
-      // Lower price low, equal RSI low.
-      expect(found(lows(90, 85, 20, 20.5))).toEqual(['bull weak']);
-      // Higher price low, lower RSI low.
-      expect(found(lows(85, 90, 30, 20))).toEqual(['bull hidden']);
     });
 
-    it('reads bearish ones at swing highs: strong, medium, weak and hidden', () => {
-      expect(found(highs(110, 115, 80, 70))).toEqual(['bear strong']);
-      expect(found(highs(110, 111, 80, 70))).toEqual(['bear medium']);
-      expect(found(highs(110, 115, 80, 79.5))).toEqual(['bear weak']);
-      expect(found(highs(115, 110, 70, 80))).toEqual(['bear hidden']);
+    it('finds a bearish one where the price makes a higher high and the RSI a lower one', () => {
+      const { candles, points } = series({}, { 26: 110, 36: 115 });
+      expect(rsiDivergences(candles, points)).toEqual([
+        { kind: 'bear', from: { time: 1560, value: 80 }, to: { time: 2160, value: 70 } },
+      ]);
     });
 
-    it("takes the RSI's own turn near the price swing", () => {
-      const [d] = rsiDivergences(lows(90, 85, 20, 30, 22).candles, lows(90, 85, 20, 30, 22).points);
-      expect(d.to).toEqual({ time: 22 * 60, value: 30 });
+    it('needs the pivots 6 to 61 bars apart, as TradingView counts its range', () => {
+      // Pivots at bars 6 and 11: only 4 bars between them.
+      const candles: Candle[] = Array.from({ length: 20 }, (_, i) => ({
+        time: i * 60,
+        open: 100,
+        high: 105,
+        low: i === 6 ? 90 : i === 11 ? 85 : 95,
+        close: 100,
+      }));
+      const points = candles.map((c, i) => ({
+        time: c.time,
+        value: i === 6 ? 20 : i === 11 ? 30 : 50,
+      }));
+      expect(rsiDivergences(candles, points)).toEqual([]);
     });
 
-    it('finds none when the RSI agrees with the price or the swing is not confirmed yet', () => {
-      expect(found(lows(90, 85, 30, 20))).toEqual([]);
-      expect(found(lows(90, 89, 20, 20))).toEqual([]);
-      // Only 3 bars after the second low: it is not a swing yet.
-      const early = lows(90, 85, 20, 30);
-      expect(rsiDivergences(early.candles.slice(0, 24), early.points.slice(0, 24))).toEqual([]);
+    it('finds none when the price agrees with the RSI or the pivot is not confirmed yet', () => {
+      const { candles, points } = series({ 6: 85, 16: 90 }, {});
+      expect(rsiDivergences(candles, points)).toEqual([]);
+      // Only 3 bars after the second low: it is not a pivot yet.
+      const early = series({ 6: 90, 16: 85 }, {});
+      expect(rsiDivergences(early.candles.slice(0, 20), early.points.slice(0, 20))).toEqual([]);
     });
   });
 });

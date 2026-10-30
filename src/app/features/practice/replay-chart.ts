@@ -41,14 +41,12 @@ import {
   DEFAULT_INDICATORS,
   INDICATORS,
   Indicator,
-  DIVERGENCE_STRENGTHS,
   RSI_COLORS,
   RSI_LEVELS,
   RSI_OVERBOUGHT,
   RSI_OVERSOLD,
   RSI_SMOOTHING,
   Divergence,
-  DivergenceStrength,
   IndicatorPoint,
   rsiDivergences,
   sma,
@@ -667,10 +665,9 @@ export class ReplayChart {
     smoothing: ISeriesApi<'Line'>;
     /** Shading where the RSI is overbought (above 70) and oversold (below 30). */
     zones: ISeriesApi<'Baseline'>[];
-    /** One line per kind and strength of divergence, each with its labels. */
+    /** One line per kind of divergence, each with its labels. */
     divergences: {
       kind: Divergence['kind'];
-      strength: DivergenceStrength;
       line: ISeriesApi<'Line'>;
       marks: ISeriesMarkersPluginApi<Time>;
     }[];
@@ -705,6 +702,7 @@ export class ReplayChart {
       this.chart.timeScale().subscribeVisibleLogicalRangeChange(relayout);
       this.chart.timeScale().subscribeSizeChange(relayout);
       this.chart.subscribeCrosshairMove(relayout);
+      this.followPriceScale();
     });
 
     effect(() => this.draw(this.candles()));
@@ -1220,6 +1218,40 @@ export class ReplayChart {
         },
       },
     };
+  }
+
+  /**
+   * The chart reports no event when its price scale is stretched (dragging the axis on the right,
+   * or a double click that resets it), so after each pointer move, wheel or click on the chart
+   * the labels and drawings are laid out again on the next frame if the scale changed.
+   */
+  private followPriceScale(): void {
+    let scale = '';
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      const series = this.series;
+      const close = this.lastClose;
+      if (!series || close === undefined) {
+        return;
+      }
+      const now = [
+        series.priceToCoordinate(close),
+        series.priceToCoordinate(close * 1.01),
+        this.chart?.timeScale().options().barSpacing,
+      ].join(':');
+      if (now !== scale) {
+        scale = now;
+        this.layoutLabels();
+      }
+    };
+    const schedule = () => {
+      frame ||= requestAnimationFrame(check);
+    };
+    const stage = this.stage().nativeElement;
+    for (const type of ['pointermove', 'pointerup', 'wheel', 'dblclick', 'touchmove']) {
+      stage.addEventListener(type, schedule, { capture: true, passive: true });
+    }
   }
 
   /** Puts each label on its line, and refreshes the P/L of open positions. */
@@ -1851,9 +1883,8 @@ export class ReplayChart {
 
   /**
    * The RSI's smoothing average (SMA 14, as Cris has TradingView set up), its overbought and
-   * oversold zones shaded red and green, and its divergences: green bullish and red bearish
-   * lines between the RSI's turns, thick for strong, thin for medium, dashed for weak and dotted
-   * for hidden ones, each labelled with its strength.
+   * oversold zones shaded red and green, and its divergences as TradingView draws them: green
+   * "Bull" and red "Bear" lines between the RSI pivots that diverge from the price.
    */
   private drawRsiExtras(chart: IChartApi, candles: Candle[], points: IndicatorPoint[]): void {
     if (!this.rsiExtras) {
@@ -1880,24 +1911,16 @@ export class ReplayChart {
           },
           1,
         );
-      const styles: Record<DivergenceStrength, [1 | 2, LineStyle]> = {
-        strong: [2, LineStyle.Solid],
-        medium: [1, LineStyle.Solid],
-        weak: [1, LineStyle.Dashed],
-        hidden: [1, LineStyle.Dotted],
-      };
       this.rsiExtras = {
         smoothing: line(RSI_COLORS.smoothing, 1),
         zones: [
           zone(RSI_OVERBOUGHT, fade(RSI_COLORS.bear, 0.25), true),
           zone(RSI_OVERSOLD, fade(RSI_COLORS.bull, 0.25), false),
         ],
-        divergences: (['bull', 'bear'] as const).flatMap((kind) =>
-          DIVERGENCE_STRENGTHS.map((strength) => {
-            const series = line(RSI_COLORS[kind], ...styles[strength]);
-            return { kind, strength, line: series, marks: createSeriesMarkers(series, []) };
-          }),
-        ),
+        divergences: (['bull', 'bear'] as const).map((kind) => {
+          const series = line(RSI_COLORS[kind], 2);
+          return { kind, line: series, marks: createSeriesMarkers(series, []) };
+        }),
       };
     }
     const extras = this.rsiExtras;
@@ -1906,11 +1929,10 @@ export class ReplayChart {
       sma(points, RSI_SMOOTHING).map((p) => ({ time: p.time as Time, value: p.value })),
     );
     extras.zones.forEach((zone) => zone.setData(rsiData));
-    const labels = this.i18n.messages().chart.divergence;
     const found = rsiDivergences(candles, points);
     const times = points.map((p) => p.time);
-    for (const { kind, strength, line, marks } of extras.divergences) {
-      const list = found.filter((d) => d.kind === kind && d.strength === strength);
+    for (const { kind, line, marks } of extras.divergences) {
+      const list = found.filter((d) => d.kind === kind);
       line.setData(divergenceSegments(list, times));
       marks.setMarkers(
         list.map((d) => ({
@@ -1919,7 +1941,7 @@ export class ReplayChart {
           shape: 'square',
           size: 0,
           color: RSI_COLORS[kind],
-          text: labels[strength],
+          text: kind === 'bull' ? 'Bull' : 'Bear',
         })),
       );
     }

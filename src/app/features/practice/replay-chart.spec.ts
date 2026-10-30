@@ -473,14 +473,15 @@ describe('ReplayChart', () => {
     await fixture.whenStable();
 
     // The RSI, in its own pane with its dotted guides, smoothing average, overbought and
-    // oversold shades and a line per kind and strength of divergence; no averages on the
-    // candles until the user wants them.
+    // oversold shades and its bullish and bearish divergence lines; no averages on the candles
+    // until the user wants them.
     expect(lw.lines.map((line) => line.type)).toEqual([
       'Line',
       'Line',
       'Baseline',
       'Baseline',
-      ...Array(8).fill('Line'),
+      'Line',
+      'Line',
     ]);
     expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 1);
     expect(lw.pane.setHeight).toHaveBeenCalled();
@@ -525,7 +526,7 @@ describe('ReplayChart', () => {
     item('EMA 200').click();
     await fixture.whenStable();
     expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 0);
-    const ema200 = lw.lines[12];
+    const ema200 = lw.lines[6];
     // 250 closes: 51 values of the 200-candle average, from bar 200 with the mean of the first.
     expect(ema200.setData.mock.calls.at(-1)![0]).toHaveLength(51);
     expect(ema200.setData.mock.calls.at(-1)![0][0]).toEqual({ time: 200, value: 199.5 });
@@ -549,9 +550,9 @@ describe('ReplayChart', () => {
     const { fixture, host } = await render();
     host.indicators.set(['ema100', 'ema200']);
     await fixture.whenStable();
-    // The RSI and its eleven extras go, the two averages come.
-    expect(lw.chart.removeSeries).toHaveBeenCalledTimes(12);
-    expect(lw.lines.slice(12).map((line) => line.type)).toEqual(['Line', 'Line']);
+    // The RSI and its five extras go, the two averages come.
+    expect(lw.chart.removeSeries).toHaveBeenCalledTimes(6);
+    expect(lw.lines.slice(6).map((line) => line.type)).toEqual(['Line', 'Line']);
     // Nothing was picked: nothing to save.
     expect(host.picked).toEqual([]);
   });
@@ -688,6 +689,30 @@ describe('ReplayChart', () => {
     await fixture.whenStable();
     expect(el.querySelector('.tool-hint')).toBeNull();
     expect(el.querySelectorAll('svg.shapes rect.rect')).toHaveLength(1);
+  });
+
+  it('keeps drawings on their prices when the price scale is stretched', async () => {
+    const r = await render();
+    const { fixture, el } = r;
+    const { pick, press } = drawing(r);
+    await pick('Línea de tendencia');
+    await press(10, 390);
+    await press(0, 380);
+    const ends = () =>
+      ['y1', 'y2'].map((a) => el.querySelector('svg.shapes .trend')!.getAttribute(a));
+    expect(ends()).toEqual(['380', '390']);
+
+    // Dragging the axis on the right stretches the scale without any chart event: prices 120
+    // and 110 now sit at y 260 and 280.
+    lw.series.priceToCoordinate.mockImplementation((price: number) => 500 - 2 * price);
+    try {
+      el.querySelector('.stage')!.dispatchEvent(new Event('pointermove'));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await fixture.whenStable();
+      expect(ends()).toEqual(['260', '280']);
+    } finally {
+      lw.series.priceToCoordinate.mockImplementation((price: number) => 500 - price);
+    }
   });
 
   it('lists the drawing tools in sections, as TradingView does', async () => {
@@ -1483,10 +1508,10 @@ describe('divergenceSegments', () => {
     expect(
       divergenceSegments(
         [
-          { kind: 'bull', strength: 'strong', from: at(2), to: at(10) },
-          { kind: 'bull', strength: 'strong', from: at(10), to: at(20) },
-          { kind: 'bull', strength: 'strong', from: at(15), to: at(25) },
-          { kind: 'bull', strength: 'strong', from: at(30), to: at(38) },
+          { kind: 'bull', from: at(2), to: at(10) },
+          { kind: 'bull', from: at(10), to: at(20) },
+          { kind: 'bull', from: at(15), to: at(25) },
+          { kind: 'bull', from: at(30), to: at(38) },
         ],
         times,
       ),

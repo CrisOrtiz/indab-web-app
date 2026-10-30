@@ -118,111 +118,73 @@ export function sma(points: IndicatorPoint[], period: number): IndicatorPoint[] 
   return result;
 }
 
-/** How a divergence reads, from the classic summary (strong, medium, weak and hidden). */
-export type DivergenceStrength = 'strong' | 'medium' | 'weak' | 'hidden';
-export const DIVERGENCE_STRENGTHS: readonly DivergenceStrength[] = [
-  'strong',
-  'medium',
-  'weak',
-  'hidden',
-];
-
-/** A divergence between the price and the RSI, from one swing to the next, on the RSI. */
+/** A divergence between the price and the RSI, from one RSI pivot to the next. */
 export interface Divergence {
   kind: 'bull' | 'bear';
-  strength: DivergenceStrength;
   from: IndicatorPoint;
   to: IndicatorPoint;
 }
 
-/** Bars each side of a price swing, and the bars allowed between two swings. */
+/** Bars left and right of an RSI pivot, and the bars allowed between two pivots. */
 export const PIVOT_BARS = 5;
 const RANGE_MIN = 5;
 const RANGE_MAX = 60;
-/** Bars each side of a price swing searched for the RSI's own turn. */
-const RSI_WINDOW = 2;
-/** Two swings are "equal" within this share of the average bar range, or these RSI points. */
-const EQUAL_RANGE = 0.25;
-const EQUAL_RSI = 1;
 
 /**
- * Divergences between the price swings and the RSI, as in the classic summary Cris shared:
- * at two consecutive swing lows (lowest low of 5 bars each side, 5 to 60 bars apart), a lower
- * price low with a higher RSI low is a strong bullish one, an equal price low with a higher RSI
- * low a medium one, a lower price low with an equal RSI low a weak one, and a higher price low
- * with a lower RSI low a hidden one. Swing highs mirror it for bearish ones. The RSI is read at
- * its own turn within 2 bars of the price swing. A swing is only known 5 bars later, so nothing
- * peeks ahead.
+ * Regular divergences exactly as TradingView's built-in RSI "Calculate divergence" draws them
+ * (lookback left and right 5, range 5 to 60): an RSI pivot low (below the 5 bars before it, not
+ * above the 5 after it) higher than the previous RSI pivot low, while the low of the price at
+ * that bar is lower than at the previous one, is bullish; pivot highs mirror it for bearish ones.
+ * Only regular divergences, as TradingView, since hidden ones are mostly noise. TradingView's
+ * range counts the bars since the bar before (`barssince(plFound[1])`), so pivots 6 to 61 bars
+ * apart. A pivot is only known 5 bars later, so nothing peeks ahead.
  */
 export function rsiDivergences(candles: Candle[], rsiPoints: IndicatorPoint[]): Divergence[] {
-  const rsiIndex = new Map(rsiPoints.map((p, i) => [p.time, i]));
-  const swing = (i: number, low: boolean) => {
-    if (i < PIVOT_BARS || i + PIVOT_BARS >= candles.length) {
+  const index = new Map(candles.map((c, i) => [c.time, i]));
+  const values = rsiPoints.map((p) => p.value);
+  const pivot = (i: number, low: boolean) => {
+    if (i < PIVOT_BARS || i + PIVOT_BARS >= values.length) {
       return false;
     }
-    const at = low ? candles[i].low : candles[i].high;
     for (let k = 1; k <= PIVOT_BARS; k++) {
-      const left = low ? candles[i - k].low : candles[i - k].high;
-      const right = low ? candles[i + k].low : candles[i + k].high;
-      if (low ? !(at < left && at <= right) : !(at > left && at >= right)) {
+      const left = values[i - k];
+      const right = values[i + k];
+      if (
+        low ? !(values[i] < left && values[i] <= right) : !(values[i] > left && values[i] >= right)
+      ) {
         return false;
       }
     }
     return true;
   };
-  // The RSI's lowest (or highest) point near the swing, where its own line turns.
-  const rsiTurn = (i: number, low: boolean): IndicatorPoint | null => {
-    let best: IndicatorPoint | null = null;
-    for (let k = i - RSI_WINDOW; k <= i + RSI_WINDOW; k++) {
-      const at = k >= 0 && k < candles.length ? rsiIndex.get(candles[k].time) : undefined;
-      const point = at === undefined ? undefined : rsiPoints[at];
-      if (point && (!best || (low ? point.value < best.value : point.value > best.value))) {
-        best = point;
-      }
-    }
-    return best;
-  };
-  // Average bar range over the 14 bars up to a swing: how close two prices count as equal.
-  const tolerance = (i: number) => {
-    const bars = candles.slice(Math.max(0, i - 13), i + 1);
-    return (bars.reduce((sum, c) => sum + c.high - c.low, 0) / bars.length) * EQUAL_RANGE;
-  };
-  const compare = (diff: number, equal: number) => (diff > equal ? 1 : diff < -equal ? -1 : 0);
   const result: Divergence[] = [];
-  const last: Record<'low' | 'high', { bar: number; rsi: IndicatorPoint } | null> = {
-    low: null,
-    high: null,
-  };
-  for (let i = 0; i < candles.length; i++) {
+  let lastLow: number | null = null;
+  let lastHigh: number | null = null;
+  for (let i = 0; i < values.length; i++) {
     for (const low of [true, false]) {
-      const rsi = swing(i, low) ? rsiTurn(i, low) : null;
-      if (!rsi) {
+      if (!pivot(i, low)) {
         continue;
       }
-      const previous = last[low ? 'low' : 'high'];
-      if (previous && i - previous.bar >= RANGE_MIN && i - previous.bar <= RANGE_MAX) {
-        const price = low
-          ? compare(candles[i].low - candles[previous.bar].low, tolerance(i))
-          : compare(candles[i].high - candles[previous.bar].high, tolerance(i));
-        const osc = compare(rsi.value - previous.rsi.value, EQUAL_RSI);
-        // Read bearish swings upside down so both kinds share one table.
-        const p = low ? price : -price;
-        const r = low ? osc : -osc;
-        const strength: DivergenceStrength | null =
-          p < 0 && r > 0
-            ? 'strong'
-            : p === 0 && r > 0
-              ? 'medium'
-              : p < 0 && r === 0
-                ? 'weak'
-                : p > 0 && r < 0
-                  ? 'hidden'
-                  : null;
-        if (strength && previous.rsi.time < rsi.time) {
-          result.push({ kind: low ? 'bull' : 'bear', strength, from: previous.rsi, to: rsi });
+      const previous = low ? lastLow : lastHigh;
+      const bar = candles[index.get(rsiPoints[i].time)!];
+      const apart = previous === null ? 0 : i - previous - 1;
+      if (previous !== null && apart >= RANGE_MIN && apart <= RANGE_MAX) {
+        const before = candles[index.get(rsiPoints[previous].time)!];
+        const bull = low && values[i] > values[previous] && bar.low < before.low;
+        const bear = !low && values[i] < values[previous] && bar.high > before.high;
+        if (bull || bear) {
+          result.push({
+            kind: bull ? 'bull' : 'bear',
+            from: rsiPoints[previous],
+            to: rsiPoints[i],
+          });
         }
       }
-      last[low ? 'low' : 'high'] = { bar: i, rsi };
+      if (low) {
+        lastLow = i;
+      } else {
+        lastHigh = i;
+      }
     }
   }
   return result;
