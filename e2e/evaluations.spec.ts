@@ -58,6 +58,12 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
   await expect(page.getByLabel('Tiempo restante')).toContainText(/Quedan (19|20):\d\d/);
   await page.getByRole('spinbutton', { name: /Lotes \(tamaño/ }).fill('0.01');
   await page.getByRole('button', { name: 'Comprar 0.01 XAUUSDT MERCADO' }).click();
+  await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
+  // A reload mid-attempt picks it up again, position and clock included.
+  await page.reload();
+  await expect(page.getByText('Retomaste tu sesión donde la dejaste')).toBeVisible();
+  await expect(page.locator('.evaluation-bar')).toContainText(/Quedan 1\d:\d\d/);
+  await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
   await page.getByRole('button', { name: 'Siguiente vela' }).click();
   await expect(page.locator('.market .price')).toHaveText('101.000');
   await page.getByRole('button', { name: 'Terminar sesión' }).click();

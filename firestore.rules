@@ -29,7 +29,8 @@ rules_version = '2';
 //   examGrades/{submissionId}            points per question set by staff; the student reads it once
 //                                        the form's results are published
 //   practiceSessions/{id}                chart-replay practice by a student with academy access;
-//                                        owner writes while active, trainers and admins read all.
+//                                        owner writes while active (with where the replay is, so
+//                                        a reload picks it up), trainers and admins read all.
 //                                        Free sessions have evaluationId null; an evaluation attempt
 //                                        has the id {evaluationId}_{uid} (one per student) and is
 //                                        shown to academy members, for the ranking, once its
@@ -784,16 +785,32 @@ service cloud.firestore {
           || (request.resource.data.evaluationId is string
             && validAttempt(request.resource.data)));
 
-      // While active, the owner refreshes the summary and finally marks it finished. An
-      // evaluation attempt accepts these until two minutes after its time is up.
+      // Where an active replay was left (bar, timeframe, speed, drawings), to pick it up
+      // after a reload.
+      function validResume(data) {
+        return !('resume' in data)
+          || (data.resume is map
+            && data.resume.keys().hasOnly(['time', 'interval', 'hideDates', 'speed', 'drawings'])
+            && data.resume.time is int
+            && data.resume.interval in ['1m', '3m', '5m', '15m', '1h', '4h', '1d']
+            && data.resume.hideDates is bool
+            && data.resume.speed is int
+            && data.resume.drawings is list
+            && data.resume.drawings.size() <= 200);
+      }
+
+      // While active, the owner refreshes the summary and where the replay is, and finally
+      // marks it finished. An evaluation attempt accepts these until two minutes after its
+      // time is up.
       allow update: if isOwner(resource.data.uid)
         && resource.data.status == 'active'
         && (resource.data.get('durationMinutes', null) == null
           || request.time < resource.data.startedAt
             + duration.value(resource.data.durationMinutes + 2, 'm'))
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['balance', 'pnl', 'tradeCount', 'status', 'endedAt'])
+          .hasOnly(['balance', 'pnl', 'tradeCount', 'status', 'endedAt', 'resume'])
         && validSummary(request.resource.data)
+        && validResume(request.resource.data)
         && (request.resource.data.status == 'active'
           || (request.resource.data.status == 'finished' && request.resource.data.endedAt == request.time));
 

@@ -22,7 +22,7 @@ import {
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
 import { LoadingService } from '../../core/loading/loading.service';
 import { Evaluation, attemptId } from '../../core/models/evaluation';
-import { PracticeSession, PracticeTrade } from '../../core/models/practice';
+import { PracticeSession, PracticeTrade, SessionResume } from '../../core/models/practice';
 import { CursorPage } from '../../shared/pager/cursor-pages';
 
 export type NewPracticeSession = Pick<
@@ -99,6 +99,33 @@ export class PracticeService {
 
   updateSummary(sessionId: string, summary: SessionSummary): Promise<void> {
     return updateDoc(doc(this.sessions, sessionId), { ...summary });
+  }
+
+  /** Saves where the replay is, so a reload picks the session up there. */
+  saveResume(sessionId: string, resume: SessionResume): Promise<void> {
+    // Firestore refuses undefined values; drawings leave out the fields they do not use.
+    return updateDoc(doc(this.sessions, sessionId), {
+      resume: JSON.parse(JSON.stringify(resume)),
+    });
+  }
+
+  /**
+   * The student's sessions still marked active, newest first: a reload or a closed tab leaves
+   * them so, and the practice page picks the newest back up.
+   */
+  async activeSessions(uid: string, max = 5): Promise<PracticeSession[]> {
+    const snapshot = await this.loading.track(
+      getDocs(
+        query(
+          this.sessions,
+          where('uid', '==', uid),
+          where('status', '==', 'active'),
+          orderBy('startedAt', 'desc'),
+          limit(max),
+        ),
+      ),
+    );
+    return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
   }
 
   finishSession(sessionId: string, summary: SessionSummary): Promise<void> {

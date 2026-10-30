@@ -9,6 +9,7 @@ import {
   inject,
   input,
   linkedSignal,
+  model,
   output,
   signal,
   untracked,
@@ -189,7 +190,7 @@ export type Tool =
   | 'abc';
 /** Drawings on the overlay: every tool but the horizontal line, which is a price line. */
 type ShapeKind = Exclude<Tool, 'hline'>;
-interface ShapeDrawing {
+export interface ShapeDrawing {
   id: number;
   kind: ShapeKind;
   /** One point (horizontal ray, vertical line) or two: the ends, corners or move. */
@@ -200,8 +201,8 @@ interface ShapeDrawing {
   /** Long/short position: the stop loss; the target is the second point's price. */
   stop?: number;
 }
-type Drawing = { id: number; kind: 'hline'; price: number } | ShapeDrawing;
-interface ChartPoint {
+export type Drawing = { id: number; kind: 'hline'; price: number } | ShapeDrawing;
+export interface ChartPoint {
   time: number;
   price: number;
 }
@@ -567,7 +568,8 @@ export class ReplayChart {
   protected readonly anchors = signal<ChartPoint[]>([]);
   /** Where the next point goes while a tool is on; `touch` shows it as a crosshair. */
   protected readonly cursor = signal<(Pixel & { touch: boolean }) | null>(null);
-  protected readonly drawings = signal<Drawing[]>([]);
+  /** The drawings on the chart; the practice page keeps them to put them back after a reload. */
+  readonly drawings = model<Drawing[]>([]);
   /** The drawing whose handles and bar are shown. */
   protected readonly selected = signal<number | null>(null);
   /** The selected drawing while it is being dragged, until it is dropped. */
@@ -673,7 +675,6 @@ export class ReplayChart {
       marks: ISeriesMarkersPluginApi<Time>;
     }[];
   };
-  private nextDrawingId = PREVIEW_ID + 1;
   private colors = { up: '', down: '', text: '', muted: '', candleUp: '', candleDown: '' };
   /** Prices of the focused trade, kept inside the price scale. */
   private focusLevels: number[] = [];
@@ -816,6 +817,11 @@ export class ReplayChart {
     this.drawings.update((list) => list.filter((d) => d.id !== id));
   }
 
+  /** An id after every drawing's, including drawings put back from a saved session. */
+  private newDrawingId(): number {
+    return Math.max(PREVIEW_ID, ...untracked(this.drawings).map((d) => d.id)) + 1;
+  }
+
   /** Escape puts down the tool and closes menus; Delete erases the selected drawing. */
   protected onKey(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
@@ -931,7 +937,7 @@ export class ReplayChart {
     const menu = this.menu();
     this.menu.set(null);
     if (menu) {
-      const id = this.nextDrawingId++;
+      const id = this.newDrawingId();
       this.drawings.update((list) => [...list, { id, kind: 'hline', price: menu.price }]);
     }
   }
@@ -2130,7 +2136,7 @@ export class ReplayChart {
       return;
     }
     if (tool === 'hline') {
-      const id = this.nextDrawingId++;
+      const id = this.newDrawingId();
       this.drawings.update((list) => [...list, { id, kind: 'hline', price: point.price }]);
       this.pick(null);
       return;
@@ -2169,7 +2175,7 @@ export class ReplayChart {
     ) {
       points.splice(0, 2, ...points.slice(0, 2).sort((p, q) => p.time - q.time));
     }
-    const id = this.nextDrawingId++;
+    const id = this.newDrawingId();
     this.drawings.update((list) => [...list, this.build(tool, points, id)]);
     this.pick(null);
     this.selected.set(id);

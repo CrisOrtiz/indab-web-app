@@ -67,6 +67,35 @@ describe('PracticeService', () => {
     service = TestBed.inject(PracticeService);
   });
 
+  it('saves where the replay is, without undefined fields', async () => {
+    await service.saveResume('s1', {
+      time: 600,
+      interval: '5m',
+      hideDates: true,
+      speed: 2,
+      drawings: [{ id: 1, kind: 'rect', points: [], color: '#fff', offset: undefined }],
+    });
+    expect(updateDoc).toHaveBeenCalledWith(
+      { path: 'practiceSessions/s1', id: 's1' },
+      {
+        resume: {
+          time: 600,
+          interval: '5m',
+          hideDates: true,
+          speed: 2,
+          drawings: [{ id: 1, kind: 'rect', points: [], color: '#fff' }],
+        },
+      },
+    );
+  });
+
+  it("lists the student's active sessions, newest first", async () => {
+    const sessions = await service.activeSessions('u1');
+    expect(where).toHaveBeenCalledWith('uid', '==', 'u1');
+    expect(where).toHaveBeenCalledWith('status', '==', 'active');
+    expect(sessions).toEqual([{ symbol: 'PAXGUSDT', id: 's1' }]);
+  });
+
   it('starts an active session with an empty summary', async () => {
     const id = await service.startSession({
       uid: 'u1',

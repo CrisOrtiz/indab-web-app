@@ -1,5 +1,14 @@
 import { DecimalPipe, PercentPipe, formatNumber } from '@angular/common';
-import { Component, DestroyRef, LOCALE_ID, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  LOCALE_ID,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
@@ -10,6 +19,7 @@ import {
   OrderType,
   PracticeSession,
   PracticeTrade,
+  SessionResume,
   TradeSide,
 } from '../../core/models/practice';
 import { EvaluationService } from '../evaluations/evaluation.service';
@@ -49,7 +59,15 @@ import {
   tradePnl,
   validateOrder,
 } from './replay';
-import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
+import { Drawing, LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
+import {
+  attemptExpired,
+  clearLocalResume,
+  pickResume,
+  readLocalResume,
+  resumeTime,
+  writeLocalResume,
+} from './resume';
 import { SessionFilterBar } from './session-filters';
 import { SessionReview } from './session-review';
 import { SessionStatsPanel } from './session-stats';
@@ -73,6 +91,10 @@ const MIN_REPLAY_MINUTES = 60;
 const PREFETCH_MINUTES = 600;
 /** How long a refused one-click order says why on the chart. */
 export const QUICK_ERROR_MS = 6000;
+/** While the replay plays, where it is goes to Firestore at most this often. */
+export const RESUME_SAVE_MS = 15_000;
+/** Other changes to pick up after a reload (drawings, timeframe, speed) go sooner. */
+export const RESUME_CHANGE_MS = 2_000;
 
 /** An evaluation assigned to the student, with their attempt if they took it. */
 export interface EvaluationCard {
@@ -124,7 +146,11 @@ export const SESSIONS_PAGE_SIZE = 10;
   ],
   templateUrl: './practice.html',
   styleUrls: ['./practice.scss', './trading-panel.scss', './trading-account.scss'],
-  host: { '(window:keydown)': 'onKey($event)' },
+  host: {
+    '(window:keydown)': 'onKey($event)',
+    '(window:pagehide)': 'saveResumeNow()',
+    '(document:visibilitychange)': 'saveResumeNow()',
+  },
 })
 export class Practice {
   private readonly auth = inject(AuthService);
@@ -240,6 +266,10 @@ export class Practice {
   protected readonly placing = signal(false);
   /** Whether the order being set up is on the chart. */
   protected readonly drafting = signal(false);
+  /** The drawings on the chart, kept with the session so a reload puts them back. */
+  protected readonly drawings = signal<Drawing[]>([]);
+  /** The session was picked up after a reload. */
+  protected readonly resumed = signal(false);
 
   protected readonly instrument = computed(() => findInstrument(this.symbol()) ?? INSTRUMENTS[0]);
   protected readonly instrumentLabel = computed(
@@ -333,19 +363,49 @@ export class Practice {
     };
   });
 
+  /** Where the running session is, to pick it up after a reload. */
+  private readonly resumeState = computed<SessionResume | null>(() => {
+    const replay = this.replay();
+    if (this.phase() !== 'playing' || !replay) {
+      return null;
+    }
+    return {
+      time: replay.current().time,
+      interval: this.timeframe().interval,
+      hideDates: this.hideDates(),
+      speed: this.speed(),
+      drawings: this.drawings(),
+    };
+  });
+
   private timer?: ReturnType<typeof setInterval>;
   private quickErrorTimer?: ReturnType<typeof setTimeout>;
   private clock?: ReturnType<typeof setInterval>;
+  /** The next save of `resume` to Firestore, and when it is due. */
+  private resumeTimer?: ReturnType<typeof setTimeout>;
+  private resumeDue = 0;
+  /** The last `resume` kept, and whether Firestore has it yet. */
+  private lastResume: SessionResume | null = null;
+  private resumeSaved = true;
 
   constructor() {
     void this.chartSettings.load();
     this.loadSessions();
     this.loadEvaluations();
+    void this.resumeActive();
+    effect(() => {
+      const state = this.resumeState();
+      if (state) {
+        untracked(() => this.keepResume(state));
+      }
+    });
     inject(DestroyRef).onDestroy(() => {
       this.pause();
       clearInterval(this.clock);
       clearTimeout(this.quickErrorTimer);
-      // Leaving mid-replay ends the session, so open trades are not left dangling.
+      clearTimeout(this.resumeTimer);
+      // Leaving mid-replay ends the session, so open trades are not left dangling (a reload
+      // does not get here: the session stays active and is picked up again).
       if (this.phase() === 'playing') {
         void this.finish();
       }
@@ -415,19 +475,7 @@ export class Practice {
             throw new Error(this.i18n.messages().practice.evaluationStartFailed);
           })
         : await this.practice.startSession(session);
-      this.builders = new Map();
-      this.histories.set({ [timeframe.interval]: history });
-      this.timeframe.set(timeframe);
-      this.replayStart.set(replayStart);
-      this.replay.set(replay);
-      this.sessionId.set(sessionId);
-      this.orderError.set(null);
-      this.stopLoss.set(null);
-      this.takeProfit.set(null);
-      this.drafting.set(false);
-      this.tab.set('positions');
-      this.evaluation.set(evaluation);
-      this.phase.set('playing');
+      this.enter(sessionId, replay, replayStart, timeframe, history, evaluation, []);
       if (evaluation) {
         this.startClock(startedAt + evaluation.durationMinutes * MINUTE);
       }
@@ -437,6 +485,156 @@ export class Practice {
       this.error.set(message === t.evaluationStartFailed ? message : t.startFailed);
       this.phase.set('setup');
     }
+  }
+
+  /** Shows a session's replay, ready to trade. */
+  private enter(
+    sessionId: string,
+    replay: Replay,
+    replayStart: number,
+    timeframe: Timeframe,
+    history: Candle[],
+    evaluation: Evaluation | null,
+    drawings: Drawing[],
+  ): void {
+    this.builders = new Map();
+    this.histories.set({ [timeframe.interval]: history });
+    this.timeframe.set(timeframe);
+    this.replayStart.set(replayStart);
+    this.replay.set(replay);
+    this.sessionId.set(sessionId);
+    this.orderError.set(null);
+    this.stopLoss.set(null);
+    this.takeProfit.set(null);
+    this.drafting.set(false);
+    this.tab.set('positions');
+    this.evaluation.set(evaluation);
+    this.drawings.set(drawings);
+    this.resumed.set(false);
+    this.lastResume = null;
+    this.resumeSaved = true;
+    this.phase.set('playing');
+  }
+
+  /**
+   * Picks up the newest session a reload (or a closed tab) left active, evaluation attempts
+   * included while their time lasts, so the student goes on where they were.
+   */
+  private async resumeActive(): Promise<void> {
+    const uid = this.auth.user()?.uid;
+    if (!uid) {
+      return;
+    }
+    this.phase.set('loading');
+    try {
+      const now = Date.now();
+      const sessions = await this.practice.activeSessions(uid);
+      const session = sessions.find((s) => findInstrument(s.symbol) && !attemptExpired(s, now));
+      if (session) {
+        await this.resume(session);
+      }
+    } catch {
+      this.error.set(this.i18n.messages().practice.resumeFailed);
+    }
+    if (this.phase() === 'loading') {
+      this.phase.set('setup');
+    }
+  }
+
+  /**
+   * Rebuilds a session as it was left: its trades, the bar it was on, the timeframe, speed,
+   * drawings and, for an evaluation, the time left. The replay waits paused.
+   */
+  private async resume(session: PracticeSession): Promise<void> {
+    const evaluation = session.evaluationId
+      ? await this.evaluationService.get(session.evaluationId).catch(() => null)
+      : null;
+    const saved = pickResume(session.resume, readLocalResume(session.id));
+    const timeframe = TIMEFRAMES.find((tf) => tf.interval === saved?.interval) ?? DEFAULT_TIMEFRAME;
+    const [trades, minutes, history] = await Promise.all([
+      this.practice.sessionTrades(session.id),
+      this.market.loadCandles(session.symbol, '1m', session.replayStart - MINUTE),
+      this.loadHistory(session.symbol, timeframe, session.replayStart),
+    ]);
+    if (minutes.length < MIN_REPLAY_MINUTES) {
+      throw new Error('Not enough data');
+    }
+    const replay = new Replay(minutes, 1, session.startingBalance, true);
+    if (minutes.length < REPLAY_BARS) {
+      replay.extend([], true);
+    }
+    const time = resumeTime(session.replayStart, saved, trades);
+    while (!replay.hasAllCandles() && replay.candles.at(-1)!.time < time) {
+      await this.fetchMinutes(replay, session.symbol, session.replayStart);
+    }
+    replay.resume(trades, time);
+    this.symbol.set(session.symbol);
+    this.hideDates.set(evaluation?.hideDates ?? saved?.hideDates ?? true);
+    if (saved && SPEEDS.includes(saved.speed)) {
+      this.speed.set(saved.speed);
+    }
+    this.enter(
+      session.id,
+      replay,
+      session.replayStart,
+      timeframe,
+      history,
+      evaluation,
+      (saved?.drawings ?? []) as Drawing[],
+    );
+    this.resumed.set(true);
+    if (session.durationMinutes != null) {
+      this.startClock(
+        (session.startedAt?.toMillis() ?? Date.now()) + session.durationMinutes * MINUTE,
+      );
+    }
+    if (replay.finished()) {
+      void this.finish();
+    }
+  }
+
+  /**
+   * Keeps where the session is: in this browser at once, in Firestore a little later (sooner
+   * when more than the bar changed), so reloads and other devices pick it up there.
+   */
+  private keepResume(state: SessionResume): void {
+    const sessionId = this.sessionId();
+    if (!sessionId) {
+      return;
+    }
+    writeLocalResume(sessionId, state);
+    const previous = this.lastResume;
+    this.lastResume = state;
+    if (!previous) {
+      return;
+    }
+    const onlyMoved =
+      previous.interval === state.interval &&
+      previous.speed === state.speed &&
+      previous.hideDates === state.hideDates &&
+      previous.drawings === state.drawings;
+    this.resumeSaved = false;
+    const due = Date.now() + (onlyMoved ? RESUME_SAVE_MS : RESUME_CHANGE_MS);
+    if (this.resumeTimer && this.resumeDue <= due) {
+      return;
+    }
+    clearTimeout(this.resumeTimer);
+    this.resumeDue = due;
+    this.resumeTimer = setTimeout(() => this.saveResumeNow(), due - Date.now());
+  }
+
+  /** Saves where the session is to Firestore now (on pause, or as the page goes away). */
+  protected saveResumeNow(): void {
+    clearTimeout(this.resumeTimer);
+    this.resumeTimer = undefined;
+    const sessionId = this.sessionId();
+    const state = this.lastResume;
+    if (this.resumeSaved || !sessionId || !state || this.phase() !== 'playing') {
+      return;
+    }
+    this.resumeSaved = true;
+    // Best effort: this browser has its own copy, and trades are logged as they happen.
+    this.practice.saveResume(sessionId, state).catch(() => (this.resumeSaved = false));
   }
 
   /** Counts the attempt's time down and finishes it when it runs out. */
@@ -484,6 +682,7 @@ export class Practice {
     if (!replay || this.phase() !== 'playing') {
       return;
     }
+    this.resumed.set(false);
     const end = nextBarEnd(replay.current().time, this.barSeconds());
     if (replay.candles.at(-1)!.time < end && !replay.hasAllCandles()) {
       void this.loadMinutes();
@@ -512,6 +711,7 @@ export class Practice {
   protected togglePlay(): void {
     if (this.playing()) {
       this.pause();
+      this.saveResumeNow();
     } else {
       this.play();
     }
@@ -780,6 +980,8 @@ export class Practice {
     }
     this.pause();
     clearInterval(this.clock);
+    clearTimeout(this.resumeTimer);
+    clearLocalResume(sessionId);
     this.deadline.set(null);
     this.phase.set('finished');
     const { cancelled, closed } = replay.closeAll('sessionEnd');
@@ -891,19 +1093,27 @@ export class Practice {
     }
     this.loadingMinutes = true;
     try {
-      const from = (replay.candles.at(-1)!.time + 60) * 1000;
-      const limit = this.replayStart() + REPLAY_DAYS * 24 * 60 * MINUTE;
-      const more = await this.market.loadCandles(this.symbol(), '1m', from, REPLAY_BARS, {
-        background: true,
-      });
-      const within = more.filter((c) => c.time * 1000 < limit);
-      replay.extend(within, more.length < REPLAY_BARS || within.length < more.length);
+      await this.fetchMinutes(replay, this.symbol(), this.replayStart(), true);
     } catch {
       this.pause();
       this.error.set(this.i18n.messages().practice.moreBarsFailed);
     } finally {
       this.loadingMinutes = false;
     }
+  }
+
+  /** Appends the next chunk of one-minute candles, up to `REPLAY_DAYS` after the start. */
+  private async fetchMinutes(
+    replay: Replay,
+    symbol: string,
+    replayStart: number,
+    background = false,
+  ): Promise<void> {
+    const from = (replay.candles.at(-1)!.time + 60) * 1000;
+    const limit = replayStart + REPLAY_DAYS * 24 * 60 * MINUTE;
+    const more = await this.market.loadCandles(symbol, '1m', from, REPLAY_BARS, { background });
+    const within = more.filter((c) => c.time * 1000 < limit);
+    replay.extend(within, more.length < REPLAY_BARS || within.length < more.length);
   }
 
   /** The `HISTORY_BARS` bars of a timeframe before the replay starts. */

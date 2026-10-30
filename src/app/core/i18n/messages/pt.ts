@@ -663,7 +663,12 @@ export const pt: Messages = {
     evaluationTitle: (title: string) => `Avaliação: ${title}`,
     timeLeftLabel: 'Tempo restante',
     timeLeft: (time: string) => `Faltam ${time}`,
-    leavingEnds: 'Sair desta página encerra a avaliação.',
+    leavingEnds:
+      'Sair desta página encerra a avaliação; se recarregar, ela continua de onde parou.',
+    resumed:
+      'Você voltou para onde deixou sua sessão: suas ordens, desenhos e o candle em que estava.',
+    resumeFailed:
+      'Não foi possível retomar sua sessão aberta. Recarregue a página para tentar de novo.',
   },
 
   chart: {

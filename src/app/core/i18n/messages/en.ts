@@ -665,7 +665,10 @@ export const en: Messages = {
     evaluationTitle: (title: string) => `Evaluation: ${title}`,
     timeLeftLabel: 'Time left',
     timeLeft: (time: string) => `${time} left`,
-    leavingEnds: 'Leaving this page ends the evaluation.',
+    leavingEnds: 'Leaving this page ends the evaluation; a reload picks it up where it was.',
+    resumed:
+      'You are back where you left your session: your orders, drawings and the bar you were on.',
+    resumeFailed: 'Your open session could not be picked up. Reload the page to try again.',
   },
 
   chart: {

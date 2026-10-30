@@ -294,6 +294,19 @@ export class Replay {
   }
 
   /**
+   * Picks a session up where it was left (after a reload): its logged trades and the last
+   * candle shown, the latest at or before `time` (seconds), never before the replay start.
+   */
+  resume(trades: PracticeTrade[], time: number): void {
+    this._trades.set(trades);
+    let cursor = this.historyBars - 1;
+    while (cursor + 1 < this.candles.length && this.candles[cursor + 1].time <= time) {
+      cursor++;
+    }
+    this._cursor.set(cursor);
+  }
+
+  /**
    * Shows the next candle, fills the pending orders it reaches and closes the trades whose
    * stop loss or take profit it hits. An order filled on this candle is checked for its
    * stops from the next candle on. If equity then falls below `STOP_OUT_LEVEL` of the margin

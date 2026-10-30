@@ -200,6 +200,35 @@ describe('Replay', () => {
     expect(replay.step()).toBeNull();
   });
 
+  it('picks a session up at the bar it was left, with its trades', () => {
+    const replay = new Replay(
+      series(
+        candle(3, 100, 101, 99, 101),
+        candle(4, 101, 104, 100, 103),
+        candle(5, 103, 103, 98, 99),
+      ),
+      2,
+    );
+    replay.resume(
+      [
+        trade({ id: 'a', status: 'closed', exitPrice: 101, exitTime: 3, pnl: 2 }),
+        trade({ id: 'b', entryTime: 3, takeProfit: 102 }),
+      ],
+      4,
+    );
+    expect(replay.current().time).toBe(4);
+    expect(replay.balance()).toBe(202);
+    expect(replay.openTrades().map((t) => t.id)).toEqual(['b']);
+    // The next bar goes on as before the reload.
+    replay.step();
+    expect(replay.current().time).toBe(5);
+    // Never before the start, nor past the candles loaded.
+    replay.resume([], 0);
+    expect(replay.cursor()).toBe(1);
+    replay.resume([], 99);
+    expect(replay.current().time).toBe(5);
+  });
+
   it('can grow while it runs and only finishes once told no more candles come', () => {
     const replay = new Replay(series(candle(3, 100, 100, 100, 101)), 2, 200, true);
     replay.step();

@@ -32,7 +32,7 @@
               (change)="setSpeed(+$any($event.target).value)"
             >
               @for (s of speeds; track s) {
-                <option [value]="s">{{ t.barsPerSecond(s) }}</option>
+                <option [value]="s" [selected]="s === speed()">{{ t.barsPerSecond(s) }}</option>
               }
             </select>
             <button type="button" class="btn" (click)="finish()">{{ t.finish }}</button>
@@ -47,6 +47,9 @@
             <span class="muted">{{ t.leavingEnds }}</span>
           </div>
         }
+        @if (resumed()) {
+          <p class="message success" role="status">{{ t.resumed }}</p>
+        }
         <p class="muted elapsed">{{ t.elapsed(elapsed()) }}</p>
 
         <div class="workspace">
@@ -56,6 +59,7 @@
             [draft]="draft()"
             [hideDates]="datesHidden()"
             [barSeconds]="barSeconds()"
+            [(drawings)]="drawings"
             [trading]="true"
             [indicators]="chartSettings.indicators()"
             (indicatorsChange)="chartSettings.saveIndicators($event)"

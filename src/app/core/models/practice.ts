@@ -52,6 +52,24 @@ export interface PracticeSession {
   evaluationId?: string | null;
   /** An evaluation attempt's time limit, copied from the evaluation. */
   durationMinutes?: number;
+  /** Where the replay was left while active. */
+  resume?: SessionResume;
+}
+
+/**
+ * Where an active session was left, so a reload (or another device) picks it up there. Saved
+ * on the session as `resume` every few seconds while it runs; the browser also keeps a copy.
+ */
+export interface SessionResume {
+  /** Open time (seconds) of the last one-minute candle shown. */
+  time: number;
+  /** Timeframe on the chart. */
+  interval: string;
+  hideDates: boolean;
+  /** Replay speed, bars per second. */
+  speed: number;
+  /** The chart's drawings, as `ReplayChart` keeps them. */
+  drawings: unknown[];
 }
 
 /**

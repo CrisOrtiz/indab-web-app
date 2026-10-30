@@ -239,6 +239,13 @@ Module notes:
   and steps through them with `TradeNavigator` (previous/next, a list, details), scrolling the
   chart to each (`focusTrade`, once per pick). Cris wants no navigator during a live session,
   only the boxes. Once a replay is over, a dotted line marks where it started (`startTime`). Admins delete a session with its trades (`PracticeService.deleteSession`).
+  A reload must never lose a session (Cris, 2026-10-30): the page keeps where the replay is
+  (bar, timeframe, speed, hidden dates, the chart's `drawings` model) in `localStorage` on every
+  change (`resume.ts`) and in the session's `resume` field (every 15 s while playing, 2 s after
+  other changes, at once on pause or `pagehide`). On load it picks up the newest `active`
+  session (`PracticeService.activeSessions`): its trades, the bar (the later of the saved one
+  and the last trade) and an evaluation's clock from `startedAt`; attempts past their 2-minute
+  grace are left alone. Leaving by navigation still finishes the session.
   Cris wants the trading screen to look and work like TradingView, students to start with 200
   USD and trade lots (100 oz) at 1:200 (Cris, 2026-10-27; was 1:100) with a 50% stop out
   (`replay.ts` constants), and
@@ -293,7 +300,9 @@ Module notes:
   (`features/admin/exams/`, editor maths in `exam-form.ts`) and grade at `/admin/forms/:id`
   (`exam-results.ts`); students take them at `/academy/exams` (`features/exams/`, list state in
   `exam-status.ts`). Answer keys live apart in `examKeys` so students can read the questions.
-  Grading runs in the staff browser ($0, no functions). The best attempt counts. "Duplicar"
+  Grading runs in the staff browser ($0, no functions). An attempt in progress opens again by
+  itself after a reload, on the same question; answers not yet saved are kept in `localStorage`
+  (`AttemptDraft` in `exam-take.ts`) and saved then. The best attempt counts. "Duplicar"
   (`cloneForm`) opens the editor with a copy (questions, key, points, settings) as a new draft with
   no students, to give the same test to others; practice evaluations have the same action
   (`clone`, keeps the exact `replayStart`). Not built yet:
