@@ -35,13 +35,20 @@ export class BarBuilder {
           high: Math.max(last.high, m.high),
           low: Math.min(last.low, m.low),
           close: m.close,
+          ...withVolume((last.volume ?? 0) + (m.volume ?? 0), last.volume ?? m.volume),
         };
       } else {
-        this.bars.push({ time, open: m.open, high: m.high, low: m.low, close: m.close });
+        const { open, high, low, close } = m;
+        this.bars.push({ time, open, high, low, close, ...withVolume(m.volume ?? 0, m.volume) });
       }
     }
     return [...this.bars];
   }
+}
+
+/** `{ volume }` when the minutes had one; bars of candles without volume get none. */
+function withVolume(total: number, known: number | undefined): { volume?: number } {
+  return known === undefined ? {} : { volume: total };
 }
 
 /** Time of the last minute of the bar after the one `minuteTime` falls in. */

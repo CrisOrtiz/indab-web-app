@@ -12,6 +12,7 @@ import { Evaluation } from '../../core/models/evaluation';
 import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
 import { SessionReview } from './session-review';
 import { quietNotifications } from '../notifications/testing';
+import { quietChartSettings } from './testing';
 
 // The real chart needs a canvas; the page only passes it data.
 @Component({ selector: 'app-replay-chart', template: '<ng-content />' })
@@ -25,6 +26,8 @@ class FakeChart {
   readonly lots = input(0);
   readonly focusTrade = input<string | null>(null);
   readonly startTime = input<number | null>(null);
+  readonly indicators = input<readonly string[] | null>(null);
+  readonly indicatorsChange = output<string[]>();
   readonly levelMoved = output<LevelMove>();
   readonly levelRemoved = output<LevelRemove>();
   readonly levelAdded = output<LevelRemove>();
@@ -128,6 +131,7 @@ describe('Practice page', () => {
       imports: [Practice],
       providers: [
         ...quiet.providers,
+        ...quietChartSettings().providers,
         provideRouter([]),
         { provide: AuthService, useValue: auth },
         { provide: MarketDataService, useValue: market },

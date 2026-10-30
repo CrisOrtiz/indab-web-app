@@ -27,6 +27,12 @@ describe('BarBuilder', () => {
     expect(builder.build(minutes, 8)[0]).toBe(second[0]);
   });
 
+  it('adds up the volume of the minutes in each bar', () => {
+    const traded = minutes.map((m, i) => ({ ...m, volume: i }));
+    // Minutes 1-5 (volumes 1..5) make the first 5-minute bar, 6-7 start the next.
+    expect(new BarBuilder(300, 1).build(traded, 7).map((bar) => bar.volume)).toEqual([15, 13]);
+  });
+
   it('starts over if asked for fewer minutes than it has', () => {
     const builder = new BarBuilder(60, 1);
     builder.build(minutes, 5);

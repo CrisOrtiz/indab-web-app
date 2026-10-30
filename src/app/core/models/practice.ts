@@ -7,6 +7,15 @@ export interface Candle {
   high: number;
   low: number;
   close: number;
+  /** Traded volume (base asset), when the source gives it. */
+  volume?: number;
+}
+
+/** `users/{uid}/settings/chart`: what the user keeps on the practice chart. */
+export interface ChartSettings {
+  /** Ids of the indicators switched on (`INDICATORS`). */
+  indicators: string[];
+  updatedAt: Timestamp;
 }
 
 export type TradeSide = 'long' | 'short';

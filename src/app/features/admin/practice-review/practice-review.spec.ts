@@ -1,4 +1,4 @@
-import { Component, input, signal } from '@angular/core';
+import { Component, input, output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { vi } from 'vitest';
@@ -12,6 +12,7 @@ import { ReplayChart } from '../../practice/replay-chart';
 import { SessionReview } from '../../practice/session-review';
 import { PracticeReview, REVIEW_PAGE_SIZE } from './practice-review';
 import { quietNotifications } from '../../notifications/testing';
+import { quietChartSettings } from '../../practice/testing';
 
 // The real chart needs a canvas; the review only passes it data.
 @Component({ selector: 'app-replay-chart', template: '' })
@@ -21,6 +22,8 @@ class FakeChart {
   readonly barSeconds = input(0);
   readonly focusTrade = input<string | null>(null);
   readonly startTime = input<number | null>(null);
+  readonly indicators = input<readonly string[] | null>(null);
+  readonly indicatorsChange = output<string[]>();
 }
 
 const candle: Candle = { time: 1_620_000_000, open: 1, high: 2, low: 0.5, close: 1.5 };
@@ -69,6 +72,7 @@ describe('PracticeReview', () => {
       imports: [PracticeReview],
       providers: [
         ...quietNotifications().providers,
+        ...quietChartSettings().providers,
         provideRouter([]),
         { provide: PracticeService, useValue: practice },
         { provide: EvaluationService, useValue: evaluations },

@@ -254,7 +254,7 @@ test('a student holds several positions and orders at gold prices, up to the mar
   const chart = page.locator('.workspace app-replay-chart');
   await expect(chart.locator('.open-count')).toContainText('3 posiciones · 1 orden');
   const tops = await chart
-    .locator('.line-label', { has: page.locator('.badge') })
+    .locator('.line-label', { has: page.locator('.qty') })
     .evaluateAll((labels) => labels.map((l) => l.getBoundingClientRect().top).filter((y) => y > 0));
   // (The limit at 4,100 is off the price scale.)
   expect(tops).toHaveLength(3);
@@ -389,4 +389,34 @@ test.describe('on a phone', () => {
       'Riesgo/beneficio: 1.00',
     );
   });
+});
+
+test("the chart keeps each student's indicators for their next sessions", async ({ page }) => {
+  await signIn(page, 'jose@indab.test');
+  await page.goto('/academy/practice');
+  await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+  await expect(page.locator('.market .price')).toHaveText('100.000');
+
+  // The RSI is on from the start, the averages are not.
+  const chart = page.locator('.workspace app-replay-chart');
+  await chart.getByRole('button', { name: 'Indicadores' }).click();
+  const item = (name: string) => page.getByRole('menuitemcheckbox', { name });
+  await expect(item('RSI 14')).toHaveAttribute('aria-checked', 'true');
+  await expect(item('EMA 100')).toHaveAttribute('aria-checked', 'false');
+  await item('EMA 100').click();
+  await item('EMA 200').click();
+  await item('Volumen').click();
+  await expect(item('EMA 200')).toHaveAttribute('aria-checked', 'true');
+  await expect
+    .poll(async () => (await listDocuments(`users/${studentUid}/settings`))[0]?.['indicators'])
+    .toEqual(['ema100', 'ema200', 'rsi14', 'volume']);
+
+  // The next session opens with them.
+  await page.reload();
+  await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+  await expect(page.getByRole('button', { name: 'Terminar sesión' })).toBeVisible();
+  await chart.getByRole('button', { name: 'Indicadores' }).click();
+  for (const name of ['EMA 100', 'EMA 200', 'RSI 14', 'Volumen']) {
+    await expect(item(name)).toHaveAttribute('aria-checked', 'true');
+  }
 });

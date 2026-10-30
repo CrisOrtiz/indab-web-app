@@ -22,9 +22,9 @@ const HOUR = 3_600_000;
 const gold = INSTRUMENTS[0];
 
 describe('parseKlines', () => {
-  it('turns Binance rows into candles with times in seconds', () => {
+  it('turns Binance rows into candles with times in seconds and their volume', () => {
     expect(parseKlines([[1_700_000_000_000, '1.5', '2', '1', '1.75', '10', 0]])).toEqual([
-      { time: 1_700_000_000, open: 1.5, high: 2, low: 1, close: 1.75 },
+      { time: 1_700_000_000, open: 1.5, high: 2, low: 1, close: 1.75, volume: 10 },
     ]);
   });
 });

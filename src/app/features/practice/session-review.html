@@ -11,6 +11,8 @@
       [barSeconds]="barSeconds()"
       [focusTrade]="selected()"
       [startTime]="session().replayStart / 1000"
+      [indicators]="chartSettings.indicators()"
+      (indicatorsChange)="chartSettings.saveIndicators($event)"
     />
   } @else {
     <p class="muted">{{ t.chartFailed }}</p>
