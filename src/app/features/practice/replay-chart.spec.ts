@@ -66,6 +66,7 @@ vi.mock('lightweight-charts', () => ({
   CandlestickSeries: 'Candlestick',
   LineSeries: 'Line',
   HistogramSeries: 'Histogram',
+  BaselineSeries: 'Baseline',
   LineStyle: { Solid: 0, Dotted: 1, Dashed: 2 },
   createChart: vi.fn(() => lw.chart),
   createSeriesMarkers: vi.fn(() => lw.markers),
@@ -471,15 +472,44 @@ describe('ReplayChart', () => {
     host.candles.set(Array.from({ length: 250 }, (_, i) => c(i + 1, 100 + i)));
     await fixture.whenStable();
 
-    // The RSI, in its own pane with its dotted guides, smoothing average and divergence lines;
-    // no averages on the candles until the user wants them.
-    expect(lw.lines).toHaveLength(4);
+    // The RSI, in its own pane with its dotted guides, smoothing average, overbought and
+    // oversold shades and a line per kind and strength of divergence; no averages on the
+    // candles until the user wants them.
+    expect(lw.lines.map((line) => line.type)).toEqual([
+      'Line',
+      'Line',
+      'Baseline',
+      'Baseline',
+      ...Array(8).fill('Line'),
+    ]);
     expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 1);
     expect(lw.pane.setHeight).toHaveBeenCalled();
-    const [rsi, smoothing] = lw.lines;
-    expect(rsi.createPriceLine.mock.calls.map(([line]) => line.price)).toEqual([
-      70, 60, 50, 40, 30,
+    const [rsi, smoothing, overbought, oversold] = lw.lines;
+    expect(rsi.createPriceLine.mock.calls.map(([line]) => [line.price, line.color])).toEqual([
+      [70, '#f23645'],
+      [60, expect.any(String)],
+      [50, expect.any(String)],
+      [40, expect.any(String)],
+      [30, '#089981'],
     ]);
+    // Red above 70, green below 30, over the RSI's own values.
+    const zones = lw.chart.addSeries.mock.calls
+      .filter(([type]) => type === 'Baseline')
+      .map((call) => (call as unknown[])[1] as Record<string, unknown>);
+    expect(zones).toEqual([
+      expect.objectContaining({
+        baseValue: { type: 'price', price: 70 },
+        topFillColor1: 'rgba(242, 54, 69, 0.25)',
+        bottomFillColor1: 'transparent',
+      }),
+      expect.objectContaining({
+        baseValue: { type: 'price', price: 30 },
+        topFillColor1: 'transparent',
+        bottomFillColor1: 'rgba(8, 153, 129, 0.25)',
+      }),
+    ]);
+    expect(overbought.setData.mock.calls.at(-1)![0]).toEqual(rsi.setData.mock.calls.at(-1)![0]);
+    expect(oversold.setData.mock.calls.at(-1)![0]).toHaveLength(236);
     // 250 RSI values (from bar 15) averaged over 14: 223 values.
     expect(smoothing.setData.mock.calls.at(-1)![0]).toHaveLength(223);
 
@@ -495,7 +525,7 @@ describe('ReplayChart', () => {
     item('EMA 200').click();
     await fixture.whenStable();
     expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 0);
-    const ema200 = lw.lines[4];
+    const ema200 = lw.lines[12];
     // 250 closes: 51 values of the 200-candle average, from bar 200 with the mean of the first.
     expect(ema200.setData.mock.calls.at(-1)![0]).toHaveLength(51);
     expect(ema200.setData.mock.calls.at(-1)![0][0]).toEqual({ time: 200, value: 199.5 });
@@ -519,9 +549,9 @@ describe('ReplayChart', () => {
     const { fixture, host } = await render();
     host.indicators.set(['ema100', 'ema200']);
     await fixture.whenStable();
-    // The RSI and its three lines go, the two averages come.
-    expect(lw.chart.removeSeries).toHaveBeenCalledTimes(4);
-    expect(lw.lines.slice(4).map((line) => line.type)).toEqual(['Line', 'Line']);
+    // The RSI and its eleven extras go, the two averages come.
+    expect(lw.chart.removeSeries).toHaveBeenCalledTimes(12);
+    expect(lw.lines.slice(12).map((line) => line.type)).toEqual(['Line', 'Line']);
     // Nothing was picked: nothing to save.
     expect(host.picked).toEqual([]);
   });
@@ -1453,10 +1483,10 @@ describe('divergenceSegments', () => {
     expect(
       divergenceSegments(
         [
-          { kind: 'bull', from: at(2), to: at(10) },
-          { kind: 'bull', from: at(10), to: at(20) },
-          { kind: 'bull', from: at(15), to: at(25) },
-          { kind: 'bull', from: at(30), to: at(38) },
+          { kind: 'bull', strength: 'strong', from: at(2), to: at(10) },
+          { kind: 'bull', strength: 'strong', from: at(10), to: at(20) },
+          { kind: 'bull', strength: 'strong', from: at(15), to: at(25) },
+          { kind: 'bull', strength: 'strong', from: at(30), to: at(38) },
         ],
         times,
       ),
