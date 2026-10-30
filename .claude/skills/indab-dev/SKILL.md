@@ -261,9 +261,11 @@ Module notes:
   Indicators are only EMA 100, EMA 200, volume and RSI 14 (Cris, 2026-10-26: no other moving
   averages). The RSI follows Cris's TradingView settings (2026-10-30): SMA 14 smoothing, dotted
   levels 70/60/50/40/30, red/green shading above 70 and below 30, and divergences
-  (`rsiDivergences`: consecutive PRICE swing lows/highs, 5 bars each side, 5-60 bars apart, RSI
-  read at its own turn within 2 bars; strong/medium/weak/hidden per the summary chart Cris shared
-  2026-10-30, "equal" = 1/4 of the average bar range or 1 RSI point; bullish green, bearish red). Defaults are RSI only (`DEFAULT_INDICATORS`); a user's own pick is saved in
+  (`rsiDivergences` = TradingView's built-in RSI "Calculate divergence": RSI pivots 5 bars
+  left/right, 6-61 bars apart, price low/high read at the RSI pivot bar, REGULAR only, green Bull /
+  red Bear). Cris tried strong/medium/weak/hidden from price swings (#54) and found it too noisy
+  (2026-10-30), so do not bring those back without asking. Drawings and labels are re-laid out
+  when the price scale is stretched (`followPriceScale`; the library has no event for it). Defaults are RSI only (`DEFAULT_INDICATORS`); a user's own pick is saved in
   `users/{uid}/settings/chart` by `ChartSettingsService` and passed to the chart's `indicators`
   input by the pages (specs fake it with `quietChartSettings()` from `practice/testing.ts`).
   Placed orders and positions show their size filled in `SIDE_COLORS` (blue buy, red sell) and

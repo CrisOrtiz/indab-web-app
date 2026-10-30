@@ -692,8 +692,6 @@ export const es = {
 
   chart: {
     replayStart: 'Inicio del replay',
-    /** Labels of the RSI's divergences by strength. */
-    divergence: { strong: 'Fuerte', medium: 'Media', weak: 'Débil', hidden: 'Oculta' },
     tools: 'Herramientas del gráfico',
     indicators: 'Indicadores',
     volume: 'Volumen',

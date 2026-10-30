@@ -673,8 +673,6 @@ export const pt: Messages = {
 
   chart: {
     replayStart: 'Início do replay',
-    /** Labels of the RSI's divergences by strength. */
-    divergence: { strong: 'Forte', medium: 'Média', weak: 'Fraca', hidden: 'Oculta' },
     tools: 'Ferramentas do gráfico',
     indicators: 'Indicadores',
     volume: 'Volume',
