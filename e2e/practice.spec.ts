@@ -393,7 +393,7 @@ test.describe('on a phone', () => {
 
 test("the chart keeps each student's indicators for their next sessions", async ({ page }) => {
   await signIn(page, 'jose@indab.test');
-  await page.goto('/academy/practice');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
   await page.getByRole('button', { name: 'Comenzar práctica' }).click();
   await expect(page.locator('.market .price')).toHaveText('100.000');
 
