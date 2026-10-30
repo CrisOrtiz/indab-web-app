@@ -20,6 +20,42 @@ test('students without access cannot open the practice', async ({ page }) => {
   await expect(page).toHaveURL('/academy');
 });
 
+test('a reload picks the practice up where it was left', async ({ page }) => {
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+  await page.getByRole('button', { name: 'Comprar 0.01 lotes a mercado' }).click();
+  await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
+  await page.getByRole('button', { name: 'Siguiente vela' }).click();
+  await page.getByRole('button', { name: 'Siguiente vela' }).click();
+  await expect(page.locator('.market .price')).toHaveText('102.000');
+  await page.getByRole('button', { name: '1h', exact: true }).click();
+  await expect(page.getByRole('button', { name: '1h', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  await page.reload();
+  await expect(page.getByText('Retomaste tu sesión donde la dejaste')).toBeVisible();
+  await expect(page.locator('.market .price')).toHaveText('102.000');
+  await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '1h', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  // Only one session: the same one goes on.
+  expect(await listDocuments('practiceSessions')).toHaveLength(1);
+  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
+  await expect
+    .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
+    .toBe('finished');
+
+  // A finished session is not picked up again.
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Comenzar práctica' })).toBeVisible();
+});
+
 test('a student practises on a replay and an admin reviews the trades', async ({ page }) => {
   await signIn(page, 'jose@indab.test');
   await page.getByRole('link', { name: 'Práctica de trading' }).click();
@@ -412,6 +448,10 @@ test("the chart keeps each student's indicators for their next sessions", async 
     .toEqual(['ema100', 'ema200', 'rsi14', 'volume']);
 
   // The next session opens with them.
+  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await expect
+    .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
+    .toBe('finished');
   await page.reload();
   await page.getByRole('button', { name: 'Comenzar práctica' }).click();
   await expect(page.getByRole('button', { name: 'Terminar sesión' })).toBeVisible();

@@ -32,6 +32,43 @@ import { attemptStatus, studentExamState } from './exam-status';
 /** Saves answers this long after the last change. */
 const SAVE_DELAY = 800;
 
+/**
+ * This browser's copy of an attempt being answered: the question on screen and the answers,
+ * `unsaved` until Firestore has them, so a reload loses neither.
+ */
+export interface AttemptDraft {
+  index: number;
+  answers: Record<string, ExamAnswer>;
+  unsaved: boolean;
+}
+
+const DRAFT_KEY = 'indab.exam.';
+
+export function readDraft(submissionId: string): AttemptDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY + submissionId);
+    return raw ? (JSON.parse(raw) as AttemptDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(submissionId: string, draft: AttemptDraft): void {
+  try {
+    localStorage.setItem(DRAFT_KEY + submissionId, JSON.stringify(draft));
+  } catch {
+    // Private mode or a full storage: answers still save to Firestore as they change.
+  }
+}
+
+function clearDraft(submissionId: string): void {
+  try {
+    localStorage.removeItem(DRAFT_KEY + submissionId);
+  } catch {
+    // Nothing to clear.
+  }
+}
+
 /** mm:ss, or h:mm:ss past an hour. */
 export function clock(ms: number): string {
   const total = Math.max(0, Math.ceil(ms / 1000));
@@ -44,7 +81,8 @@ export function clock(ms: number): string {
 
 /**
  * One evaluation form for a student: its details and attempts, answering an attempt one
- * question at a time (saved as they go, handed in by them or when the time runs out), and,
+ * question at a time (saved as they go, handed in by them or when the time runs out; a reload
+ * opens the attempt again on the same question with every answer), and,
  * once staff publish the results, the grade per question with the trainer's comments. Mentors'
  * notes on each attempt show as soon as they are written.
  */
@@ -53,6 +91,7 @@ export function clock(ms: number): string {
   imports: [LocalDatePipe, MentorNotes, RouterLink],
   templateUrl: './exam-take.html',
   styleUrl: './exam-take.scss',
+  host: { '(window:pagehide)': 'flush()' },
 })
 export class ExamTake {
   private readonly service = inject(ExamService);
@@ -188,6 +227,7 @@ export class ExamTake {
     const count = this.exam()?.questions.length ?? 0;
     if (index >= 0 && index < count) {
       this.index.set(index);
+      this.keepDraft();
       void this.flush();
     }
   }
@@ -279,11 +319,29 @@ export class ExamTake {
   private begin(submission: ExamSubmission): void {
     this.notice.set(null);
     this.reviewing.set(null);
+    const draft = readDraft(submission.id);
+    const count = this.exam()?.questions.length ?? 0;
     this.attempt.set(submission);
-    this.answers.set({ ...submission.answers });
-    this.index.set(0);
+    // Answers this browser had not saved yet win; otherwise Firestore's are the latest.
+    this.answers.set({ ...(draft?.unsaved ? draft.answers : submission.answers) });
+    this.index.set(Math.min(Math.max(draft?.index ?? 0, 0), Math.max(count - 1, 0)));
     this.saveState.set('idle');
-    this.dirty = false;
+    this.dirty = !!draft?.unsaved;
+    if (this.dirty) {
+      void this.flush();
+    }
+  }
+
+  /** Keeps the question on screen and the answers in this browser. */
+  private keepDraft(): void {
+    const attempt = this.attempt();
+    if (attempt) {
+      writeDraft(attempt.id, {
+        index: this.index(),
+        answers: this.answers(),
+        unsaved: this.dirty,
+      });
+    }
   }
 
   private finish(attempt: ExamSubmission, text: string, status: ExamSubmission['status']): void {
@@ -291,6 +349,7 @@ export class ExamTake {
     this.submissions.update((list) =>
       list.map((s) => (s.id === attempt.id ? { ...s, answers, status } : s)),
     );
+    clearDraft(attempt.id);
     this.attempt.set(null);
     this.dirty = false;
     this.notice.set({ kind: 'ok', text });
@@ -299,13 +358,15 @@ export class ExamTake {
   private setAnswer(q: ExamQuestion, answer: ExamAnswer): void {
     this.answers.update((all) => ({ ...all, [q.id]: answer }));
     this.dirty = true;
+    this.keepDraft();
     if (this.saveTimer) {
       clearTimeout(this.saveTimer);
     }
     this.saveTimer = setTimeout(() => void this.flush(), SAVE_DELAY);
   }
 
-  private async flush(): Promise<void> {
+  /** Saves unsaved answers: after a pause in typing, on another question, or on leaving. */
+  protected async flush(): Promise<void> {
     const attempt = this.attempt();
     if (!attempt || !this.dirty) {
       return;
@@ -319,6 +380,7 @@ export class ExamTake {
     try {
       await this.service.saveAnswers(attempt.id, this.answers());
       this.saveState.set('saved');
+      this.keepDraft();
     } catch {
       this.dirty = true;
       this.saveState.set('error');
@@ -344,6 +406,11 @@ export class ExamTake {
       this.submissions.set(submissions);
       this.grades.set(grades);
       this.key.set(key);
+      // An attempt still running (the page was reloaded or left) opens again where it was.
+      const state = this.state();
+      if (state?.action === 'continue' && state.active) {
+        this.begin(state.active);
+      }
     } catch {
       this.missing.set(true);
     } finally {

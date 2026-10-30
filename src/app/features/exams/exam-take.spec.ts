@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 import { AuthService } from '../../core/auth/auth.service';
 import { ExamService } from './exam.service';
-import { ExamTake, clock } from './exam-take';
+import { ExamTake, clock, readDraft } from './exam-take';
 import { quietNotifications } from '../notifications/testing';
 
 const hour = 3_600_000;
@@ -104,6 +104,7 @@ describe('ExamTake', () => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
+    localStorage.clear();
     service.get.mockResolvedValue(exam());
     service.mySubmissions.mockResolvedValue([]);
   });
@@ -154,16 +155,43 @@ describe('ExamTake', () => {
     expect(button('Comenzar intento 2')).toBeTruthy();
   });
 
-  it('continues an attempt in progress with its saved answers', async () => {
+  it('opens an attempt in progress again with its saved answers', async () => {
     service.mySubmissions.mockResolvedValue([
       attempt({ answers: { q1: { choices: [1], text: '' } } }),
     ]);
     await render();
-    button('Continuar intento 1').click();
-    await fixture.whenStable();
+    expect(el.textContent).toContain('Pregunta 1 de 2');
     const boxes = el.querySelectorAll<HTMLInputElement>('.choice input');
     expect(boxes[1].checked).toBe(true);
     expect(service.start).not.toHaveBeenCalled();
+  });
+
+  it('after a reload, goes back to the same question with answers not saved yet', async () => {
+    await render();
+    button('Comenzar intento 1').click();
+    await fixture.whenStable();
+    button('Siguiente').click();
+    await fixture.whenStable();
+    const text = el.querySelector<HTMLTextAreaElement>('.open textarea')!;
+    text.value = 'Bajo el mínimo';
+    text.dispatchEvent(new Event('input'));
+    // The page reloads before the answer is saved.
+    expect(service.saveAnswers).not.toHaveBeenCalled();
+    expect(readDraft('x1_jose_1')).toEqual({
+      index: 1,
+      answers: { q2: { choices: [], text: 'Bajo el mínimo' } },
+      unsaved: true,
+    });
+    fixture.destroy();
+    service.saveAnswers.mockClear();
+    TestBed.resetTestingModule();
+    service.mySubmissions.mockResolvedValue([attempt()]);
+    await render();
+    expect(el.textContent).toContain('Pregunta 2 de 2');
+    expect(el.querySelector<HTMLTextAreaElement>('.open textarea')!.value).toBe('Bajo el mínimo');
+    expect(service.saveAnswers).toHaveBeenCalledWith('x1_jose_1', {
+      q2: { choices: [], text: 'Bajo el mínimo' },
+    });
   });
 
   it('shows the published grade with comments and the right answers', async () => {

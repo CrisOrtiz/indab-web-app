@@ -1,4 +1,4 @@
-import { Component, input, output, signal } from '@angular/core';
+import { Component, input, model, output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
@@ -38,6 +38,7 @@ class FakeChart {
   readonly draftSubmitted = output<void>();
   readonly lotsChanged = output<string>();
   readonly orderAt = output<OrderAt>();
+  readonly drawings = model<unknown[]>([]);
 }
 
 /**
@@ -90,8 +91,13 @@ describe('Practice page', () => {
     sessionsPage: vi.fn(),
     myAttempts: vi.fn(async () => [] as unknown[]),
     sessionTrades: vi.fn(async () => [] as unknown[]),
+    activeSessions: vi.fn(async () => [] as unknown[]),
+    saveResume: vi.fn(async () => undefined),
   };
-  const evaluations = { assignedTo: vi.fn(async () => [] as Evaluation[]) };
+  const evaluations = {
+    assignedTo: vi.fn(async () => [] as Evaluation[]),
+    get: vi.fn(async () => null as Evaluation | null),
+  };
   const auth = {
     user: signal({ uid: 'u1', email: 'ana@indab.co' }),
     profile: signal({ displayName: 'Ana' }),
@@ -104,6 +110,9 @@ describe('Practice page', () => {
     vi.restoreAllMocks();
     evaluations.assignedTo.mockResolvedValue([]);
     practice.myAttempts.mockResolvedValue([]);
+    practice.activeSessions.mockResolvedValue([]);
+    practice.sessionTrades.mockResolvedValue([]);
+    localStorage.clear();
     let n = 0;
     practice.newTradeId.mockImplementation(() => `t${++n}`);
     begin = 0;
@@ -294,6 +303,139 @@ describe('Practice page', () => {
     expect(el.textContent).toContain('Sesión terminada');
     // The card now shows it as taken.
     expect(evaluations.assignedTo).toHaveBeenCalledTimes(loads + 1);
+  });
+
+  describe('after a reload', () => {
+    const replayStart = Date.UTC(2026, 1, 2, 8);
+    const start = replayStart / 1000;
+    const active = (extra: Record<string, unknown> = {}) => ({
+      id: 's9',
+      uid: 'u1',
+      userName: 'Ana',
+      symbol: 'XAUUSDT',
+      interval: '15m',
+      replayStart,
+      startingBalance: 200,
+      balance: 200,
+      pnl: 0,
+      tradeCount: 1,
+      status: 'active',
+      startedAt: at(Date.now() - 600_000),
+      evaluationId: null,
+      ...extra,
+    });
+    const resume = {
+      time: start + 30 * 60,
+      interval: '5m',
+      hideDates: false,
+      speed: 5,
+      drawings: [{ id: 3, kind: 'hline', price: 101.5 }],
+    };
+    const position = {
+      id: 't1',
+      uid: 'u1',
+      side: 'long',
+      orderType: 'market',
+      orderPrice: null,
+      placedTime: start + 600,
+      quantity: 1,
+      entryPrice: 101,
+      entryTime: start + 600,
+      stopLoss: null,
+      takeProfit: null,
+      status: 'open',
+    };
+
+    it('picks the open session up where it was left', async () => {
+      practice.activeSessions.mockResolvedValue([active({ resume })]);
+      practice.sessionTrades.mockResolvedValue([position]);
+      await reload();
+      expect(practice.activeSessions).toHaveBeenCalledWith('u1');
+      expect(practice.sessionTrades).toHaveBeenCalledWith('s9');
+      expect(practice.startSession).not.toHaveBeenCalled();
+      // The bar it was on (30 minutes in: the third 15-minute step), its timeframe and speed.
+      expect(el.querySelector('.toolbar .price')!.textContent).toContain('103');
+      expect(el.querySelector('.timeframes .selected')!.textContent).toContain('5m');
+      expect(el.querySelector<HTMLSelectElement>('.controls select')!.value).toBe('5');
+      expect(chart().hideDates()).toBe(false);
+      expect(chart().drawings()).toEqual(resume.drawings);
+      expect(chart().trades()).toEqual([expect.objectContaining({ id: 't1', status: 'open' })]);
+      expect(el.textContent).toContain('Retomaste tu sesión donde la dejaste');
+      // It goes on from there.
+      await click('Siguiente vela');
+      expect(el.querySelector('.toolbar .price')!.textContent).toContain('103');
+      expect(el.textContent).not.toContain('Retomaste tu sesión');
+    });
+
+    it("prefers this browser's copy, saved on every bar", async () => {
+      practice.activeSessions.mockResolvedValue([active({ resume })]);
+      localStorage.setItem(
+        'indab.practice.s9',
+        JSON.stringify({ ...resume, time: start + 45 * 60, drawings: [] }),
+      );
+      await reload();
+      expect(el.querySelector('.toolbar .price')!.textContent).toContain('104');
+      expect(chart().drawings()).toEqual([]);
+    });
+
+    it('goes on after the last trade when nothing else was saved', async () => {
+      practice.activeSessions.mockResolvedValue([active()]);
+      practice.sessionTrades.mockResolvedValue([
+        { ...position, status: 'closed', exitPrice: 102, exitTime: start + 20 * 60, pnl: 1 },
+      ]);
+      await reload();
+      expect(el.querySelector('.toolbar .price')!.textContent).toContain('102');
+      expect(el.querySelector('.timeframes .selected')!.textContent).toContain('15m');
+    });
+
+    it('keeps where it is in the browser and in Firestore', async () => {
+      practice.activeSessions.mockResolvedValue([active({ resume })]);
+      await reload();
+      await click('Siguiente vela');
+      chart().drawings.set([{ id: 1, kind: 'hline', price: 100 }]);
+      await fixture.whenStable();
+      const saved = JSON.parse(localStorage.getItem('indab.practice.s9')!);
+      expect(saved).toEqual({
+        time: start + 34 * 60,
+        interval: '5m',
+        hideDates: false,
+        speed: 5,
+        drawings: [{ id: 1, kind: 'hline', price: 100 }],
+      });
+      window.dispatchEvent(new Event('pagehide'));
+      expect(practice.saveResume).toHaveBeenCalledWith('s9', saved);
+      // Finishing forgets it.
+      await click('Terminar sesión');
+      expect(localStorage.getItem('indab.practice.s9')).toBeNull();
+    });
+
+    it('picks an evaluation up with the time it has left', async () => {
+      const ev = evaluation('e1', { replayStart });
+      evaluations.get.mockResolvedValue(ev);
+      practice.activeSessions.mockResolvedValue([
+        active({ id: 'e1_u1', evaluationId: 'e1', durationMinutes: 30 }),
+      ]);
+      await reload();
+      expect(evaluations.get).toHaveBeenCalledWith('e1');
+      const bar = el.querySelector('.evaluation-bar')!.textContent!;
+      expect(bar).toContain('Evaluación: Evaluación e1');
+      expect(bar).toMatch(/Quedan (19:5\d|20:00)/);
+      expect(chart().hideDates()).toBe(true);
+    });
+
+    it('leaves an evaluation whose time is over', async () => {
+      practice.activeSessions.mockResolvedValue([
+        active({
+          id: 'e1_u1',
+          evaluationId: 'e1',
+          durationMinutes: 30,
+          startedAt: at(Date.now() - 40 * 60_000),
+        }),
+      ]);
+      await reload();
+      expect(practice.sessionTrades).not.toHaveBeenCalled();
+      expect(el.querySelector('form')).not.toBeNull();
+    });
   });
 
   it('explains when the evaluation cannot start', async () => {

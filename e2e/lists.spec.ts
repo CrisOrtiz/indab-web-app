@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { Page, expect, test } from '@playwright/test';
 import { createUser, resetEmulators, setDocument } from './emulators';
 import { signIn } from './helpers';
 import { mockMarket } from './market';
@@ -23,6 +23,12 @@ async function seedSessions(uid: string, userName: string, count: number, prefix
       evaluationId: null,
     });
   }
+}
+
+/** The newest active session opens again on the practice page: end it to see the lists. */
+async function endResumedSession(page: Page) {
+  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await page.getByRole('button', { name: 'Nueva práctica' }).click();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -76,6 +82,7 @@ test('a student pages and filters their own sessions', async ({ page }) => {
   await signIn(page, 'jose@indab.test');
   await expect(page).toHaveURL('/academy');
   await page.goto('/academy/practice');
+  await endResumedSession(page);
   await expect(rows).toHaveCount(10);
   await expect(page.getByLabel('Estudiante')).toHaveCount(0);
 
@@ -85,8 +92,8 @@ test('a student pages and filters their own sessions', async ({ page }) => {
   await expect(rows).toHaveCount(5);
 
   await page.getByLabel('Estado').selectOption({ label: 'En curso' });
-  // Sessions 0, 3, ..., 24 are active: 9 of them, on one page.
-  await expect(rows).toHaveCount(9);
+  // Sessions 3, 6, ..., 24 are still active (0 was picked up and finished): 8, on one page.
+  await expect(rows).toHaveCount(8);
   await expect(pager).toHaveCount(0);
 });
 
@@ -95,6 +102,7 @@ test('the date filters fit side by side on a phone', async ({ page }) => {
   await signIn(page, 'jose@indab.test');
   await expect(page).toHaveURL('/academy');
   await page.goto('/academy/practice');
+  await endResumedSession(page);
   const from = (await page.getByLabel('Desde').boundingBox())!;
   const to = (await page.getByLabel('Hasta').boundingBox())!;
   // One row, a gap between them and both inside the screen.

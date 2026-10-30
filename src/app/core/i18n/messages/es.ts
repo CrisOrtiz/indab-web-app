@@ -684,7 +684,10 @@ export const es = {
     evaluationTitle: (title: string) => `Evaluación: ${title}`,
     timeLeftLabel: 'Tiempo restante',
     timeLeft: (time: string) => `Quedan ${time}`,
-    leavingEnds: 'Salir de esta página termina la evaluación.',
+    leavingEnds: 'Salir de esta página termina la evaluación; si se recarga, sigue donde quedó.',
+    resumed: 'Retomaste tu sesión donde la dejaste: tus órdenes, dibujos y la vela en la que ibas.',
+    resumeFailed:
+      'No se pudo retomar tu sesión abierta. Recarga la página para intentarlo de nuevo.',
   },
 
   chart: {

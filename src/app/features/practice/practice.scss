@@ -65,6 +65,10 @@ label {
   border-radius: var(--radius);
 }
 
+.message.success {
+  border-color: var(--color-border);
+}
+
 .setup {
   display: grid;
   gap: 16px;

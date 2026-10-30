@@ -609,6 +609,30 @@ describe('trading practice', () => {
     await assertFails(updateDoc(sessionRef('enrolled', 'done'), { status: 'active' }));
   });
 
+  it('lets the owner save where an active replay was left', async () => {
+    const resume = (extra: Record<string, unknown> = {}) => ({
+      time: 1_620_003_600,
+      interval: '15m',
+      hideDates: true,
+      speed: 2,
+      drawings: [{ id: 1, kind: 'hline', price: 2300.5 }],
+      ...extra,
+    });
+    await assertSucceeds(updateDoc(sessionRef('enrolled'), { resume: resume() }));
+    await assertFails(updateDoc(sessionRef('other'), { resume: resume() }));
+    await assertFails(updateDoc(sessionRef('admin'), { resume: resume() }));
+    await assertFails(updateDoc(sessionRef('enrolled'), { resume: resume({ time: 1.5 }) }));
+    await assertFails(updateDoc(sessionRef('enrolled'), { resume: resume({ interval: '1s' }) }));
+    await assertFails(updateDoc(sessionRef('enrolled'), { resume: resume({ grade: 'A' }) }));
+    await assertFails(updateDoc(sessionRef('enrolled'), { resume: 'here' }));
+    await assertFails(
+      updateDoc(sessionRef('enrolled'), {
+        resume: resume({ drawings: Array.from({ length: 201 }, (_, id) => ({ id })) }),
+      }),
+    );
+    await assertFails(updateDoc(sessionRef('enrolled', 'done'), { resume: resume() }));
+  });
+
   it('lets only admins delete sessions and trades', async () => {
     await assertFails(deleteDoc(tradeRef('enrolled')));
     await assertFails(deleteDoc(sessionRef('enrolled')));
@@ -996,6 +1020,11 @@ describe('evaluations', () => {
       startedAt: new Date(Date.now() - 33 * 60 * 1000),
     });
     await assertFails(updateDoc(attemptRef('enrolled'), { pnl: 500, balance: 700 }));
+    await assertFails(
+      updateDoc(attemptRef('enrolled'), {
+        resume: { time: 1, interval: '15m', hideDates: true, speed: 1, drawings: [] },
+      }),
+    );
   });
 
   it('take orders while the time runs', async () => {
