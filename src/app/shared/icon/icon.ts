@@ -33,6 +33,9 @@ export const ICONS = {
   close: ['M18 6 6 18', 'm6 6 12 12'],
   play: ['M6 4v16l14-8Z'],
   pause: ['M8 5v14', 'M16 5v14'],
+  // Replay controls: next bar and end session.
+  stepForward: ['M5 5v14l10-7Z', 'M19 5v14'],
+  stop: ['M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z'],
   users: [
     'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2',
     'M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z',

@@ -21,22 +21,16 @@
               r.current().close | number: priceDigits(r.current().close)
             }}</span>
           </div>
-          <div class="controls">
-            <button type="button" class="btn btn-outline" (click)="step()">{{ t.nextBar }}</button>
-            <button type="button" class="btn btn-outline" (click)="togglePlay()">
-              {{ playing() ? t.pause : t.play }}
-            </button>
-            <select
-              [attr.aria-label]="t.speed"
-              [value]="speed()"
-              (change)="setSpeed(+$any($event.target).value)"
-            >
-              @for (s of speeds; track s) {
-                <option [value]="s" [selected]="s === speed()">{{ t.barsPerSecond(s) }}</option>
-              }
-            </select>
-            <button type="button" class="btn" (click)="finish()">{{ t.finish }}</button>
-          </div>
+          <app-replay-controls
+            class="controls"
+            [playing]="playing()"
+            [speed]="speed()"
+            [speeds]="speeds"
+            (step)="step()"
+            (togglePlay)="togglePlay()"
+            (speedChange)="setSpeed($event)"
+            (finish)="finish()"
+          />
         </div>
         @if (evaluation(); as ev) {
           <div class="evaluation-bar" role="status">

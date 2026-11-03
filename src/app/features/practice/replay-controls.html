@@ -1,0 +1,59 @@
+@let t = i18n.messages().practice;
+<div class="deck" role="group" [attr.aria-label]="t.replayControls">
+  <button
+    type="button"
+    class="round step"
+    [attr.aria-label]="t.nextBar"
+    [attr.data-tip]="t.nextBar + ' · →'"
+    aria-keyshortcuts="ArrowRight"
+    (click)="step.emit()"
+  >
+    <app-icon name="stepForward" [size]="18" />
+  </button>
+
+  <button
+    type="button"
+    class="round play"
+    [class.on]="playing()"
+    [style.--spin]="spin()"
+    [attr.aria-label]="playing() ? t.pause : t.play"
+    [attr.aria-pressed]="playing()"
+    [attr.data-tip]="(playing() ? t.pause : t.play) + ' · ' + t.spaceKey"
+    aria-keyshortcuts="Space"
+    (click)="togglePlay.emit()"
+  >
+    <svg class="ring" viewBox="0 0 48 48" aria-hidden="true">
+      <circle cx="24" cy="24" r="22" />
+    </svg>
+    <span class="glyph glyph-play"><app-icon name="play" [size]="18" /></span>
+    <span class="glyph glyph-pause"><app-icon name="pause" [size]="18" /></span>
+  </button>
+
+  <div
+    class="speeds"
+    role="radiogroup"
+    [attr.aria-label]="t.speed"
+    [style.--n]="speeds().length"
+    [style.--i]="speedIndex()"
+  >
+    <span class="thumb" aria-hidden="true"></span>
+    @for (s of speeds(); track s) {
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="s === speed()"
+        [attr.aria-label]="t.barsPerSecond(s)"
+        [attr.data-tip]="t.barsPerSecond(s)"
+        [class.active]="s === speed()"
+        (click)="speedChange.emit(s)"
+      >
+        {{ s }}×
+      </button>
+    }
+  </div>
+</div>
+
+<button type="button" class="finish" [attr.data-tip]="t.finish" (click)="finish.emit()">
+  <app-icon name="stop" [size]="16" />
+  <span class="label">{{ t.finish }}</span>
+</button>
