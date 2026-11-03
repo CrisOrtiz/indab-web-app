@@ -641,6 +641,32 @@ service cloud.firestore {
         allow delete: if isStaff();
       }
 
+      // Each attempt's INDAB score (0-100: return, risk control, rubric), worked out by a staff
+      // browser for the students' ranking: read by assigned students once results are out.
+      match /grades/{uid} {
+        function evaluation() {
+          return get(/databases/$(database)/documents/evaluations/$(evaluationId)).data;
+        }
+
+        function points(value) {
+          return value is number && value >= 0 && value <= 100;
+        }
+
+        allow read: if isStaff()
+          || (evaluation().resultsPublished == true && assignedTo(evaluation()));
+        allow create, update: if isStaff()
+          && request.resource.data.keys().hasOnly(['score', 'parts', 'by', 'updatedAt'])
+          && points(request.resource.data.score)
+          && request.resource.data.parts is map
+          && request.resource.data.parts.keys().hasOnly(['return', 'risk', 'rubric'])
+          && points(request.resource.data.parts['return'])
+          && points(request.resource.data.parts.risk)
+          && points(request.resource.data.parts.rubric)
+          && request.resource.data.by == request.auth.uid
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isStaff();
+      }
+
       // What staff did to an attempt that went wrong, and why: read and written by staff only,
       // never changed afterwards.
       match /adjustments/{adjustmentId} {

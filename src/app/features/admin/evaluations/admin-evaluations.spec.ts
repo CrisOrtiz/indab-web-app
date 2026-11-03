@@ -42,6 +42,9 @@ describe('AdminEvaluations', () => {
     rubrics: vi.fn(async () => new Map()),
     saveRubric: vi.fn(async () => undefined),
     removeRubric: vi.fn(async () => undefined),
+    grades: vi.fn(async () => new Map()),
+    saveGrade: vi.fn(async () => undefined),
+    removeGrade: vi.fn(async () => undefined),
   };
   const practice = {
     evaluationSessions: vi.fn(),
@@ -337,6 +340,7 @@ describe('AdminEvaluations', () => {
     await fixture.whenStable();
     expect(practice.deleteSession).toHaveBeenCalledWith('e1_jose');
     expect(service.removeRubric).toHaveBeenCalledWith('e1', 'jose');
+    expect(service.removeGrade).toHaveBeenCalledWith('e1', 'jose');
     expect(service.logAdjustment).toHaveBeenLastCalledWith(
       'e1',
       expect.objectContaining({ kind: 'reset', minutes: null }),
@@ -391,6 +395,13 @@ describe('AdminEvaluations', () => {
     expect(message()).toContain('Se guardó la rúbrica de José Pérez.');
     expect(el.querySelector('form.rubric')).toBeNull();
     expect(el.querySelector('.results tbody')?.textContent).toContain('3.6 / 5');
+    // Return 6 % = 65, no trades loaded = full risk marks, rubric 3.6 = 65: score 75.5,
+    // saved for the students' ranking.
+    expect(el.querySelector('.results tbody td.score')?.textContent?.trim()).toBe('75.5');
+    expect(service.saveGrade).toHaveBeenCalledWith('e1', 'jose', {
+      score: 75.5,
+      parts: { return: 65, risk: 100, rubric: 65 },
+    });
   });
 
   it('lists what staff did to the attempts', async () => {

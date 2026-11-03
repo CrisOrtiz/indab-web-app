@@ -1,5 +1,14 @@
 import { DecimalPipe, PercentPipe } from '@angular/common';
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import {
+  Component,
+  LOCALE_ID,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { ActionsMenu, MenuAction } from '../../../shared/actions-menu/actions-menu';
 import { I18n } from '../../../core/i18n/i18n.service';
 import { Mentorship, membersOf } from '../../../core/models/mentorship';
@@ -7,6 +16,7 @@ import { MentorshipFilter } from '../audience/mentorship-filter';
 import { Pager } from '../../../shared/pager/pager';
 import { pageCount, pageOf } from '../../../shared/pager/cursor-pages';
 import { rubricAverage } from '../../../core/models/evaluation';
+import { IndabScore } from '../../ranking/score';
 import { EvaluationStanding } from '../../ranking/standings';
 
 /** Students per page of results. */
@@ -67,12 +77,16 @@ export const RESULTS_PAGE_SIZE = 20;
         {{ t.viewMetrics }}
       </button>
     </div>
+    @if (view() === 'ranking') {
+      <p class="muted score-how">{{ t.score.how }}</p>
+    }
     <table class="users results">
       <thead>
         <tr>
           <th>#</th>
           <th>{{ t.student }}</th>
           @if (view() === 'ranking') {
+            <th>{{ t.score.column }}</th>
             <th>{{ t.status }}</th>
             <th>{{ t.pnl }}</th>
             <th>{{ t.return }}</th>
@@ -129,6 +143,19 @@ export const RESULTS_PAGE_SIZE = 20;
                 {{ m ? (m.stoppedOut ? ts.stopOutYes : ts.stopOutNo) : '—' }}
               </td>
             } @else {
+              <td
+                [attr.data-label]="t.score.column"
+                class="score"
+                [attr.title]="row.score ? partsOf(row.score) : null"
+              >
+                @if (row.score; as sc) {
+                  <strong>{{ sc.score | number: '1.1-1' }}</strong>
+                } @else if (row.sessionId) {
+                  <span class="muted">{{ t.score.missing }}</span>
+                } @else {
+                  —
+                }
+              </td>
               <td [attr.data-label]="t.status">
                 {{ t.attemptStates[row.status] }}
                 @if (row.extraMinutes) {
@@ -165,7 +192,7 @@ export const RESULTS_PAGE_SIZE = 20;
           </tr>
         } @empty {
           <tr>
-            <td [attr.colspan]="view() === 'ranking' ? 8 : 10" class="muted empty">
+            <td [attr.colspan]="view() === 'ranking' ? 9 : 10" class="muted empty">
               {{ standings().length ? tl.noMatches : t.noAttempts }}
             </td>
           </tr>
@@ -209,6 +236,11 @@ export const RESULTS_PAGE_SIZE = 20;
       }
     }
 
+    .score-how {
+      margin: 0 0 8px;
+      font-size: 0.85rem;
+    }
+
     td small {
       display: block;
       font-size: 0.75rem;
@@ -233,6 +265,15 @@ export class EvaluationResults {
   /** The ranking (P/L) or how each attempt traded (risk, drawdown...). */
   protected readonly view = signal<'ranking' | 'metrics'>('ranking');
   protected readonly average = rubricAverage;
+
+  /** A score's three parts, for its tooltip. */
+  protected partsOf({ parts }: IndabScore): string {
+    const n = (value: number) => this.decimal.transform(value, '1.0-1') ?? '';
+    return this.i18n
+      .messages()
+      .evaluations.score.parts(n(parts.return), n(parts.risk), n(parts.rubric));
+  }
+  private readonly decimal = new DecimalPipe(inject(LOCALE_ID));
 
   protected readonly matches = computed(() => {
     const term = this.search().trim().toLowerCase();

@@ -982,6 +982,13 @@ export const en: Messages = {
       yours: "Your mentor's rubric",
       by: (name: string) => `Rated by ${name}`,
     },
+    score: {
+      column: 'INDAB score',
+      how: 'INDAB score (0 to 100) = 40% return + 30% risk control + 30% mentor rubric. A stop out sets risk control to 0. Attempts without a rubric yet follow, by profit.',
+      missing: 'No rubric yet',
+      parts: (ret: string, risk: string, rubric: string) =>
+        `Return ${ret} · Risk ${risk} · Rubric ${rubric}`,
+    },
     resultsView: 'What to show',
     viewRanking: 'Ranking',
     viewMetrics: 'Risk metrics',

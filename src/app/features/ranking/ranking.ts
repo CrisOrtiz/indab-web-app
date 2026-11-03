@@ -43,6 +43,11 @@ export class Ranking {
     void this.loadEvaluations();
   }
 
+  /** Whether the shown ranking has INDAB scores (staff rated the attempts). */
+  protected scored(rows: EvaluationStanding[]): boolean {
+    return rows.some((row) => row.score);
+  }
+
   protected isMe(uid: string): boolean {
     return uid === this.auth.user()?.uid;
   }
@@ -56,9 +61,12 @@ export class Ranking {
     }
     void this.loadMyRubric(id);
     try {
-      const sessions = await this.practice.evaluationSessions(id);
+      const [sessions, grades] = await Promise.all([
+        this.practice.evaluationSessions(id),
+        this.evaluationService.grades(id).catch(() => undefined),
+      ]);
       if (this.selected() === id) {
-        this.results.set(evaluationStandings(sessions));
+        this.results.set(evaluationStandings(sessions, [], Date.now(), { grades }));
       }
     } catch {
       this.results.set([]);

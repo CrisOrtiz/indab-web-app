@@ -1337,6 +1337,36 @@ describe('evaluations', () => {
     await assertFails(getDoc(ref('other')));
     await assertSucceeds(deleteDoc(ref('trainer')));
   });
+
+  it('show the INDAB scores staff save to assigned students once results are out', async () => {
+    const ref = (uid: string | null, student = 'enrolled') =>
+      doc(as(uid), `evaluations/e1/grades/${student}`);
+    const grade = (by: string, extra: Record<string, unknown> = {}) => ({
+      score: 71.5,
+      parts: { return: 60, risk: 80, rubric: 77.5 },
+      by,
+      updatedAt: serverTimestamp(),
+      ...extra,
+    });
+    await assertSucceeds(setDoc(ref('trainer'), grade('trainer')));
+    await assertFails(setDoc(ref('trainer'), grade('admin')));
+    await assertFails(setDoc(ref('trainer'), grade('trainer', { score: 101 })));
+    await assertFails(
+      setDoc(ref('trainer'), grade('trainer', { parts: { return: 60, risk: -1, rubric: 50 } })),
+    );
+    await assertFails(
+      setDoc(ref('trainer'), grade('trainer', { parts: { return: 60, risk: 80, luck: 50 } })),
+    );
+    await assertFails(setDoc(ref('enrolled'), grade('enrolled')));
+
+    await assertSucceeds(getDoc(ref('trainer')));
+    await assertFails(getDoc(ref('enrolled')));
+    await seed('evaluations/e1', seeded(evaluation({ resultsPublished: true })));
+    await assertSucceeds(getDoc(ref('enrolled')));
+    await assertSucceeds(getDocs(collection(as('enrolled'), 'evaluations/e1/grades')));
+    await assertFails(getDoc(ref('other')));
+    await assertSucceeds(deleteDoc(ref('admin')));
+  });
 });
 
 describe('ranking', () => {

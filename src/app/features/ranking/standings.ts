@@ -1,7 +1,8 @@
-import { EvaluationRubric, RubricScores } from '../../core/models/evaluation';
+import { EvaluationGrade, EvaluationRubric, RubricScores } from '../../core/models/evaluation';
 import { PracticeSession, PracticeTrade } from '../../core/models/practice';
 import { shownStatus } from '../practice/resume';
 import { SessionStats, sessionStats } from '../practice/stats';
+import { IndabScore, indabScore } from './score';
 
 /** One assigned student's line in an evaluation's ranking. */
 export interface EvaluationStanding {
@@ -25,12 +26,16 @@ export interface EvaluationStanding {
   stats: SessionStats | null;
   /** The mentor's rubric, when staff loaded it and the attempt was rated. */
   rubric: RubricScores | null;
+  /** The INDAB score: worked out when the trades and rubric are loaded, else the saved one. */
+  score: IndabScore | null;
 }
 
-/** What staff load besides the attempts: their trades (by session id), rubrics (by student). */
+/** What is loaded besides the attempts: trades (by session id), rubrics and grades (by student). */
 export interface StandingExtras {
   trades?: Map<string, PracticeTrade[]>;
   rubrics?: Map<string, EvaluationRubric>;
+  /** Saved scores, for those who cannot read trades and rubrics (students). */
+  grades?: Map<string, EvaluationGrade>;
 }
 
 const byName = (a: { name: string }, b: { name: string }) =>
@@ -40,36 +45,61 @@ const returnOf = (session: PracticeSession) =>
   session.startingBalance > 0 ? session.pnl / session.startingBalance : 0;
 
 /**
- * Ranks an evaluation's attempts by P/L (every attempt starts with the same balance), with
- * fewer trades first on a tie. Attempts still `active` count with what they had closed: the
- * student is still trading, or left it open (once its time is up it shows as finished, and is
- * closed the next time the student opens the practice page). Assigned students without an
- * attempt follow, unranked. With each attempt's `trades` and `rubrics`, rows carry their
- * statistics and the mentor's rating.
+ * Ranks an evaluation's attempts by INDAB score (`score.ts`) where they have one, then by P/L
+ * (every attempt starts with the same balance), with fewer trades first on a tie. Attempts
+ * still `active` count with what they had closed: the student is still trading, or left it
+ * open (once its time is up it shows as finished, and is closed the next time the student
+ * opens the practice page). Assigned students without an attempt follow, unranked. With each
+ * attempt's `trades` and `rubrics`, rows carry their statistics, the mentor's rating and the
+ * score worked out from both; with `grades`, the saved score.
  */
 export function evaluationStandings(
   sessions: PracticeSession[],
   students: { uid: string; name: string }[] = [],
   now = Date.now(),
-  { trades, rubrics }: StandingExtras = {},
+  { trades, rubrics, grades }: StandingExtras = {},
 ): EvaluationStanding[] {
-  const ranked: EvaluationStanding[] = [...sessions]
-    .sort((a, b) => b.pnl - a.pnl || a.tradeCount - b.tradeCount || byName(nameOf(a), nameOf(b)))
-    .map((s, i) => ({
-      rank: i + 1,
-      uid: s.uid,
-      name: s.userName,
-      status: shownStatus(s, now),
-      balance: s.balance,
-      pnl: s.pnl,
-      return: returnOf(s),
-      trades: s.tradeCount,
-      sessionId: s.id,
-      open: s.status === 'active',
-      extraMinutes: s.extraMinutes ?? 0,
-      stats: trades?.has(s.id) ? sessionStats(trades.get(s.id)!, s.startingBalance) : null,
-      rubric: rubrics?.get(s.uid)?.scores ?? null,
-    }));
+  const rows = sessions.map((s) => {
+    const stats = trades?.has(s.id) ? sessionStats(trades.get(s.id)!, s.startingBalance) : null;
+    const rubric = rubrics?.get(s.uid)?.scores ?? null;
+    const saved = grades?.get(s.uid);
+    return {
+      session: s,
+      stats,
+      rubric,
+      score:
+        stats && rubric
+          ? indabScore(returnOf(s), stats, rubric)
+          : saved
+            ? { score: saved.score, parts: saved.parts }
+            : null,
+    };
+  });
+  // Scored attempts first, by score; the rest by P/L, then fewer trades.
+  rows.sort(
+    (a, b) =>
+      (b.score ? 1 : 0) - (a.score ? 1 : 0) ||
+      (b.score?.score ?? 0) - (a.score?.score ?? 0) ||
+      b.session.pnl - a.session.pnl ||
+      a.session.tradeCount - b.session.tradeCount ||
+      byName(nameOf(a.session), nameOf(b.session)),
+  );
+  const ranked: EvaluationStanding[] = rows.map(({ session: s, stats, rubric, score }, i) => ({
+    rank: i + 1,
+    uid: s.uid,
+    name: s.userName,
+    status: shownStatus(s, now),
+    balance: s.balance,
+    pnl: s.pnl,
+    return: returnOf(s),
+    trades: s.tradeCount,
+    sessionId: s.id,
+    open: s.status === 'active',
+    extraMinutes: s.extraMinutes ?? 0,
+    stats,
+    rubric,
+    score,
+  }));
   const taken = new Set(sessions.map((s) => s.uid));
   const missing: EvaluationStanding[] = students
     .filter((student) => !taken.has(student.uid))
@@ -88,6 +118,7 @@ export function evaluationStandings(
       extraMinutes: 0,
       stats: null,
       rubric: null,
+      score: null,
     }));
   return [...ranked, ...missing];
 }

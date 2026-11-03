@@ -1001,6 +1001,13 @@ export const es = {
       yours: 'Rúbrica de tu mentor',
       by: (name: string) => `Calificó ${name}`,
     },
+    score: {
+      column: 'Nota INDAB',
+      how: 'Nota INDAB (0 a 100) = 40 % rentabilidad + 30 % control de riesgo + 30 % rúbrica del mentor. Un stop out deja en 0 el control de riesgo. Quien aún no tiene rúbrica se ordena después, por ganancia.',
+      missing: 'Falta rúbrica',
+      parts: (ret: string, risk: string, rubric: string) =>
+        `Rentabilidad ${ret} · Riesgo ${risk} · Rúbrica ${rubric}`,
+    },
     resultsView: 'Qué mostrar',
     viewRanking: 'Ranking',
     viewMetrics: 'Métricas de riesgo',

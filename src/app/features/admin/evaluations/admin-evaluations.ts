@@ -9,6 +9,7 @@ import {
   EVALUATION_PACES,
   Evaluation,
   EvaluationAdjustment,
+  EvaluationGrade,
   EvaluationRubric,
   RubricScores,
   evaluationWindow,
@@ -425,10 +426,11 @@ export class AdminEvaluations {
 
   private async loadResults(evaluation: Evaluation): Promise<void> {
     try {
-      const [sessions, adjustments, rubrics] = await Promise.all([
+      const [sessions, adjustments, rubrics, grades] = await Promise.all([
         this.practice.evaluationSessions(evaluation.id),
         this.service.adjustments(evaluation.id).catch(() => []),
         this.service.rubrics(evaluation.id).catch(() => new Map<string, EvaluationRubric>()),
+        this.service.grades(evaluation.id).catch(() => new Map<string, EvaluationGrade>()),
       ]);
       const students = this.assigned(evaluation).map((uid) => ({ uid, name: this.nameOf(uid) }));
       // Each attempt's trades, for its statistics; one that fails to load just shows none.
@@ -444,9 +446,9 @@ export class AdminEvaluations {
       if (this.selected() === evaluation.id) {
         this.attempts.set(sessions);
         this.adjustments.set(adjustments);
-        this.standings.set(
-          evaluationStandings(sessions, students, Date.now(), { trades, rubrics }),
-        );
+        const standings = evaluationStandings(sessions, students, Date.now(), { trades, rubrics });
+        this.standings.set(standings);
+        void this.syncGrades(evaluation.id, standings, grades);
       }
     } catch {
       this.standings.set([]);
@@ -509,6 +511,7 @@ export class AdminEvaluations {
         await this.practice.deleteSession(session.id);
         // A new attempt gets a new rating.
         await this.service.removeRubric(evaluation.id, session.uid).catch(() => undefined);
+        await this.service.removeGrade(evaluation.id, session.uid).catch(() => undefined);
       }
       await this.service.logAdjustment(evaluation.id, {
         uid: session.uid,
@@ -531,6 +534,34 @@ export class AdminEvaluations {
       this.adjustBusy.set(false);
     }
     await this.loadResults(evaluation);
+  }
+
+  /**
+   * Saves each scored attempt's INDAB score where it changed, so the students' ranking (which
+   * cannot read trades or rubrics) shows the same score staff see. Best effort: the next
+   * visit to the results tries again.
+   */
+  private async syncGrades(
+    evaluationId: string,
+    standings: EvaluationStanding[],
+    saved: Map<string, EvaluationGrade>,
+  ): Promise<void> {
+    const changed = standings.filter((row) => {
+      const before = saved.get(row.uid);
+      return (
+        row.score &&
+        (!before ||
+          before.score !== row.score.score ||
+          before.parts.return !== row.score.parts.return ||
+          before.parts.risk !== row.score.parts.risk ||
+          before.parts.rubric !== row.score.parts.rubric)
+      );
+    });
+    await Promise.all(
+      changed.map((row) =>
+        this.service.saveGrade(evaluationId, row.uid, row.score!).catch(() => undefined),
+      ),
+    );
   }
 
   /** Saves the mentor's rubric for the attempt being rated. */

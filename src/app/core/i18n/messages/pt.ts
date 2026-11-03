@@ -981,6 +981,13 @@ export const pt: Messages = {
       yours: 'Rubrica do seu mentor',
       by: (name: string) => `Avaliado por ${name}`,
     },
+    score: {
+      column: 'Nota INDAB',
+      how: 'Nota INDAB (0 a 100) = 40% rentabilidade + 30% controle de risco + 30% rubrica do mentor. Um stop out zera o controle de risco. Quem ainda não tem rubrica vem depois, por lucro.',
+      missing: 'Sem rubrica',
+      parts: (ret: string, risk: string, rubric: string) =>
+        `Rentabilidade ${ret} · Risco ${risk} · Rubrica ${rubric}`,
+    },
     resultsView: 'O que mostrar',
     viewRanking: 'Ranking',
     viewMetrics: 'Métricas de risco',

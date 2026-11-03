@@ -87,6 +87,19 @@ export function rubricAverage(scores: RubricScores): number {
   return RUBRIC_CRITERIA.reduce((sum, c) => sum + scores[c], 0) / RUBRIC_CRITERIA.length;
 }
 
+/**
+ * Stored at `evaluations/{id}/grades/{uid}`: an attempt's INDAB score, worked out by a staff
+ * member's browser (from the attempt's trades and the rubric, which students cannot read) so
+ * the students' ranking can show it once the results are published.
+ */
+export interface EvaluationGrade {
+  /** 0 to 100: 40 % return, 30 % risk control, 30 % mentor rubric. */
+  score: number;
+  parts: { return: number; risk: number; rubric: number };
+  by: string;
+  updatedAt: Timestamp;
+}
+
 export type EvaluationWindow = 'upcoming' | 'open' | 'closed';
 
 /** Where `now` (ms) falls in the evaluation's window. */

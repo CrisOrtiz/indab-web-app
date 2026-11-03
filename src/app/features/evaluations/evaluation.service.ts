@@ -18,6 +18,7 @@ import { LoadingService } from '../../core/loading/loading.service';
 import {
   Evaluation,
   EvaluationAdjustment,
+  EvaluationGrade,
   EvaluationRubric,
   RubricScores,
 } from '../../core/models/evaluation';
@@ -158,6 +159,31 @@ export class EvaluationService {
   /** Removes a rubric (its attempt was restarted). */
   removeRubric(evaluationId: string, uid: string): Promise<void> {
     return deleteDoc(doc(this.evaluations, evaluationId, 'rubrics', uid));
+  }
+
+  /** The INDAB scores saved for an evaluation's attempts, by student. */
+  async grades(evaluationId: string): Promise<Map<string, EvaluationGrade>> {
+    const snapshot = await getDocs(collection(this.evaluations, evaluationId, 'grades'));
+    return new Map(snapshot.docs.map((d) => [d.id, d.data() as EvaluationGrade]));
+  }
+
+  /** Saves an attempt's INDAB score for the students' ranking (staff). */
+  async saveGrade(
+    evaluationId: string,
+    uid: string,
+    grade: Pick<EvaluationGrade, 'score' | 'parts'>,
+  ): Promise<void> {
+    await setDoc(doc(this.evaluations, evaluationId, 'grades', uid), {
+      score: grade.score,
+      parts: grade.parts,
+      by: this.auth.user()?.uid,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  /** Removes an attempt's score (its attempt was restarted). */
+  removeGrade(evaluationId: string, uid: string): Promise<void> {
+    return deleteDoc(doc(this.evaluations, evaluationId, 'grades', uid));
   }
 
   /** Deletes the evaluation; its attempts stay in the practice review. */

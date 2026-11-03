@@ -18,6 +18,7 @@ const standing = (i: number, status: EvaluationStanding['status']): EvaluationSt
   extraMinutes: 0,
   stats: null,
   rubric: null,
+  score: null,
 });
 
 describe('EvaluationResults', () => {

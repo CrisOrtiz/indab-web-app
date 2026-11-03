@@ -205,3 +205,107 @@ test('a trainer duplicates an evaluation to give the same replay to other studen
   await page.getByRole('link', { name: 'Práctica de trading' }).click();
   await expect(page.locator('.evaluation')).toContainText('Evaluación semanal (copia)');
 });
+
+test('a mentor rates an attempt and the student sees the INDAB score and the rubric', async ({
+  page,
+}) => {
+  const hour = 60 * 60 * 1000;
+  await setDocument('evaluations/e1', {
+    title: 'Final de oro',
+    description: '',
+    symbol: 'XAUUSDT',
+    replayStart: 1_770_000_000_000,
+    hideDates: true,
+    startingBalance: 200,
+    durationMinutes: 30,
+    pace: 60,
+    opensAt: new Date(Date.now() - 3 * hour),
+    closesAt: new Date(Date.now() - hour),
+    studentIds: [joseUid],
+    mentorshipIds: [],
+    resultsPublished: false,
+    createdBy: 'seed',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  await setDocument(`practiceSessions/e1_${joseUid}`, {
+    uid: joseUid,
+    userName: 'José Pérez',
+    symbol: 'XAUUSDT',
+    interval: '15m',
+    replayStart: 1_770_000_000_000,
+    startingBalance: 200,
+    balance: 212,
+    pnl: 12,
+    tradeCount: 1,
+    status: 'finished',
+    startedAt: new Date(Date.now() - 2 * hour),
+    endedAt: new Date(Date.now() - 2 * hour + 30 * 60_000),
+    evaluationId: 'e1',
+    durationMinutes: 30,
+  });
+  // 0.01 lot risking 10 USD to its stop: 5 % of the account.
+  await setDocument(`practiceSessions/e1_${joseUid}/trades/t1`, {
+    uid: joseUid,
+    side: 'long',
+    orderType: 'market',
+    orderPrice: null,
+    placedTime: 1_770_000_000,
+    quantity: 1,
+    entryPrice: 4000,
+    entryTime: 1_770_000_000,
+    stopLoss: 3990,
+    takeProfit: 4020,
+    initialStopLoss: 3990,
+    status: 'closed',
+    exitPrice: 4012,
+    exitTime: 1_770_000_600,
+    exitReason: 'manual',
+    pnl: 12,
+  });
+
+  await openEvaluations(page);
+  await page.getByRole('button', { name: 'Acciones: Final de oro' }).click();
+  await page.getByRole('menuitem', { name: 'Ver resultados' }).click();
+  const results = page.locator('.results');
+  await expect(results).toContainText('Falta rúbrica');
+
+  await page.getByRole('button', { name: 'Acciones del intento de José Pérez' }).click();
+  await page.getByRole('menuitem', { name: 'Calificar con rúbrica' }).click();
+  for (const criterion of [
+    'Plan de entrada',
+    'Gestión de riesgo',
+    'Respeto de SL y TP',
+    'Lectura de contexto',
+    'Disciplina',
+  ]) {
+    await page
+      .getByRole('radiogroup', { name: criterion })
+      .getByRole('radio', { name: '4' })
+      .click();
+  }
+  await page.getByRole('button', { name: 'Guardar rúbrica' }).click();
+  await expect(page.getByRole('status')).toContainText('Se guardó la rúbrica de José Pérez.');
+  // Return 6 % = 65, risk 5 % per trade = 70, rubric 4 = 75: 69.5.
+  await expect(results.locator('td.score')).toHaveText('69.5');
+  await expect(results).toContainText('4.0 / 5');
+
+  await page.getByRole('button', { name: 'Métricas de riesgo' }).click();
+  await expect(results).toContainText('máx. 5.0% de la cuenta');
+  await expect(results).toContainText('1:2');
+
+  await page.getByRole('button', { name: 'Acciones: Final de oro' }).click();
+  await page.getByRole('menuitem', { name: 'Publicar resultados' }).click();
+  await expect(page.getByRole('status')).toBeVisible();
+
+  await signOut(page);
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Ranking de evaluaciones' }).click();
+  const ranking = page.locator('table.ranking');
+  await expect(ranking.locator('thead')).toContainText('Nota INDAB');
+  await expect(ranking.locator('td.score')).toHaveText('69.5');
+  const rubric = page.locator('section.rubric');
+  await expect(rubric).toContainText('Rúbrica de tu mentor');
+  await expect(rubric).toContainText('4.0 / 5');
+  await expect(rubric).toContainText('Calificó Tomás Trainer');
+});
