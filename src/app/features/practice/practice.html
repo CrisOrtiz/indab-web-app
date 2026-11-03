@@ -42,6 +42,19 @@
             }}</span>
             <span class="muted">{{ live() ? t.liveHint : t.leavingKeeps }}</span>
           </div>
+          @if (timeWarning(); as warning) {
+            <p class="message warning time-warning" role="alert">
+              {{ warning }}
+              <button
+                type="button"
+                class="dismiss"
+                [attr.aria-label]="t.dismissWarning"
+                (click)="timeWarning.set(null)"
+              >
+                ×
+              </button>
+            </p>
+          }
         }
         @if (notice(); as text) {
           <p class="message success" role="status">{{ text }}</p>
@@ -64,6 +77,7 @@
             (indicatorsChange)="chartSettings.saveIndicators($event)"
             [lots]="lots()"
             (levelMoved)="onLevelMoved($event)"
+            (levelsMoved)="onLevelsMoved($event)"
             (levelRemoved)="onLevelRemoved($event)"
             (levelAdded)="onLevelAdded($event)"
             (tradeClosed)="onTradeClosed($event)"
@@ -821,3 +835,10 @@
     }
   }
 </section>
+@if (briefing(); as ev) {
+  <app-evaluation-briefing
+    [evaluation]="ev"
+    (started)="confirmEvaluation()"
+    (cancelled)="briefing.set(null)"
+  />
+}

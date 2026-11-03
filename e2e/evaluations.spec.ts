@@ -57,8 +57,13 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
   await signIn(page, 'jose@indab.test');
   await page.getByRole('link', { name: 'Práctica de trading' }).click();
   await expect(page.getByText('Tus evaluaciones')).toBeVisible();
-  page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Comenzar evaluación' }).click();
+  // The instructions come first, and the attempt starts once they are read.
+  const briefing = page.getByRole('dialog', { name: 'Antes de empezar: Evaluación semanal' });
+  await expect(briefing).toContainText('Tienes un solo intento de 20 minutos');
+  await expect(briefing.getByRole('button', { name: 'Empezar ahora' })).toBeDisabled();
+  await briefing.getByRole('checkbox', { name: 'Leí las instrucciones y estoy listo' }).check();
+  await briefing.getByRole('button', { name: 'Empezar ahora' }).click();
   await expect(page.getByText('Evaluación: Evaluación semanal')).toBeVisible();
   await expect(page.getByLabel('Tiempo restante')).toContainText(/Quedan (19|20):\d\d/);
   await page.getByRole('spinbutton', { name: /Lotes \(tamaño/ }).fill('0.01');
@@ -127,8 +132,9 @@ test('an evaluation at one market minute a second moves on its own', async ({ pa
   await signOut(page);
   await signIn(page, 'jose@indab.test');
   await page.getByRole('link', { name: 'Práctica de trading' }).click();
-  page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Comenzar evaluación' }).click();
+  await page.getByRole('checkbox', { name: 'Leí las instrucciones y estoy listo' }).check();
+  await page.getByRole('button', { name: 'Empezar ahora' }).click();
   await expect(page.getByText('En vivo')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Reproducir' })).toHaveCount(0);
   // The first replayed minute comes after a second, with no one pressing play.

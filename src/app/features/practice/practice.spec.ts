@@ -10,7 +10,14 @@ import { PracticeService } from './practice.service';
 import { EvaluationService } from '../evaluations/evaluation.service';
 import { ServerClock } from './server-clock';
 import { Evaluation } from '../../core/models/evaluation';
-import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
+import {
+  LevelMove,
+  LevelRemove,
+  LevelsMove,
+  OrderAt,
+  OrderDraft,
+  ReplayChart,
+} from './replay-chart';
 import { SessionReview } from './session-review';
 import { quietNotifications } from '../notifications/testing';
 import { quietChartSettings } from './testing';
@@ -30,6 +37,7 @@ class FakeChart {
   readonly indicators = input<readonly string[] | null>(null);
   readonly indicatorsChange = output<string[]>();
   readonly levelMoved = output<LevelMove>();
+  readonly levelsMoved = output<LevelsMove>();
   readonly levelRemoved = output<LevelRemove>();
   readonly levelAdded = output<LevelRemove>();
   readonly draftDiscarded = output<void>();
@@ -72,6 +80,9 @@ const history = async (_symbol: string, interval: string, endTime: number, limit
   begin ||= endTime / 1000;
   return klines(interval, endTime - limit * SECONDS[interval] * 1000, limit);
 };
+
+/** How far the server clock is moved ahead, to bring an attempt near its end. */
+let clockAhead = 0;
 
 describe('Practice page', () => {
   const quiet = quietNotifications();
@@ -153,7 +164,10 @@ describe('Practice page', () => {
         { provide: MarketDataService, useValue: market },
         { provide: PracticeService, useValue: practice },
         { provide: EvaluationService, useValue: evaluations },
-        { provide: ServerClock, useValue: { now: () => Date.now(), sync: async () => undefined } },
+        {
+          provide: ServerClock,
+          useValue: { now: () => Date.now() + clockAhead, sync: async () => undefined },
+        },
       ],
     });
     TestBed.overrideComponent(Practice, {
@@ -182,6 +196,14 @@ describe('Practice page', () => {
     await fixture.whenStable();
   };
   const submit = () => pressed('button.submit');
+  /** The evaluation's button, then its instructions: ticked as read, and started. */
+  const takeEvaluation = async () => {
+    await click('Comenzar evaluación');
+    const read = el.querySelector<HTMLInputElement>('app-evaluation-briefing input')!;
+    read.click();
+    await fixture.whenStable();
+    await click('Empezar ahora');
+  };
   const submitLabel = () =>
     [...el.querySelector('button.submit')!.children].map((c) => c.textContent!.trim()).join(' ');
   /** Ticks or unticks the take profit / stop loss checkbox. */
@@ -268,9 +290,17 @@ describe('Practice page', () => {
     const ev = evaluation('e1', { hideDates: false });
     evaluations.assignedTo.mockResolvedValue([ev]);
     await reload();
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     await click('Comenzar evaluación');
-    expect(confirm.mock.calls[0][0]).toContain('un solo intento de 30 minutos');
+    // The instructions come first: nothing starts until they are read.
+    const briefing = el.querySelector('app-evaluation-briefing [role="dialog"]')!;
+    expect(briefing.textContent).toContain('Tienes un solo intento de 30 minutos');
+    expect(briefing.textContent).toContain('40\u00a0% rentabilidad');
+    expect(button('Empezar ahora').disabled).toBe(true);
+    expect(practice.startSession).not.toHaveBeenCalled();
+    briefing.querySelector<HTMLInputElement>('input')!.click();
+    await fixture.whenStable();
+    await click('Empezar ahora');
+    expect(el.querySelector('app-evaluation-briefing')).toBeNull();
     expect(begin * 1000).toBe(ev.replayStart);
     expect(practice.startSession).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -284,7 +314,42 @@ describe('Practice page', () => {
     const bar = el.querySelector('.evaluation-bar')!.textContent!;
     expect(bar).toContain('Evaluación: Evaluación e1');
     expect(bar).toMatch(/Quedan (29:5\d|30:00)/);
-    confirm.mockRestore();
+  });
+
+  it('warns when 5 minutes and then 1 minute are left', async () => {
+    evaluations.assignedTo.mockResolvedValue([evaluation('e1', { durationMinutes: 6 })]);
+    await reload();
+    await takeEvaluation();
+    const warning = () => el.querySelector('.time-warning')?.textContent?.trim() ?? null;
+    expect(warning()).toBeNull();
+    const tick = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      await fixture.whenStable();
+    };
+    try {
+      clockAhead = 61_000;
+      await tick();
+      expect(warning()).toContain('Quedan 5 minutos de evaluación.');
+      await click('Cerrar aviso');
+      expect(warning()).toBeNull();
+      // Shown once only.
+      await tick();
+      expect(warning()).toBeNull();
+      clockAhead = 5 * 60_000 + 1000;
+      await tick();
+      expect(warning()).toContain('Queda 1 minuto');
+    } finally {
+      clockAhead = 0;
+    }
+  });
+
+  it('can put off an evaluation from its instructions', async () => {
+    evaluations.assignedTo.mockResolvedValue([evaluation('e1')]);
+    await reload();
+    await click('Comenzar evaluación');
+    await click('Ahora no');
+    expect(el.querySelector('app-evaluation-briefing')).toBeNull();
+    expect(practice.startSession).not.toHaveBeenCalled();
   });
 
   it('finishes the evaluation when its time runs out', async () => {
@@ -293,7 +358,7 @@ describe('Practice page', () => {
     await reload();
     const loads = evaluations.assignedTo.mock.calls.length;
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    await click('Comenzar evaluación');
+    await takeEvaluation();
     await pressed('.quick-buy');
     await new Promise((resolve) => setTimeout(resolve, 1100));
     await fixture.whenStable();
@@ -319,7 +384,7 @@ describe('Practice page', () => {
     evaluations.assignedTo.mockResolvedValue([evaluation('e1', { pace: 60 })]);
     await reload();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    await click('Comenzar evaluación');
+    await takeEvaluation();
     expect(el.querySelector('.live')?.textContent).toContain('En vivo');
     expect(el.querySelector('.deck')).toBeNull();
     expect(el.querySelector('.evaluation-bar')!.textContent).toContain('no se puede pausar');
@@ -339,7 +404,7 @@ describe('Practice page', () => {
     evaluations.assignedTo.mockResolvedValue([evaluation('e1')]);
     await reload();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    await click('Comenzar evaluación');
+    await takeEvaluation();
     expect(practice.watchSession).toHaveBeenCalledWith('session-1', expect.any(Function));
     const bar = () => el.querySelector('.evaluation-bar')!.textContent!;
     expect(bar()).toMatch(/Quedan (29:5\d|30:00)/);
@@ -359,7 +424,7 @@ describe('Practice page', () => {
     evaluations.assignedTo.mockResolvedValue([evaluation('e1', { durationMinutes: 0.01 })]);
     await reload();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    await click('Comenzar evaluación');
+    await takeEvaluation();
     await new Promise((resolve) => setTimeout(resolve, 1100));
     await fixture.whenStable();
     expect(el.textContent).toContain('Sesión terminada');
@@ -606,7 +671,7 @@ describe('Practice page', () => {
     await reload();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     practice.startSession.mockRejectedValueOnce(new Error('permission-denied'));
-    await click('Comenzar evaluación');
+    await takeEvaluation();
     expect(alert()).toContain('Puede que ya la hayas presentado');
     expect(el.querySelector('form')).not.toBeNull();
   });
@@ -1057,6 +1122,17 @@ describe('Practice page', () => {
     expect(practice.updateLevels).toHaveBeenLastCalledWith(
       'session-1',
       expect.objectContaining({ id: 't1', stopLoss: null }),
+    );
+  });
+
+  it("saves a position's moved lines together once confirmed on the chart", async () => {
+    await start();
+    await submit();
+    chart().levelsMoved.emit({ target: 't1', levels: { stopLoss: 98, takeProfit: 104 } });
+    await fixture.whenStable();
+    expect(practice.updateLevels).toHaveBeenLastCalledWith(
+      'session-1',
+      expect.objectContaining({ id: 't1', stopLoss: 98, takeProfit: 104 }),
     );
   });
 

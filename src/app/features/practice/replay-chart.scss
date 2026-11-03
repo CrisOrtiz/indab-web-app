@@ -199,6 +199,29 @@
   }
 }
 
+/* ✓ saves the lines moved on a placed order or position, ↺ puts them back. */
+.line-label .confirm,
+.line-label .undo {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.line-label .confirm {
+  background: #089981;
+  color: #ffffff;
+}
+
+.line-label .undo {
+  color: var(--color-muted);
+
+  &:hover {
+    color: var(--color-text);
+  }
+}
+
 /*
  * The Buy/Sell button of the order being set up, and the size of a placed order or position,
  * in its side's color (SIDE_COLORS): blue buys, red sells.

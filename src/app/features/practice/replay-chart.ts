@@ -86,6 +86,12 @@ export interface LevelMove {
  * The × of a stop loss or take profit label, or the level dragged back onto its entry; also a
  * click on a TP/SL tab, which asks for that level at its default distance.
  */
+/** The lines of a placed order or position moved together, saved with its ✓. */
+export interface LevelsMove {
+  target: string;
+  levels: Partial<Record<LevelField, number>>;
+}
+
 export interface LevelRemove {
   target: string;
   field: 'stopLoss' | 'takeProfit';
@@ -108,6 +114,8 @@ interface LineLabel {
    * sell): once placed, the line no longer names the side, as in TradingView.
    */
   qty?: { text: string; side: TradeSide; title: string };
+  /** A placed order or position whose lines were moved: ✓ saves the move, ↺ undoes it. */
+  confirm?: { tradeId: string };
   /** Lots of the order being set up: a button that opens the quantity pad. */
   lots?: number;
   /** The text is the order type, a button that opens the order type menu. */
@@ -530,6 +538,8 @@ export class ReplayChart {
   /** Time (seconds) the replay started at, marked with a dotted line once it is over. */
   readonly startTime = input<number | null>(null);
   readonly levelMoved = output<LevelMove>();
+  /** A placed order's or position's moved lines, once the student presses their ✓. */
+  readonly levelsMoved = output<LevelsMove>();
   readonly levelRemoved = output<LevelRemove>();
   /** The × of a position (close it) or pending order (cancel it). */
   readonly tradeClosed = output<string>();
@@ -585,6 +595,14 @@ export class ReplayChart {
     top: number;
   } | null>(null);
   protected readonly labels = signal<PlacedLabel[]>([]);
+  /**
+   * Lines of placed orders and positions moved on the chart but not saved yet, by trade, with
+   * the status the trade had: as in TradingView, a move only counts once its ✓ is pressed.
+   */
+  private readonly edits = new Map<
+    string,
+    { status: PracticeTrade['status']; levels: Partial<Record<LevelField, number>> }
+  >();
   protected readonly shapes = signal<PlacedShape[]>([]);
   protected readonly selectedShape = computed(() =>
     this.shapes().find((s) => s.id === this.selected() && s.id !== PREVIEW_ID),
@@ -869,6 +887,55 @@ export class ReplayChart {
     }
   }
 
+  /** Saves the moved lines of a placed order or position, checked together. */
+  protected confirmEdit(tradeId: string): void {
+    const edit = this.edits.get(tradeId);
+    this.edits.delete(tradeId);
+    if (edit) {
+      this.levelsMoved.emit({ target: tradeId, levels: { ...edit.levels } });
+    }
+    // A move the page rejects leaves the trade as it was: draw it there.
+    setTimeout(() => this.drawTrades(this.trades(), this.draft()));
+  }
+
+  /** Puts the moved lines of a placed order or position back. */
+  protected undoEdit(tradeId: string): void {
+    this.edits.delete(tradeId);
+    this.drawTrades(this.trades(), this.draft());
+  }
+
+  /** A placed trade as moved on the chart, or itself if nothing waits for its ✓. */
+  private withEdits(trade: PracticeTrade): PracticeTrade {
+    const edit = this.edits.get(trade.id);
+    if (!edit) {
+      return trade;
+    }
+    if (edit.status !== trade.status) {
+      // It filled, closed or was cancelled meanwhile: the move no longer applies.
+      this.edits.delete(trade.id);
+      return trade;
+    }
+    const { price, stopLoss, takeProfit } = edit.levels;
+    return {
+      ...trade,
+      ...(price !== undefined ? { orderPrice: price, entryPrice: price } : {}),
+      ...(stopLoss !== undefined ? { stopLoss } : {}),
+      ...(takeProfit !== undefined ? { takeProfit } : {}),
+    };
+  }
+
+  /** Keeps a line moved on a placed trade until its ✓; the order being set up moves at once. */
+  private moveLevel(move: LevelMove): void {
+    const trade = this.trades().find((t) => t.id === move.target);
+    if (!trade) {
+      this.levelMoved.emit(move);
+      return;
+    }
+    const edit = this.edits.get(trade.id) ?? { status: trade.status, levels: {} };
+    edit.levels[move.field] = move.price;
+    this.edits.set(trade.id, edit);
+  }
+
   /** Opens the "+" menu at the price under the pointer. */
   protected openMenu(): void {
     const y = this.hoverY();
@@ -1079,7 +1146,15 @@ export class ReplayChart {
   private lines(trades: PracticeTrade[], draft: OrderDraft | null, drawings: Drawing[]): Line[] {
     const { chart, trading: tr } = untracked(this.i18n.messages);
     const lines: Line[] = [];
-    for (const t of trades) {
+    const ids = new Set(trades.map((t) => t.id));
+    for (const id of this.edits.keys()) {
+      if (!ids.has(id)) {
+        this.edits.delete(id);
+      }
+    }
+    for (const placed of trades) {
+      const t = this.withEdits(placed);
+      const confirm = t === placed ? undefined : { tradeId: t.id };
       const lots = formatLots(tradeLots(t));
       const color = SIDE_COLORS[t.side];
       const qty = { text: lots, side: t.side, title: t.side === 'long' ? tr.long : tr.short };
@@ -1094,6 +1169,7 @@ export class ReplayChart {
           bracket,
           label: {
             qty,
+            confirm,
             text: '',
             pnl: null,
             tabs: this.tabs(bracket, t),
@@ -1110,6 +1186,7 @@ export class ReplayChart {
           drag: { target: t.id, field: 'price' },
           label: {
             qty,
+            confirm,
             text: tr.orderTypes[t.orderType],
             pnl: null,
             tabs: this.tabs({ target: t.id, side: t.side, quantity: t.quantity }, t),
@@ -2457,9 +2534,10 @@ export class ReplayChart {
       }
       if (field !== 'price' && !dragging.bracket && this.onEntry(dragging.line, dragging.price)) {
         // A TP/SL dropped back on its entry is taken off, as in TradingView.
+        delete this.edits.get(target)?.levels[field];
         this.levelRemoved.emit({ target, field });
       } else {
-        this.levelMoved.emit({ target, field, price: dragging.price });
+        this.moveLevel({ target, field, price: dragging.price });
       }
       // If the page rejects the move its inputs stay the same, so put the line back.
       setTimeout(() => this.drawTrades(this.trades(), this.draft()));

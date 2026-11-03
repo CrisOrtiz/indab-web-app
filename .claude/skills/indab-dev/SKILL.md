@@ -351,6 +351,10 @@ Module notes:
   first. Students cannot read trades or rubrics, so staff browsers save each score to
   `evaluations/{id}/grades/{uid}` when they open the results (`syncGrades`), and
   `/academy/ranking` reads those.
+  Before an attempt starts, `EvaluationBriefing` (modal, "Leí las instrucciones" required)
+  explains time, pace, account, leaving, the end and the grading; the countdown warns at 5 and
+  1 minutes left (`TIME_WARNINGS`). Lines of placed orders/positions moved on the chart wait
+  for a ✓ next to their size (↺ undoes; `levelsMoved` saves them together), as in TradingView.
 - **Evaluation forms (built)**: questionnaires, separate from chart evaluations.
   `core/models/exam.ts` (types, `suggestScore`, `bestGrade`, `attemptDeadline`),
   `features/exams/exam.service.ts`; staff build them at `/admin/forms`

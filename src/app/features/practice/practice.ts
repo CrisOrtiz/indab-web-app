@@ -31,6 +31,7 @@ import { EvaluationService } from '../evaluations/evaluation.service';
 import { ChartSettingsService } from './chart-settings.service';
 import { BarBuilder, formatElapsed, nextBarEnd } from './bars';
 import { ReplayControls } from './replay-controls';
+import { EvaluationBriefing } from './evaluation-briefing';
 import {
   DEFAULT_TIMEFRAME,
   HISTORY_BARS,
@@ -71,7 +72,15 @@ import {
   tradePnl,
   validateOrder,
 } from './replay';
-import { Drawing, LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
+import {
+  Drawing,
+  LevelMove,
+  LevelRemove,
+  LevelsMove,
+  OrderAt,
+  OrderDraft,
+  ReplayChart,
+} from './replay-chart';
 import {
   attemptDeadline,
   attemptTimeUp,
@@ -145,12 +154,16 @@ export { formatCountdown } from './practice-format';
 /** Past sessions per page. */
 export const SESSIONS_PAGE_SIZE = 10;
 
+/** Minutes before the end of an attempt when the student is warned. */
+const TIME_WARNINGS = [5, 1];
+
 @Component({
   selector: 'app-practice',
   imports: [
     RouterLink,
     LocalDatePipe,
     DecimalPipe,
+    EvaluationBriefing,
     PercentPipe,
     Pager,
     ReplayChart,
@@ -254,6 +267,12 @@ export class Practice {
   protected readonly evaluation = signal<Evaluation | null>(null);
   /** When the attempt's time runs out (ms), by this device's clock. */
   protected readonly deadline = signal<number | null>(null);
+  /** The evaluation whose instructions are shown before its attempt starts. */
+  protected readonly briefing = signal<Evaluation | null>(null);
+  /** The time warning on screen, as the attempt nears its end. */
+  protected readonly timeWarning = signal<string | null>(null);
+  /** Minutes left whose warning was already given, so each shows once. */
+  private warned = new Set<number>();
   protected readonly now = signal(this.serverClock.now());
   /**
    * The attempt runs by the clock (its evaluation sets a pace): the replay moves on its own,
@@ -488,14 +507,20 @@ export class Practice {
     return this.begin(replayStart, null);
   }
 
-  /** Starts the student's one attempt at an evaluation, after they confirm. */
-  protected async startEvaluation(evaluation: Evaluation): Promise<void> {
-    const t = this.i18n.messages().practice;
+  /** Shows the instructions before the student's one attempt at an evaluation. */
+  protected startEvaluation(evaluation: Evaluation): void {
     if (!findInstrument(evaluation.symbol)) {
-      this.error.set(t.startFailed);
+      this.error.set(this.i18n.messages().practice.startFailed);
       return;
     }
-    if (!confirm(t.confirmEvaluation(evaluation.title, evaluation.durationMinutes))) {
+    this.briefing.set(evaluation);
+  }
+
+  /** Starts the attempt once the student has read the instructions. */
+  protected async confirmEvaluation(): Promise<void> {
+    const evaluation = this.briefing();
+    this.briefing.set(null);
+    if (!evaluation) {
       return;
     }
     this.symbol.set(evaluation.symbol);
@@ -981,15 +1006,31 @@ export class Practice {
   private startClock(deadline: number): void {
     this.deadline.set(deadline);
     this.now.set(this.serverClock.now());
+    // Warnings already past (on resuming, or with minutes added) are not given again.
+    this.warned = new Set(TIME_WARNINGS.filter((m) => deadline - this.now() <= m * MINUTE));
+    this.timeWarning.set(null);
     clearInterval(this.clock);
     this.clock = setInterval(() => {
       this.now.set(this.serverClock.now());
+      this.warnTime(deadline - this.now());
       if (this.now() >= deadline) {
         // A live attempt shows its last candles before it closes.
         this.tickLive();
         void this.finish();
       }
     }, 1000);
+  }
+
+  /** Warns once when 5 minutes and then 1 minute are left, and buzzes a phone. */
+  private warnTime(left: number): void {
+    const due = TIME_WARNINGS.filter((m) => left <= m * MINUTE && !this.warned.has(m));
+    if (!due.length || left <= 0) {
+      return;
+    }
+    due.forEach((m) => this.warned.add(m));
+    const t = this.i18n.messages().practice;
+    this.timeWarning.set(Math.min(...due) === 1 ? t.warnOne : t.warnFive);
+    navigator.vibrate?.(200);
   }
 
   /** Switches the chart's timeframe, loading its history the first time. */
@@ -1309,6 +1350,20 @@ export class Practice {
         takeProfit: trade.takeProfit,
         orderPrice: trade.orderPrice,
         [move.field === 'price' ? 'orderPrice' : move.field]: move.price,
+      });
+    }
+  }
+
+  /** A placed order's or position's lines moved on the chart and confirmed with their ✓. */
+  protected onLevelsMoved({ target, levels }: LevelsMove): void {
+    const trade = this.replay()
+      ?.trades()
+      .find((t) => t.id === target);
+    if (trade) {
+      this.changeTrade(trade, {
+        stopLoss: levels.stopLoss ?? trade.stopLoss,
+        takeProfit: levels.takeProfit ?? trade.takeProfit,
+        orderPrice: levels.price ?? trade.orderPrice,
       });
     }
   }

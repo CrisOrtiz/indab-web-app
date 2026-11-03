@@ -823,8 +823,35 @@ export const es = {
     evaluationUpcoming: 'Aún no abre',
     evaluationMissed: 'No presentada',
     evaluationTag: 'Evaluación',
-    confirmEvaluation: (title: string, minutes: number) =>
-      `¿Comenzar «${title}»? Tienes un solo intento de ${minutes} minutos y el tiempo corre desde ahora. Puedes salir y volver: el tiempo sigue corriendo y al acabarse se entrega sola.`,
+    briefing: {
+      title: (title: string) => `Antes de empezar: ${title}`,
+      howTitle: 'Cómo funciona',
+      oneAttempt: (minutes: number) =>
+        `Tienes un solo intento de ${minutes} minutos. El tiempo corre desde que pulses «Comenzar evaluación».`,
+      live: (pace: string, covered: string) =>
+        `El gráfico avanza solo con el reloj (${pace}) y cubre ${covered} de mercado: no se puede pausar, adelantar ni cambiar la velocidad.`,
+      freeSpeed: 'Eliges la velocidad del replay, pero el tiempo límite es de reloj.',
+      account: (balance: number, leverage: number, stopOut: number) =>
+        `Empiezas con ${balance} USD y apalancamiento 1:${leverage}. Si tu margen cae al ${stopOut} %, las posiciones se cierran solas (stop out).`,
+      hiddenDates: 'No verás la fecha del gráfico hasta que cierre la evaluación.',
+      leaving:
+        'Si sales o se corta internet, puedes volver: el tiempo sigue corriendo. Ábrela en una sola pestaña o dispositivo.',
+      end: 'Al acabarse el tiempo se entrega sola: las órdenes pendientes se cancelan y las posiciones abiertas se cierran al último precio.',
+      warnings: 'Te avisaremos cuando queden 5 minutos y 1 minuto.',
+      gradeTitle: 'Cómo se califica',
+      grade:
+        'Nota INDAB de 0 a 100: 40 % rentabilidad, 30 % control de riesgo y 30 % rúbrica de tu mentor (plan de entrada, gestión de riesgo, respeto de SL y TP, lectura de contexto y disciplina).',
+      tipStop: 'Pon stop loss en cada operación: cada una sin stop loss resta puntos de riesgo.',
+      tipRisk:
+        'No arriesgues más del 2 % de la cuenta por operación ni dejes caer la cuenta más de 10 %.',
+      tipStopOut: 'Un stop out deja en 0 el control de riesgo.',
+      read: 'Leí las instrucciones y estoy listo',
+      start: 'Empezar ahora',
+      cancel: 'Ahora no',
+    },
+    dismissWarning: 'Cerrar aviso',
+    warnFive: 'Quedan 5 minutos de evaluación.',
+    warnOne: 'Queda 1 minuto: al terminar se cierran las posiciones abiertas.',
     evaluationStartFailed:
       'No se pudo comenzar la evaluación. Puede que ya la hayas presentado o que esté cerrada.',
     evaluationTitle: (title: string) => `Evaluación: ${title}`,
@@ -916,6 +943,8 @@ export const es = {
     addOrder: (price: string) => `Añadir orden en ${price}…`,
     drawLine: (price: string) => `Dibujar línea horizontal en ${price}`,
     closePosition: 'Cerrar posición',
+    confirmMove: 'Confirmar cambio',
+    undoMove: 'Deshacer cambio',
     cancelOrder: 'Cancelar orden',
     removeLevel: (level: string) => `Quitar ${level.toLowerCase()}`,
     hints: {

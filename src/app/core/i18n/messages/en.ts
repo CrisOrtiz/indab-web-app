@@ -804,8 +804,35 @@ export const en: Messages = {
     evaluationUpcoming: 'Not open yet',
     evaluationMissed: 'Not taken',
     evaluationTag: 'Evaluation',
-    confirmEvaluation: (title: string, minutes: number) =>
-      `Start "${title}"? You get a single ${minutes}-minute attempt and the clock starts now. You can leave and come back: the clock keeps running and the attempt is handed in when time is up.`,
+    briefing: {
+      title: (title: string) => `Before you start: ${title}`,
+      howTitle: 'How it works',
+      oneAttempt: (minutes: number) =>
+        `You have one attempt of ${minutes} minutes. The time runs from when you press "Start evaluation".`,
+      live: (pace: string, covered: string) =>
+        `The chart moves on its own with the clock (${pace}) and covers ${covered} of market: it cannot be paused, skipped or sped up.`,
+      freeSpeed: 'You pick the replay speed, but the time limit is real time.',
+      account: (balance: number, leverage: number, stopOut: number) =>
+        `You start with ${balance} USD and 1:${leverage} leverage. If your margin falls to ${stopOut}%, positions close on their own (stop out).`,
+      hiddenDates: 'You will not see the chart date until the evaluation closes.',
+      leaving:
+        'If you leave or lose your connection, you can come back: the time keeps running. Open it in one tab or device only.',
+      end: 'When time is up it is handed in: pending orders are cancelled and open positions close at the last price.',
+      warnings: 'We will warn you when 5 minutes and 1 minute are left.',
+      gradeTitle: 'How it is graded',
+      grade:
+        "INDAB score from 0 to 100: 40% return, 30% risk control and 30% your mentor's rubric (entry plan, risk management, respect for SL and TP, reading the context and discipline).",
+      tipStop: 'Set a stop loss on every trade: each trade without one costs risk points.',
+      tipRisk:
+        'Do not risk more than 2% of the account per trade, nor let the account fall more than 10%.',
+      tipStopOut: 'A stop out sets risk control to 0.',
+      read: 'I read the instructions and I am ready',
+      start: 'Start now',
+      cancel: 'Not now',
+    },
+    dismissWarning: 'Dismiss warning',
+    warnFive: '5 minutes of the evaluation left.',
+    warnOne: '1 minute left: open positions close at the end.',
     evaluationStartFailed:
       'The evaluation could not start. You may have taken it already, or it may be closed.',
     evaluationTitle: (title: string) => `Evaluation: ${title}`,
@@ -897,6 +924,8 @@ export const en: Messages = {
     addOrder: (price) => `Add order at ${price}…`,
     drawLine: (price) => `Draw horizontal line at ${price}`,
     closePosition: 'Close position',
+    confirmMove: 'Confirm change',
+    undoMove: 'Undo change',
     cancelOrder: 'Cancel order',
     removeLevel: (level) => `Remove ${level.toLowerCase()}`,
     hints: {
