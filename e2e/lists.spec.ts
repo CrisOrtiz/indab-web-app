@@ -92,8 +92,10 @@ test('a student pages and filters their own sessions', async ({ page }) => {
   await expect(rows).toHaveCount(5);
 
   await page.getByLabel('Estado').selectOption({ label: 'En curso' });
-  // Sessions 3, 6, ..., 24 are still active (0 was picked up and finished): 8, on one page.
-  await expect(rows).toHaveCount(8);
+  // Only the last free practice stays open: the older active ones (3, 6, ..., 24) were closed
+  // when the page loaded, and 0 was picked up and finished.
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first().locator('td.empty')).toBeVisible();
   await expect(pager).toHaveCount(0);
 });
 
