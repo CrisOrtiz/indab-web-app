@@ -268,6 +268,11 @@ button {
     }
   }
 
+  &.leave:hover {
+    border-color: var(--color-text);
+    color: var(--color-text);
+  }
+
   // On wide screens the label already says it.
   &::after {
     display: none;

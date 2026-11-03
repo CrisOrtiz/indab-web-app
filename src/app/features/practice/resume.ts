@@ -67,3 +67,25 @@ export function attemptExpired(session: PracticeSession, now: number): boolean {
   const started = session.startedAt?.toMillis() ?? 0;
   return now >= started + (session.durationMinutes + 2) * MINUTE;
 }
+
+/** When an evaluation attempt's time runs out (ms), or null for free practice. */
+export function attemptDeadline(session: PracticeSession): number | null {
+  if (session.durationMinutes == null) {
+    return null;
+  }
+  return (session.startedAt?.toMillis() ?? 0) + session.durationMinutes * MINUTE;
+}
+
+/**
+ * Whether an evaluation attempt's time is up. One the student left open counts as finished from
+ * then on (they close it, or it is closed for them, the next time they open the practice page).
+ */
+export function attemptTimeUp(session: PracticeSession, now: number): boolean {
+  const deadline = attemptDeadline(session);
+  return deadline !== null && now >= deadline;
+}
+
+/** A session's status as students and staff should see it: time-up attempts are finished. */
+export function shownStatus(session: PracticeSession, now: number): PracticeSession['status'] {
+  return session.status === 'active' && attemptTimeUp(session, now) ? 'finished' : session.status;
+}

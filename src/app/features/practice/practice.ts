@@ -41,7 +41,13 @@ import {
   replayStartAt,
   replayWindow,
 } from './market-data.service';
-import { formatLots, priceDigits, roundPrice, signedMoney } from './practice-format';
+import {
+  formatCountdown,
+  formatLots,
+  priceDigits,
+  roundPrice,
+  signedMoney,
+} from './practice-format';
 import { CursorPages } from '../../shared/pager/cursor-pages';
 import { Pager } from '../../shared/pager/pager';
 import { NotificationService } from '../notifications/notification.service';
@@ -62,8 +68,10 @@ import {
 } from './replay';
 import { Drawing, LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
 import {
-  attemptExpired,
+  attemptDeadline,
+  attemptTimeUp,
   clearLocalResume,
+  shownStatus,
   pickResume,
   readLocalResume,
   resumeTime,
@@ -96,6 +104,8 @@ export const QUICK_ERROR_MS = 6000;
 export const RESUME_SAVE_MS = 15_000;
 /** Other changes to pick up after a reload (drawings, timeframe, speed) go sooner. */
 export const RESUME_CHANGE_MS = 2_000;
+/** Open sessions looked up for the list (only one free practice is kept open). */
+const OPEN_SESSIONS_MAX = 10;
 
 /** An evaluation assigned to the student, with their attempt if they took it. */
 export interface EvaluationCard {
@@ -104,14 +114,7 @@ export interface EvaluationCard {
   attempt: PracticeSession | null;
 }
 
-/** Remaining time as m:ss, or h:mm:ss from an hour up. */
-export function formatCountdown(ms: number): string {
-  const total = Math.max(0, Math.ceil(ms / 1000));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const ss = String(total % 60).padStart(2, '0');
-  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
-}
+export { formatCountdown } from './practice-format';
 
 /**
  * Chart-replay trading practice: the student picks a market, gets a random stretch of real
@@ -270,6 +273,17 @@ export class Practice {
   protected readonly drafting = signal(false);
   /** The drawings on the chart, kept with the session so a reload puts them back. */
   protected readonly drawings = signal<Drawing[]>([]);
+  /**
+   * Sessions the student left open, other than the one on screen: they go back to them, or
+   * close them, from the setup.
+   */
+  protected readonly openSessions = signal<PracticeSession[]>([]);
+  /** The open free practice: one at a time, so it is closed before another starts. */
+  protected readonly openFree = computed(() =>
+    this.openSessions().find((s) => s.durationMinutes == null),
+  );
+  /** The open session being closed from the list. */
+  protected readonly closing = signal<string | null>(null);
   /** The session was picked up after a reload. */
   protected readonly resumed = signal(false);
 
@@ -383,6 +397,8 @@ export class Practice {
   private timer?: ReturnType<typeof setInterval>;
   private quickErrorTimer?: ReturnType<typeof setTimeout>;
   private clock?: ReturnType<typeof setInterval>;
+  /** Counts down the open attempts listed on the setup. */
+  private openClock?: ReturnType<typeof setInterval>;
   /** The next save of `resume` to Firestore, and when it is due. */
   private resumeTimer?: ReturnType<typeof setTimeout>;
   private resumeDue = 0;
@@ -406,16 +422,18 @@ export class Practice {
       clearInterval(this.clock);
       clearTimeout(this.quickErrorTimer);
       clearTimeout(this.resumeTimer);
-      // Leaving mid-replay ends the session, so open trades are not left dangling (a reload
-      // does not get here: the session stays active and is picked up again).
-      if (this.phase() === 'playing') {
-        void this.finish();
-      }
+      clearInterval(this.openClock);
+      // Leaving the page keeps the session open where it is: the student comes back to it
+      // here (from this or another device) until they close it or its time runs out.
+      this.saveResumeNow();
     });
   }
 
   /** Starts free practice at a random start or the date the student picked. */
-  protected start(): Promise<void> {
+  protected async start(): Promise<void> {
+    if (this.openFree()) {
+      return;
+    }
     const instrument = this.instrument();
     const replayStart =
       this.randomStart() || !this.startDate()
@@ -519,8 +537,9 @@ export class Practice {
   }
 
   /**
-   * Picks up the newest session a reload (or a closed tab) left active, evaluation attempts
-   * included while their time lasts, so the student goes on where they were.
+   * Picks up the newest session the student left open (a reload, a closed tab, another page or
+   * another device), so they go on where they were. Evaluation attempts whose time ran out
+   * while they were away are closed first, at the bar they were left on.
    */
   private async resumeActive(): Promise<void> {
     const uid = this.auth.user()?.uid;
@@ -529,9 +548,8 @@ export class Practice {
     }
     this.phase.set('loading');
     try {
-      const now = Date.now();
-      const sessions = await this.practice.activeSessions(uid);
-      const session = sessions.find((s) => findInstrument(s.symbol) && !attemptExpired(s, now));
+      const open = await this.loadOpen(uid);
+      const session = open.find((s) => findInstrument(s.symbol));
       if (session) {
         await this.resume(session);
       }
@@ -544,20 +562,166 @@ export class Practice {
   }
 
   /**
-   * Rebuilds a session as it was left: its trades, the bar it was on, the timeframe, speed,
-   * drawings and, for an evaluation, the time left. The replay waits paused.
+   * The student's open sessions, after closing attempts whose time is up. Keeps them in
+   * `openSessions` for the list of practices to go back to.
    */
-  private async resume(session: PracticeSession): Promise<void> {
-    const evaluation = session.evaluationId
-      ? await this.evaluationService.get(session.evaluationId).catch(() => null)
-      : null;
+  private async loadOpen(uid: string): Promise<PracticeSession[]> {
+    const now = Date.now();
+    const sessions = await this.practice.activeSessions(uid, OPEN_SESSIONS_MAX);
+    const expired = sessions.filter((s) => attemptTimeUp(s, now));
+    const open = sessions.filter((s) => !attemptTimeUp(s, now));
+    this.openSessions.set(open);
+    this.watchOpen();
+    if (expired.length) {
+      await Promise.all(expired.map((s) => this.closeLeft(s).catch(() => undefined)));
+      this.loadSessions();
+      this.loadEvaluations();
+    }
+    return open;
+  }
+
+  /** Reloads the list of open sessions (not the one on screen). */
+  private async refreshOpen(): Promise<void> {
+    const uid = this.auth.user()?.uid;
+    if (!uid) {
+      return;
+    }
+    try {
+      await this.loadOpen(uid);
+    } catch {
+      // The list stays as it was; the page itself still works.
+    }
+  }
+
+  /**
+   * While the list shows open evaluation attempts, counts their time down and closes each one
+   * as it runs out.
+   */
+  private watchOpen(): void {
+    clearInterval(this.openClock);
+    this.openClock = undefined;
+    if (!this.openSessions().some((s) => s.durationMinutes != null)) {
+      return;
+    }
+    this.openClock = setInterval(() => {
+      const now = Date.now();
+      this.now.set(now);
+      const expired = this.openSessions().filter((s) => attemptTimeUp(s, now));
+      if (expired.length) {
+        this.openSessions.update((all) => all.filter((s) => !expired.includes(s)));
+        void Promise.all(expired.map((s) => this.closeLeft(s).catch(() => undefined))).then(() => {
+          this.loadSessions();
+          this.loadEvaluations();
+        });
+      }
+    }, 1000);
+  }
+
+  /** Goes back to a session the student left open, where they left it. */
+  protected async continueSession(session: PracticeSession): Promise<void> {
+    if (this.phase() === 'loading') {
+      return;
+    }
+    if (attemptTimeUp(session, Date.now())) {
+      await this.refreshOpen();
+      return;
+    }
+    this.error.set(null);
+    this.phase.set('loading');
+    try {
+      await this.resume(session);
+      this.openSessions.update((all) => all.filter((s) => s.id !== session.id));
+    } catch {
+      this.error.set(this.i18n.messages().practice.resumeFailed);
+    }
+    if (this.phase() === 'loading') {
+      this.phase.set('setup');
+    }
+  }
+
+  /**
+   * Leaves the session on screen open and goes back to the list: it stays where it is (an
+   * evaluation's clock keeps running) until the student comes back or closes it.
+   */
+  protected leaveOpen(): void {
+    if (this.phase() !== 'playing') {
+      return;
+    }
+    this.pause();
+    this.saveResumeNow();
+    clearInterval(this.clock);
+    this.deadline.set(null);
+    this.focused.set(null);
+    this.evaluation.set(null);
+    this.replay.set(null);
+    this.sessionId.set(null);
+    this.error.set(null);
+    this.resumed.set(false);
+    this.phase.set('setup');
+    this.loadSessions();
+    void this.refreshOpen().then(() => this.loadEvaluations());
+  }
+
+  /** Closes a session from the list of open ones, without opening it. */
+  protected async closeOpen(session: PracticeSession): Promise<void> {
+    const t = this.i18n.messages().practice;
+    if (this.closing() || !confirm(t.confirmClose)) {
+      return;
+    }
+    this.closing.set(session.id);
+    this.error.set(null);
+    try {
+      await this.closeLeft(session);
+      this.openSessions.update((all) => all.filter((s) => s.id !== session.id));
+      this.watchOpen();
+    } catch {
+      this.error.set(t.finishFailed);
+    } finally {
+      this.closing.set(null);
+    }
+    this.loadSessions();
+    if (session.evaluationId) {
+      this.loadEvaluations();
+    }
+  }
+
+  /**
+   * Closes a session that is not on screen as `finish` would have: positions close and orders
+   * are cancelled at the bar it was left on, and it is marked finished.
+   */
+  private async closeLeft(session: PracticeSession): Promise<void> {
     const saved = pickResume(session.resume, readLocalResume(session.id));
-    const timeframe = TIMEFRAMES.find((tf) => tf.interval === saved?.interval) ?? DEFAULT_TIMEFRAME;
-    const [trades, minutes, history] = await Promise.all([
-      this.practice.sessionTrades(session.id),
-      this.market.loadCandles(session.symbol, '1m', session.replayStart - MINUTE),
-      this.loadHistory(session.symbol, timeframe, session.replayStart),
+    const trades = await this.practice.sessionTrades(session.id);
+    const replay = await this.rebuild(session, saved, trades);
+    const { cancelled, closed } = replay.closeAll('sessionEnd');
+    await Promise.all([
+      ...cancelled.map((order) => this.practice.cancelOrder(session.id, order)),
+      ...closed.map((trade) => this.practice.closeTrade(session.id, trade)),
     ]);
+    await this.practice.finishSession(session.id, this.summary(replay));
+    clearLocalResume(session.id);
+    void this.notifications.notifyActivity({
+      type: session.evaluationId ? 'evaluationFinished' : 'practiceFinished',
+      kind: session.evaluationId ? 'evaluation' : 'practice',
+      refId: session.id,
+      contextId: session.evaluationId ?? null,
+      title:
+        this.evaluations().find((card) => card.evaluation.id === session.evaluationId)?.evaluation
+          .title ?? '',
+    });
+  }
+
+  /** A session's replay with its trades, at the bar it was left on. */
+  private async rebuild(
+    session: PracticeSession,
+    saved: SessionResume | null,
+    trades: PracticeTrade[],
+  ): Promise<Replay> {
+    const minutes = await this.market.loadCandles(
+      session.symbol,
+      '1m',
+      session.replayStart - MINUTE,
+    );
     if (minutes.length < MIN_REPLAY_MINUTES) {
       throw new Error('Not enough data');
     }
@@ -570,6 +734,24 @@ export class Practice {
       await this.fetchMinutes(replay, session.symbol, session.replayStart);
     }
     replay.resume(trades, time);
+    return replay;
+  }
+
+  /**
+   * Rebuilds a session as it was left: its trades, the bar it was on, the timeframe, speed,
+   * drawings and, for an evaluation, the time left. The replay waits paused.
+   */
+  private async resume(session: PracticeSession): Promise<void> {
+    const evaluation = session.evaluationId
+      ? await this.evaluationService.get(session.evaluationId).catch(() => null)
+      : null;
+    const saved = pickResume(session.resume, readLocalResume(session.id));
+    const timeframe = TIMEFRAMES.find((tf) => tf.interval === saved?.interval) ?? DEFAULT_TIMEFRAME;
+    const [trades, history] = await Promise.all([
+      this.practice.sessionTrades(session.id),
+      this.loadHistory(session.symbol, timeframe, session.replayStart),
+    ]);
+    const replay = await this.rebuild(session, saved, trades);
     this.symbol.set(session.symbol);
     this.hideDates.set(evaluation?.hideDates ?? saved?.hideDates ?? true);
     if (saved && SPEEDS.includes(saved.speed)) {
@@ -584,11 +766,11 @@ export class Practice {
       evaluation,
       (saved?.drawings ?? []) as Drawing[],
     );
+    this.openSessions.update((all) => all.filter((s) => s.id !== session.id));
     this.resumed.set(true);
-    if (session.durationMinutes != null) {
-      this.startClock(
-        (session.startedAt?.toMillis() ?? Date.now()) + session.durationMinutes * MINUTE,
-      );
+    const deadline = attemptDeadline(session);
+    if (deadline !== null) {
+      this.startClock(deadline);
     }
     if (replay.finished()) {
       void this.finish();
@@ -1017,6 +1199,30 @@ export class Practice {
     this.sessionId.set(null);
     this.error.set(null);
     this.phase.set('setup');
+    void this.refreshOpen();
+  }
+
+  /** An evaluation attempt the student left open, to go back to from its card. */
+  protected openAttempt(card: EvaluationCard): PracticeSession | null {
+    const attempt = card.attempt;
+    return attempt?.status === 'active' && !attemptTimeUp(attempt, this.now()) ? attempt : null;
+  }
+
+  /** The time an open evaluation attempt has left, or null for free practice. */
+  protected openTimeLeft(session: PracticeSession): string | null {
+    const deadline = attemptDeadline(session);
+    return deadline === null ? null : formatCountdown(deadline - this.now());
+  }
+
+  protected evaluationTitle(session: PracticeSession): string {
+    return (
+      this.evaluations().find((card) => card.evaluation.id === session.evaluationId)?.evaluation
+        .title ?? ''
+    );
+  }
+
+  protected shownStatus(session: PracticeSession): PracticeSession['status'] {
+    return shownStatus(session, this.now());
   }
 
   protected numberOrNull(value: string): number | null {

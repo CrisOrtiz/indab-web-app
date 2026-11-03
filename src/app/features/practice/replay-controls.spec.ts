@@ -11,6 +11,7 @@ import { ReplayControls } from './replay-controls';
     (step)="steps = steps + 1"
     (togglePlay)="playing.set(!playing())"
     (speedChange)="speed.set($event)"
+    (leave)="left = true"
     (finish)="finished = true"
   />`,
 })
@@ -19,6 +20,7 @@ class Host {
   readonly speed = signal(2);
   steps = 0;
   finished = false;
+  left = false;
 }
 
 describe('ReplayControls', () => {
@@ -81,9 +83,17 @@ describe('ReplayControls', () => {
   });
 
   it('ends the session', () => {
-    const finish = el.querySelector<HTMLButtonElement>('button.finish')!;
+    const finish = el.querySelector<HTMLButtonElement>('button.finish:not(.leave)')!;
     expect(finish.textContent?.trim()).toBe('Terminar sesión');
     finish.click();
     expect(host.finished).toBe(true);
+  });
+
+  it('leaves the session open', () => {
+    const leave = el.querySelector<HTMLButtonElement>('button.leave')!;
+    expect(leave.textContent?.trim()).toBe('Salir sin cerrar');
+    leave.click();
+    expect(host.left).toBe(true);
+    expect(host.finished).toBe(false);
   });
 });

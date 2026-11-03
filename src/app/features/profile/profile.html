@@ -114,7 +114,7 @@
               <tr>
                 <td>{{ session.startedAt?.toDate?.() | localDate }}</td>
                 <td>{{ tr.instruments[session.symbol] ?? session.symbol }}</td>
-                <td>{{ session.status === 'active' ? tr.active : tr.finished }}</td>
+                <td>{{ statusOf(session) === 'active' ? tr.active : tr.finished }}</td>
                 <td class="num">{{ session.tradeCount }}</td>
                 <td class="num" [class.up]="session.pnl > 0" [class.down]="session.pnl < 0">
                   {{ signed(session.pnl) }}

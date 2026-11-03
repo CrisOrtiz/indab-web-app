@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createUser, listDocuments, resetEmulators } from './emulators';
+import { createUser, listDocuments, resetEmulators, setDocument } from './emulators';
 import { nav, signIn, signOut } from './helpers';
 import { mockMarket } from './market';
 
@@ -54,6 +54,91 @@ test('a reload picks the practice up where it was left', async ({ page }) => {
   // A finished session is not picked up again.
   await page.reload();
   await expect(page.getByRole('button', { name: 'Comenzar práctica' })).toBeVisible();
+});
+
+test('a practice stays open until the student closes it, wherever they go', async ({ page }) => {
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+  await page.getByRole('button', { name: 'Comprar 0.01 lotes a mercado' }).click();
+  await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
+  await page.getByRole('button', { name: 'Siguiente vela' }).click();
+  await expect(page.locator('.market .price')).toHaveText('101.000');
+
+  // Leaving for another page keeps it open, and the academy leads back to it.
+  await page.getByRole('link', { name: '← Academia' }).click();
+  await expect(page).toHaveURL('/academy');
+  await expect(page.getByText('Tienes una práctica abierta')).toBeVisible();
+  expect((await listDocuments('practiceSessions'))[0]?.['status']).toBe('active');
+  await page.getByRole('link', { name: /Continuar práctica/ }).click();
+  await expect(page.getByText('Retomaste tu sesión donde la dejaste')).toBeVisible();
+  await expect(page.locator('.market .price')).toHaveText('101.000');
+  await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
+
+  // Back to the list without closing it: it waits there, and no other free practice starts.
+  await page.getByRole('button', { name: 'Salir sin cerrar' }).click();
+  const open = page.locator('.open-session');
+  await expect(open).toContainText('Práctica libre');
+  await expect(page.getByRole('button', { name: 'Comenzar práctica' })).toHaveCount(0);
+  await open.getByRole('button', { name: 'Continuar' }).click();
+  await expect(page.locator('.market .price')).toHaveText('101.000');
+
+  // Closing it is the student's call.
+  await page.getByRole('button', { name: 'Salir sin cerrar' }).click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await open.getByRole('button', { name: 'Cerrar' }).click();
+  await expect(page.getByRole('button', { name: 'Comenzar práctica' })).toBeVisible();
+  await expect
+    .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
+    .toBe('finished');
+  expect(await listDocuments('practiceSessions')).toHaveLength(1);
+});
+
+test('an evaluation left open is handed in once its time is up', async ({ page }) => {
+  const replayStart = Date.UTC(2026, 1, 2, 8);
+  const id = `ev1_${studentUid}`;
+  await setDocument(`practiceSessions/${id}`, {
+    uid: studentUid,
+    userName: 'José Pérez',
+    symbol: 'XAUUSDT',
+    interval: '15m',
+    replayStart,
+    startingBalance: 200,
+    balance: 200,
+    pnl: 0,
+    tradeCount: 1,
+    status: 'active',
+    startedAt: new Date(Date.now() - 45 * 60_000),
+    evaluationId: 'ev1',
+    durationMinutes: 20,
+  });
+  await setDocument(`practiceSessions/${id}/trades/t1`, {
+    uid: studentUid,
+    side: 'long',
+    orderType: 'market',
+    orderPrice: null,
+    placedTime: replayStart / 1000,
+    quantity: 0.01,
+    entryPrice: 100,
+    entryTime: replayStart / 1000,
+    stopLoss: null,
+    takeProfit: null,
+    status: 'open',
+    openedAt: new Date(),
+  });
+  await signIn(page, 'jose@indab.test');
+  // Its time is up, so the academy no longer offers to go back to it...
+  await expect(page.getByRole('link', { name: 'Práctica de trading' })).toBeVisible();
+  await expect(page.getByText('Tienes una práctica abierta')).toHaveCount(0);
+  // ...and the practice page closes it where it was left.
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await expect(page.getByRole('button', { name: 'Comenzar práctica' })).toBeVisible();
+  await expect
+    .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
+    .toBe('finished');
+  expect(await listDocuments(`practiceSessions/${id}/trades`)).toEqual([
+    expect.objectContaining({ status: 'closed', exitReason: 'sessionEnd' }),
+  ]);
 });
 
 test('a student practises on a replay and an admin reviews the trades', async ({ page }) => {

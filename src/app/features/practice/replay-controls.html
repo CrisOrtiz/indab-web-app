@@ -53,6 +53,11 @@
   </div>
 </div>
 
+<button type="button" class="finish leave" [attr.data-tip]="t.leaveOpenHint" (click)="leave.emit()">
+  <app-icon name="exit" [size]="16" />
+  <span class="label">{{ t.leaveOpen }}</span>
+</button>
+
 <button type="button" class="finish" [attr.data-tip]="t.finish" (click)="finish.emit()">
   <app-icon name="stop" [size]="16" />
   <span class="label">{{ t.finish }}</span>

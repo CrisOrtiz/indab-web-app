@@ -4,7 +4,7 @@ import { Icon } from '../../shared/icon/icon';
 
 /**
  * The replay's transport bar: next bar, a round play/pause button whose ring spins faster with
- * the speed, the speed as a sliding segmented control, and the end-session button. Space plays
+ * the speed, the speed as a sliding segmented control, the leave-open button and the end-session button. Space plays
  * and pauses (the practice page already steps with the right arrow).
  */
 @Component({
@@ -23,6 +23,8 @@ export class ReplayControls {
   readonly step = output<void>();
   readonly togglePlay = output<void>();
   readonly speedChange = output<number>();
+  /** Back to the list, leaving the session open where it is. */
+  readonly leave = output<void>();
   readonly finish = output<void>();
 
   protected readonly i18n = inject(I18n);

@@ -13,6 +13,7 @@ import { MentorshipService } from '../../mentorships/mentorship.service';
 import { PracticeService, SessionCursor, SessionFilters } from '../../practice/practice.service';
 import { SessionFilterBar } from '../../practice/session-filters';
 import { SessionReview } from '../../practice/session-review';
+import { shownStatus } from '../../practice/resume';
 
 /** Sessions per page. */
 export const REVIEW_PAGE_SIZE = 20;
@@ -30,6 +31,9 @@ export const REVIEW_PAGE_SIZE = 20;
   styleUrls: ['../admin.scss', './practice-review.scss'],
 })
 export class PracticeReview {
+  /** Attempts left open past their time show as finished. */
+  protected readonly statusOf = (session: PracticeSession) => shownStatus(session, Date.now());
+
   private readonly practice = inject(PracticeService);
   private readonly evaluations = inject(EvaluationService);
   private readonly mentorshipService = inject(MentorshipService);
