@@ -18,6 +18,7 @@ class FakeChart {
   readonly barSeconds = input(0);
   readonly focusTrade = input<string | null>(null);
   readonly startTime = input<number | null>(null);
+  readonly hideDates = input(false);
   readonly indicators = input<readonly string[] | null>(null);
   readonly indicatorsChange = output<string[]>();
 }

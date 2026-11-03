@@ -11,6 +11,7 @@
       [barSeconds]="barSeconds()"
       [focusTrade]="selected()"
       [startTime]="session().replayStart / 1000"
+      [hideDates]="hideDates()"
       [indicators]="chartSettings.indicators()"
       (indicatorsChange)="chartSettings.saveIndicators($event)"
     />
@@ -22,7 +23,12 @@
 }
 @if (trades(); as list) {
   @if (filled().length) {
-    <app-trade-navigator [trades]="filled()" [(selected)]="selected" />
+    <app-trade-navigator
+      [trades]="filled()"
+      [(selected)]="selected"
+      [hideDates]="hideDates()"
+      [startTime]="session().replayStart / 1000"
+    />
   } @else if (list.length) {
     <p class="muted">{{ t.noFilled }}</p>
   }
@@ -52,14 +58,22 @@
           >
             <td>{{ tr.orderLabel(trade.side, trade.orderType) }}</td>
             <td>
-              {{ trade.entryTime * 1000 | localDate: 'd MMM y, HH:mm' : 'UTC' }}
+              {{
+                hideDates()
+                  ? since(trade.entryTime)
+                  : (trade.entryTime * 1000 | localDate: 'd MMM y, HH:mm')
+              }}
             </td>
             <td>{{ trade.entryPrice | number: priceDigits(trade.entryPrice) }}</td>
             <td>{{ trade.quantity / lotSize | number: '1.2-4' }}</td>
             <td>{{ trade.stopLoss ?? '—' }} / {{ trade.takeProfit ?? '—' }}</td>
             @if (trade.status === 'closed') {
               <td>
-                {{ trade.exitTime! * 1000 | localDate: 'd MMM y, HH:mm' : 'UTC' }}
+                {{
+                  hideDates()
+                    ? since(trade.exitTime!)
+                    : (trade.exitTime! * 1000 | localDate: 'd MMM y, HH:mm')
+                }}
               </td>
               <td>{{ trade.exitPrice | number: priceDigits(trade.exitPrice!) }}</td>
               <td>{{ tr.exitReasons[trade.exitReason!] }}</td>

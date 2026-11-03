@@ -1009,6 +1009,16 @@ describe('evaluations', () => {
     await assertFails(create({ grade: 'A' }));
   });
 
+  it('take a pace from the list, or none for free speed', async () => {
+    const create = (id: string, extra: Record<string, unknown>) =>
+      setDoc(evalRef('trainer', id), evaluation(extra));
+    await assertSucceeds(create('p1', { pace: 60 }));
+    await assertSucceeds(create('p2', { pace: 900 }));
+    await assertSucceeds(create('p3', { pace: 1 }));
+    await assertFails(create('p4', { pace: 120 }));
+    await assertFails(create('p5', { pace: '60' }));
+  });
+
   it('keep their author when edited', async () => {
     await assertSucceeds(
       updateDoc(evalRef('admin'), { title: 'Nuevo', updatedAt: serverTimestamp() }),

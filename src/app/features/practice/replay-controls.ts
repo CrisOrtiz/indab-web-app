@@ -5,7 +5,8 @@ import { Icon } from '../../shared/icon/icon';
 /**
  * The replay's transport bar: next bar, a round play/pause button whose ring spins faster with
  * the speed, the speed as a sliding segmented control, the leave-open button and the end-session button. Space plays
- * and pauses (the practice page already steps with the right arrow).
+ * and pauses (the practice page already steps with the right arrow). A `live` replay (an
+ * evaluation run by the clock) only shows that it is live, with the leave and end buttons.
  */
 @Component({
   selector: 'app-replay-controls',
@@ -19,6 +20,8 @@ export class ReplayControls {
   /** Bars per second. */
   readonly speed = input.required<number>();
   readonly speeds = input.required<readonly number[]>();
+  /** The replay runs by the clock: no step, pause or speed. */
+  readonly live = input(false);
 
   readonly step = output<void>();
   readonly togglePlay = output<void>();
@@ -38,7 +41,7 @@ export class ReplayControls {
     const busy =
       target instanceof Element &&
       target.closest('input, select, textarea, button, a, [contenteditable="true"]');
-    if (event.key === ' ' && !busy && !event.repeat) {
+    if (event.key === ' ' && !busy && !event.repeat && !this.live()) {
       event.preventDefault();
       this.togglePlay.emit();
     }

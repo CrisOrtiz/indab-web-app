@@ -21,8 +21,8 @@ rules_version = '2';
 //                                        and members read their own. Membership lives in the
 //                                        student's users/{uid}.mentorshipIds
 //   evaluations/{id}                     timed practice evaluation set up by trainers or admins:
-//                                        market, replay start, time limit, window, assigned students
-//                                        and mentorships
+//                                        market, replay start, time limit, pace (the replay runs by
+//                                        the clock), window, assigned students and mentorships
 //   examForms/{id}                       evaluation form (questions, points, window, attempts,
 //                                        audience: everyone, or chosen students and mentorships)
 //                                        built by trainers or admins; no right answers
@@ -578,7 +578,7 @@ service cloud.firestore {
     match /evaluations/{evaluationId} {
       function validEvaluation(data) {
         return data.keys().hasOnly(['title', 'description', 'symbol', 'replayStart', 'hideDates',
-            'startingBalance', 'durationMinutes', 'opensAt', 'closesAt', 'studentIds',
+            'startingBalance', 'durationMinutes', 'pace', 'opensAt', 'closesAt', 'studentIds',
             'mentorshipIds', 'resultsPublished', 'createdBy', 'createdAt', 'updatedAt'])
           && data.title is string && data.title.size() > 0 && data.title.size() <= 120
           && data.description is string && data.description.size() <= 2000
@@ -587,6 +587,8 @@ service cloud.firestore {
           && data.hideDates is bool
           && data.startingBalance is number && data.startingBalance > 0
           && data.durationMinutes is int && data.durationMinutes >= 5 && data.durationMinutes <= 600
+          // Market minutes per real minute of an attempt run by the clock (missing: free speed).
+          && (!('pace' in data) || data.pace in [1, 60, 900])
           && data.opensAt is timestamp && data.closesAt is timestamp
           && data.closesAt > data.opensAt
           && data.studentIds is list && data.studentIds.size() <= 500

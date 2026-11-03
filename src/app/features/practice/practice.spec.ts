@@ -8,6 +8,7 @@ import { HISTORY_BARS, MarketDataService, REPLAY_BARS } from './market-data.serv
 import { Practice, QUICK_ERROR_MS, SESSIONS_PAGE_SIZE, formatCountdown } from './practice';
 import { PracticeService } from './practice.service';
 import { EvaluationService } from '../evaluations/evaluation.service';
+import { ServerClock } from './server-clock';
 import { Evaluation } from '../../core/models/evaluation';
 import { LevelMove, LevelRemove, OrderAt, OrderDraft, ReplayChart } from './replay-chart';
 import { SessionReview } from './session-review';
@@ -146,6 +147,7 @@ describe('Practice page', () => {
         { provide: MarketDataService, useValue: market },
         { provide: PracticeService, useValue: practice },
         { provide: EvaluationService, useValue: evaluations },
+        { provide: ServerClock, useValue: { now: () => Date.now(), sync: async () => undefined } },
       ],
     });
     TestBed.overrideComponent(Practice, {
@@ -305,6 +307,38 @@ describe('Practice page', () => {
     expect(el.textContent).toContain('Sesión terminada');
     // The card now shows it as taken.
     expect(evaluations.assignedTo).toHaveBeenCalledTimes(loads + 1);
+  });
+
+  it('runs an evaluation with a pace by the clock, with no pause, step or speed', async () => {
+    evaluations.assignedTo.mockResolvedValue([evaluation('e1', { pace: 60 })]);
+    await reload();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await click('Comenzar evaluación');
+    expect(el.querySelector('.live')?.textContent).toContain('En vivo');
+    expect(el.querySelector('.deck')).toBeNull();
+    expect(el.querySelector('.evaluation-bar')!.textContent).toContain('no se puede pausar');
+    const elapsed = () => el.querySelector('.elapsed')!.textContent!;
+    expect(elapsed()).toContain(': 0 min');
+    // The arrow key steps free practice only.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    await fixture.whenStable();
+    expect(elapsed()).toContain(': 0 min');
+    // One market minute a second.
+    await new Promise((resolve) => setTimeout(resolve, 1300));
+    await fixture.whenStable();
+    expect(elapsed()).toContain(': 1 min');
+  });
+
+  it("keeps an evaluation's dates hidden after it ends while its window is open", async () => {
+    evaluations.assignedTo.mockResolvedValue([evaluation('e1', { durationMinutes: 0.01 })]);
+    await reload();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await click('Comenzar evaluación');
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    await fixture.whenStable();
+    expect(el.textContent).toContain('Sesión terminada');
+    expect(el.textContent).toContain('fecha oculta hasta que cierre la evaluación');
+    expect(chart().hideDates()).toBe(true);
   });
 
   describe('after a reload', () => {

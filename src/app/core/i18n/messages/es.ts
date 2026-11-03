@@ -714,6 +714,11 @@ export const es = {
     closed: 'La operación ya está cerrada.',
   },
 
+  timeZone: {
+    title: 'Zona horaria',
+    hint: 'Las fechas, las horas y el gráfico de práctica se muestran en esta zona. Se guarda en este navegador.',
+    inputHint: (zone: string) => `Horas en ${zone}. Puedes cambiar la zona horaria en tu perfil.`,
+  },
   practice: {
     title: 'Práctica de trading',
     intro:
@@ -827,6 +832,11 @@ export const es = {
     timeLeft: (time: string) => `Quedan ${time}`,
     leavingKeeps:
       'Puedes salir y volver cuando quieras: el tiempo sigue corriendo y al acabarse la evaluación se entrega sola.',
+    live: 'En vivo',
+    liveHint:
+      'El gráfico avanza solo con el reloj: no se puede pausar ni adelantar. Si sales, el mercado sigue y al volver lo ves donde va.',
+    openedElsewhere: 'Abriste esta sesión en otra pestaña, así que aquí quedó en pausa.',
+    dateHidden: 'fecha oculta hasta que cierre la evaluación',
     leaveOpen: 'Salir sin cerrar',
     leaveOpenHint: 'Vuelve a la lista; la sesión queda abierta donde está.',
     openSessions: 'Tus prácticas abiertas',
@@ -952,6 +962,14 @@ export const es = {
     description: 'Instrucciones (opcional)',
     market: 'Mercado',
     duration: 'Tiempo límite (minutos)',
+    pace: 'Ritmo del examen',
+    paces: {
+      60: '1 min de mercado por segundo',
+      900: '15 min de mercado por segundo',
+      1: 'Tiempo real (1 min por minuto)',
+    } as Record<number, string>,
+    covers: (time: string) => `Avanza solo con el reloj y cubre ${time} de mercado.`,
+    freeSpeed: 'velocidad libre',
     start: 'Inicio del replay',
     randomStart: 'Fecha al azar',
     pickStart: 'Elegir fecha',

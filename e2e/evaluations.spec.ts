@@ -33,12 +33,17 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
   await page.getByRole('button', { name: 'Nueva evaluación' }).click();
   await page.getByLabel('Nombre').fill('Evaluación semanal');
   await page.getByLabel('Tiempo límite (minutos)').fill('20');
+  // Real time: the price stays put while the test trades.
+  await page
+    .getByLabel('Ritmo del examen')
+    .selectOption({ label: 'Tiempo real (1 min por minuto)' });
+  await expect(page.getByText('cubre 20 min de mercado')).toBeVisible();
   await page.getByRole('checkbox', { name: /José Pérez/ }).check();
   await page.getByRole('button', { name: 'Guardar evaluación' }).click();
   await expect(page.getByRole('status')).toContainText('Se guardó la evaluación');
   await expect(page.getByRole('heading', { name: /Evaluación semanal/ })).toContainText('Abierta');
   const [evaluation] = await listDocuments('evaluations');
-  expect(evaluation).toMatchObject({ durationMinutes: 20, studentIds: [joseUid] });
+  expect(evaluation).toMatchObject({ durationMinutes: 20, pace: 1, studentIds: [joseUid] });
 
   // Luis is not assigned: he sees no evaluation.
   await signOut(page);
@@ -64,10 +69,13 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
   await expect(page.getByText('Retomaste tu sesión donde la dejaste')).toBeVisible();
   await expect(page.locator('.evaluation-bar')).toContainText(/Quedan 1\d:\d\d/);
   await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
-  await page.getByRole('button', { name: 'Siguiente vela' }).click();
-  await expect(page.locator('.market .price')).toHaveText('101.000');
+  // It runs by the clock: nothing to step, pause or speed up.
+  await expect(page.getByText('En vivo')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Siguiente vela' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Terminar sesión' }).click();
   await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
+  // The date stays hidden while others can still take it.
+  await expect(page.getByText(/fecha oculta hasta que cierre la evaluación/)).toBeVisible();
   await page.getByRole('button', { name: 'Nueva práctica' }).click();
   await expect(page.locator('.evaluation')).toContainText('Presentada');
   await expect(page.getByRole('button', { name: 'Comenzar evaluación' })).toHaveCount(0);
@@ -79,7 +87,7 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
       evaluationId: evaluation['id'],
       durationMinutes: 20,
       status: 'finished',
-      pnl: 1,
+      pnl: 0,
     }),
   ]);
 
@@ -95,7 +103,7 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
   await page.getByRole('menuitem', { name: 'Ver resultados' }).click();
   const row = page.locator('.results tbody tr').first();
   await expect(row).toContainText('José Pérez');
-  await expect(row).toContainText('1.00');
+  await expect(row).toContainText('0.00');
   await page.getByRole('button', { name: 'Acciones: Evaluación semanal' }).click();
   await page.getByRole('menuitem', { name: 'Publicar resultados' }).click();
   await expect(page.getByRole('status')).toContainText('Los estudiantes ya ven el ranking');
@@ -104,7 +112,27 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
   await signIn(page, 'jose@indab.test');
   await page.getByRole('link', { name: 'Ranking de evaluaciones' }).click();
   await expect(page).toHaveURL('/academy/ranking');
-  await expect(page.getByRole('row', { name: /José Pérez Tú/ })).toContainText('1.00');
+  await expect(page.getByRole('row', { name: /José Pérez Tú/ })).toContainText('0.00');
+});
+
+test('an evaluation at one market minute a second moves on its own', async ({ page }) => {
+  await openEvaluations(page);
+  await page.getByRole('button', { name: 'Nueva evaluación' }).click();
+  await page.getByLabel('Nombre').fill('Evaluación en vivo');
+  await expect(page.getByLabel('Ritmo del examen')).toHaveValue('60');
+  await page.getByRole('checkbox', { name: /José Pérez/ }).check();
+  await page.getByRole('button', { name: 'Guardar evaluación' }).click();
+  await expect(page.getByRole('status')).toContainText('Se guardó la evaluación');
+
+  await signOut(page);
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Comenzar evaluación' }).click();
+  await expect(page.getByText('En vivo')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reproducir' })).toHaveCount(0);
+  // The first replayed minute comes after a second, with no one pressing play.
+  await expect(page.locator('.market .price')).toHaveText('101.000', { timeout: 10_000 });
 });
 
 test('free practice stays out of the ranking and private', async ({ page }) => {
@@ -168,6 +196,7 @@ test('a trainer duplicates an evaluation to give the same replay to other studen
     symbol: original['symbol'],
     replayStart: original['replayStart'],
     durationMinutes: 20,
+    pace: 60,
     studentIds: [await uidOf('luis@indab.test')],
   });
 

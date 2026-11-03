@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../core/i18n/local-date.pipe';
+import { datesLocked } from '../../core/models/evaluation';
 import { PracticeSession } from '../../core/models/practice';
 import { EvaluationService } from '../evaluations/evaluation.service';
 import { PracticeService } from './practice.service';
@@ -41,7 +42,7 @@ import { SessionReview } from './session-review';
             }}</strong>
           </p>
         </header>
-        <app-session-review [session]="s" [evaluationTitle]="title()" />
+        <app-session-review [session]="s" [evaluationTitle]="title()" [hideDates]="hidesDates()" />
       } @else {
         <p class="muted">{{ t.notFound }}</p>
       }
@@ -96,6 +97,8 @@ export class SessionPage {
   /** The evaluation's title, for an attempt. */
   protected readonly title = signal('');
   protected readonly loading = signal(true);
+  /** Students see an attempt without dates while its evaluation's window is open. */
+  protected readonly hidesDates = signal(false);
 
   constructor() {
     effect(() => {
@@ -107,12 +110,14 @@ export class SessionPage {
   private async load(id: string): Promise<void> {
     this.loading.set(true);
     this.title.set('');
+    this.hidesDates.set(false);
     try {
       const session = await this.practice.getSession(id);
       this.session.set(session);
       if (session?.evaluationId) {
         const evaluation = await this.evaluations.get(session.evaluationId).catch(() => null);
         this.title.set(evaluation?.title ?? '');
+        this.hidesDates.set(!this.auth.isStaff() && datesLocked(evaluation));
       }
     } catch {
       this.session.set(null);

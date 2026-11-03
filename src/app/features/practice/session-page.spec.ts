@@ -11,11 +11,12 @@ import { SessionReview } from './session-review';
 
 @Component({
   selector: 'app-session-review',
-  template: 'review {{ session().id }} {{ evaluationTitle() }}',
+  template: 'review {{ session().id }} {{ evaluationTitle() }} {{ hideDates() ? "hidden" : "" }}',
 })
 class FakeReview {
   readonly session = input.required<PracticeSession>();
   readonly evaluationTitle = input('');
+  readonly hideDates = input(false);
 }
 
 describe('SessionPage', () => {
@@ -82,6 +83,31 @@ describe('SessionPage', () => {
     expect(el.textContent).toContain('Ana Pérez');
     expect(el.textContent).toContain('review e1_ana Final de oro');
     expect(el.querySelector('a.back')?.getAttribute('href')).toBe('/admin/practice');
+  });
+
+  it("hides an attempt's dates from its student until the window closes", async () => {
+    const closes = (ms: number) => ({
+      id: 'e1',
+      title: 'Final de oro',
+      hideDates: true,
+      closesAt: { toMillis: () => ms },
+    });
+    practice.getSession.mockResolvedValue(session({ id: 'e1_ana', evaluationId: 'e1' }));
+    evaluations.get.mockResolvedValueOnce(closes(Date.now() + 60_000) as never);
+    await render('e1_ana');
+    expect(el.textContent).toContain('hidden');
+
+    TestBed.resetTestingModule();
+    evaluations.get.mockResolvedValueOnce(closes(Date.now() - 60_000) as never);
+    await render('e1_ana');
+    expect(el.textContent).not.toContain('hidden');
+
+    // Staff always see them.
+    TestBed.resetTestingModule();
+    auth.isStaff.set(true);
+    evaluations.get.mockResolvedValueOnce(closes(Date.now() + 60_000) as never);
+    await render('e1_ana');
+    expect(el.textContent).not.toContain('hidden');
   });
 
   it('says when the session does not exist', async () => {

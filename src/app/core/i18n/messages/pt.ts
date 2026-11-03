@@ -693,6 +693,12 @@ export const pt: Messages = {
     closed: 'A operação já está fechada.',
   },
 
+  timeZone: {
+    title: 'Fuso horário',
+    hint: 'As datas, os horários e o gráfico de prática aparecem neste fuso. Fica salvo neste navegador.',
+    inputHint: (zone: string) =>
+      `Horários em ${zone}. Você pode mudar o fuso horário no seu perfil.`,
+  },
   practice: {
     title: 'Prática de trading',
     intro:
@@ -805,6 +811,11 @@ export const pt: Messages = {
     timeLeft: (time: string) => `Faltam ${time}`,
     leavingKeeps:
       'Você pode sair e voltar quando quiser: o tempo continua correndo e, ao acabar, a avaliação é entregue sozinha.',
+    live: 'Ao vivo',
+    liveHint:
+      'O gráfico avança sozinho com o relógio: não dá para pausar nem adiantar. Se você sair, o mercado continua e ao voltar você o vê onde estiver.',
+    openedElsewhere: 'Você abriu esta sessão em outra aba, então aqui ela parou.',
+    dateHidden: 'data oculta até a avaliação fechar',
     leaveOpen: 'Sair sem fechar',
     leaveOpenHint: 'Volta para a lista; a sessão fica aberta onde está.',
     openSessions: 'Suas práticas abertas',
@@ -931,6 +942,14 @@ export const pt: Messages = {
     description: 'Instruções (opcional)',
     market: 'Mercado',
     duration: 'Tempo limite (minutos)',
+    pace: 'Ritmo do exame',
+    paces: {
+      60: '1 min de mercado por segundo',
+      900: '15 min de mercado por segundo',
+      1: 'Tempo real (1 min por minuto)',
+    } as Record<number, string>,
+    covers: (time: string) => `Avança sozinho com o relógio e cobre ${time} de mercado.`,
+    freeSpeed: 'velocidade livre',
     start: 'Início do replay',
     randomStart: 'Data aleatória',
     pickStart: 'Escolher data',

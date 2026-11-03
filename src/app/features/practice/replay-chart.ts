@@ -1,4 +1,4 @@
-import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
+import { DecimalPipe, NgTemplateOutlet, formatDate } from '@angular/common';
 import {
   Component,
   DestroyRef,
@@ -34,8 +34,12 @@ import {
   createChart,
   createSeriesMarkers,
 } from 'lightweight-charts';
+import type { TickMarkType } from 'lightweight-charts';
 import { I18n } from '../../core/i18n/i18n.service';
 import { ThemeService } from '../../core/theme/theme.service';
+import { TimeZoneService } from '../../core/time-zone/time-zone.service';
+// Registers the month names of every language for the times on the axis.
+import '../../core/i18n/local-date.pipe';
 import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/practice';
 import {
   DEFAULT_INDICATORS,
@@ -549,6 +553,7 @@ export class ReplayChart {
 
   protected readonly i18n = inject(I18n);
   private readonly theme = inject(ThemeService);
+  private readonly timeZones = inject(TimeZoneService);
   protected readonly indicatorList = INDICATORS;
   protected readonly signed = signedMoney;
   protected readonly priceDigits = priceDigits;
@@ -717,7 +722,11 @@ export class ReplayChart {
         }
       });
     });
-    effect(() => this.applyDates(this.hideDates()));
+    effect(() => {
+      // The chosen time zone also changes how times read.
+      this.timeZones.zone();
+      this.applyDates(this.hideDates());
+    });
     effect(() => {
       // A start given after the bars frames the replay too.
       this.startTime();
@@ -995,10 +1004,23 @@ export class ReplayChart {
     return this.drawn.at(-1)?.close;
   }
 
+  /** Times on the axis and the crosshair: hidden, or in the user's time zone. */
   private applyDates(hide: boolean): void {
+    const format = (time: Time, pattern: string) => {
+      const ms = (time as number) * 1000;
+      return formatDate(ms, pattern, this.i18n.language(), this.timeZones.offset(ms));
+    };
+    // By `TickMarkType`: year, month, day of month, time, time with seconds.
+    const ticks = ['y', 'MMM', 'd', 'HH:mm', 'HH:mm:ss'];
     this.chart?.applyOptions({
-      localization: { timeFormatter: hide ? () => '' : undefined },
-      timeScale: { tickMarkFormatter: hide ? () => '' : undefined },
+      localization: {
+        timeFormatter: hide ? () => '' : (time: Time) => format(time, 'EEE d MMM y, HH:mm'),
+      },
+      timeScale: {
+        tickMarkFormatter: hide
+          ? () => ''
+          : (time: Time, type: TickMarkType) => format(time, ticks[type]),
+      },
     });
   }
 

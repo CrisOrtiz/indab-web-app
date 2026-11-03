@@ -3,6 +3,7 @@ import { Component, computed, inject, input, model } from '@angular/core';
 import { I18n } from '../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../core/i18n/local-date.pipe';
 import { PracticeTrade } from '../../core/models/practice';
+import { sinceStart } from './bars';
 import { formatLots, priceDigits, signedMoney } from './practice-format';
 import { tradeLots } from './replay';
 
@@ -21,11 +22,15 @@ export class TradeNavigator {
   readonly trades = input.required<PracticeTrade[]>();
   /** Id of the trade shown. */
   readonly selected = model<string | null>(null);
+  /** Times show as market time since `startTime` (seconds) instead of dates. */
+  readonly hideDates = input(false);
+  readonly startTime = input(0);
 
   protected readonly i18n = inject(I18n);
   protected readonly priceDigits = priceDigits;
   protected readonly signed = signedMoney;
   protected readonly lots = (t: PracticeTrade) => formatLots(tradeLots(t));
+  protected readonly since = (time: number) => sinceStart(time, this.startTime());
 
   protected readonly index = computed(() =>
     this.trades().findIndex((t) => t.id === this.selected()),

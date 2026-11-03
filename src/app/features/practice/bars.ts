@@ -56,6 +56,14 @@ export function nextBarEnd(minuteTime: number, seconds: number): number {
   return (Math.floor((minuteTime + 60) / seconds) + 1) * seconds - 60;
 }
 
+/**
+ * "+1 h 15 min": when a candle (open time, seconds) came in the replay that started at
+ * `start` (seconds), shown instead of its date while dates are hidden.
+ */
+export function sinceStart(time: number, start: number): string {
+  return `+${formatElapsed(time + 60 - start)}`;
+}
+
 /** "2 d 4 h 15 min": market time elapsed in the replay. */
 export function formatElapsed(seconds: number): string {
   const minutes = Math.max(0, Math.round(seconds / 60));

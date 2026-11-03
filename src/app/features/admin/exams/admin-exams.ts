@@ -17,6 +17,7 @@ import { EvaluationService, StudentOption } from '../../evaluations/evaluation.s
 import { MentorshipService } from '../../mentorships/mentorship.service';
 import { NotificationService } from '../../notifications/notification.service';
 import { AudiencePicker } from '../audience/audience-picker';
+import { TimeZoneService } from '../../../core/time-zone/time-zone.service';
 import { ExamService } from '../../exams/exam.service';
 import {
   EditorQuestion,
@@ -41,6 +42,7 @@ import {
   styleUrls: ['../admin.scss', '../evaluations/admin-evaluations.scss', './admin-exams.scss'],
 })
 export class AdminExams {
+  protected readonly zones = inject(TimeZoneService);
   private readonly service = inject(ExamService);
   private readonly evaluations = inject(EvaluationService);
   private readonly mentorshipService = inject(MentorshipService);
@@ -119,7 +121,7 @@ export class AdminExams {
   protected create(): void {
     this.editing.set(null);
     this.cloning.set(null);
-    this.form.set(toForm(null, null));
+    this.form.set(toForm(null, null, new Date(), this.zones.zone()));
   }
 
   protected async edit(exam: Exam): Promise<void> {
@@ -127,7 +129,7 @@ export class AdminExams {
       const key = await this.service.key(exam.id);
       this.editing.set(exam);
       this.cloning.set(null);
-      this.form.set(toForm(exam, key));
+      this.form.set(toForm(exam, key, new Date(), this.zones.zone()));
     } catch {
       this.message.set({ kind: 'error', text: this.i18n.messages().examAdmin.loadFailed });
     }
@@ -141,7 +143,7 @@ export class AdminExams {
       this.editing.set(null);
       this.cloning.set(exam);
       this.message.set(null);
-      this.form.set(cloneForm(exam, key, t.copyOf(exam.title)));
+      this.form.set(cloneForm(exam, key, t.copyOf(exam.title), new Date(), this.zones.zone()));
     } catch {
       this.message.set({ kind: 'error', text: t.loadFailed });
     }
@@ -247,13 +249,13 @@ export class AdminExams {
     if (!form) {
       return;
     }
-    const problem = formProblem(form, t);
+    const problem = formProblem(form, t, this.zones.zone());
     if (problem) {
       this.message.set({ kind: 'error', text: problem });
       return;
     }
     const editing = this.editing();
-    const { input, key } = fromForm(form, editing);
+    const { input, key } = fromForm(form, editing, this.zones.zone());
     this.saving.set(true);
     try {
       const id = await this.service.save(editing?.id ?? null, input, key);
