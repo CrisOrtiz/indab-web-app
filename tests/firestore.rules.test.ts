@@ -1299,6 +1299,44 @@ describe('evaluations', () => {
     await assertFails(updateDoc(ref('trainer'), { reason: 'Otro' }));
     await assertFails(deleteDoc(ref('admin')));
   });
+
+  it('let staff rate an attempt 1 to 5, which the student reads once results are out', async () => {
+    const ref = (uid: string | null, student = 'enrolled') =>
+      doc(as(uid), `evaluations/e1/rubrics/${student}`);
+    const scores = { plan: 4, risk: 3, stops: 5, context: 2, discipline: 4 };
+    const rubric = (by: string, extra: Record<string, unknown> = {}) => ({
+      uid: 'enrolled',
+      scores,
+      by,
+      byName: 'Tomás',
+      updatedAt: serverTimestamp(),
+      ...extra,
+    });
+    await assertSucceeds(setDoc(ref('trainer'), rubric('trainer')));
+    await assertSucceeds(setDoc(ref('admin'), rubric('admin')));
+    await assertFails(setDoc(ref('trainer'), rubric('admin')));
+    await assertFails(setDoc(ref('trainer', 'other'), rubric('trainer')));
+    await assertFails(
+      setDoc(ref('trainer'), rubric('trainer', { scores: { ...scores, risk: 6 } })),
+    );
+    await assertFails(
+      setDoc(ref('trainer'), rubric('trainer', { scores: { ...scores, plan: 0 } })),
+    );
+    await assertFails(
+      setDoc(ref('trainer'), rubric('trainer', { scores: { ...scores, luck: 5 } })),
+    );
+    await assertFails(setDoc(ref('trainer'), rubric('trainer', { scores: { plan: 4, risk: 3 } })));
+    await assertFails(setDoc(ref('trainer'), rubric('trainer', { grade: 'A' })));
+    await assertFails(setDoc(ref('enrolled'), rubric('enrolled')));
+
+    // Hidden from the student until the results are published, and from everyone else.
+    await assertSucceeds(getDoc(ref('trainer')));
+    await assertFails(getDoc(ref('enrolled')));
+    await seed('evaluations/e1', seeded(evaluation({ resultsPublished: true })));
+    await assertSucceeds(getDoc(ref('enrolled')));
+    await assertFails(getDoc(ref('other')));
+    await assertSucceeds(deleteDoc(ref('trainer')));
+  });
 });
 
 describe('ranking', () => {

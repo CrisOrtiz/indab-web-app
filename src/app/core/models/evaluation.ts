@@ -64,6 +64,29 @@ export interface EvaluationAdjustment {
   at: Timestamp;
 }
 
+/** What the mentor rates on each attempt, from 1 to 5. */
+export const RUBRIC_CRITERIA = ['plan', 'risk', 'stops', 'context', 'discipline'] as const;
+export type RubricCriterion = (typeof RUBRIC_CRITERIA)[number];
+export type RubricScores = Record<RubricCriterion, number>;
+
+/**
+ * Stored at `evaluations/{id}/rubrics/{uid}`: the mentor's rating of a student's attempt,
+ * 1 to 5 per criterion, so the grade weighs judgement and not only luck. Staff write it; the
+ * student reads it once the results are published.
+ */
+export interface EvaluationRubric {
+  uid: string;
+  scores: RubricScores;
+  by: string;
+  byName: string;
+  updatedAt: Timestamp;
+}
+
+/** A rubric's average, 1 to 5. */
+export function rubricAverage(scores: RubricScores): number {
+  return RUBRIC_CRITERIA.reduce((sum, c) => sum + scores[c], 0) / RUBRIC_CRITERIA.length;
+}
+
 export type EvaluationWindow = 'upcoming' | 'open' | 'closed';
 
 /** Where `now` (ms) falls in the evaluation's window. */

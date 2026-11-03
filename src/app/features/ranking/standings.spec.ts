@@ -70,7 +70,7 @@ describe('evaluationStandings', () => {
       [session('a', 'Ana', -4), session('b', 'Bea', 0)],
       [],
       Date.now(),
-      new Map([['a--4', [trade as PracticeTrade]]]),
+      { trades: new Map([['a--4', [trade as PracticeTrade]]]) },
     );
     expect(rows[1].stats).toMatchObject({ trades: 1, stoppedOut: true });
     expect(rows[0].stats).toBeNull();

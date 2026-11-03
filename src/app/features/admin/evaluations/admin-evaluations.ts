@@ -9,6 +9,8 @@ import {
   EVALUATION_PACES,
   Evaluation,
   EvaluationAdjustment,
+  EvaluationRubric,
+  RubricScores,
   evaluationWindow,
 } from '../../../core/models/evaluation';
 import { PracticeSession, PracticeTrade } from '../../../core/models/practice';
@@ -31,6 +33,7 @@ import { EvaluationStanding, evaluationStandings } from '../../ranking/standings
 import { TimeZoneService } from '../../../core/time-zone/time-zone.service';
 import { fromLocalInput, toLocalInput } from '../exams/exam-form';
 import { EvaluationResults } from './evaluation-results';
+import { RubricForm } from './rubric-form';
 
 /** The evaluation form, as the inputs hold it. */
 interface EvaluationForm {
@@ -69,7 +72,15 @@ const utcDay = (time: number) => new Date(time).toISOString().slice(0, 10);
  */
 @Component({
   selector: 'app-admin-evaluations',
-  imports: [ActionsMenu, AudiencePicker, EvaluationResults, Icon, LocalDatePipe, RouterLink],
+  imports: [
+    ActionsMenu,
+    AudiencePicker,
+    EvaluationResults,
+    Icon,
+    LocalDatePipe,
+    RouterLink,
+    RubricForm,
+  ],
   templateUrl: './admin-evaluations.html',
   styleUrls: ['../admin.scss', './admin-evaluations.scss'],
 })
@@ -118,6 +129,9 @@ export class AdminEvaluations {
   protected readonly adjustReason = signal('');
   protected readonly adjustBusy = signal(false);
   protected readonly maxExtra = MAX_EXTRA_MINUTES;
+  /** The attempt the mentor is rating with the rubric. */
+  protected readonly rating = signal<EvaluationStanding | null>(null);
+  protected readonly ratingBusy = signal(false);
   protected readonly standings = signal<EvaluationStanding[] | null>(null);
 
   protected readonly dateRange = computed(() => {
@@ -411,9 +425,10 @@ export class AdminEvaluations {
 
   private async loadResults(evaluation: Evaluation): Promise<void> {
     try {
-      const [sessions, adjustments] = await Promise.all([
+      const [sessions, adjustments, rubrics] = await Promise.all([
         this.practice.evaluationSessions(evaluation.id),
         this.service.adjustments(evaluation.id).catch(() => []),
+        this.service.rubrics(evaluation.id).catch(() => new Map<string, EvaluationRubric>()),
       ]);
       const students = this.assigned(evaluation).map((uid) => ({ uid, name: this.nameOf(uid) }));
       // Each attempt's trades, for its statistics; one that fails to load just shows none.
@@ -429,7 +444,9 @@ export class AdminEvaluations {
       if (this.selected() === evaluation.id) {
         this.attempts.set(sessions);
         this.adjustments.set(adjustments);
-        this.standings.set(evaluationStandings(sessions, students, Date.now(), trades));
+        this.standings.set(
+          evaluationStandings(sessions, students, Date.now(), { trades, rubrics }),
+        );
       }
     } catch {
       this.standings.set([]);
@@ -437,8 +454,15 @@ export class AdminEvaluations {
     }
   }
 
-  /** Opens the form to add minutes to an attempt, or to restart it. */
-  protected startAdjust(row: EvaluationStanding, kind: 'extraTime' | 'reset'): void {
+  /** Opens the form to add minutes to an attempt, restart it or rate it. */
+  protected startAdjust(row: EvaluationStanding, kind: 'extraTime' | 'reset' | 'rubric'): void {
+    this.message.set(null);
+    if (kind === 'rubric') {
+      this.adjusting.set(null);
+      this.rating.set(row);
+      return;
+    }
+    this.rating.set(null);
     this.adjusting.set({ row, kind });
     this.adjustMinutes.set(10);
     this.adjustReason.set('');
@@ -483,6 +507,8 @@ export class AdminEvaluations {
         await this.practice.giveExtraTime(session.id, extra);
       } else {
         await this.practice.deleteSession(session.id);
+        // A new attempt gets a new rating.
+        await this.service.removeRubric(evaluation.id, session.uid).catch(() => undefined);
       }
       await this.service.logAdjustment(evaluation.id, {
         uid: session.uid,
@@ -503,6 +529,26 @@ export class AdminEvaluations {
       this.message.set({ kind: 'error', text: t.adjustFailed });
     } finally {
       this.adjustBusy.set(false);
+    }
+    await this.loadResults(evaluation);
+  }
+
+  /** Saves the mentor's rubric for the attempt being rated. */
+  protected async saveRubric(evaluation: Evaluation, scores: RubricScores): Promise<void> {
+    const row = this.rating();
+    const t = this.i18n.messages().evaluations.rubric;
+    if (!row || this.ratingBusy()) {
+      return;
+    }
+    this.ratingBusy.set(true);
+    try {
+      await this.service.saveRubric(evaluation.id, row.uid, scores);
+      this.message.set({ kind: 'ok', text: t.saved(row.name) });
+      this.rating.set(null);
+    } catch {
+      this.message.set({ kind: 'error', text: t.failed });
+    } finally {
+      this.ratingBusy.set(false);
     }
     await this.loadResults(evaluation);
   }

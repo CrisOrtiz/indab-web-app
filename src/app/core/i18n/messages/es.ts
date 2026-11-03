@@ -965,6 +965,42 @@ export const es = {
     description: 'Instrucciones (opcional)',
     market: 'Mercado',
     duration: 'Tiempo límite (minutos)',
+    rubric: {
+      rate: 'Calificar con rúbrica',
+      column: 'Rúbrica',
+      title: (name: string) => `Rúbrica de ${name}`,
+      scale:
+        'De 1 (muy débil) a 5 (excelente) en cada criterio. El estudiante la ve cuando publiques los resultados.',
+      criteria: {
+        plan: {
+          label: 'Plan de entrada',
+          hint: 'Entró con una razón clara, en zonas planificadas.',
+        },
+        risk: {
+          label: 'Gestión de riesgo',
+          hint: 'Tamaño de posición acorde a su stop y a la cuenta.',
+        },
+        stops: {
+          label: 'Respeto de SL y TP',
+          hint: 'Puso stop loss y take profit y no los movió en su contra.',
+        },
+        context: {
+          label: 'Lectura de contexto',
+          hint: 'Leyó tendencia, estructura y noticias antes de operar.',
+        },
+        discipline: {
+          label: 'Disciplina',
+          hint: 'Siguió su plan sin sobreoperar ni operar por impulso.',
+        },
+      },
+      missing: 'Elige una nota en cada criterio.',
+      save: 'Guardar rúbrica',
+      saved: (name: string) => `Se guardó la rúbrica de ${name}.`,
+      failed: 'No se pudo guardar la rúbrica. Inténtalo de nuevo.',
+      average: (value: string) => `${value} / 5`,
+      yours: 'Rúbrica de tu mentor',
+      by: (name: string) => `Calificó ${name}`,
+    },
     resultsView: 'Qué mostrar',
     viewRanking: 'Ranking',
     viewMetrics: 'Métricas de riesgo',

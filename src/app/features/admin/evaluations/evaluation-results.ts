@@ -6,6 +6,7 @@ import { Mentorship, membersOf } from '../../../core/models/mentorship';
 import { MentorshipFilter } from '../audience/mentorship-filter';
 import { Pager } from '../../../shared/pager/pager';
 import { pageCount, pageOf } from '../../../shared/pager/cursor-pages';
+import { rubricAverage } from '../../../core/models/evaluation';
 import { EvaluationStanding } from '../../ranking/standings';
 
 /** Students per page of results. */
@@ -76,6 +77,7 @@ export const RESULTS_PAGE_SIZE = 20;
             <th>{{ t.pnl }}</th>
             <th>{{ t.return }}</th>
             <th>{{ t.trades }}</th>
+            <th>{{ t.rubric.column }}</th>
           } @else {
             <th>{{ ts.maxDrawdown }}</th>
             <th>{{ ts.profitFactor }}</th>
@@ -144,6 +146,11 @@ export const RESULTS_PAGE_SIZE = 20;
                 {{ row.return === null ? '—' : (row.return | percent: '1.1-1') }}
               </td>
               <td [attr.data-label]="t.trades">{{ row.trades ?? '—' }}</td>
+              <td [attr.data-label]="t.rubric.column">
+                {{
+                  row.rubric ? t.rubric.average((average(row.rubric) | number: '1.1-1') ?? '') : '—'
+                }}
+              </td>
             }
             <td class="row-actions">
               @let actions = menus().get(row.uid) ?? [];
@@ -158,7 +165,7 @@ export const RESULTS_PAGE_SIZE = 20;
           </tr>
         } @empty {
           <tr>
-            <td [attr.colspan]="view() === 'ranking' ? 7 : 10" class="muted empty">
+            <td [attr.colspan]="view() === 'ranking' ? 8 : 10" class="muted empty">
               {{ standings().length ? tl.noMatches : t.noAttempts }}
             </td>
           </tr>
@@ -216,7 +223,7 @@ export class EvaluationResults {
   readonly students = input<{ uid: string; mentorshipIds: string[] }[]>([]);
   readonly mentorships = input<Mentorship[]>([]);
   /** Staff picked "add minutes" or "restart" on an attempt. */
-  readonly adjust = output<{ row: EvaluationStanding; kind: 'extraTime' | 'reset' }>();
+  readonly adjust = output<{ row: EvaluationStanding; kind: 'extraTime' | 'reset' | 'rubric' }>();
 
   protected readonly states: EvaluationStanding['status'][] = ['finished', 'active', 'notStarted'];
   protected readonly search = signal('');
@@ -225,6 +232,7 @@ export class EvaluationResults {
   protected readonly page = signal(0);
   /** The ranking (P/L) or how each attempt traded (risk, drawdown...). */
   protected readonly view = signal<'ranking' | 'metrics'>('ranking');
+  protected readonly average = rubricAverage;
 
   protected readonly matches = computed(() => {
     const term = this.search().trim().toLowerCase();
@@ -253,11 +261,12 @@ export class EvaluationResults {
     });
   }
 
-  /** A row's menu: minutes for an open attempt, restart for any attempt taken. */
+  /** A row's menu: minutes for an open attempt; rate or restart any attempt taken. */
   private actionsFor(row: EvaluationStanding): MenuAction[] {
     const t = this.i18n.messages().evaluations;
     return [
       ...(row.open ? [{ id: 'extraTime', label: t.giveExtraTime, icon: 'clock' as const }] : []),
+      ...(row.sessionId ? [{ id: 'rubric', label: t.rubric.rate, icon: 'grade' as const }] : []),
       ...(row.sessionId
         ? [{ id: 'reset', label: t.resetAttempt, icon: 'restart' as const, danger: true }]
         : []),

@@ -67,6 +67,26 @@
       } @else {
         <p class="muted">{{ t.loading }}</p>
       }
+      @if (myRubric(); as rubric) {
+        @let tr = i18n.messages().evaluations.rubric;
+        <section class="rubric" [attr.aria-label]="tr.yours">
+          <h2>
+            {{ tr.yours }}
+            <span class="badge">{{
+              tr.average((average(rubric.scores) | number: '1.1-1') ?? '')
+            }}</span>
+          </h2>
+          <ul>
+            @for (criterion of criteria; track criterion) {
+              <li>
+                <span>{{ tr.criteria[criterion].label }}</span>
+                <strong>{{ rubric.scores[criterion] }} / 5</strong>
+              </li>
+            }
+          </ul>
+          <p class="muted">{{ tr.by(rubric.byName) }}</p>
+        </section>
+      }
     } @else {
       <p class="muted">{{ t.noEvaluations }}</p>
     }

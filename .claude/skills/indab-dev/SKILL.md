@@ -64,6 +64,7 @@ otherwise create a feature service.
 | `evaluations/{id}`                                               | staff, assigned students (by uid or mentorship)                                                                 | staff (shape validated)                                                                                                                                                                                                              |
 | `practiceSessions/{id}` + `/trades/{id}`                         | owner, staff (trades also as a collection group); attempts at published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit (+ `extraMinutes`, raised only by staff); trades closed once; admins delete, staff delete evaluation attempts |
 | `evaluations/{id}/adjustments/{id}`                              | staff                                                                                                           | staff create only (who, kind, minutes, reason); never edited or deleted                                                                                                                                                              |
+| `evaluations/{id}/rubrics/{uid}`                                 | staff; the student once `resultsPublished`                                                                      | staff (5 criteria, ints 1-5, signed)                                                                                                                                                                                                 |
 | `examForms/{id}`                                                 | staff; published + assigned to students                                                                         | staff (shape validated; no answers stored here)                                                                                                                                                                                      |
 | `examKeys/{examId}`                                              | staff; students once `resultsPublished && showAnswers`                                                          | staff                                                                                                                                                                                                                                |
 | `examSubmissions/{examId}_{uid}_{n}`                             | owner, staff                                                                                                    | owner (academy access): attempt n ≤ `maxAttempts`, in window, previous handed in; saves until deadline + 2 min                                                                                                                       |
@@ -338,8 +339,11 @@ Module notes:
   Adjustments (A6): in an evaluation's results, staff give an open attempt extra minutes
   (`extraMinutes`, counted from now or the deadline, whichever is later) or restart an attempt
   (deletes the session and trades so the student can take it again). Both need a reason and
-  are logged in `evaluations/{id}/adjustments`; the student's page watches its session
+  are logged in `evaluations/{id}/adjustments` (a restart also drops the attempt's rubric); the student's page watches its session
   (`PracticeService.watchSession`) to extend the countdown or leave a deleted attempt.
+  Mentor rubric (B3): staff rate each attempt 1-5 on `RUBRIC_CRITERIA` (plan, risk, stops,
+  context, discipline) from the results menu (`RubricForm`), stored at
+  `evaluations/{id}/rubrics/{uid}`; the student sees theirs on `/academy/ranking` once published.
 - **Evaluation forms (built)**: questionnaires, separate from chart evaluations.
   `core/models/exam.ts` (types, `suggestScore`, `bestGrade`, `attemptDeadline`),
   `features/exams/exam.service.ts`; staff build them at `/admin/forms`

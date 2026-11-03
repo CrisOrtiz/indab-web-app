@@ -1,3 +1,4 @@
+import { EvaluationRubric, RubricScores } from '../../core/models/evaluation';
 import { PracticeSession, PracticeTrade } from '../../core/models/practice';
 import { shownStatus } from '../practice/resume';
 import { SessionStats, sessionStats } from '../practice/stats';
@@ -22,6 +23,14 @@ export interface EvaluationStanding {
   extraMinutes: number;
   /** How the attempt traded (drawdown, risk...), when its trades were loaded. */
   stats: SessionStats | null;
+  /** The mentor's rubric, when staff loaded it and the attempt was rated. */
+  rubric: RubricScores | null;
+}
+
+/** What staff load besides the attempts: their trades (by session id), rubrics (by student). */
+export interface StandingExtras {
+  trades?: Map<string, PracticeTrade[]>;
+  rubrics?: Map<string, EvaluationRubric>;
 }
 
 const byName = (a: { name: string }, b: { name: string }) =>
@@ -35,14 +44,14 @@ const returnOf = (session: PracticeSession) =>
  * fewer trades first on a tie. Attempts still `active` count with what they had closed: the
  * student is still trading, or left it open (once its time is up it shows as finished, and is
  * closed the next time the student opens the practice page). Assigned students without an
- * attempt follow, unranked. With each attempt's `trades` (by session id), rows carry their
- * statistics.
+ * attempt follow, unranked. With each attempt's `trades` and `rubrics`, rows carry their
+ * statistics and the mentor's rating.
  */
 export function evaluationStandings(
   sessions: PracticeSession[],
   students: { uid: string; name: string }[] = [],
   now = Date.now(),
-  trades?: Map<string, PracticeTrade[]>,
+  { trades, rubrics }: StandingExtras = {},
 ): EvaluationStanding[] {
   const ranked: EvaluationStanding[] = [...sessions]
     .sort((a, b) => b.pnl - a.pnl || a.tradeCount - b.tradeCount || byName(nameOf(a), nameOf(b)))
@@ -59,6 +68,7 @@ export function evaluationStandings(
       open: s.status === 'active',
       extraMinutes: s.extraMinutes ?? 0,
       stats: trades?.has(s.id) ? sessionStats(trades.get(s.id)!, s.startingBalance) : null,
+      rubric: rubrics?.get(s.uid)?.scores ?? null,
     }));
   const taken = new Set(sessions.map((s) => s.uid));
   const missing: EvaluationStanding[] = students
@@ -77,6 +87,7 @@ export function evaluationStandings(
       open: false,
       extraMinutes: 0,
       stats: null,
+      rubric: null,
     }));
   return [...ranked, ...missing];
 }

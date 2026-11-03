@@ -945,6 +945,42 @@ export const pt: Messages = {
     description: 'Instruções (opcional)',
     market: 'Mercado',
     duration: 'Tempo limite (minutos)',
+    rubric: {
+      rate: 'Avaliar com rubrica',
+      column: 'Rubrica',
+      title: (name: string) => `Rubrica de ${name}`,
+      scale:
+        'De 1 (muito fraco) a 5 (excelente) em cada critério. O estudante a vê quando você publicar os resultados.',
+      criteria: {
+        plan: {
+          label: 'Plano de entrada',
+          hint: 'Entrou por um motivo claro, em zonas planejadas.',
+        },
+        risk: {
+          label: 'Gestão de risco',
+          hint: 'Tamanho de posição de acordo com o stop e a conta.',
+        },
+        stops: {
+          label: 'Respeito ao SL e TP',
+          hint: 'Colocou stop loss e take profit e não os moveu contra a operação.',
+        },
+        context: {
+          label: 'Leitura de contexto',
+          hint: 'Leu tendência, estrutura e notícias antes de operar.',
+        },
+        discipline: {
+          label: 'Disciplina',
+          hint: 'Seguiu o plano sem operar demais nem por impulso.',
+        },
+      },
+      missing: 'Escolha uma nota em cada critério.',
+      save: 'Salvar rubrica',
+      saved: (name: string) => `A rubrica de ${name} foi salva.`,
+      failed: 'Não foi possível salvar a rubrica. Tente de novo.',
+      average: (value: string) => `${value} / 5`,
+      yours: 'Rubrica do seu mentor',
+      by: (name: string) => `Avaliado por ${name}`,
+    },
     resultsView: 'O que mostrar',
     viewRanking: 'Ranking',
     viewMetrics: 'Métricas de risco',

@@ -17,6 +17,7 @@ const standing = (i: number, status: EvaluationStanding['status']): EvaluationSt
   open: status === 'active',
   extraMinutes: 0,
   stats: null,
+  rubric: null,
 });
 
 describe('EvaluationResults', () => {

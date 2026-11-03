@@ -946,6 +946,42 @@ export const en: Messages = {
     description: 'Instructions (optional)',
     market: 'Market',
     duration: 'Time limit (minutes)',
+    rubric: {
+      rate: 'Rate with rubric',
+      column: 'Rubric',
+      title: (name: string) => `Rubric for ${name}`,
+      scale:
+        'From 1 (very weak) to 5 (excellent) on each criterion. The student sees it once you publish the results.',
+      criteria: {
+        plan: {
+          label: 'Entry plan',
+          hint: 'Entered for a clear reason, at planned zones.',
+        },
+        risk: {
+          label: 'Risk management',
+          hint: 'Position size in line with the stop and the account.',
+        },
+        stops: {
+          label: 'Respect for SL and TP',
+          hint: 'Set stop loss and take profit and did not move them against the trade.',
+        },
+        context: {
+          label: 'Reading the context',
+          hint: 'Read trend, structure and news before trading.',
+        },
+        discipline: {
+          label: 'Discipline',
+          hint: 'Followed the plan without overtrading or trading on impulse.',
+        },
+      },
+      missing: 'Pick a score on each criterion.',
+      save: 'Save rubric',
+      saved: (name: string) => `Saved the rubric for ${name}.`,
+      failed: 'Could not save the rubric. Try again.',
+      average: (value: string) => `${value} / 5`,
+      yours: "Your mentor's rubric",
+      by: (name: string) => `Rated by ${name}`,
+    },
     resultsView: 'What to show',
     viewRanking: 'Ranking',
     viewMetrics: 'Risk metrics',
