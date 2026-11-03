@@ -89,3 +89,15 @@ export function attemptTimeUp(session: PracticeSession, now: number): boolean {
 export function shownStatus(session: PracticeSession, now: number): PracticeSession['status'] {
   return session.status === 'active' && attemptTimeUp(session, now) ? 'finished' : session.status;
 }
+
+/**
+ * Of a student's active sessions (newest first), the ones to close: evaluation attempts whose
+ * time is up, and every free practice but the newest. Only the last free practice stays open
+ * (Cris, 2026-11-03); evaluations stay open until their time runs out.
+ */
+export function staleSessions(sessions: PracticeSession[], now: number): PracticeSession[] {
+  const newestFree = sessions.find((s) => s.durationMinutes == null);
+  return sessions.filter((s) =>
+    s.durationMinutes == null ? s !== newestFree : attemptTimeUp(s, now),
+  );
+}

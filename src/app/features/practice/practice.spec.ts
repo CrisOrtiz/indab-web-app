@@ -507,6 +507,18 @@ describe('Practice page', () => {
       expect(el.querySelector('form')).not.toBeNull();
     });
 
+    it('keeps only the last free practice open and closes older ones', async () => {
+      const older = active({ id: 's1', startedAt: at(Date.now() - 3_600_000) });
+      practice.activeSessions.mockResolvedValue([active({ resume }), older]);
+      await reload();
+      expect(practice.finishSession).toHaveBeenCalledTimes(1);
+      expect(practice.finishSession).toHaveBeenCalledWith('s1', expect.anything());
+      // The newest one is picked up where it was left.
+      expect(el.querySelector('.toolbar .price')!.textContent).toContain('103');
+      await click('Salir sin cerrar');
+      expect(el.querySelectorAll('.open-session')).toHaveLength(1);
+    });
+
     it('lets the student go back to an evaluation they left, with its time left', async () => {
       const ev = evaluation('e1', { replayStart });
       evaluations.get.mockResolvedValue(ev);

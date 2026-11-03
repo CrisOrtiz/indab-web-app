@@ -256,8 +256,8 @@ Module notes:
   grace are left alone.
   A session stays open until the student closes it, or until an evaluation's time is up (Cris,
   2026-11-03): leaving the page (or "Salir sin cerrar", `leaveOpen`) only saves `resume`. The
-  setup lists open sessions (`openSessions`, Continuar / Cerrar) and allows one open free
-  practice at a time; evaluation cards offer "Continuar evaluación"; the academy home links
+  setup lists open sessions (`openSessions`, Continuar / Cerrar) and keeps only the newest free
+  practice open (`staleSessions` closes older ones, Cris 2026-11-03); evaluation cards offer "Continuar evaluación"; the academy home links
   back with a banner. The replay only moves while on screen, so an attempt whose time ran out
   while away is closed by `closeLeft` the next time the practice page loads (positions close
   and orders cancel at the saved bar; the rules let an attempt past its grace only cancel,

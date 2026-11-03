@@ -8,6 +8,7 @@ import {
   readLocalResume,
   resumeTime,
   shownStatus,
+  staleSessions,
   writeLocalResume,
 } from './resume';
 
@@ -76,5 +77,26 @@ describe('resuming a practice session', () => {
     expect(shownStatus(session(5000), now)).toBe('active');
     expect(shownStatus(session(29, 30), now)).toBe('active');
     expect(shownStatus(session(31, 30), now)).toBe('finished');
+  });
+
+  it('keeps the last free practice and attempts with time left open', () => {
+    const now = Date.now();
+    const session = (id: string, startedMinutesAgo: number, durationMinutes?: number) =>
+      ({
+        id,
+        status: 'active',
+        durationMinutes,
+        startedAt: { toMillis: () => now - startedMinutesAgo * 60_000 },
+      }) as PracticeSession;
+    // Newest first, as Firestore lists them.
+    const sessions = [
+      session('ev2', 5, 30),
+      session('free3', 10),
+      session('ev1', 40, 30),
+      session('free2', 60),
+      session('free1', 600),
+    ];
+    expect(staleSessions(sessions, now).map((s) => s.id)).toEqual(['ev1', 'free2', 'free1']);
+    expect(staleSessions([], now)).toEqual([]);
   });
 });

@@ -72,6 +72,7 @@ import {
   attemptTimeUp,
   clearLocalResume,
   shownStatus,
+  staleSessions,
   pickResume,
   readLocalResume,
   resumeTime,
@@ -104,8 +105,8 @@ export const QUICK_ERROR_MS = 6000;
 export const RESUME_SAVE_MS = 15_000;
 /** Other changes to pick up after a reload (drawings, timeframe, speed) go sooner. */
 export const RESUME_CHANGE_MS = 2_000;
-/** Open sessions looked up for the list (only one free practice is kept open). */
-const OPEN_SESSIONS_MAX = 10;
+/** Active sessions looked up at once: the open ones, and older ones left to close. */
+const OPEN_SESSIONS_MAX = 20;
 
 /** An evaluation assigned to the student, with their attempt if they took it. */
 export interface EvaluationCard {
@@ -562,14 +563,14 @@ export class Practice {
   }
 
   /**
-   * The student's open sessions, after closing attempts whose time is up. Keeps them in
-   * `openSessions` for the list of practices to go back to.
+   * The student's open sessions: the last free practice and evaluation attempts with time left.
+   * Older free practice and attempts whose time is up are closed where they were left. Keeps
+   * them in `openSessions` for the list of practices to go back to.
    */
   private async loadOpen(uid: string): Promise<PracticeSession[]> {
-    const now = Date.now();
     const sessions = await this.practice.activeSessions(uid, OPEN_SESSIONS_MAX);
-    const expired = sessions.filter((s) => attemptTimeUp(s, now));
-    const open = sessions.filter((s) => !attemptTimeUp(s, now));
+    const expired = staleSessions(sessions, Date.now());
+    const open = sessions.filter((s) => !expired.includes(s));
     this.openSessions.set(open);
     this.watchOpen();
     if (expired.length) {
