@@ -6,7 +6,7 @@ import { I18n } from '../../core/i18n/i18n.service';
 import { PracticeSession } from '../../core/models/practice';
 import { formatCountdown } from '../practice/practice-format';
 import { PracticeService } from '../practice/practice.service';
-import { attemptDeadline, attemptTimeUp } from '../practice/resume';
+import { attemptDeadline, staleSessions } from '../practice/resume';
 import { Reveal } from '../../shared/reveal/reveal';
 
 type CardKey = 'material' | 'practice' | 'exams' | 'ranking' | 'calendar';
@@ -47,8 +47,10 @@ export class Academy {
     }
     try {
       const now = Date.now();
-      const sessions = await this.practice.activeSessions(uid);
-      this.open.set(sessions.filter((s) => !attemptTimeUp(s, now)));
+      const sessions = await this.practice.activeSessions(uid, 20);
+      // The practice page closes the rest: older free practice and attempts out of time.
+      const stale = staleSessions(sessions, now);
+      this.open.set(sessions.filter((s) => !stale.includes(s)));
     } catch {
       // Without the list the cards still lead to the practice page, which picks it up.
     }

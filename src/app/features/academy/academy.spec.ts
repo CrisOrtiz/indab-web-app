@@ -37,10 +37,22 @@ describe('Academy', () => {
       { id: 's1', status: 'active', startedAt: at(Date.now()) },
     ]);
     const el = await render();
-    expect(practice.activeSessions).toHaveBeenCalledWith('u1');
+    expect(practice.activeSessions).toHaveBeenCalledWith('u1', 20);
     const banner = el.querySelector('a.open-practice[href="/academy/practice"]')!;
     expect(banner.textContent).toContain('Tienes una práctica abierta');
     expect(banner.textContent).toContain('Continuar práctica');
+  });
+
+  it('counts only the last free practice as open', async () => {
+    auth.hasAcademyAccess.set(true);
+    practice.activeSessions.mockResolvedValue([
+      { id: 's2', status: 'active', startedAt: at(Date.now()) },
+      { id: 's1', status: 'active', startedAt: at(Date.now() - 3.6e6) },
+    ]);
+    const el = await render();
+    expect(el.querySelector('.open-practice')!.textContent).toContain(
+      'Tienes una práctica abierta',
+    );
   });
 
   it('shows the time an open evaluation has left, and not one whose time is up', async () => {
