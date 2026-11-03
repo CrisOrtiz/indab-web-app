@@ -92,6 +92,20 @@ describe('Login', () => {
     expect(el.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled).toBe(false);
   });
 
+  it('shows the Google "G" logo inside the Google button, hidden from screen readers', () => {
+    const button = [...el.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('Continuar con Google'),
+    )!;
+    const logo = button.querySelector('svg.google-logo')!;
+    expect(logo.getAttribute('aria-hidden')).toBe('true');
+    expect([...logo.querySelectorAll('path')].map((p) => p.getAttribute('fill'))).toEqual([
+      '#EA4335',
+      '#4285F4',
+      '#FBBC05',
+      '#34A853',
+    ]);
+  });
+
   it('signs in with Google', async () => {
     await click('Continuar con Google');
     expect(auth.signInWithGoogle).toHaveBeenCalled();
