@@ -5,7 +5,8 @@ import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
 import { Reveal } from '../../shared/reveal/reveal';
 
-type AdminCard = 'mentor' | 'users' | 'mentorships' | 'exams' | 'evaluations' | 'practice';
+type AdminCard =
+  'mentor' | 'users' | 'mentorships' | 'material' | 'exams' | 'evaluations' | 'practice';
 
 // Admin home: a card per tool, each opening its own page.
 @Component({
@@ -26,6 +27,7 @@ export class Admin {
     { key: 'mentor', link: '/admin/mentor' },
     ...(this.auth.isAdmin() ? [{ key: 'users' as const, link: '/admin/users' }] : []),
     { key: 'mentorships', link: '/admin/mentorships' },
+    { key: 'material', link: '/admin/material' },
     { key: 'exams', link: '/admin/forms' },
     { key: 'evaluations', link: '/admin/evaluations' },
     { key: 'practice', link: '/admin/practice' },

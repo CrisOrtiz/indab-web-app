@@ -1,0 +1,252 @@
+@let t = i18n.messages().materialAdmin;
+@let tm = i18n.messages().material;
+@let ta = i18n.messages().admin;
+@let tl = i18n.messages().lists;
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/admin" class="back">{{ ta.back }}</a>
+    <h1>{{ t.title }}</h1>
+    <p>{{ t.intro }}</p>
+    @if (!form()) {
+      <button type="button" class="btn" (click)="create()">
+        <app-icon name="plus" />{{ t.new }}
+      </button>
+    }
+  </header>
+
+  @if (message(); as msg) {
+    <p class="message" [class.error]="msg.kind === 'error'" role="status">
+      {{ msg.text }}
+      <button
+        type="button"
+        class="dismiss"
+        [attr.aria-label]="ta.close"
+        (click)="message.set(null)"
+      >
+        ×
+      </button>
+    </p>
+  }
+
+  @if (form(); as f) {
+    <form class="evaluation-form material-form" (submit)="$event.preventDefault(); save()">
+      <h2>{{ editing() ? t.editTitle : t.newTitle }}</h2>
+      <label>
+        {{ t.url }}
+        <input
+          type="url"
+          inputmode="url"
+          required
+          [maxLength]="maxUrl"
+          [placeholder]="t.urlPlaceholder"
+          [value]="f.url"
+          (input)="setUrl($any($event.target).value)"
+        />
+      </label>
+      @if (f.url.trim()) {
+        @if (embed(); as e) {
+          <p class="hint" [class.ok]="e.embedUrl">
+            {{ e.embedUrl ? t.detected(tm.providers[e.provider]) : t.external }}
+          </p>
+        } @else {
+          <p class="hint error">{{ t.badUrl }}</p>
+        }
+      } @else {
+        <p class="hint">{{ t.urlHint }}</p>
+      }
+
+      <label>
+        {{ t.name }}
+        <input
+          type="text"
+          maxlength="120"
+          required
+          [value]="f.title"
+          (input)="patch({ title: $any($event.target).value })"
+        />
+      </label>
+      <div class="row">
+        <label>
+          {{ t.kind }}
+          <select [attr.aria-label]="t.kind" (change)="setKind($any($event.target).value)">
+            @for (k of kinds; track k) {
+              <option [value]="k" [selected]="k === f.kind">{{ tm.kinds[k] }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          {{ t.category }}
+          <input
+            type="text"
+            maxlength="60"
+            list="material-categories"
+            [placeholder]="t.categoryPlaceholder"
+            [value]="f.category"
+            (input)="patch({ category: $any($event.target).value })"
+          />
+          <datalist id="material-categories">
+            @for (c of categories(); track c) {
+              <option [value]="c"></option>
+            }
+          </datalist>
+        </label>
+      </div>
+      <span class="muted small">{{ t.categoryHint }}</span>
+      <label>
+        {{ t.description }}
+        <textarea
+          rows="3"
+          maxlength="2000"
+          [value]="f.description"
+          (input)="patch({ description: $any($event.target).value })"
+        ></textarea>
+      </label>
+
+      <fieldset>
+        <legend>{{ t.audience }}</legend>
+        <label class="check">
+          <input
+            type="radio"
+            name="material-audience"
+            [checked]="f.audience === 'all'"
+            (change)="patch({ audience: 'all' })"
+          />
+          {{ t.audienceAll }}
+        </label>
+        <label class="check">
+          <input
+            type="radio"
+            name="material-audience"
+            [checked]="f.audience === 'selected'"
+            (change)="patch({ audience: 'selected' })"
+          />
+          {{ t.audienceSelected }}
+        </label>
+      </fieldset>
+      @if (f.audience === 'selected') {
+        <app-audience-picker
+          [students]="students()"
+          [mentorships]="mentorships()"
+          [studentIds]="f.studentIds"
+          (studentIdsChange)="patch({ studentIds: $event })"
+          [mentorshipIds]="f.mentorshipIds"
+          (mentorshipIdsChange)="patch({ mentorshipIds: $event })"
+        />
+      }
+
+      <label class="check">
+        <input
+          type="checkbox"
+          [checked]="f.published"
+          (change)="patch({ published: $any($event.target).checked })"
+        />
+        {{ t.publish }}
+      </label>
+      <span class="muted small">{{ t.publishHint }}</span>
+
+      @if (embed(); as e) {
+        <section class="preview" [attr.aria-label]="t.preview">
+          <h3>{{ t.preview }}</h3>
+          <app-material-frame [url]="f.url" [title]="f.title || t.preview" [kind]="f.kind" />
+        </section>
+      }
+
+      <div class="actions">
+        <button type="submit" class="btn" [disabled]="saving()">
+          {{ saving() ? t.saving : t.save }}
+        </button>
+        <button type="button" class="btn btn-outline" (click)="cancel()">{{ t.cancel }}</button>
+      </div>
+    </form>
+  }
+
+  @if (loading()) {
+    <p class="muted">{{ t.loading }}</p>
+  } @else {
+    <div class="stats">
+      <div class="stat">
+        <strong>{{ stats().total }}</strong
+        ><span>{{ t.total }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ stats().published }}</strong
+        ><span>{{ t.publishedPlural }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ stats().drafts }}</strong
+        ><span>{{ t.drafts }}</span>
+      </div>
+    </div>
+
+    <div class="list-filters" role="group" [attr.aria-label]="tl.filters">
+      <label>
+        {{ tm.search }}
+        <input
+          type="search"
+          [placeholder]="tm.searchPlaceholder"
+          [value]="search()"
+          (input)="search.set($any($event.target).value)"
+        />
+      </label>
+      <label>
+        {{ t.kind }}
+        <select
+          [attr.aria-label]="t.kind"
+          [value]="kindFilter()"
+          (change)="kindFilter.set($any($event.target).value)"
+        >
+          <option value="">{{ tm.allKinds }}</option>
+          @for (k of kinds; track k) {
+            <option [value]="k">{{ tm.kindsPlural[k] }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        {{ tl.status }}
+        <select
+          [attr.aria-label]="tl.status"
+          [value]="status()"
+          (change)="status.set($any($event.target).value)"
+        >
+          <option value="">{{ tl.allStatuses }}</option>
+          <option value="published">{{ t.publishedPlural }}</option>
+          <option value="draft">{{ t.drafts }}</option>
+        </select>
+      </label>
+    </div>
+
+    <ul class="cards material-cards">
+      @for (m of visible(); track m.id) {
+        <li class="card">
+          <app-actions-menu
+            class="card-menu"
+            [actions]="menus().get(m.id) ?? []"
+            [label]="ta.itemAction(ta.actions, m.title)"
+            (picked)="act(m, $event)"
+          />
+          <app-material-thumb class="thumb" [url]="m.url" [kind]="m.kind" />
+          <div class="info">
+            <h3>
+              {{ m.title }}
+              <span class="badge" [class.off]="!m.published">{{
+                m.published ? t.published : t.draft
+              }}</span>
+            </h3>
+            <p class="muted">
+              {{ tm.kinds[m.kind] }}
+              @if (m.category) {
+                · {{ m.category }}
+              }
+              · {{ m.audience === 'all' ? t.forAll : t.forSelected(reach(m)) }}
+            </p>
+            @if (m.description) {
+              <p class="muted description">{{ m.description }}</p>
+            }
+          </div>
+        </li>
+      } @empty {
+        <li class="muted">{{ items().length ? tl.noMatches : t.empty }}</li>
+      }
+    </ul>
+  }
+</section>

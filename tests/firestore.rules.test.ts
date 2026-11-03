@@ -48,7 +48,12 @@ beforeEach(async () => {
     await setDoc(doc(db, 'users/student'), { uid: 'student', role: 'student', displayName: 'Ana' });
     await setDoc(doc(db, 'enrollments/enrolled'), { academy: true, courses: [] });
     await setDoc(doc(db, 'enrollments/partial'), { academy: false, courses: ['forex-101'] });
-    await setDoc(doc(db, 'materials/m1'), { title: 'Gestión de riesgo' });
+    await setDoc(doc(db, 'materials/m1'), {
+      title: 'Gestión de riesgo',
+      published: true,
+      audience: 'all',
+      studentIds: [],
+    });
     await setDoc(doc(db, 'courses/forex-101'), { title: 'Forex 101', published: true });
     await setDoc(doc(db, 'courses/draft'), { title: 'Borrador', published: false });
     await setDoc(doc(db, 'courses/forex-101/lessons/l1'), { title: 'Lección 1' });
@@ -353,22 +358,127 @@ describe('enrollment privacy', () => {
   });
 });
 
-describe('learning material', () => {
-  it('is readable only by enrolled users and admins', async () => {
-    await assertFails(getDoc(doc(as(null), 'materials/m1')));
-    await assertFails(getDoc(doc(as('student'), 'materials/m1')));
-    await assertFails(getDoc(doc(as('partial'), 'materials/m1')));
-    await assertSucceeds(getDoc(doc(as('enrolled'), 'materials/m1')));
-    await assertSucceeds(getDoc(doc(as('admin'), 'materials/m1')));
-    await assertFails(setDoc(doc(as('enrolled'), 'materials/m2'), { title: 'x' }));
+describe('study material', () => {
+  const material = (extra: Record<string, unknown> = {}) => ({
+    title: 'Gestión de riesgo',
+    description: 'Clase grabada',
+    kind: 'video',
+    url: 'https://youtu.be/dQw4w9WgXcQ',
+    category: 'Riesgo',
+    audience: 'all',
+    studentIds: [],
+    mentorshipIds: [],
+    published: true,
+    createdBy: 'trainer',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const ref = (uid: string | null, id = 'm1') => doc(as(uid), `materials/${id}`);
+  const seed = (id: string, extra: Record<string, unknown> = {}) =>
+    env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), `materials/${id}`), {
+        ...material(extra),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'enrollments/other'), { academy: true, courses: [] });
+      await setDoc(doc(db, 'users/other'), {
+        uid: 'other',
+        role: 'student',
+        mentorshipIds: ['g1'],
+      });
+    });
+    await seed('m1');
   });
 
-  it('is managed by admins only', async () => {
-    await assertSucceeds(setDoc(doc(as('admin'), 'materials/m2'), { title: 'Nuevo' }));
-    await assertSucceeds(deleteDoc(doc(as('admin'), 'materials/m2')));
-    await assertFails(deleteDoc(doc(as('enrolled'), 'materials/m1')));
+  it('shows published material for everyone to students with academy access only', async () => {
+    await assertFails(getDoc(ref(null)));
+    await assertFails(getDoc(ref('student')));
+    await assertFails(getDoc(ref('partial')));
+    await assertSucceeds(getDoc(ref('enrolled')));
+    await assertSucceeds(getDoc(ref('admin')));
+    await assertSucceeds(getDoc(ref('trainer')));
     await assertFails(getDocs(collection(as('student'), 'materials')));
-    await assertSucceeds(getDocs(collection(as('enrolled'), 'materials')));
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(as('enrolled'), 'materials'),
+          where('published', '==', true),
+          where('audience', '==', 'all'),
+        ),
+      ),
+    );
+    // Students cannot list everything (drafts included); staff can.
+    await assertFails(getDocs(collection(as('enrolled'), 'materials')));
+    await assertSucceeds(getDocs(collection(as('trainer'), 'materials')));
+  });
+
+  it('keeps drafts for staff and assigned material for its students and mentorships', async () => {
+    await seed('draft', { published: false });
+    await assertFails(getDoc(ref('enrolled', 'draft')));
+    await assertSucceeds(getDoc(ref('trainer', 'draft')));
+
+    await seed('named', { audience: 'selected', studentIds: ['enrolled'] });
+    await assertSucceeds(getDoc(ref('enrolled', 'named')));
+    await assertFails(getDoc(ref('other', 'named')));
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(as('enrolled'), 'materials'),
+          where('published', '==', true),
+          where('studentIds', 'array-contains', 'enrolled'),
+        ),
+      ),
+    );
+
+    await seed('group', { audience: 'selected', mentorshipIds: ['g1'] });
+    await assertSucceeds(getDoc(ref('other', 'group')));
+    await assertFails(getDoc(ref('enrolled', 'group')));
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(as('other'), 'materials'),
+          where('published', '==', true),
+          where('mentorshipIds', 'array-contains-any', ['g1']),
+        ),
+      ),
+    );
+  });
+
+  it('is managed by trainers and admins', async () => {
+    await assertSucceeds(setDoc(ref('trainer', 'm2'), material()));
+    await assertSucceeds(setDoc(ref('admin', 'm3'), material({ createdBy: 'admin' })));
+    await assertFails(setDoc(ref('enrolled', 'm4'), material({ createdBy: 'enrolled' })));
+    await assertFails(setDoc(ref('trainer', 'm4'), material({ createdBy: 'admin' })));
+    await assertSucceeds(
+      updateDoc(ref('admin'), { published: false, updatedAt: serverTimestamp() }),
+    );
+    await assertFails(
+      updateDoc(ref('admin'), { createdBy: 'admin', updatedAt: serverTimestamp() }),
+    );
+    await assertFails(updateDoc(ref('enrolled'), { title: 'x', updatedAt: serverTimestamp() }));
+    await assertFails(deleteDoc(ref('enrolled')));
+    await assertSucceeds(deleteDoc(ref('trainer')));
+  });
+
+  it('validates a material', async () => {
+    const create = (extra: Record<string, unknown>) =>
+      setDoc(ref('trainer', 'm5'), material(extra));
+    await assertFails(create({ title: '' }));
+    await assertFails(create({ kind: 'audio' }));
+    await assertFails(create({ url: 'http://example.com/video' }));
+    await assertFails(create({ url: 'javascript:alert(1)' }));
+    await assertFails(create({ url: `https://x.co/${'a'.repeat(1000)}` }));
+    await assertFails(create({ category: 'x'.repeat(61) }));
+    await assertFails(create({ audience: 'group' }));
+    await assertFails(create({ file: 'data:application/pdf;base64,AAAA' }));
+    await assertSucceeds(create({ kind: 'presentation', url: 'https://docs.google.com/x' }));
   });
 });
 
@@ -806,7 +916,6 @@ describe('trainers', () => {
       }),
     );
     await assertFails(deleteDoc(doc(as('trainer'), 'users/student')));
-    await assertFails(setDoc(doc(as('trainer'), 'materials/m2'), { title: 'x' }));
   });
 
   it('have academy access', async () => {

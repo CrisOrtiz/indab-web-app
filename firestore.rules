@@ -11,7 +11,10 @@ rules_version = '2';
 //                                        admin-managed from the /admin area
 //   courses/{courseId}                   course catalog; published courses are public
 //   courses/{courseId}/lessons/{id}      lesson content; enrolled users only
-//   materials/{materialId}               learning-material repository; enrolled users only
+//   materials/{materialId}               study material: a video, presentation, document or link
+//                                        (by URL, no file uploads) set up by trainers or admins; the
+//                                        published ones go to everyone with academy access or to
+//                                        chosen students and mentorships
 //   investors/{uid}                      Eleva Inversiones investor account; owner reads, admins write
 //   mentorships/{id}                     a group of students with its mentors (trainers or admins),
 //                                        dates and active flag; admins manage them, staff read them
@@ -492,9 +495,42 @@ service cloud.firestore {
       }
     }
 
+    // Study material: staff add links to videos, presentations and files (Storage needs the
+    // Blaze plan, so nothing is uploaded); students with academy access read the published ones
+    // meant for everyone or assigned to them by name or through a mentorship.
     match /materials/{materialId} {
-      allow read: if hasAcademyAccess();
-      allow write: if isAdmin();
+      function validMaterial(data) {
+        return data.keys().hasOnly(['title', 'description', 'kind', 'url', 'category',
+            'audience', 'studentIds', 'mentorshipIds', 'published', 'createdBy', 'createdAt',
+            'updatedAt'])
+          && data.title is string && data.title.size() > 0 && data.title.size() <= 120
+          && data.description is string && data.description.size() <= 2000
+          && data.kind in ['video', 'presentation', 'document', 'link']
+          && data.url is string && data.url.size() <= 1000 && data.url.matches('https://[^ ]+')
+          && data.category is string && data.category.size() <= 60
+          && data.audience in ['all', 'selected']
+          && data.studentIds is list && data.studentIds.size() <= 500
+          && validMentorshipIds(data)
+          && data.published is bool
+          && data.updatedAt == request.time;
+      }
+
+      allow read: if hasAcademyAccess()
+        && (isStaff()
+          || (resource.data.published == true
+            && (resource.data.audience == 'all' || assignedTo(resource.data))));
+
+      allow create: if isStaff()
+        && validMaterial(request.resource.data)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if isStaff()
+        && validMaterial(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if isStaff();
     }
 
     match /investors/{uid} {
