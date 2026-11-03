@@ -77,10 +77,21 @@ test('a trainer shares a video and a presentation, and students open what is the
     'src',
     /youtube-nocookie\.com\/embed\/dQw4w9WgXcQ/,
   );
-  await expect(page.getByRole('link', { name: /Abrir en YouTube/ })).toHaveAttribute(
-    'href',
-    'https://youtu.be/dQw4w9WgXcQ',
+  // It stays in the academy: no pop-outs from the player, no link to the original, and the
+  // player is marked with who is watching.
+  const player = page.getByTitle('Material: Clase 1: soportes y resistencias');
+  await expect(player).toHaveAttribute('sandbox', /allow-scripts/);
+  await expect(player).not.toHaveAttribute('sandbox', /allow-popups/);
+  await expect(page.getByRole('link', { name: /Abrir en YouTube/ })).toHaveCount(0);
+  await expect(page.locator('app-material-watermark span').first()).toHaveText(
+    'José Pérez · jose@indab.test',
   );
+  await page.getByRole('button', { name: 'Pantalla completa' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Salir de pantalla completa' }).first(),
+  ).toBeVisible();
+  await expect(page.locator('app-material-watermark')).toBeVisible();
+  await page.getByRole('button', { name: 'Salir de pantalla completa' }).first().click();
 
   // Luis only gets the class, not José's deck.
   await signOut(page);

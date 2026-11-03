@@ -227,7 +227,12 @@ Module notes:
   anything else (a PDF elsewhere, a web page) opens in a new tab. `MaterialFrame` shows it and
   `MaterialThumb` draws the card picture (YouTube's preview or the kind's art). Students read
   with three queries (everyone, by name, by mentorship) like the forms. Ask Cris before
-  anything that needs Blaze (Storage uploads).
+  anything that needs Blaze (Storage uploads). Protection (Cris wants it as safe as possible,
+  viewable only in the academy; README "Protecting the study material"): the iframe is
+  sandboxed without `allow-popups`/`allow-top-navigation`, full screen is our own (the frame,
+  not the player) so `MaterialWatermark` (viewer name + email, moving) stays on, students get no
+  link to the original (staff do), and `/admin/material` shows per-site sharing tips. Keep all
+  of that when touching `MaterialFrame`.
 - **Academy (`/academy`)**: published `courses` and their `lessons`, filtered by
   `enrollment().courses` or full academy access. Shows the pending notice when not enrolled.
   Its home is a grid of illustrated cards, one per section (`cards` in `academy.ts`, inline SVG

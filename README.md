@@ -331,6 +331,30 @@ saved in the browser (`localStorage` key `indab.theme`), not in Firestore.
   http://localhost:5000 (Chrome DevTools > Application shows the manifest and worker).
 - Push notifications are not set up (they need a server to send them).
 
+## Protecting the study material
+
+The material lives where staff upload it (YouTube, Vimeo, Google Drive, Slides, Docs, Canva),
+so who can open the file at all is set there. The app adds what a web page can:
+
+- Firestore rules: only users with academy access (confirmed email) read `materials`, and
+  students only the published ones meant for them.
+- The player's iframe is sandboxed without pop-ups or top navigation, so "Watch on YouTube",
+  Drive's pop-out and similar buttons do nothing. Its fullscreen is off; the page's own
+  "Pantalla completa" button enlarges the frame (or fills the window on iPhone), so the
+  watermark stays on.
+- A faint watermark with the viewer's name and email moves over the player every 20 s, so a
+  screen recording or photo says who leaked it.
+- Students get no link to the original file (staff do) and right-click on the player is off.
+- `/admin/material` tells staff how to share each site. The strongest free option is Google
+  Drive / Slides / Docs shared as **Restricted** with a Google group of the students, with
+  "Viewers can download, print and copy" turned off: a copied link then works for nobody else.
+  YouTube cannot limit a video to one site (an unlisted link works anywhere); Vimeo can, on a
+  paid plan.
+
+Limits: anyone who can watch can screen-record or film the screen, and anyone with DevTools can
+read the frame's address; only restricted sharing at the source (or a paid video host with
+signed URLs) makes that address useless to others.
+
 ## Trading practice (chart replay)
 
 `/academy/practice` replays real historical candles bar by bar. For now the only market is

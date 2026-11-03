@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { signal } from '@angular/core';
 import { vi } from 'vitest';
+import { AuthService } from '../../core/auth/auth.service';
 import { Material } from '../../core/models/material';
 import { MaterialService } from './material.service';
 import { MaterialView } from './material-view';
@@ -24,7 +26,14 @@ describe('MaterialView', () => {
   const render = async (id = 'm1') => {
     TestBed.configureTestingModule({
       imports: [MaterialView],
-      providers: [provideRouter([]), { provide: MaterialService, useValue: service }],
+      providers: [
+        provideRouter([]),
+        { provide: MaterialService, useValue: service },
+        {
+          provide: AuthService,
+          useValue: { isStaff: signal(false), user: signal(null), profile: signal(null) },
+        },
+      ],
     });
     fixture = TestBed.createComponent(MaterialView);
     fixture.componentRef.setInput('id', id);
@@ -34,7 +43,7 @@ describe('MaterialView', () => {
 
   beforeEach(() => vi.clearAllMocks());
 
-  it('shows a presentation inside the page with a link to open it on Google Slides', async () => {
+  it('shows a presentation inside the page, without a link out for students', async () => {
     service.get.mockResolvedValue(deck);
     await render();
     expect(service.get).toHaveBeenCalledWith('m1');
@@ -45,10 +54,8 @@ describe('MaterialView', () => {
       'https://docs.google.com/presentation/d/1SlideDeckId_x/embed',
     );
     expect(frame.getAttribute('title')).toBe('Material: Plan de trading');
-    const open = el.querySelector<HTMLAnchorElement>('a[target="_blank"]')!;
-    expect(open.textContent).toContain('Abrir en Google Slides');
-    expect(open.href).toBe(deck.url);
-    expect(open.rel).toContain('noopener');
+    expect(el.querySelector('a[target="_blank"]')).toBeNull();
+    expect(el.querySelector('app-material-watermark')).not.toBeNull();
     expect(el.querySelector('.description')?.textContent).toBe('Paso 1\nPaso 2');
     expect(el.textContent).toContain('Agregado el');
   });

@@ -406,7 +406,12 @@ export const en: Messages = {
     notFound: 'This material does not exist or is no longer available to you.',
     added: (date: string) => `Added on ${date}`,
     frameTitle: (title: string) => `Material: ${title}`,
-    notShowing: 'Not showing? Open it in a new tab.',
+    notShowing: 'Not showing? Reload the page or tell your mentor.',
+    fullscreen: 'Full screen',
+    exitFullscreen: 'Exit full screen',
+    staffOnlyLink: 'Only the team sees the original link.',
+    googleAccess: (email: string) =>
+      `Asked for access? Sign in to Google with ${email || 'your account email'} and reload the page.`,
     externalOnly: 'This material opens on another page.',
     openIn: {
       youtube: 'Open on YouTube',
@@ -440,9 +445,25 @@ export const en: Messages = {
     url: 'Link',
     urlPlaceholder: 'https://youtu.be/… or https://docs.google.com/presentation/…',
     urlHint:
-      'Free of charge: upload the video to YouTube as "Unlisted" or the file to Google Drive or Slides, share it as "Anyone with the link" and paste the link here.',
+      'Free of charge: upload the video to YouTube as "Unlisted" or the file to Google Drive or Slides and paste the link here. Below you will see how to protect it.',
     detected: (provider: string) => `${provider}: it will show inside the academy.`,
     external: 'This link will open in a new tab.',
+    protectTitle: 'How to protect it',
+    protect: {
+      youtube:
+        'Upload it as "Unlisted" and keep "Allow embedding" on. YouTube cannot limit a video to one site: anyone who copies the link can watch it outside the academy. For sensitive material use restricted Google Drive.',
+      vimeo:
+        'Under Privacy choose "Hide from Vimeo". Limiting embedding to indab-academy.web.app (so it does not play outside the academy) needs a paid Vimeo plan.',
+      drive:
+        'Safest at no cost: under "Share" keep access "Restricted" and share it only with the students\' Google group (or their emails). In the settings (⚙) turn off "Viewers can download, print and copy". A copied link then works for nobody else.',
+      slides:
+        'Safest at no cost: under "Share" keep access "Restricted" and share it only with the students\' Google group (or their emails). In the settings (⚙) turn off "Viewers can download, print and copy". Do not use "Publish to the web": that makes it public.',
+      docs: 'Safest at no cost: under "Share" keep access "Restricted" and share it only with the students\' Google group (or their emails). In the settings (⚙) turn off "Viewers can download, print and copy". Do not use "Publish to the web": that makes it public.',
+      canva:
+        'Canva only embeds with "Anyone with the link": whoever has it can view it outside the academy. For sensitive material download it as a PDF or presentation and upload it to restricted Google Drive.',
+      pdf: 'This link opens outside the academy and anyone who has it can open it. For sensitive material upload it to restricted Google Drive.',
+      web: 'This link opens outside the academy and anyone who has it can open it.',
+    },
     badUrl: 'Paste a full link that starts with https://',
     name: 'Title',
     description: 'Description',

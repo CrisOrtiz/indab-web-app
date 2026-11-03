@@ -48,6 +48,10 @@
           <p class="hint" [class.ok]="e.embedUrl">
             {{ e.embedUrl ? t.detected(tm.providers[e.provider]) : t.external }}
           </p>
+          <aside class="protect" [attr.aria-label]="t.protectTitle">
+            <strong>{{ t.protectTitle }}</strong>
+            <p>{{ t.protect[e.provider] }}</p>
+          </aside>
         } @else {
           <p class="hint error">{{ t.badUrl }}</p>
         }
