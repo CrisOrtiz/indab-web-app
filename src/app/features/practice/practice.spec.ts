@@ -94,7 +94,13 @@ describe('Practice page', () => {
     sessionTrades: vi.fn(async () => [] as unknown[]),
     activeSessions: vi.fn(async () => [] as unknown[]),
     saveResume: vi.fn(async () => undefined),
+    watchSession: vi.fn((_id: string, next: (s: unknown) => void) => {
+      watched = next;
+      return () => (watched = null);
+    }),
   };
+  /** Sends a change of the watched attempt, as staff would make it. */
+  let watched: ((session: unknown) => void) | null = null;
   const evaluations = {
     assignedTo: vi.fn(async () => [] as Evaluation[]),
     get: vi.fn(async () => null as Evaluation | null),
@@ -327,6 +333,26 @@ describe('Practice page', () => {
     await new Promise((resolve) => setTimeout(resolve, 1300));
     await fixture.whenStable();
     expect(elapsed()).toContain(': 1 min');
+  });
+
+  it('takes the minutes staff add at once, and leaves an attempt they restart', async () => {
+    evaluations.assignedTo.mockResolvedValue([evaluation('e1')]);
+    await reload();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await click('Comenzar evaluación');
+    expect(practice.watchSession).toHaveBeenCalledWith('session-1', expect.any(Function));
+    const bar = () => el.querySelector('.evaluation-bar')!.textContent!;
+    expect(bar()).toMatch(/Quedan (29:5\d|30:00)/);
+    watched!({ id: 'session-1', extraMinutes: 10 });
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    await fixture.whenStable();
+    expect(el.textContent).toContain('El staff te dio 10 minutos más.');
+    expect(bar()).toMatch(/Quedan (39:5\d|40:00)/);
+    watched!(null);
+    await fixture.whenStable();
+    expect(alert()).toContain('El staff reinició tu intento');
+    expect(el.querySelector('.evaluation-bar')).toBeNull();
+    expect(practice.finishSession).not.toHaveBeenCalled();
   });
 
   it("keeps an evaluation's dates hidden after it ends while its window is open", async () => {

@@ -61,6 +61,19 @@ describe('resuming a practice session', () => {
     expect(attemptExpired(attempt(32, 30), now)).toBe(true);
   });
 
+  it('counts the minutes staff added to an attempt', () => {
+    const now = Date.now();
+    const session = {
+      status: 'active',
+      durationMinutes: 30,
+      extraMinutes: 10,
+      startedAt: { toMillis: () => now - 35 * 60_000 },
+    } as PracticeSession;
+    expect(attemptDeadline(session)).toBe(now + 5 * 60_000);
+    expect(attemptTimeUp(session, now)).toBe(false);
+    expect(attemptExpired(session, now + 7 * 60_000)).toBe(true);
+  });
+
   it('counts an attempt left open past its time as finished', () => {
     const now = Date.now();
     const session = (startedMinutesAgo: number, durationMinutes?: number) =>

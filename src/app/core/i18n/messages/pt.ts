@@ -811,6 +811,9 @@ export const pt: Messages = {
     timeLeft: (time: string) => `Faltam ${time}`,
     leavingKeeps:
       'Você pode sair e voltar quando quiser: o tempo continua correndo e, ao acabar, a avaliação é entregue sozinha.',
+    extraTimeGiven: (minutes: number) => `A equipe te deu ${minutes} minutos a mais.`,
+    attemptReset:
+      'A equipe reiniciou sua tentativa nesta avaliação. Você pode começá-la de novo pela lista.',
     live: 'Ao vivo',
     liveHint:
       'O gráfico avança sozinho com o relógio: não dá para pausar nem adiantar. Se você sair, o mercado continua e ao voltar você o vê onde estiver.',
@@ -942,6 +945,28 @@ export const pt: Messages = {
     description: 'Instruções (opcional)',
     market: 'Mercado',
     duration: 'Tempo limite (minutos)',
+    adjustments: 'Ajustes de tentativas',
+    extraBadge: (minutes: number) => `+${minutes} min`,
+    attemptActions: (name: string) => `Ações da tentativa de ${name}`,
+    giveExtraTime: 'Dar minutos extras',
+    resetAttempt: 'Reiniciar tentativa',
+    giveExtraTimeTitle: (name: string) => `Minutos extras para ${name}`,
+    resetAttemptTitle: (name: string) => `Reiniciar a tentativa de ${name}`,
+    extraMinutesLabel: 'Minutos',
+    extraTimeHint:
+      'Somam-se ao tempo limite, ou a partir de agora se ele já acabou. Se o aluno estiver na página, ele os vê na hora.',
+    resetHint:
+      'A tentativa e as operações são apagadas e o aluno pode começar de novo, com o mesmo mercado e período (que ele já viu).',
+    adjustReason: 'Motivo',
+    adjustReasonPlaceholder: 'Por exemplo: a internet caiu aos 20 minutos',
+    resetDone: 'tentativa reiniciada',
+    reasonRequired: 'Escreva o motivo; ele fica registrado.',
+    extraRange: (max: number) => `Dê entre 1 e ${max} minutos, até 600 minutos extras no total.`,
+    confirmReset: (name: string) =>
+      `Reiniciar a tentativa de ${name}? O resultado e as operações são apagados, e isso não pode ser desfeito.`,
+    extraGiven: (minutes: number, name: string) => `${name} tem ${minutes} minutos a mais.`,
+    resetGiven: (name: string) => `A tentativa de ${name} foi reiniciada: já pode começar de novo.`,
+    adjustFailed: 'Não foi possível aplicar o ajuste. Tente de novo.',
     pace: 'Ritmo do exame',
     paces: {
       60: '1 min de mercado por segundo',

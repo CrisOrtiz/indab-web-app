@@ -11,6 +11,9 @@ const standing = (i: number, status: EvaluationStanding['status']): EvaluationSt
   pnl: status === 'notStarted' ? null : 30 - i,
   return: status === 'notStarted' ? null : 0.1,
   trades: status === 'notStarted' ? null : 2,
+  sessionId: status === 'notStarted' ? null : `s${i}`,
+  open: status === 'active',
+  extraMinutes: 0,
 });
 
 describe('EvaluationResults', () => {
@@ -74,6 +77,19 @@ describe('EvaluationResults', () => {
     search.dispatchEvent(new Event('input'));
     await fixture.whenStable();
     expect(el.textContent).toContain('Nada coincide con estos filtros.');
+  });
+
+  it('offers extra time only on open attempts and a restart on any taken one', async () => {
+    await render([
+      { ...standing(0, 'active'), extraMinutes: 15 },
+      standing(1, 'finished'),
+      standing(2, 'notStarted'),
+    ]);
+    expect(rows()[0].textContent).toContain('+15 min');
+    const menus = rows().map((r) => r.querySelector('app-actions-menu'));
+    expect(menus[0]).not.toBeNull();
+    expect(menus[1]).not.toBeNull();
+    expect(menus[2]).toBeNull();
   });
 
   it('says when nobody took the evaluation', async () => {

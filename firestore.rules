@@ -20,6 +20,8 @@ rules_version = '2';
 //                                        dates and active flag; admins manage them, staff read them
 //                                        and members read their own. Membership lives in the
 //                                        student's users/{uid}.mentorshipIds
+//   evaluations/{id}/adjustments/{id}    minutes added to an attempt, or an attempt deleted to take
+//                                        again, with the reason; staff only
 //   evaluations/{id}                     timed practice evaluation set up by trainers or admins:
 //                                        market, replay start, time limit, pace (the replay runs by
 //                                        the clock), window, assigned students and mentorships
@@ -61,7 +63,7 @@ rules_version = '2';
 // academy access from the /admin area. Admins cannot remove their own admin role, so the
 // last admin can never lock everyone out. Trainers (role == 'trainer') run evaluations and
 // review practice, but cannot change roles, academy access or mentorships, or delete anything
-// but evaluations and evaluation forms.
+// but evaluations, evaluation forms and evaluation attempts (to let a student take one again).
 // Academy content also needs a verified email (emailVerified()), so an account registered with
 // someone else's address never opens it.
 service cloud.firestore {
@@ -610,6 +612,30 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt;
 
       allow delete: if isStaff();
+
+      // What staff did to an attempt that went wrong, and why: read and written by staff only,
+      // never changed afterwards.
+      match /adjustments/{adjustmentId} {
+        allow read: if isStaff();
+        allow create: if isStaff()
+          && request.resource.data.keys().hasOnly(['uid', 'studentName', 'kind', 'minutes',
+            'reason', 'by', 'byName', 'at'])
+          && request.resource.data.uid is string
+          && request.resource.data.studentName is string
+          && request.resource.data.studentName.size() <= 120
+          && ((request.resource.data.kind == 'extraTime'
+              && request.resource.data.minutes is int
+              && request.resource.data.minutes > 0
+              && request.resource.data.minutes <= 600)
+            || (request.resource.data.kind == 'reset' && request.resource.data.minutes == null))
+          && request.resource.data.reason is string
+          && request.resource.data.reason.size() > 0
+          && request.resource.data.reason.size() <= 500
+          && request.resource.data.by == request.auth.uid
+          && request.resource.data.byName is string
+          && request.resource.data.byName.size() <= 120
+          && request.resource.data.at == request.time;
+      }
     }
 
     // Evaluation forms. Staff build them; students with academy access see the published ones
@@ -845,7 +871,8 @@ service cloud.firestore {
         && resource.data.status == 'active'
         && (resource.data.get('durationMinutes', null) == null
           || request.time < resource.data.startedAt
-            + duration.value(resource.data.durationMinutes + 2, 'm')
+            + duration.value(resource.data.durationMinutes
+              + resource.data.get('extraMinutes', 0) + 2, 'm')
           || (request.resource.data.status == 'finished'
             && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['resume'])))
         && request.resource.data.diff(resource.data).affectedKeys()
@@ -855,7 +882,20 @@ service cloud.firestore {
         && (request.resource.data.status == 'active'
           || (request.resource.data.status == 'finished' && request.resource.data.endedAt == request.time));
 
-      allow delete: if isAdmin();
+      // Staff add minutes to an evaluation attempt still open (the student lost time to a
+      // problem), never take them away.
+      allow update: if isStaff()
+        && resource.data.get('evaluationId', null) is string
+        && resource.data.status == 'active'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['extraMinutes'])
+        && request.resource.data.extraMinutes is int
+        && request.resource.data.extraMinutes > resource.data.get('extraMinutes', 0)
+        && request.resource.data.extraMinutes <= 600;
+
+      // Admins delete any session; trainers too an evaluation attempt, so its student can take
+      // it again after a problem.
+      allow delete: if isAdmin()
+        || (isStaff() && resource.data.get('evaluationId', null) is string);
 
       match /trades/{tradeId} {
         function session() {
@@ -864,10 +904,11 @@ service cloud.firestore {
 
         // An evaluation attempt takes orders until its time is up, and closes them for two
         // minutes more; free practice has no limit.
-        function inTime(extraMinutes) {
+        function inTime(grace) {
           return session().get('durationMinutes', null) == null
             || request.time < session().startedAt
-              + duration.value(session().durationMinutes + extraMinutes, 'm');
+              + duration.value(session().durationMinutes + session().get('extraMinutes', 0)
+                + grace, 'm');
         }
 
         function isPrice(value) {
@@ -967,7 +1008,8 @@ service cloud.firestore {
             && request.resource.data.pnl is number
             && request.resource.data.closedAt == request.time));
 
-        allow delete: if isAdmin();
+        allow delete: if isAdmin()
+          || (isStaff() && session().get('evaluationId', null) is string);
       }
     }
 

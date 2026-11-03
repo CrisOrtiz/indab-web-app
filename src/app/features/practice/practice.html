@@ -43,6 +43,9 @@
             <span class="muted">{{ live() ? t.liveHint : t.leavingKeeps }}</span>
           </div>
         }
+        @if (notice(); as text) {
+          <p class="message success" role="status">{{ text }}</p>
+        }
         @if (resumed()) {
           <p class="message success" role="status">{{ t.resumed }}</p>
         }

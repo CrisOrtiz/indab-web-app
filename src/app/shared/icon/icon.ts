@@ -37,6 +37,8 @@ export const ICONS = {
   stepForward: ['M5 5v14l10-7Z', 'M19 5v14'],
   // A door with an arrow out: leave without closing.
   exit: ['M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4', 'M16 17l5-5-5-5', 'M21 12H9'],
+  clock: ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z', 'M12 6v6l4 2'],
+  restart: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5'],
   stop: ['M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z'],
   users: [
     'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2',

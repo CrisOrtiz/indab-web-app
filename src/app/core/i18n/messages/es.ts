@@ -832,6 +832,9 @@ export const es = {
     timeLeft: (time: string) => `Quedan ${time}`,
     leavingKeeps:
       'Puedes salir y volver cuando quieras: el tiempo sigue corriendo y al acabarse la evaluación se entrega sola.',
+    extraTimeGiven: (minutes: number) => `El staff te dio ${minutes} minutos más.`,
+    attemptReset:
+      'El staff reinició tu intento de esta evaluación. Puedes comenzarla de nuevo desde la lista.',
     live: 'En vivo',
     liveHint:
       'El gráfico avanza solo con el reloj: no se puede pausar ni adelantar. Si sales, el mercado sigue y al volver lo ves donde va.',
@@ -962,6 +965,28 @@ export const es = {
     description: 'Instrucciones (opcional)',
     market: 'Mercado',
     duration: 'Tiempo límite (minutos)',
+    adjustments: 'Ajustes de intentos',
+    extraBadge: (minutes: number) => `+${minutes} min`,
+    attemptActions: (name: string) => `Acciones del intento de ${name}`,
+    giveExtraTime: 'Dar minutos extra',
+    resetAttempt: 'Reiniciar intento',
+    giveExtraTimeTitle: (name: string) => `Minutos extra para ${name}`,
+    resetAttemptTitle: (name: string) => `Reiniciar el intento de ${name}`,
+    extraMinutesLabel: 'Minutos',
+    extraTimeHint:
+      'Se suman a su tiempo límite, o desde ahora si ya se le acabó. Si está en la página, los ve al instante.',
+    resetHint:
+      'Se borra su intento con sus operaciones y puede comenzar de nuevo, con el mismo mercado y periodo (que ya vio).',
+    adjustReason: 'Motivo',
+    adjustReasonPlaceholder: 'Por ejemplo: se le cortó internet a los 20 minutos',
+    resetDone: 'intento reiniciado',
+    reasonRequired: 'Escribe el motivo, queda registrado.',
+    extraRange: (max: number) => `Da entre 1 y ${max} minutos, hasta 600 minutos extra en total.`,
+    confirmReset: (name: string) =>
+      `¿Reiniciar el intento de ${name}? Se borran su resultado y sus operaciones, y no se puede deshacer.`,
+    extraGiven: (minutes: number, name: string) => `${name} tiene ${minutes} minutos más.`,
+    resetGiven: (name: string) => `Se reinició el intento de ${name}: ya puede comenzar de nuevo.`,
+    adjustFailed: 'No se pudo aplicar el ajuste. Inténtalo de nuevo.',
     pace: 'Ritmo del examen',
     paces: {
       60: '1 min de mercado por segundo',

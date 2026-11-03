@@ -8,8 +8,10 @@ import {
   DEFAULT_PACE,
   EVALUATION_PACES,
   Evaluation,
+  EvaluationAdjustment,
   evaluationWindow,
 } from '../../../core/models/evaluation';
+import { PracticeSession } from '../../../core/models/practice';
 import { formatElapsed } from '../../practice/bars';
 import { marketCovered } from '../../practice/live';
 import { Mentorship, audienceIds } from '../../../core/models/mentorship';
@@ -50,6 +52,9 @@ interface EvaluationForm {
 }
 
 export const MIN_DURATION = 5;
+/** Most minutes staff add at once to an attempt. */
+export const MAX_EXTRA_MINUTES = 120;
+const MINUTE = 60_000;
 export const MAX_DURATION = 600;
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -101,6 +106,18 @@ export class AdminEvaluations {
 
   /** Evaluation whose results are shown, and its standings once loaded. */
   protected readonly selected = signal<string | null>(null);
+  /** The shown evaluation's attempts and what staff did to them. */
+  private readonly attempts = signal<PracticeSession[]>([]);
+  protected readonly adjustments = signal<EvaluationAdjustment[]>([]);
+  /** The attempt staff are adding minutes to or restarting, with the form's values. */
+  protected readonly adjusting = signal<{
+    row: EvaluationStanding;
+    kind: 'extraTime' | 'reset';
+  } | null>(null);
+  protected readonly adjustMinutes = signal(10);
+  protected readonly adjustReason = signal('');
+  protected readonly adjustBusy = signal(false);
+  protected readonly maxExtra = MAX_EXTRA_MINUTES;
   protected readonly standings = signal<EvaluationStanding[] | null>(null);
 
   protected readonly dateRange = computed(() => {
@@ -388,16 +405,96 @@ export class AdminEvaluations {
     }
     this.selected.set(evaluation.id);
     this.standings.set(null);
+    this.adjusting.set(null);
+    await this.loadResults(evaluation);
+  }
+
+  private async loadResults(evaluation: Evaluation): Promise<void> {
     try {
-      const sessions = await this.practice.evaluationSessions(evaluation.id);
+      const [sessions, adjustments] = await Promise.all([
+        this.practice.evaluationSessions(evaluation.id),
+        this.service.adjustments(evaluation.id).catch(() => []),
+      ]);
       const students = this.assigned(evaluation).map((uid) => ({ uid, name: this.nameOf(uid) }));
       if (this.selected() === evaluation.id) {
+        this.attempts.set(sessions);
+        this.adjustments.set(adjustments);
         this.standings.set(evaluationStandings(sessions, students));
       }
     } catch {
       this.standings.set([]);
       this.message.set({ kind: 'error', text: this.i18n.messages().evaluations.resultsFailed });
     }
+  }
+
+  /** Opens the form to add minutes to an attempt, or to restart it. */
+  protected startAdjust(row: EvaluationStanding, kind: 'extraTime' | 'reset'): void {
+    this.adjusting.set({ row, kind });
+    this.adjustMinutes.set(10);
+    this.adjustReason.set('');
+    this.message.set(null);
+  }
+
+  /**
+   * Adds the minutes (counted from the attempt's deadline, or from now if it already passed,
+   * so the student really gets them), or deletes the attempt so the student starts it again,
+   * and records why.
+   */
+  protected async applyAdjust(evaluation: Evaluation): Promise<void> {
+    const adjusting = this.adjusting();
+    const t = this.i18n.messages().evaluations;
+    const session = this.attempts().find((s) => s.id === adjusting?.row.sessionId);
+    if (!adjusting || !session || this.adjustBusy()) {
+      return;
+    }
+    const reason = this.adjustReason().trim();
+    const minutes = Math.round(this.adjustMinutes());
+    if (!reason) {
+      this.message.set({ kind: 'error', text: t.reasonRequired });
+      return;
+    }
+    let extra = 0;
+    if (adjusting.kind === 'extraTime') {
+      const started = session.startedAt?.toMillis() ?? 0;
+      const limit = session.durationMinutes ?? 0;
+      const deadline = started + (limit + (session.extraMinutes ?? 0)) * MINUTE;
+      const from = Math.max(deadline, Date.now());
+      extra = Math.ceil((from + minutes * MINUTE - started) / MINUTE) - limit;
+      if (!(minutes >= 1 && minutes <= MAX_EXTRA_MINUTES) || extra > 600) {
+        this.message.set({ kind: 'error', text: t.extraRange(MAX_EXTRA_MINUTES) });
+        return;
+      }
+    } else if (!confirm(t.confirmReset(adjusting.row.name))) {
+      return;
+    }
+    this.adjustBusy.set(true);
+    try {
+      if (adjusting.kind === 'extraTime') {
+        await this.practice.giveExtraTime(session.id, extra);
+      } else {
+        await this.practice.deleteSession(session.id);
+      }
+      await this.service.logAdjustment(evaluation.id, {
+        uid: session.uid,
+        studentName: adjusting.row.name,
+        kind: adjusting.kind,
+        minutes: adjusting.kind === 'extraTime' ? minutes : null,
+        reason,
+      });
+      this.message.set({
+        kind: 'ok',
+        text:
+          adjusting.kind === 'extraTime'
+            ? t.extraGiven(minutes, adjusting.row.name)
+            : t.resetGiven(adjusting.row.name),
+      });
+      this.adjusting.set(null);
+    } catch {
+      this.message.set({ kind: 'error', text: t.adjustFailed });
+    } finally {
+      this.adjustBusy.set(false);
+    }
+    await this.loadResults(evaluation);
   }
 
   private async load(): Promise<void> {

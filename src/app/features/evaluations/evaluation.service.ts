@@ -5,6 +5,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -14,7 +15,7 @@ import {
 import { AuthService } from '../../core/auth/auth.service';
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
 import { LoadingService } from '../../core/loading/loading.service';
-import { Evaluation } from '../../core/models/evaluation';
+import { Evaluation, EvaluationAdjustment } from '../../core/models/evaluation';
 import { Enrollment, UserProfile } from '../../core/models/user-profile';
 
 /** What a trainer fills in to set up an evaluation. */
@@ -99,6 +100,30 @@ export class EvaluationService {
 
   setResultsPublished(id: string, resultsPublished: boolean): Promise<void> {
     return updateDoc(doc(this.evaluations, id), { resultsPublished, updatedAt: serverTimestamp() });
+  }
+
+  /** What staff did to the evaluation's attempts when they went wrong, newest first. */
+  async adjustments(evaluationId: string): Promise<EvaluationAdjustment[]> {
+    const snapshot = await getDocs(
+      query(collection(this.evaluations, evaluationId, 'adjustments'), orderBy('at', 'desc')),
+    );
+    return snapshot.docs.map((d) => ({ ...(d.data() as EvaluationAdjustment), id: d.id }));
+  }
+
+  /** Records an adjustment, signed by the staff member making it. */
+  async logAdjustment(
+    evaluationId: string,
+    input: Pick<EvaluationAdjustment, 'uid' | 'studentName' | 'kind' | 'minutes' | 'reason'>,
+  ): Promise<void> {
+    const user = this.auth.user();
+    await setDoc(doc(collection(this.evaluations, evaluationId, 'adjustments')), {
+      ...input,
+      studentName: input.studentName.slice(0, 120),
+      reason: input.reason.slice(0, 500),
+      by: user?.uid,
+      byName: (this.auth.profile()?.displayName || user?.email || user?.uid || '').slice(0, 120),
+      at: serverTimestamp(),
+    });
   }
 
   /** Deletes the evaluation; its attempts stay in the practice review. */
