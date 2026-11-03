@@ -39,6 +39,30 @@
     <strong [class.down]="s.maxDrawdown > 0">{{ s.maxDrawdown | number: '1.2-2' }} USD</strong>
     <small>{{ t.fromPeak((s.maxDrawdownPct | percent: '1.0-1') ?? '') }}</small>
   </div>
+  <div class="item" [title]="t.riskHint">
+    <span>{{ t.riskPerTrade }}</span>
+    <strong>{{ s.avgRiskPct === null ? '—' : (s.avgRiskPct | percent: '1.1-1') }}</strong>
+    @if (s.maxRiskPct !== null) {
+      <small>{{ t.riskMax((s.maxRiskPct | percent: '1.1-1') ?? '') }}</small>
+    }
+  </div>
+  <div class="item" [title]="t.rewardRiskHint">
+    <span>{{ t.rewardRisk }}</span>
+    <strong>{{
+      s.avgRewardRisk === null ? '—' : '1:' + (s.avgRewardRisk | number: '1.0-2')
+    }}</strong>
+  </div>
+  <div class="item">
+    <span>{{ t.withoutStopLoss }}</span>
+    <strong [class.down]="s.withoutStopLoss > 0">{{ s.withoutStopLoss }}</strong>
+  </div>
+  <div class="item">
+    <span>{{ t.stopOut }}</span>
+    <strong [class.down]="s.stoppedOut">{{ s.stoppedOut ? t.stopOutYes : t.stopOutNo }}</strong>
+    @if (s.stoppedOut) {
+      <small>{{ t.stopOutHint }}</small>
+    }
+  </div>
 </div>
 
 <figure class="curve">

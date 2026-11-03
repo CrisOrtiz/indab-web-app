@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { PracticeTrade } from '../../../core/models/practice';
+import { sessionStats } from '../../practice/stats';
 import { EvaluationStanding } from '../../ranking/standings';
 import { EvaluationResults, RESULTS_PAGE_SIZE } from './evaluation-results';
 
@@ -14,6 +16,7 @@ const standing = (i: number, status: EvaluationStanding['status']): EvaluationSt
   sessionId: status === 'notStarted' ? null : `s${i}`,
   open: status === 'active',
   extraMinutes: 0,
+  stats: null,
 });
 
 describe('EvaluationResults', () => {
@@ -90,6 +93,43 @@ describe('EvaluationResults', () => {
     expect(menus[0]).not.toBeNull();
     expect(menus[1]).not.toBeNull();
     expect(menus[2]).toBeNull();
+  });
+
+  it("switches to each attempt's risk metrics", async () => {
+    const closed = (pnl: number, stopLoss: number | null, exitReason = 'manual') =>
+      ({
+        status: 'closed',
+        side: 'long',
+        entryPrice: 100,
+        entryTime: 0,
+        quantity: 2,
+        stopLoss,
+        takeProfit: stopLoss === null ? null : 110,
+        exitTime: 1,
+        exitReason,
+        pnl,
+      }) as PracticeTrade;
+    await render([
+      {
+        ...standing(0, 'finished'),
+        stats: sessionStats([closed(20, 95), closed(-10, null, 'stopOut')], 200),
+      },
+      standing(1, 'notStarted'),
+    ]);
+    expect(el.querySelector('thead')?.textContent).toContain('Ganancia / pérdida');
+    [...el.querySelectorAll<HTMLButtonElement>('.result-views button')]
+      .find((b) => b.textContent?.trim() === 'Métricas de riesgo')!
+      .click();
+    await fixture.whenStable();
+    const head = el.querySelector('thead')!.textContent!;
+    expect(head).toContain('Riesgo por operación');
+    expect(head).not.toContain('Ganancia / pérdida');
+    const cells = [...rows()[0].querySelectorAll('td')].map((td) => td.textContent?.trim());
+    // Risk: 5 USD a unit x 2 units over 200 = 5 %; R:R 10 / 5 = 2.
+    expect(cells).toContain('1:2');
+    expect(cells.some((c) => c?.startsWith('5.0%'))).toBe(true);
+    expect(cells).toContain('Sí');
+    expect(rows()[1].textContent).toContain('—');
   });
 
   it('says when nobody took the evaluation', async () => {

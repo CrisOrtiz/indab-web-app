@@ -11,7 +11,7 @@ import {
   EvaluationAdjustment,
   evaluationWindow,
 } from '../../../core/models/evaluation';
-import { PracticeSession } from '../../../core/models/practice';
+import { PracticeSession, PracticeTrade } from '../../../core/models/practice';
 import { formatElapsed } from '../../practice/bars';
 import { marketCovered } from '../../practice/live';
 import { Mentorship, audienceIds } from '../../../core/models/mentorship';
@@ -416,10 +416,20 @@ export class AdminEvaluations {
         this.service.adjustments(evaluation.id).catch(() => []),
       ]);
       const students = this.assigned(evaluation).map((uid) => ({ uid, name: this.nameOf(uid) }));
+      // Each attempt's trades, for its statistics; one that fails to load just shows none.
+      const trades = new Map<string, PracticeTrade[]>();
+      await Promise.all(
+        sessions.map(async (s) => {
+          const list = await this.practice.sessionTrades(s.id).catch(() => null);
+          if (list) {
+            trades.set(s.id, list);
+          }
+        }),
+      );
       if (this.selected() === evaluation.id) {
         this.attempts.set(sessions);
         this.adjustments.set(adjustments);
-        this.standings.set(evaluationStandings(sessions, students));
+        this.standings.set(evaluationStandings(sessions, students, Date.now(), trades));
       }
     } catch {
       this.standings.set([]);

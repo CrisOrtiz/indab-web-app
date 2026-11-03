@@ -933,7 +933,7 @@ service cloud.firestore {
           && inTime(0)
           && request.resource.data.keys().hasOnly(['uid', 'side', 'orderType', 'orderPrice',
             'placedTime', 'quantity', 'entryPrice', 'entryTime', 'stopLoss', 'takeProfit',
-            'status', 'openedAt'])
+            'initialStopLoss', 'status', 'openedAt'])
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.side in ['long', 'short']
           && isPrice(request.resource.data.quantity)
@@ -942,6 +942,9 @@ service cloud.firestore {
           && request.resource.data.entryTime == request.resource.data.placedTime
           && optionalPrice(request.resource.data.stopLoss)
           && optionalPrice(request.resource.data.takeProfit)
+          // The stop loss it was placed with, kept to measure its risk (older apps omit it).
+          && request.resource.data.get('initialStopLoss', request.resource.data.stopLoss)
+            == request.resource.data.stopLoss
           && ((request.resource.data.orderType == 'market'
               && request.resource.data.orderPrice == null
               && request.resource.data.status == 'open')

@@ -771,6 +771,26 @@ describe('trading practice', () => {
     );
   });
 
+  it('keeps the stop loss a trade was placed with, unchangeable', async () => {
+    await assertSucceeds(
+      setDoc(tradeRef('enrolled', 'i1'), trade('enrolled', { initialStopLoss: 49000 })),
+    );
+    await assertSucceeds(
+      setDoc(
+        tradeRef('enrolled', 'i2'),
+        trade('enrolled', { stopLoss: null, initialStopLoss: null }),
+      ),
+    );
+    await assertFails(
+      setDoc(tradeRef('enrolled', 'i3'), trade('enrolled', { initialStopLoss: 48000 })),
+    );
+    await assertFails(
+      setDoc(tradeRef('enrolled', 'i4'), trade('enrolled', { initialStopLoss: null })),
+    );
+    await assertFails(updateDoc(tradeRef('enrolled', 'i1'), { initialStopLoss: 49900 }));
+    await assertSucceeds(updateDoc(tradeRef('enrolled', 'i1'), { stopLoss: 49900 }));
+  });
+
   it('places limit and stop orders as pending at their price', async () => {
     await assertSucceeds(setDoc(tradeRef('enrolled', 'p2'), limitOrder('enrolled')));
     await assertSucceeds(

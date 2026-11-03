@@ -37,6 +37,11 @@ describe('sessionStats', () => {
       maxDrawdown: 0,
       maxDrawdownPct: 0,
       equity: [{ time: 5, balance: 200 }],
+      avgRiskPct: null,
+      maxRiskPct: null,
+      avgRewardRisk: null,
+      withoutStopLoss: 0,
+      stoppedOut: false,
     });
   });
 
@@ -61,6 +66,25 @@ describe('sessionStats', () => {
       maxDrawdown: 30,
     });
     expect(stats.maxDrawdownPct).toBeCloseTo(30 / 220);
+  });
+
+  it('measures risk to the stop loss each trade was placed with', () => {
+    const stats = sessionStats(
+      [
+        // Risked 5 USD a unit on 4 units from 200: 10 %. TP 10 away: 1:2. SL moved to entry later.
+        { ...trade('a', 40, 10), quantity: 4, initialStopLoss: 95, stopLoss: 100, takeProfit: 110 },
+        // Opened after a closed, so from 240: 2 x 6 / 240 = 5 %. No take profit.
+        { ...trade('b', -12, 30), entryTime: 20, quantity: 2, stopLoss: 94 },
+        // No stop loss at all, closed by the stop out.
+        { ...trade('c', -20, 40), entryTime: 35, exitReason: 'stopOut' },
+      ],
+      200,
+    );
+    expect(stats.avgRiskPct).toBeCloseTo(0.075);
+    expect(stats.maxRiskPct).toBeCloseTo(0.1);
+    expect(stats.avgRewardRisk).toBe(2);
+    expect(stats.withoutStopLoss).toBe(1);
+    expect(stats.stoppedOut).toBe(true);
   });
 
   it('has no profit factor without losses', () => {

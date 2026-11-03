@@ -42,6 +42,7 @@ describe('AdminEvaluations', () => {
   };
   const practice = {
     evaluationSessions: vi.fn(),
+    sessionTrades: vi.fn(async () => [] as unknown[]),
     giveExtraTime: vi.fn(async () => undefined),
     deleteSession: vi.fn(async () => undefined),
   };

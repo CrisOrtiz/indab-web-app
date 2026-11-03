@@ -1,5 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
-import { PracticeSession } from '../../core/models/practice';
+import { PracticeSession, PracticeTrade } from '../../core/models/practice';
 import { evaluationStandings } from './standings';
 
 const session = (
@@ -62,5 +62,17 @@ describe('evaluationStandings', () => {
       ['Ana', 'active'],
       ['Bea', 'finished'],
     ]);
+  });
+
+  it('adds the statistics of attempts whose trades are given', () => {
+    const trade = { status: 'closed', pnl: -4, exitTime: 1, exitReason: 'stopOut' };
+    const rows = evaluationStandings(
+      [session('a', 'Ana', -4), session('b', 'Bea', 0)],
+      [],
+      Date.now(),
+      new Map([['a--4', [trade as PracticeTrade]]]),
+    );
+    expect(rows[1].stats).toMatchObject({ trades: 1, stoppedOut: true });
+    expect(rows[0].stats).toBeNull();
   });
 });

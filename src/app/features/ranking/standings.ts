@@ -1,5 +1,6 @@
-import { PracticeSession } from '../../core/models/practice';
+import { PracticeSession, PracticeTrade } from '../../core/models/practice';
 import { shownStatus } from '../practice/resume';
+import { SessionStats, sessionStats } from '../practice/stats';
 
 /** One assigned student's line in an evaluation's ranking. */
 export interface EvaluationStanding {
@@ -19,6 +20,8 @@ export interface EvaluationStanding {
   open: boolean;
   /** Minutes staff added to it. */
   extraMinutes: number;
+  /** How the attempt traded (drawdown, risk...), when its trades were loaded. */
+  stats: SessionStats | null;
 }
 
 const byName = (a: { name: string }, b: { name: string }) =>
@@ -32,12 +35,14 @@ const returnOf = (session: PracticeSession) =>
  * fewer trades first on a tie. Attempts still `active` count with what they had closed: the
  * student is still trading, or left it open (once its time is up it shows as finished, and is
  * closed the next time the student opens the practice page). Assigned students without an
- * attempt follow, unranked.
+ * attempt follow, unranked. With each attempt's `trades` (by session id), rows carry their
+ * statistics.
  */
 export function evaluationStandings(
   sessions: PracticeSession[],
   students: { uid: string; name: string }[] = [],
   now = Date.now(),
+  trades?: Map<string, PracticeTrade[]>,
 ): EvaluationStanding[] {
   const ranked: EvaluationStanding[] = [...sessions]
     .sort((a, b) => b.pnl - a.pnl || a.tradeCount - b.tradeCount || byName(nameOf(a), nameOf(b)))
@@ -53,6 +58,7 @@ export function evaluationStandings(
       sessionId: s.id,
       open: s.status === 'active',
       extraMinutes: s.extraMinutes ?? 0,
+      stats: trades?.has(s.id) ? sessionStats(trades.get(s.id)!, s.startingBalance) : null,
     }));
   const taken = new Set(sessions.map((s) => s.uid));
   const missing: EvaluationStanding[] = students
@@ -70,6 +76,7 @@ export function evaluationStandings(
       sessionId: null,
       open: false,
       extraMinutes: 0,
+      stats: null,
     }));
   return [...ranked, ...missing];
 }

@@ -49,15 +49,42 @@ export const RESULTS_PAGE_SIZE = 20;
         </select>
       </label>
     </div>
+    @let ts = i18n.messages().stats;
+    <div class="chips result-views" role="group" [attr.aria-label]="t.resultsView">
+      <button
+        type="button"
+        [attr.aria-pressed]="view() === 'ranking'"
+        (click)="view.set('ranking')"
+      >
+        {{ t.viewRanking }}
+      </button>
+      <button
+        type="button"
+        [attr.aria-pressed]="view() === 'metrics'"
+        (click)="view.set('metrics')"
+      >
+        {{ t.viewMetrics }}
+      </button>
+    </div>
     <table class="users results">
       <thead>
         <tr>
           <th>#</th>
           <th>{{ t.student }}</th>
-          <th>{{ t.status }}</th>
-          <th>{{ t.pnl }}</th>
-          <th>{{ t.return }}</th>
-          <th>{{ t.trades }}</th>
+          @if (view() === 'ranking') {
+            <th>{{ t.status }}</th>
+            <th>{{ t.pnl }}</th>
+            <th>{{ t.return }}</th>
+            <th>{{ t.trades }}</th>
+          } @else {
+            <th>{{ ts.maxDrawdown }}</th>
+            <th>{{ ts.profitFactor }}</th>
+            <th>{{ ts.winRate }}</th>
+            <th>{{ ts.riskPerTrade }}</th>
+            <th>{{ ts.rewardRisk }}</th>
+            <th>{{ ts.withoutStopLoss }}</th>
+            <th>{{ ts.stopOut }}</th>
+          }
           <th [attr.aria-label]="t.adjustments"></th>
         </tr>
       </thead>
@@ -66,23 +93,58 @@ export const RESULTS_PAGE_SIZE = 20;
           <tr>
             <td data-label="#">{{ row.rank ?? '—' }}</td>
             <td [attr.data-label]="t.student" class="name">{{ row.name }}</td>
-            <td [attr.data-label]="t.status">
-              {{ t.attemptStates[row.status] }}
-              @if (row.extraMinutes) {
-                <span class="badge">{{ t.extraBadge(row.extraMinutes) }}</span>
-              }
-            </td>
-            <td
-              [attr.data-label]="t.pnl"
-              [class.up]="(row.pnl ?? 0) > 0"
-              [class.down]="(row.pnl ?? 0) < 0"
-            >
-              {{ row.pnl === null ? '—' : (row.pnl | number: '1.2-2') }}
-            </td>
-            <td [attr.data-label]="t.return">
-              {{ row.return === null ? '—' : (row.return | percent: '1.1-1') }}
-            </td>
-            <td [attr.data-label]="t.trades">{{ row.trades ?? '—' }}</td>
+            @if (view() === 'metrics') {
+              @let m = row.stats;
+              <td [attr.data-label]="ts.maxDrawdown" [class.down]="(m?.maxDrawdown ?? 0) > 0">
+                {{ m ? (m.maxDrawdownPct | percent: '1.1-1') : '—' }}
+              </td>
+              <td [attr.data-label]="ts.profitFactor">
+                {{ m?.profitFactor == null ? '—' : (m!.profitFactor | number: '1.2-2') }}
+              </td>
+              <td [attr.data-label]="ts.winRate">
+                {{ m?.winRate == null ? '—' : (m!.winRate | percent: '1.0-0') }}
+              </td>
+              <td [attr.data-label]="ts.riskPerTrade">
+                @if (m?.avgRiskPct == null) {
+                  —
+                } @else {
+                  {{ m!.avgRiskPct | percent: '1.1-1' }}
+                  <small class="muted">{{
+                    ts.riskMax((m!.maxRiskPct | percent: '1.1-1') ?? '')
+                  }}</small>
+                }
+              </td>
+              <td [attr.data-label]="ts.rewardRisk">
+                {{ m?.avgRewardRisk == null ? '—' : '1:' + (m!.avgRewardRisk | number: '1.0-2') }}
+              </td>
+              <td
+                [attr.data-label]="ts.withoutStopLoss"
+                [class.down]="(m?.withoutStopLoss ?? 0) > 0"
+              >
+                {{ m ? m.withoutStopLoss : '—' }}
+              </td>
+              <td [attr.data-label]="ts.stopOut" [class.down]="!!m?.stoppedOut">
+                {{ m ? (m.stoppedOut ? ts.stopOutYes : ts.stopOutNo) : '—' }}
+              </td>
+            } @else {
+              <td [attr.data-label]="t.status">
+                {{ t.attemptStates[row.status] }}
+                @if (row.extraMinutes) {
+                  <span class="badge">{{ t.extraBadge(row.extraMinutes) }}</span>
+                }
+              </td>
+              <td
+                [attr.data-label]="t.pnl"
+                [class.up]="(row.pnl ?? 0) > 0"
+                [class.down]="(row.pnl ?? 0) < 0"
+              >
+                {{ row.pnl === null ? '—' : (row.pnl | number: '1.2-2') }}
+              </td>
+              <td [attr.data-label]="t.return">
+                {{ row.return === null ? '—' : (row.return | percent: '1.1-1') }}
+              </td>
+              <td [attr.data-label]="t.trades">{{ row.trades ?? '—' }}</td>
+            }
             <td class="row-actions">
               @let actions = menus().get(row.uid) ?? [];
               @if (actions.length) {
@@ -96,7 +158,7 @@ export const RESULTS_PAGE_SIZE = 20;
           </tr>
         } @empty {
           <tr>
-            <td colspan="7" class="muted empty">
+            <td [attr.colspan]="view() === 'ranking' ? 7 : 10" class="muted empty">
               {{ standings().length ? tl.noMatches : t.noAttempts }}
             </td>
           </tr>
@@ -116,6 +178,35 @@ export const RESULTS_PAGE_SIZE = 20;
     './admin-evaluations.scss',
     '../../../shared/pager/_list-filters.scss',
   ],
+  styles: `
+    .result-views {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+
+      button {
+        padding: 6px 14px;
+        border: 1px solid var(--color-border);
+        border-radius: 999px;
+        background: var(--color-bg);
+        color: var(--color-text);
+        font: inherit;
+        cursor: pointer;
+
+        &[aria-pressed='true'] {
+          border-color: var(--color-text);
+          background: var(--color-text);
+          color: var(--color-bg);
+        }
+      }
+    }
+
+    td small {
+      display: block;
+      font-size: 0.75rem;
+    }
+  `,
 })
 export class EvaluationResults {
   protected readonly i18n = inject(I18n);
@@ -132,6 +223,8 @@ export class EvaluationResults {
   protected readonly status = signal('');
   protected readonly mentorship = signal('');
   protected readonly page = signal(0);
+  /** The ranking (P/L) or how each attempt traded (risk, drawdown...). */
+  protected readonly view = signal<'ranking' | 'metrics'>('ranking');
 
   protected readonly matches = computed(() => {
     const term = this.search().trim().toLowerCase();
