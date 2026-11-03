@@ -574,6 +574,8 @@ export const en: Messages = {
     speed: 'Speed',
     barsPerSecond: (n) => `${n} bars/s`,
     finish: 'End session',
+    replayControls: 'Replay controls',
+    spaceKey: 'Space',
     elapsed: (time) => `Market time elapsed: ${time}`,
     quickTrade: 'Quick market trade',
     quickSell: (lots) => `Sell ${lots} lots at market`,

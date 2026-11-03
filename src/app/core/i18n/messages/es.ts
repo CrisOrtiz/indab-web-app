@@ -591,6 +591,8 @@ export const es = {
     speed: 'Velocidad',
     barsPerSecond: (n: number) => `${n} velas/s`,
     finish: 'Terminar sesión',
+    replayControls: 'Controles de reproducción',
+    spaceKey: 'Espacio',
     elapsed: (time: string) => `Tiempo de mercado transcurrido: ${time}`,
     quickTrade: 'Operación rápida a mercado',
     quickSell: (lots: string) => `Vender ${lots} lotes a mercado`,

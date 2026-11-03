@@ -25,6 +25,7 @@ import {
 import { EvaluationService } from '../evaluations/evaluation.service';
 import { ChartSettingsService } from './chart-settings.service';
 import { BarBuilder, formatElapsed, nextBarEnd } from './bars';
+import { ReplayControls } from './replay-controls';
 import {
   DEFAULT_TIMEFRAME,
   HISTORY_BARS,
@@ -142,6 +143,7 @@ export const SESSIONS_PAGE_SIZE = 10;
     PercentPipe,
     Pager,
     ReplayChart,
+    ReplayControls,
     SessionFilterBar,
     SessionReview,
     SessionStatsPanel,

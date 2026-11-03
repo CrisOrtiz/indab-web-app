@@ -162,7 +162,9 @@ describe('Practice page', () => {
   });
 
   const button = (name: string) =>
-    [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === name)!;
+    [...el.querySelectorAll('button')].find(
+      (b) => b.textContent?.trim() === name || b.getAttribute('aria-label') === name,
+    )!;
   const click = async (name: string) => {
     button(name).click();
     await fixture.whenStable();
@@ -356,7 +358,7 @@ describe('Practice page', () => {
       // The bar it was on (30 minutes in: the third 15-minute step), its timeframe and speed.
       expect(el.querySelector('.toolbar .price')!.textContent).toContain('103');
       expect(el.querySelector('.timeframes .selected')!.textContent).toContain('5m');
-      expect(el.querySelector<HTMLSelectElement>('.controls select')!.value).toBe('5');
+      expect(el.querySelector('.controls [aria-checked="true"]')!.textContent!.trim()).toBe('5×');
       expect(chart().hideDates()).toBe(false);
       expect(chart().drawings()).toEqual(resume.drawings);
       expect(chart().trades()).toEqual([expect.objectContaining({ id: 't1', status: 'open' })]);

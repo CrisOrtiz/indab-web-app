@@ -571,6 +571,8 @@ export const pt: Messages = {
     speed: 'Velocidade',
     barsPerSecond: (n) => `${n} candles/s`,
     finish: 'Encerrar sessão',
+    replayControls: 'Controles de reprodução',
+    spaceKey: 'Espaço',
     elapsed: (time) => `Tempo de mercado decorrido: ${time}`,
     quickTrade: 'Operação rápida a mercado',
     quickSell: (lots) => `Vender ${lots} lotes a mercado`,
