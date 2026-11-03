@@ -197,6 +197,17 @@
         </select>
       </label>
       <p class="hint">{{ t.languageHint }}</p>
+      <label>
+        {{ i18n.messages().timeZone.title }}
+        <select (change)="zones.use($any($event.target).value)">
+          @for (zone of zones.options(); track zone) {
+            <option [value]="zone" [selected]="zone === zones.zone()">
+              {{ zones.label(zone) }}
+            </option>
+          }
+        </select>
+      </label>
+      <p class="hint">{{ i18n.messages().timeZone.hint }}</p>
     </div>
 
     <div class="card">

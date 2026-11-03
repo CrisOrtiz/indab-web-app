@@ -1,5 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { sinceStart } from './bars';
 import { I18n } from '../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../core/i18n/local-date.pipe';
 import { NoteTarget } from '../../core/models/mentor-note';
@@ -38,6 +39,8 @@ export class SessionReview {
   readonly session = input.required<PracticeSession>();
   /** The evaluation's title for an attempt, shown in the student's note notification. */
   readonly evaluationTitle = input('');
+  /** The chart and the trades show market time since the start instead of dates. */
+  readonly hideDates = input(false);
 
   private readonly practice = inject(PracticeService);
   private readonly market = inject(MarketDataService);
@@ -47,6 +50,7 @@ export class SessionReview {
   protected readonly i18n = inject(I18n);
   protected readonly priceDigits = priceDigits;
   protected readonly lotSize = LOT_SIZE;
+  protected readonly since = (time: number) => sinceStart(time, this.session().replayStart / 1000);
 
   /** The session's trades once loaded. */
   protected readonly trades = signal<PracticeTrade[] | null>(null);

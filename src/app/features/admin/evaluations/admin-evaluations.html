@@ -73,6 +73,15 @@
             (input)="patch({ durationMinutes: +$any($event.target).value })"
           />
         </label>
+        <label>
+          {{ t.pace }}
+          <select [value]="f.pace" (change)="patch({ pace: +$any($event.target).value })">
+            @for (p of paces; track p) {
+              <option [value]="p" [selected]="p === f.pace">{{ t.paces[p] }}</option>
+            }
+          </select>
+          <small class="muted">{{ t.covers(covered(f.pace, f.durationMinutes || 0)) }}</small>
+        </label>
       </div>
       <fieldset>
         <legend>{{ t.start }}</legend>
@@ -134,6 +143,7 @@
           />
         </label>
       </div>
+      <p class="muted zone-hint">{{ i18n.messages().timeZone.inputHint(zones.label()) }}</p>
       <span class="muted">{{ t.windowHint }}</span>
       <app-audience-picker
         [students]="students()"
@@ -178,7 +188,7 @@
           <p class="muted">
             {{ tr.instruments[ev.symbol] ?? ev.symbol }} ·
             {{ ev.replayStart | localDate: 'd MMM y, HH:mm' }} ·
-            {{ t.minutes(ev.durationMinutes) }} ·
+            {{ t.minutes(ev.durationMinutes) }} · {{ ev.pace ? t.paces[ev.pace] : t.freeSpeed }} ·
             {{ t.studentCount(assigned(ev).length) }}
           </p>
           @if (ev.mentorshipIds?.length) {

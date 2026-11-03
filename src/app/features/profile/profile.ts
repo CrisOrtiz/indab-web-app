@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n, LANGUAGES, Language } from '../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../core/i18n/local-date.pipe';
+import { TimeZoneService } from '../../core/time-zone/time-zone.service';
 import { PracticeSession } from '../../core/models/practice';
 import { DeviceSession } from '../../core/models/user-profile';
 import { Avatar } from '../../shared/avatar/avatar';
@@ -48,6 +49,7 @@ export class Profile {
 
   protected readonly auth = inject(AuthService);
   protected readonly i18n = inject(I18n);
+  protected readonly zones = inject(TimeZoneService);
   private readonly profiles = inject(ProfileService);
   private readonly practice = inject(PracticeService);
   private readonly devices = inject(SessionsService);

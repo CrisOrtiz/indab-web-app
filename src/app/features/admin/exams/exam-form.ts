@@ -8,6 +8,7 @@ import {
 } from '../../../core/models/exam';
 import type { Messages } from '../../../core/i18n/messages/es';
 import { ExamInput } from '../../exams/exam.service';
+import { fromZoneInput, toZoneInput } from '../../../core/time-zone/time-zone.service';
 
 /** A question as the editor holds it: with its right answers, which are saved apart. */
 export interface EditorQuestion extends ExamQuestion {
@@ -34,10 +35,21 @@ export interface ExamForm {
 
 const DAY = 24 * 60 * 60 * 1000;
 
-/** A date as a `datetime-local` input value, in local time. */
-export function toLocalInput(date: Date): string {
+/**
+ * A date as a `datetime-local` input value: as clocks read it in `zone` (the user's chosen time
+ * zone), or in the device's time without one.
+ */
+export function toLocalInput(date: Date, zone?: string): string {
+  if (zone) {
+    return toZoneInput(date.getTime(), zone);
+  }
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** The instant a `datetime-local` value means: in `zone`, or in the device's time without one. */
+export function fromLocalInput(value: string, zone?: string): Date {
+  return new Date(zone ? fromZoneInput(value, zone) : new Date(value).getTime());
 }
 const hasChoices = (type: QuestionType) => type === 'single' || type === 'multiple';
 
@@ -75,7 +87,12 @@ export function withType(question: EditorQuestion, type: QuestionType): EditorQu
 }
 
 /** The editor's starting state: a new form, or an existing one with its answer key. */
-export function toForm(exam: Exam | null, key: ExamKey | null, now = new Date()): ExamForm {
+export function toForm(
+  exam: Exam | null,
+  key: ExamKey | null,
+  now = new Date(),
+  zone?: string,
+): ExamForm {
   if (!exam) {
     const opens = new Date(now);
     opens.setSeconds(0, 0);
@@ -89,8 +106,8 @@ export function toForm(exam: Exam | null, key: ExamKey | null, now = new Date())
       audience: 'all',
       studentIds: [],
       mentorshipIds: [],
-      opensAt: toLocalInput(opens),
-      closesAt: toLocalInput(new Date(opens.getTime() + 7 * DAY)),
+      opensAt: toLocalInput(opens, zone),
+      closesAt: toLocalInput(new Date(opens.getTime() + 7 * DAY), zone),
       questions: [newQuestion()],
       published: false,
     };
@@ -105,8 +122,8 @@ export function toForm(exam: Exam | null, key: ExamKey | null, now = new Date())
     audience: exam.audience,
     studentIds: [...exam.studentIds],
     mentorshipIds: [...(exam.mentorshipIds ?? [])],
-    opensAt: toLocalInput(exam.opensAt.toDate()),
-    closesAt: toLocalInput(exam.closesAt.toDate()),
+    opensAt: toLocalInput(exam.opensAt.toDate(), zone),
+    closesAt: toLocalInput(exam.closesAt.toDate(), zone),
     questions: exam.questions.map((q) => ({ ...q, correct: [...(key?.answers[q.id] ?? [])] })),
     published: exam.published,
   };
@@ -122,8 +139,9 @@ export function cloneForm(
   key: ExamKey | null,
   title: string,
   now = new Date(),
+  zone?: string,
 ): ExamForm {
-  const form = toForm(exam, key);
+  const form = toForm(exam, key, now, zone);
   const opens = new Date(now);
   opens.setSeconds(0, 0);
   const length = Math.max(exam.closesAt.toMillis() - exam.opensAt.toMillis(), DAY);
@@ -132,20 +150,24 @@ export function cloneForm(
     title: title.slice(0, 120),
     studentIds: [],
     mentorshipIds: [],
-    opensAt: toLocalInput(opens),
-    closesAt: toLocalInput(new Date(opens.getTime() + length)),
+    opensAt: toLocalInput(opens, zone),
+    closesAt: toLocalInput(new Date(opens.getTime() + length), zone),
     questions: form.questions.map((q) => ({ ...q, options: [...q.options] })),
     published: false,
   };
 }
 
 /** The first problem that keeps the form from being saved, or null. */
-export function formProblem(form: ExamForm, t: Messages['examAdmin']): string | null {
+export function formProblem(
+  form: ExamForm,
+  t: Messages['examAdmin'],
+  zone?: string,
+): string | null {
   const total = Number(form.totalPoints);
   const passing = Number(form.passingPoints);
   const duration = Number(form.durationMinutes);
-  const opens = new Date(form.opensAt).getTime();
-  const closes = new Date(form.closesAt).getTime();
+  const opens = fromLocalInput(form.opensAt, zone).getTime();
+  const closes = fromLocalInput(form.closesAt, zone).getTime();
   if (!form.title.trim()) {
     return t.titleRequired;
   }
@@ -196,6 +218,7 @@ export function formProblem(form: ExamForm, t: Messages['examAdmin']): string | 
 export function fromForm(
   form: ExamForm,
   existing: Exam | null,
+  zone?: string,
 ): { input: ExamInput; key: ExamKey } {
   const questions = form.questions.slice(0, MAX_QUESTIONS).map((q) => {
     // Options left blank are dropped, and the right answers renumbered to match.
@@ -229,8 +252,8 @@ export function fromForm(
       audience: form.audience,
       studentIds: form.audience === 'selected' ? form.studentIds : [],
       mentorshipIds: form.audience === 'selected' ? form.mentorshipIds : [],
-      opensAt: new Date(form.opensAt),
-      closesAt: new Date(form.closesAt),
+      opensAt: fromLocalInput(form.opensAt, zone),
+      closesAt: fromLocalInput(form.closesAt, zone),
       questions: questions.map((q) => q.question),
       published: form.published,
       resultsPublished: existing?.resultsPublished ?? false,

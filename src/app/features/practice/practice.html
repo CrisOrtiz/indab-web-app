@@ -26,6 +26,7 @@
             [playing]="playing()"
             [speed]="speed()"
             [speeds]="speeds"
+            [live]="live()"
             (step)="step()"
             (togglePlay)="togglePlay()"
             (speedChange)="setSpeed($event)"
@@ -39,7 +40,7 @@
             <span class="countdown" [attr.aria-label]="t.timeLeftLabel">{{
               t.timeLeft(remaining() ?? '')
             }}</span>
-            <span class="muted">{{ t.leavingKeeps }}</span>
+            <span class="muted">{{ live() ? t.liveHint : t.leavingKeeps }}</span>
           </div>
         }
         @if (resumed()) {
@@ -540,7 +541,9 @@
             {{
               t.summary(
                 instrumentLabel(),
-                (replayStart() | localDate: 'd MMM y, HH:mm') ?? '',
+                datesHidden()
+                  ? t.dateHidden
+                  : ((replayStart() | localDate: 'd MMM y, HH:mm') ?? ''),
                 elapsed()
               )
             }}
@@ -551,11 +554,17 @@
             [barSeconds]="barSeconds()"
             [focusTrade]="focused()"
             [startTime]="replayStart() / 1000"
+            [hideDates]="datesHidden()"
             [indicators]="chartSettings.indicators()"
             (indicatorsChange)="chartSettings.saveIndicators($event)"
           />
           @if (filledTrades().length) {
-            <app-trade-navigator [trades]="filledTrades()" [(selected)]="focused" />
+            <app-trade-navigator
+              [trades]="filledTrades()"
+              [(selected)]="focused"
+              [hideDates]="datesHidden()"
+              [startTime]="replayStart() / 1000"
+            />
           }
           <h3>{{ t.stats }}</h3>
           <app-session-stats [trades]="r.trades()" [startingBalance]="startingBalance" />
@@ -781,7 +790,9 @@
             </tr>
             @if (reviewing() === s.id) {
               <tr class="detail">
-                <td colspan="6"><app-session-review [session]="s" /></td>
+                <td colspan="6">
+                  <app-session-review [session]="s" [hideDates]="reviewHidesDates(s)" />
+                </td>
               </tr>
             }
           } @empty {

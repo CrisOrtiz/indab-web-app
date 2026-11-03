@@ -675,6 +675,11 @@ export const en: Messages = {
     closed: 'The trade is already closed.',
   },
 
+  timeZone: {
+    title: 'Time zone',
+    hint: 'Dates, times and the practice chart show in this zone. It is kept on this browser.',
+    inputHint: (zone: string) => `Times in ${zone}. You can change the time zone in your profile.`,
+  },
   practice: {
     title: 'Trading practice',
     intro:
@@ -787,6 +792,11 @@ export const en: Messages = {
     timeLeft: (time: string) => `${time} left`,
     leavingKeeps:
       'You can leave and come back any time: the clock keeps running and the evaluation is handed in when time is up.',
+    live: 'Live',
+    liveHint:
+      'The chart moves on its own with the clock: it cannot be paused or skipped. If you leave, the market goes on and you see it where it is when you come back.',
+    openedElsewhere: 'You opened this session in another tab, so it stopped here.',
+    dateHidden: 'date hidden until the evaluation closes',
     leaveOpen: 'Leave open',
     leaveOpenHint: 'Back to the list; the session stays open where it is.',
     openSessions: 'Your open practice',
@@ -912,6 +922,14 @@ export const en: Messages = {
     description: 'Instructions (optional)',
     market: 'Market',
     duration: 'Time limit (minutes)',
+    pace: 'Exam pace',
+    paces: {
+      60: '1 market minute per second',
+      900: '15 market minutes per second',
+      1: 'Real time (1 minute per minute)',
+    } as Record<number, string>,
+    covers: (time: string) => `It moves on its own with the clock and covers ${time} of market.`,
+    freeSpeed: 'free speed',
     start: 'Replay start',
     randomStart: 'Random date',
     pickStart: 'Pick a date',

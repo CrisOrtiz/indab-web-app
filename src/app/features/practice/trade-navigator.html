@@ -57,7 +57,11 @@
         <dt>{{ t.entry }}</dt>
         <dd>
           {{ trade.entryPrice | number: priceDigits(trade.entryPrice) }}
-          <small>{{ trade.entryTime * 1000 | localDate: 'd MMM y, HH:mm' : 'UTC' }}</small>
+          <small>{{
+            hideDates()
+              ? since(trade.entryTime)
+              : (trade.entryTime * 1000 | localDate: 'd MMM y, HH:mm')
+          }}</small>
         </dd>
       </div>
       <div>
@@ -79,7 +83,11 @@
           <dt>{{ t.exit }}</dt>
           <dd>
             {{ trade.exitPrice | number: priceDigits(trade.exitPrice!) }}
-            <small>{{ trade.exitTime! * 1000 | localDate: 'd MMM y, HH:mm' : 'UTC' }}</small>
+            <small>{{
+              hideDates()
+                ? since(trade.exitTime!)
+                : (trade.exitTime! * 1000 | localDate: 'd MMM y, HH:mm')
+            }}</small>
           </dd>
         </div>
         <div>

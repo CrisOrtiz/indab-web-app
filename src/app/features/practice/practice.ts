@@ -13,7 +13,12 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../core/i18n/local-date.pipe';
-import { Evaluation, EvaluationWindow, evaluationWindow } from '../../core/models/evaluation';
+import {
+  Evaluation,
+  EvaluationWindow,
+  datesLocked,
+  evaluationWindow,
+} from '../../core/models/evaluation';
 import {
   Candle,
   OrderType,
@@ -78,7 +83,10 @@ import {
   resumeTime,
   writeLocalResume,
 } from './resume';
+import { liveMinutes } from './live';
+import { ServerClock } from './server-clock';
 import { SessionFilterBar } from './session-filters';
+import { SessionTabs } from './session-tabs';
 import { SessionReview } from './session-review';
 import { SessionStatsPanel } from './session-stats';
 import { filledTrades } from './trade-boxes';
@@ -97,6 +105,8 @@ const DEFAULT_TARGET_OFFSET = 0.02;
 
 /** Fewer one-minute candles than this means the window hit the end of the data. */
 const MIN_REPLAY_MINUTES = 60;
+/** How often a live attempt checks the clock for its next candle (ms). */
+const LIVE_TICK_MS = 250;
 /** Fetch the next chunk of minutes when fewer than this are left to replay. */
 const PREFETCH_MINUTES = 600;
 /** How long a refused one-click order says why on the chart. */
@@ -150,6 +160,7 @@ export const SESSIONS_PAGE_SIZE = 10;
     SessionStatsPanel,
     TradeNavigator,
   ],
+  providers: [SessionTabs],
   templateUrl: './practice.html',
   styleUrls: ['./practice.scss', './trading-panel.scss', './trading-account.scss'],
   host: {
@@ -164,6 +175,8 @@ export class Practice {
   private readonly practice = inject(PracticeService);
   private readonly notifications = inject(NotificationService);
   private readonly evaluationService = inject(EvaluationService);
+  private readonly serverClock = inject(ServerClock);
+  private readonly tabs = inject(SessionTabs);
   /** The indicators the user keeps on the chart. */
   protected readonly chartSettings = inject(ChartSettingsService);
   private readonly locale = inject(LOCALE_ID);
@@ -241,7 +254,12 @@ export class Practice {
   protected readonly evaluation = signal<Evaluation | null>(null);
   /** When the attempt's time runs out (ms), by this device's clock. */
   protected readonly deadline = signal<number | null>(null);
-  protected readonly now = signal(Date.now());
+  protected readonly now = signal(this.serverClock.now());
+  /**
+   * The attempt runs by the clock (its evaluation sets a pace): the replay moves on its own,
+   * the same on every screen, and cannot be paused, stepped or sped up.
+   */
+  protected readonly live = computed(() => this.evaluation()?.pace != null);
   protected readonly remaining = computed(() => {
     const deadline = this.deadline();
     return deadline === null ? null : formatCountdown(deadline - this.now());
@@ -315,8 +333,15 @@ export class Practice {
     const replay = this.replay();
     return replay ? formatElapsed(replay.current().time + 60 - this.replayStart() / 1000) : '';
   });
-  /** Dates come back once the replay is over. */
-  protected readonly datesHidden = computed(() => this.hideDates() && this.phase() === 'playing');
+  /**
+   * Dates come back once the replay is over; for an evaluation that hides them, only once its
+   * window closes, so nobody who finished can tell others which day it is.
+   */
+  protected readonly datesHidden = computed(
+    () =>
+      this.hideDates() &&
+      (this.phase() === 'playing' || datesLocked(this.evaluation(), this.now())),
+  );
   protected readonly closedTrades = computed(() =>
     [...(this.replay()?.closedTrades() ?? [])].reverse(),
   );
@@ -398,6 +423,10 @@ export class Practice {
   private timer?: ReturnType<typeof setInterval>;
   private quickErrorTimer?: ReturnType<typeof setTimeout>;
   private clock?: ReturnType<typeof setInterval>;
+  /** Moves a live attempt's replay along with the clock. */
+  private liveTimer?: ReturnType<typeof setInterval>;
+  /** When the live attempt on screen started (ms, server clock). */
+  private liveStart = 0;
   /** Counts down the open attempts listed on the setup. */
   private openClock?: ReturnType<typeof setInterval>;
   /** The next save of `resume` to Firestore, and when it is due. */
@@ -412,6 +441,13 @@ export class Practice {
     this.loadSessions();
     this.loadEvaluations();
     void this.resumeActive();
+    // The same session opened in another tab of this browser takes over from this one.
+    this.tabs.onTaken(() => {
+      if (this.phase() === 'playing') {
+        this.leaveOpen();
+        this.error.set(this.i18n.messages().practice.openedElsewhere);
+      }
+    });
     effect(() => {
       const state = this.resumeState();
       if (state) {
@@ -421,6 +457,8 @@ export class Practice {
     inject(DestroyRef).onDestroy(() => {
       this.pause();
       clearInterval(this.clock);
+      clearInterval(this.liveTimer);
+      this.tabs.close();
       clearTimeout(this.quickErrorTimer);
       clearTimeout(this.resumeTimer);
       clearInterval(this.openClock);
@@ -472,6 +510,7 @@ export class Practice {
       const [minutes, history] = await Promise.all([
         this.market.loadCandles(symbol, '1m', replayStart - MINUTE),
         this.loadHistory(symbol, timeframe, replayStart),
+        evaluation ? this.serverClock.sync() : null,
       ]);
       if (minutes.length < MIN_REPLAY_MINUTES) {
         throw new Error('Not enough data');
@@ -490,7 +529,7 @@ export class Practice {
         startingBalance: replay.startingBalance,
       };
       // Taken before the write, so the countdown never runs past the server's limit.
-      const startedAt = Date.now();
+      const startedAt = this.serverClock.now();
       const sessionId = evaluation
         ? await this.practice.startSession(session, evaluation).catch(() => {
             throw new Error(this.i18n.messages().practice.evaluationStartFailed);
@@ -498,6 +537,7 @@ export class Practice {
         : await this.practice.startSession(session);
       this.enter(sessionId, replay, replayStart, timeframe, history, evaluation, []);
       if (evaluation) {
+        this.startLive(evaluation, startedAt);
         this.startClock(startedAt + evaluation.durationMinutes * MINUTE);
       }
     } catch (e) {
@@ -535,6 +575,44 @@ export class Practice {
     this.lastResume = null;
     this.resumeSaved = true;
     this.phase.set('playing');
+    this.tabs.open(sessionId);
+  }
+
+  /** Moves an attempt at an evaluation with a pace along with the clock, from `startedAt`. */
+  private startLive(evaluation: Evaluation, startedAt: number): void {
+    clearInterval(this.liveTimer);
+    if (evaluation.pace == null) {
+      return;
+    }
+    this.liveStart = startedAt;
+    this.tickLive();
+    this.liveTimer = setInterval(() => this.tickLive(), LIVE_TICK_MS);
+  }
+
+  /**
+   * Shows every one-minute candle the clock has reached since the attempt started (all at once
+   * after a reload or time away, filling orders and hitting stops on the way).
+   */
+  private tickLive(): void {
+    const replay = this.replay();
+    const evaluation = this.evaluation();
+    if (!replay || evaluation?.pace == null || this.phase() !== 'playing') {
+      return;
+    }
+    const shown = liveMinutes(
+      this.serverClock.now() - this.liveStart,
+      evaluation.pace,
+      evaluation.durationMinutes,
+    );
+    const target = replay.historyBars - 1 + shown;
+    if (replay.cursor() >= target) {
+      return;
+    }
+    if (replay.atEnd() && !replay.hasAllCandles()) {
+      void this.loadMinutes();
+      return;
+    }
+    this.advance(replay, () => replay.cursor() < target);
   }
 
   /**
@@ -569,7 +647,7 @@ export class Practice {
    */
   private async loadOpen(uid: string): Promise<PracticeSession[]> {
     const sessions = await this.practice.activeSessions(uid, OPEN_SESSIONS_MAX);
-    const expired = staleSessions(sessions, Date.now());
+    const expired = staleSessions(sessions, this.serverClock.now());
     const open = sessions.filter((s) => !expired.includes(s));
     this.openSessions.set(open);
     this.watchOpen();
@@ -605,7 +683,7 @@ export class Practice {
       return;
     }
     this.openClock = setInterval(() => {
-      const now = Date.now();
+      const now = this.serverClock.now();
       this.now.set(now);
       const expired = this.openSessions().filter((s) => attemptTimeUp(s, now));
       if (expired.length) {
@@ -623,7 +701,7 @@ export class Practice {
     if (this.phase() === 'loading') {
       return;
     }
-    if (attemptTimeUp(session, Date.now())) {
+    if (attemptTimeUp(session, this.serverClock.now())) {
       await this.refreshOpen();
       return;
     }
@@ -651,6 +729,8 @@ export class Practice {
     this.pause();
     this.saveResumeNow();
     clearInterval(this.clock);
+    clearInterval(this.liveTimer);
+    this.tabs.close();
     this.deadline.set(null);
     this.focused.set(null);
     this.evaluation.set(null);
@@ -746,6 +826,9 @@ export class Practice {
     const evaluation = session.evaluationId
       ? await this.evaluationService.get(session.evaluationId).catch(() => null)
       : null;
+    if (session.evaluationId) {
+      await this.serverClock.sync();
+    }
     const saved = pickResume(session.resume, readLocalResume(session.id));
     const timeframe = TIMEFRAMES.find((tf) => tf.interval === saved?.interval) ?? DEFAULT_TIMEFRAME;
     const [trades, history] = await Promise.all([
@@ -770,6 +853,9 @@ export class Practice {
     this.openSessions.update((all) => all.filter((s) => s.id !== session.id));
     this.resumed.set(true);
     const deadline = attemptDeadline(session);
+    if (evaluation && session.startedAt) {
+      this.startLive(evaluation, session.startedAt.toMillis());
+    }
     if (deadline !== null) {
       this.startClock(deadline);
     }
@@ -825,11 +911,13 @@ export class Practice {
   /** Counts the attempt's time down and finishes it when it runs out. */
   private startClock(deadline: number): void {
     this.deadline.set(deadline);
-    this.now.set(Date.now());
+    this.now.set(this.serverClock.now());
     clearInterval(this.clock);
     this.clock = setInterval(() => {
-      this.now.set(Date.now());
+      this.now.set(this.serverClock.now());
       if (this.now() >= deadline) {
+        // A live attempt shows its last candles before it closes.
+        this.tickLive();
         void this.finish();
       }
     }, 1000);
@@ -864,7 +952,7 @@ export class Practice {
    */
   protected step(): void {
     const replay = this.replay();
-    if (!replay || this.phase() !== 'playing') {
+    if (!replay || this.phase() !== 'playing' || this.live()) {
       return;
     }
     this.resumed.set(false);
@@ -873,9 +961,17 @@ export class Practice {
       void this.loadMinutes();
       return;
     }
+    this.advance(replay, () => replay.current().time < end);
+  }
+
+  /**
+   * Moves the replay a minute at a time while `more` holds (and candles are loaded), saving
+   * the orders filled and trades closed on the way; ends the session after the last candle.
+   */
+  private advance(replay: Replay, more: () => boolean): void {
     const closed: PracticeTrade[] = [];
     const filled: PracticeTrade[] = [];
-    while (!replay.atEnd() && replay.current().time < end) {
+    while (!replay.atEnd() && more()) {
       const result = replay.step()!;
       closed.push(...result.closed);
       filled.push(...result.filled);
@@ -894,6 +990,9 @@ export class Practice {
   }
 
   protected togglePlay(): void {
+    if (this.live()) {
+      return;
+    }
     if (this.playing()) {
       this.pause();
       this.saveResumeNow();
@@ -903,6 +1002,9 @@ export class Practice {
   }
 
   protected setSpeed(speed: number): void {
+    if (this.live()) {
+      return;
+    }
     this.speed.set(speed);
     if (this.playing()) {
       this.pause();
@@ -1165,6 +1267,8 @@ export class Practice {
     }
     this.pause();
     clearInterval(this.clock);
+    clearInterval(this.liveTimer);
+    this.tabs.close();
     clearTimeout(this.resumeTimer);
     clearLocalResume(sessionId);
     this.deadline.set(null);
@@ -1201,6 +1305,15 @@ export class Practice {
     this.error.set(null);
     this.phase.set('setup');
     void this.refreshOpen();
+  }
+
+  /** A finished attempt keeps its dates hidden from students until its window closes. */
+  protected reviewHidesDates(session: PracticeSession): boolean {
+    if (!session.evaluationId || this.auth.isStaff()) {
+      return false;
+    }
+    const card = this.evaluations().find((c) => c.evaluation.id === session.evaluationId);
+    return datesLocked(card?.evaluation ?? null, this.now());
   }
 
   /** An evaluation attempt the student left open, to go back to from its card. */
@@ -1288,7 +1401,7 @@ export class Practice {
   protected onKey(event: KeyboardEvent): void {
     const target = event.target;
     const typing = target instanceof Element && target.closest('input, select, textarea');
-    if (event.key === 'ArrowRight' && !typing) {
+    if (event.key === 'ArrowRight' && !typing && !this.live()) {
       event.preventDefault();
       this.step();
     }
@@ -1398,7 +1511,7 @@ export class Practice {
             evaluations.map((e) => e.id),
           )
         : [];
-      const now = Date.now();
+      const now = this.serverClock.now();
       this.evaluations.set(
         evaluations.map((evaluation) => ({
           evaluation,

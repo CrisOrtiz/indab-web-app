@@ -15,7 +15,14 @@ const SECONDS: Record<string, number> = {
 };
 
 /** Replaces Binance on `page`; each call starts a new series. */
-export function mockMarket(page: Page, base = 100): Promise<void> {
+export async function mockMarket(page: Page, base = 100): Promise<void> {
+  // Binance's clock, which evaluations count down by.
+  await page.route(/fapi\.binance\.com\/fapi\/v1\/time/, (route) =>
+    route.fulfill({
+      json: { serverTime: Date.now() },
+      headers: { 'Access-Control-Allow-Origin': '*' },
+    }),
+  );
   let replayStart = 0;
   return page.route(/binance\.(vision|com)\/(api\/v3|fapi\/v1)\/klines/, (route) => {
     const params = new URL(route.request().url()).searchParams;

@@ -16,6 +16,12 @@ export interface Evaluation {
   hideDates: boolean;
   startingBalance: number;
   durationMinutes: number;
+  /**
+   * Market minutes replayed per real minute. Set, the attempt runs by the clock from the moment
+   * it starts: it cannot be paused, stepped or sped up, so every screen shows the same candle at
+   * the same time. Missing on older evaluations, whose students pick the speed.
+   */
+  pace?: number;
   /** Attempts can be started from `opensAt` until `closesAt`. */
   opensAt: Timestamp;
   closesAt: Timestamp;
@@ -27,6 +33,18 @@ export interface Evaluation {
   createdBy: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+/** Paces staff pick from (market minutes per real minute); the first is the default. */
+export const EVALUATION_PACES = [60, 900, 1] as const;
+export const DEFAULT_PACE = EVALUATION_PACES[0];
+
+/**
+ * Whether students still see an attempt without dates: the evaluation hides them, and its
+ * window is open, so someone could still start it. Once it closes, dates come back.
+ */
+export function datesLocked(evaluation: Evaluation | null, now = Date.now()): boolean {
+  return !!evaluation?.hideDates && now < evaluation.closesAt.toMillis();
 }
 
 export type EvaluationWindow = 'upcoming' | 'open' | 'closed';

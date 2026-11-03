@@ -4,7 +4,14 @@ import { I18n } from '../../../core/i18n/i18n.service';
 import { ActionsMenu, MenuAction } from '../../../shared/actions-menu/actions-menu';
 import { Icon } from '../../../shared/icon/icon';
 import { LocalDatePipe } from '../../../core/i18n/local-date.pipe';
-import { Evaluation, evaluationWindow } from '../../../core/models/evaluation';
+import {
+  DEFAULT_PACE,
+  EVALUATION_PACES,
+  Evaluation,
+  evaluationWindow,
+} from '../../../core/models/evaluation';
+import { formatElapsed } from '../../practice/bars';
+import { marketCovered } from '../../practice/live';
 import { Mentorship, audienceIds } from '../../../core/models/mentorship';
 import { EvaluationService, StudentOption } from '../../evaluations/evaluation.service';
 import { MentorshipService } from '../../mentorships/mentorship.service';
@@ -19,6 +26,8 @@ import {
 import { PracticeService } from '../../practice/practice.service';
 import { STARTING_BALANCE } from '../../practice/replay';
 import { EvaluationStanding, evaluationStandings } from '../../ranking/standings';
+import { TimeZoneService } from '../../../core/time-zone/time-zone.service';
+import { fromLocalInput, toLocalInput } from '../exams/exam-form';
 import { EvaluationResults } from './evaluation-results';
 
 /** The evaluation form, as the inputs hold it. */
@@ -31,6 +40,8 @@ interface EvaluationForm {
   startDate: string;
   hideDates: boolean;
   durationMinutes: number;
+  /** Market minutes per real minute: the attempt runs by the clock at this pace. */
+  pace: number;
   /** yyyy-mm-ddTHH:mm, local time. */
   opensAt: string;
   closesAt: string;
@@ -42,11 +53,7 @@ export const MIN_DURATION = 5;
 export const MAX_DURATION = 600;
 const DAY = 24 * 60 * 60 * 1000;
 
-/** A date as a `datetime-local` input value, in local time. */
-export function toLocalInput(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
+export { toLocalInput };
 
 const utcDay = (time: number) => new Date(time).toISOString().slice(0, 10);
 
@@ -62,6 +69,7 @@ const utcDay = (time: number) => new Date(time).toISOString().slice(0, 10);
   styleUrls: ['../admin.scss', './admin-evaluations.scss'],
 })
 export class AdminEvaluations {
+  protected readonly zones = inject(TimeZoneService);
   private readonly service = inject(EvaluationService);
   private readonly practice = inject(PracticeService);
   private readonly mentorshipService = inject(MentorshipService);
@@ -72,6 +80,10 @@ export class AdminEvaluations {
   protected readonly instruments = INSTRUMENTS;
   protected readonly minDuration = MIN_DURATION;
   protected readonly maxDuration = MAX_DURATION;
+  protected readonly paces = EVALUATION_PACES;
+  /** "2 d 12 h": the market time an attempt covers at the form's pace and time limit. */
+  protected readonly covered = (pace: number, minutes: number) =>
+    formatElapsed(marketCovered(pace, minutes));
   protected readonly windowOf = (evaluation: Evaluation) => evaluationWindow(evaluation);
 
   protected readonly evaluations = signal<Evaluation[]>([]);
@@ -171,8 +183,9 @@ export class AdminEvaluations {
       startDate: '',
       hideDates: true,
       durationMinutes: 60,
-      opensAt: toLocalInput(opens),
-      closesAt: toLocalInput(new Date(opens.getTime() + 7 * DAY)),
+      pace: DEFAULT_PACE,
+      opensAt: toLocalInput(opens, this.zones.zone()),
+      closesAt: toLocalInput(new Date(opens.getTime() + 7 * DAY), this.zones.zone()),
       studentIds: [],
       mentorshipIds: [],
     });
@@ -189,8 +202,9 @@ export class AdminEvaluations {
       startDate: utcDay(evaluation.replayStart),
       hideDates: evaluation.hideDates,
       durationMinutes: evaluation.durationMinutes,
-      opensAt: toLocalInput(evaluation.opensAt.toDate()),
-      closesAt: toLocalInput(evaluation.closesAt.toDate()),
+      pace: evaluation.pace ?? DEFAULT_PACE,
+      opensAt: toLocalInput(evaluation.opensAt.toDate(), this.zones.zone()),
+      closesAt: toLocalInput(evaluation.closesAt.toDate(), this.zones.zone()),
       studentIds: [...evaluation.studentIds],
       mentorshipIds: [...(evaluation.mentorshipIds ?? [])],
     });
@@ -216,8 +230,9 @@ export class AdminEvaluations {
       startDate: utcDay(evaluation.replayStart),
       hideDates: evaluation.hideDates,
       durationMinutes: evaluation.durationMinutes,
-      opensAt: toLocalInput(opens),
-      closesAt: toLocalInput(new Date(opens.getTime() + length)),
+      pace: evaluation.pace ?? DEFAULT_PACE,
+      opensAt: toLocalInput(opens, this.zones.zone()),
+      closesAt: toLocalInput(new Date(opens.getTime() + length), this.zones.zone()),
       studentIds: [],
       mentorshipIds: [],
     });
@@ -244,8 +259,8 @@ export class AdminEvaluations {
     if (!form) {
       return;
     }
-    const opensAt = new Date(form.opensAt);
-    const closesAt = new Date(form.closesAt);
+    const opensAt = fromLocalInput(form.opensAt, this.zones.zone());
+    const closesAt = fromLocalInput(form.closesAt, this.zones.zone());
     const duration = Math.round(Number(form.durationMinutes));
     let problem: string | null = null;
     if (!form.title.trim()) {
@@ -284,6 +299,7 @@ export class AdminEvaluations {
       hideDates: form.hideDates,
       startingBalance: base?.startingBalance ?? STARTING_BALANCE,
       durationMinutes: duration,
+      pace: (EVALUATION_PACES as readonly number[]).includes(form.pace) ? form.pace : DEFAULT_PACE,
       opensAt,
       closesAt,
       studentIds: form.studentIds,

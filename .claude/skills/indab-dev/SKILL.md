@@ -125,6 +125,11 @@ src/styles.scss          global tokens: --color-*, --radius, --max-width, .conta
   templates). Texts with values are functions. Dates go through the `localDate` pipe; numbers
   stay en-US (`1,250.00`). Route `title`s are keys of `messages.titles` (ending in `| INDAB`).
   Firestore content is not translated. Code, comments, commits in English. See README "Languages".
+- Time zone (Cris, 2026-11-03): dates and chart times show in the user's zone, La Paz
+  (`America/La_Paz`) unless they pick another in /profile (`TimeZoneService`, `core/time-zone`,
+  kept in localStorage `indab.timeZone`). The `localDate` pipe applies it by itself, so do not
+  pass a zone; `datetime-local` inputs go through `toLocalInput`/`fromLocalInput` with the zone.
+  Unit tests run with the zone set to UTC (`src/test-setup.ts`).
 - Loading: `AppLoader` (`shared/loader`) shows the logo bouncing while the app starts (static copy
   in `index.html`, styles in `styles.scss`), while the router navigates and while
   `LoadingService` tracks something. Wrap page reads with `loading.track(promise)` (or
@@ -312,6 +317,14 @@ Module notes:
   `standings.ts`) ranks only evaluations, by attempt P/L: Cris does not want free practice
   ranked, so free sessions stay private to the student and staff. Students see an evaluation's ranking
   only after staff publish it. P/L is client-computed: not a trusted grade.
+  Fairness (Cris, 2026-11-03): an evaluation with a `pace` (market minutes per real minute: 60
+  default, 900 or 1, picked by staff) runs **by the clock** (`live.ts`): the replay shows
+  `liveMinutes(now - startedAt)` candles, with no play, step or speed, so every tab or device
+  shows the same candle and nobody can scout ahead. Clocks use Binance's server time
+  (`ServerClock`), not the device's. Opening a session in another tab of the browser makes the
+  old tab let go (`SessionTabs`, BroadcastChannel). Students see an attempt without dates
+  (finish screen, reviews) until the evaluation's window closes (`datesLocked`). Older
+  evaluations without `pace` keep the free speed.
 - **Evaluation forms (built)**: questionnaires, separate from chart evaluations.
   `core/models/exam.ts` (types, `suggestScore`, `bestGrade`, `attemptDeadline`),
   `features/exams/exam.service.ts`; staff build them at `/admin/forms`

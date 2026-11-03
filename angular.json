@@ -80,6 +80,7 @@
           "builder": "@angular/build:unit-test",
           "options": {
             "isolate": true,
+            "setupFiles": ["src/test-setup.ts"],
             "coverageInclude": ["src/app/**/*.ts"],
             "coverageReporters": ["text", "html", "lcov"]
           }

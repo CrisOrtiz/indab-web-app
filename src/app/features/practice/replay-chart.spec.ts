@@ -217,7 +217,12 @@ describe('ReplayChart', () => {
 
     host.hide.set(false);
     await fixture.whenStable();
-    expect(lw.chart.applyOptions.mock.calls.at(-1)![0].localization.timeFormatter).toBeUndefined();
+    const shown = lw.chart.applyOptions.mock.calls.at(-1)![0];
+    // Times in the user's time zone (UTC in these tests).
+    const time = Date.UTC(2026, 10, 3, 14, 30) / 1000;
+    expect(shown.localization.timeFormatter(time)).toBe('mar 3 nov 2026, 14:30');
+    expect(shown.timeScale.tickMarkFormatter(time, 3)).toBe('14:30');
+    expect(shown.timeScale.tickMarkFormatter(time, 2)).toBe('3');
   });
 
   it('marks entries and exits on their bar and labels positions with size and live P/L', async () => {
