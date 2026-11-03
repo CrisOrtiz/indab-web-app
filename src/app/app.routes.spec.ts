@@ -5,6 +5,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from './app.routes';
 import { AuthService } from './core/auth/auth.service';
 import { FIRESTORE_LOADER } from './core/firebase/firebase.providers';
+import { MaterialService } from './features/repository/material.service';
 import { AdminUsers } from './features/admin/users/users';
 import { AdminService } from './features/admin/admin.service';
 import { MentorshipService } from './features/mentorships/mentorship.service';
@@ -71,6 +72,7 @@ describe('app routes', () => {
           },
         },
         { provide: MentorshipService, useValue: { all: async () => [] } },
+        { provide: MaterialService, useValue: { all: async () => [], visible: async () => [] } },
       ],
     });
     TestBed.overrideComponent(Practice, { set: { template: '' } });
@@ -172,6 +174,7 @@ describe('app routes', () => {
     expect(await visit('/academy')).toBe('/academy');
     expect(await visit('/profile')).toBe('/profile');
     expect(await visit('/academy/material')).toBe('/academy');
+    expect(await visit('/academy/material/m1')).toBe('/academy');
     expect(await visit('/academy/practice')).toBe('/academy');
     expect(await visit('/academy/ranking')).toBe('/academy');
     // The calendar is public, so the academy opens it for everyone signed in.
@@ -193,6 +196,7 @@ describe('app routes', () => {
     expect(await visit('/admin/practice')).toBe('/academy');
     expect(await visit('/admin/evaluations')).toBe('/academy');
     expect(await visit('/admin/mentorships')).toBe('/academy');
+    expect(await visit('/admin/material')).toBe('/academy');
   });
 
   it('opens the admin area and evaluations to trainers', async () => {
@@ -201,6 +205,7 @@ describe('app routes', () => {
     expect(await visit('/admin/practice')).toBe('/admin/practice');
     expect(await visit('/admin/evaluations')).toBe('/admin/evaluations');
     expect(await visit('/admin/mentorships')).toBe('/admin/mentorships');
+    expect(await visit('/admin/material')).toBe('/admin/material');
     expect(await visit('/admin/users')).toBe('/academy');
     expect(await visit('/academy/practice')).toBe('/academy/practice');
   });
