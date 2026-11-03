@@ -245,7 +245,15 @@ Module notes:
   other changes, at once on pause or `pagehide`). On load it picks up the newest `active`
   session (`PracticeService.activeSessions`): its trades, the bar (the later of the saved one
   and the last trade) and an evaluation's clock from `startedAt`; attempts past their 2-minute
-  grace are left alone. Leaving by navigation still finishes the session.
+  grace are left alone.
+  A session stays open until the student closes it, or until an evaluation's time is up (Cris,
+  2026-11-03): leaving the page (or "Salir sin cerrar", `leaveOpen`) only saves `resume`. The
+  setup lists open sessions (`openSessions`, Continuar / Cerrar) and allows one open free
+  practice at a time; evaluation cards offer "Continuar evaluación"; the academy home links
+  back with a banner. The replay only moves while on screen, so an attempt whose time ran out
+  while away is closed by `closeLeft` the next time the practice page loads (positions close
+  and orders cancel at the saved bar; the rules let an attempt past its grace only cancel,
+  close with `sessionEnd` and finish). Until then lists show it as finished (`shownStatus`).
   Cris wants the trading screen to look and work like TradingView, students to start with 200
   USD and trade lots (100 oz) at 1:200 (Cris, 2026-10-27; was 1:100) with a 50% stop out
   (`replay.ts` constants), and

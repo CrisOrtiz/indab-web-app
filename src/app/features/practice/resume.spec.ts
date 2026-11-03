@@ -1,10 +1,13 @@
 import { PracticeSession, PracticeTrade, SessionResume } from '../../core/models/practice';
 import {
+  attemptDeadline,
   attemptExpired,
+  attemptTimeUp,
   clearLocalResume,
   pickResume,
   readLocalResume,
   resumeTime,
+  shownStatus,
   writeLocalResume,
 } from './resume';
 
@@ -55,5 +58,23 @@ describe('resuming a practice session', () => {
     expect(attemptExpired(attempt(500), now)).toBe(false);
     expect(attemptExpired(attempt(31, 30), now)).toBe(false);
     expect(attemptExpired(attempt(32, 30), now)).toBe(true);
+  });
+
+  it('counts an attempt left open past its time as finished', () => {
+    const now = Date.now();
+    const session = (startedMinutesAgo: number, durationMinutes?: number) =>
+      ({
+        status: 'active',
+        durationMinutes,
+        startedAt: { toMillis: () => now - startedMinutesAgo * 60_000 },
+      }) as PracticeSession;
+    expect(attemptDeadline(session(10, 30))).toBe(now + 20 * 60_000);
+    expect(attemptDeadline(session(10))).toBeNull();
+    expect(attemptTimeUp(session(29, 30), now)).toBe(false);
+    expect(attemptTimeUp(session(30, 30), now)).toBe(true);
+    // Free practice stays open until the student closes it.
+    expect(shownStatus(session(5000), now)).toBe('active');
+    expect(shownStatus(session(29, 30), now)).toBe('active');
+    expect(shownStatus(session(31, 30), now)).toBe('finished');
   });
 });

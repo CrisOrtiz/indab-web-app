@@ -1,12 +1,16 @@
+import { vi } from 'vitest';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { PracticeService } from '../practice/practice.service';
 import { Academy } from './academy';
 
 describe('Academy', () => {
+  const practice = { activeSessions: vi.fn(async () => [] as unknown[]) };
+  const at = (ms: number) => ({ toMillis: () => ms });
   const auth = {
-    user: signal({ email: 'ana@indab.co' }),
+    user: signal({ uid: 'u1', email: 'ana@indab.co' }),
     profile: signal<{ displayName: string } | null>({ displayName: 'Ana' }),
     hasAcademyAccess: signal(false),
   };
@@ -14,12 +18,49 @@ describe('Academy', () => {
   const render = async () => {
     TestBed.configureTestingModule({
       imports: [Academy],
-      providers: [provideRouter([]), { provide: AuthService, useValue: auth }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: auth },
+        { provide: PracticeService, useValue: practice },
+      ],
     });
     const fixture = TestBed.createComponent(Academy);
     await fixture.whenStable();
     return fixture.nativeElement as HTMLElement;
   };
+
+  beforeEach(() => practice.activeSessions.mockResolvedValue([]));
+
+  it('leads back to practice the student left open', async () => {
+    auth.hasAcademyAccess.set(true);
+    practice.activeSessions.mockResolvedValue([
+      { id: 's1', status: 'active', startedAt: at(Date.now()) },
+    ]);
+    const el = await render();
+    expect(practice.activeSessions).toHaveBeenCalledWith('u1');
+    const banner = el.querySelector('a.open-practice[href="/academy/practice"]')!;
+    expect(banner.textContent).toContain('Tienes una práctica abierta');
+    expect(banner.textContent).toContain('Continuar práctica');
+  });
+
+  it('shows the time an open evaluation has left, and not one whose time is up', async () => {
+    auth.hasAcademyAccess.set(true);
+    practice.activeSessions.mockResolvedValue([
+      { id: 'e1_u1', status: 'active', durationMinutes: 30, startedAt: at(Date.now() - 600_000) },
+      { id: 'e2_u1', status: 'active', durationMinutes: 30, startedAt: at(Date.now() - 3.6e6) },
+    ]);
+    const el = await render();
+    const banner = el.querySelector('.open-practice')!.textContent!;
+    expect(banner).toContain('Tienes una práctica abierta');
+    expect(banner).toMatch(/Evaluación en curso: quedan (19:5\d|20:00)/);
+  });
+
+  it('does not look for open practice without academy access', async () => {
+    auth.hasAcademyAccess.set(false);
+    const el = await render();
+    expect(practice.activeSessions).not.toHaveBeenCalled();
+    expect(el.querySelector('.open-practice')).toBeNull();
+  });
 
   it('shows the pending notice without academy access', async () => {
     auth.hasAcademyAccess.set(false);

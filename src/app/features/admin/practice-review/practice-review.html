@@ -65,7 +65,7 @@
               {{ s.pnl | number: '1.2-2' }}
             </td>
             <td [attr.data-label]="t.status">
-              {{ s.status === 'active' ? tr.active : tr.finished }}
+              {{ statusOf(s) === 'active' ? tr.active : tr.finished }}
             </td>
             <td class="actions">
               <button

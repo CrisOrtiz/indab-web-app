@@ -1,8 +1,12 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
+import { PracticeSession } from '../../core/models/practice';
+import { formatCountdown } from '../practice/practice-format';
+import { PracticeService } from '../practice/practice.service';
+import { attemptDeadline, attemptTimeUp } from '../practice/resume';
 import { Reveal } from '../../shared/reveal/reveal';
 
 type CardKey = 'material' | 'practice' | 'exams' | 'ranking' | 'calendar';
@@ -17,6 +21,38 @@ type CardKey = 'material' | 'practice' | 'exams' | 'ranking' | 'calendar';
 export class Academy {
   protected readonly auth = inject(AuthService);
   protected readonly i18n = inject(I18n);
+  private readonly practice = inject(PracticeService);
+
+  /** Practice sessions the student left open, to go back to from here. */
+  protected readonly open = signal<PracticeSession[]>([]);
+  private readonly now = signal(Date.now());
+  /** The open evaluation attempt with the least time left, as a countdown. */
+  protected readonly attemptLeft = computed(() => {
+    const deadlines = this.open()
+      .map(attemptDeadline)
+      .filter((d): d is number => d !== null && d > this.now());
+    return deadlines.length ? formatCountdown(Math.min(...deadlines) - this.now()) : null;
+  });
+
+  constructor() {
+    const tick = setInterval(() => this.now.set(Date.now()), 1000);
+    inject(DestroyRef).onDestroy(() => clearInterval(tick));
+    void this.loadOpen();
+  }
+
+  private async loadOpen(): Promise<void> {
+    const uid = this.auth.user()?.uid;
+    if (!uid || !this.auth.hasAcademyAccess()) {
+      return;
+    }
+    try {
+      const now = Date.now();
+      const sessions = await this.practice.activeSessions(uid);
+      this.open.set(sessions.filter((s) => !attemptTimeUp(s, now)));
+    } catch {
+      // Without the list the cards still lead to the practice page, which picks it up.
+    }
+  }
 
   /** `open` cards work without academy access (the calendar is public). */
   protected readonly cards: { key: CardKey; link: string; open?: boolean }[] = [

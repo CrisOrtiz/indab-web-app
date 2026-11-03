@@ -801,12 +801,15 @@ service cloud.firestore {
 
       // While active, the owner refreshes the summary and where the replay is, and finally
       // marks it finished. An evaluation attempt accepts these until two minutes after its
-      // time is up.
+      // time is up; one the student left open past that can only be closed, with the trades
+      // it had (where it was left no longer moves).
       allow update: if isOwner(resource.data.uid)
         && resource.data.status == 'active'
         && (resource.data.get('durationMinutes', null) == null
           || request.time < resource.data.startedAt
-            + duration.value(resource.data.durationMinutes + 2, 'm'))
+            + duration.value(resource.data.durationMinutes + 2, 'm')
+          || (request.resource.data.status == 'finished'
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['resume'])))
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['balance', 'pnl', 'tradeCount', 'status', 'endedAt', 'resume'])
         && validSummary(request.resource.data)
@@ -867,6 +870,27 @@ service cloud.firestore {
               && request.resource.data.orderPrice == request.resource.data.entryPrice
               && request.resource.data.status == 'pending'))
           && request.resource.data.openedAt == request.time;
+
+        // An attempt left open past its time is closed when the student comes back: its
+        // pending orders are cancelled and its positions closed as the session ends.
+        function lateClose() {
+          return session().status == 'active'
+            && ((resource.data.status == 'pending'
+                && changes(['status', 'closedAt'])
+                && request.resource.data.status == 'cancelled'
+                && request.resource.data.closedAt == request.time)
+              || (resource.data.status == 'open'
+                && changes(['status', 'exitPrice', 'exitTime', 'exitReason', 'pnl', 'closedAt'])
+                && request.resource.data.status == 'closed'
+                && isPrice(request.resource.data.exitPrice)
+                && request.resource.data.exitTime is int
+                && request.resource.data.exitTime >= resource.data.entryTime
+                && request.resource.data.exitReason == 'sessionEnd'
+                && request.resource.data.pnl is number
+                && request.resource.data.closedAt == request.time));
+        }
+
+        allow update: if isOwner(resource.data.uid) && !inTime(2) && lateClose();
 
         allow update: if isOwner(resource.data.uid) && inTime(2) && (
           // A pending order moves its price, stop loss or take profit...

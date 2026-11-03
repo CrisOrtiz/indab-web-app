@@ -1,4 +1,5 @@
 import { PracticeSession } from '../../core/models/practice';
+import { shownStatus } from '../practice/resume';
 
 /** One assigned student's line in an evaluation's ranking. */
 export interface EvaluationStanding {
@@ -23,12 +24,14 @@ const returnOf = (session: PracticeSession) =>
 /**
  * Ranks an evaluation's attempts by P/L (every attempt starts with the same balance), with
  * fewer trades first on a tie. Attempts still `active` count with what they had closed: the
- * student is still trading, or left without finishing. Assigned students without an attempt
- * follow, unranked.
+ * student is still trading, or left it open (once its time is up it shows as finished, and is
+ * closed the next time the student opens the practice page). Assigned students without an
+ * attempt follow, unranked.
  */
 export function evaluationStandings(
   sessions: PracticeSession[],
   students: { uid: string; name: string }[] = [],
+  now = Date.now(),
 ): EvaluationStanding[] {
   const ranked: EvaluationStanding[] = [...sessions]
     .sort((a, b) => b.pnl - a.pnl || a.tradeCount - b.tradeCount || byName(nameOf(a), nameOf(b)))
@@ -36,7 +39,7 @@ export function evaluationStandings(
       rank: i + 1,
       uid: s.uid,
       name: s.userName,
-      status: s.status,
+      status: shownStatus(s, now),
       balance: s.balance,
       pnl: s.pnl,
       return: returnOf(s),

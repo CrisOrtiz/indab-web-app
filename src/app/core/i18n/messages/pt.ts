@@ -335,6 +335,11 @@ export const pt: Messages = {
     welcome: 'Bem-vindo à academia. O que você quer fazer hoje?',
     pending:
       'Sua matrícula está pendente. Quando a equipe da INDAB ativá-la, você verá seus cursos aqui.',
+    openPractice: (n: number) =>
+      n === 1 ? 'Você tem uma prática aberta' : `Você tem ${n} práticas abertas`,
+    openPracticeText: 'Continue de onde parou: suas ordens, desenhos e o candle em que estava.',
+    openEvaluation: (time: string) => `Avaliação em andamento: faltam ${time}`,
+    continuePractice: 'Continuar prática',
     cards: {
       material: {
         title: 'Material de estudo',
@@ -657,14 +662,27 @@ export const pt: Messages = {
     evaluationMissed: 'Não realizada',
     evaluationTag: 'Avaliação',
     confirmEvaluation: (title: string, minutes: number) =>
-      `Começar "${title}"? Você tem uma única tentativa de ${minutes} minutos e o tempo começa agora. Sair da página encerra a avaliação.`,
+      `Começar "${title}"? Você tem uma única tentativa de ${minutes} minutos e o tempo começa agora. Você pode sair e voltar: o tempo continua correndo e, ao acabar, ela é entregue sozinha.`,
     evaluationStartFailed:
       'Não foi possível começar a avaliação. Talvez você já a tenha feito ou ela esteja fechada.',
     evaluationTitle: (title: string) => `Avaliação: ${title}`,
     timeLeftLabel: 'Tempo restante',
     timeLeft: (time: string) => `Faltam ${time}`,
-    leavingEnds:
-      'Sair desta página encerra a avaliação; se recarregar, ela continua de onde parou.',
+    leavingKeeps:
+      'Você pode sair e voltar quando quiser: o tempo continua correndo e, ao acabar, a avaliação é entregue sozinha.',
+    leaveOpen: 'Sair sem fechar',
+    leaveOpenHint: 'Volta para a lista; a sessão fica aberta onde está.',
+    openSessions: 'Suas práticas abertas',
+    openSessionsHint:
+      'Elas esperam onde você parou até você fechá-las; uma avaliação é entregue sozinha quando o tempo acaba.',
+    startedOn: (date: string) => `Começou em ${date}`,
+    continue: 'Continuar',
+    continueEvaluation: 'Continuar avaliação',
+    closeSession: 'Fechar',
+    closing: 'Fechando…',
+    confirmClose:
+      'Fechar esta sessão? As posições abertas são fechadas e as ordens canceladas no candle onde ela parou.',
+    closeToStart: 'Você tem uma prática livre aberta. Continue ou feche-a para começar outra.',
     resumed:
       'Você voltou para onde deixou sua sessão: suas ordens, desenhos e o candle em que estava.',
     resumeFailed:

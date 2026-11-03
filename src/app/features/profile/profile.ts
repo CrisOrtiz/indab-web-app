@@ -18,6 +18,7 @@ import { authErrorMessage } from '../auth/auth-errors';
 import { NotificationSettingsPanel } from '../notifications/notification-settings';
 import { signedMoney } from '../practice/practice-format';
 import { PracticeService } from '../practice/practice.service';
+import { shownStatus } from '../practice/resume';
 import { summarizePractice } from './practice-summary';
 import { ProfileService, signInMethods } from './profile.service';
 import { SessionsService, openSessions } from './sessions.service';
@@ -42,6 +43,9 @@ type Status = { kind: 'error' | 'notice'; text: string };
   styleUrl: './profile.scss',
 })
 export class Profile {
+  /** Attempts left open past their time show as finished. */
+  protected readonly statusOf = (session: PracticeSession) => shownStatus(session, Date.now());
+
   protected readonly auth = inject(AuthService);
   protected readonly i18n = inject(I18n);
   private readonly profiles = inject(ProfileService);

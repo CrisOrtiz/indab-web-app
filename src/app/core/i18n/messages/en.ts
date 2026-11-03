@@ -340,6 +340,12 @@ export const en: Messages = {
     welcome: 'Welcome to the academy. What would you like to do today?',
     pending:
       'Your enrollment is pending. Once the INDAB team activates it, your courses will show up here.',
+    openPractice: (n: number) =>
+      n === 1 ? 'You have practice open' : `You have ${n} practice sessions open`,
+    openPracticeText:
+      'Pick it up where you left it: your orders, drawings and the bar you were on.',
+    openEvaluation: (time: string) => `Evaluation in progress: ${time} left`,
+    continuePractice: 'Continue practice',
     cards: {
       material: {
         title: 'Study material',
@@ -659,13 +665,27 @@ export const en: Messages = {
     evaluationMissed: 'Not taken',
     evaluationTag: 'Evaluation',
     confirmEvaluation: (title: string, minutes: number) =>
-      `Start "${title}"? You get a single ${minutes}-minute attempt and the clock starts now. Leaving the page ends the evaluation.`,
+      `Start "${title}"? You get a single ${minutes}-minute attempt and the clock starts now. You can leave and come back: the clock keeps running and the attempt is handed in when time is up.`,
     evaluationStartFailed:
       'The evaluation could not start. You may have taken it already, or it may be closed.',
     evaluationTitle: (title: string) => `Evaluation: ${title}`,
     timeLeftLabel: 'Time left',
     timeLeft: (time: string) => `${time} left`,
-    leavingEnds: 'Leaving this page ends the evaluation; a reload picks it up where it was.',
+    leavingKeeps:
+      'You can leave and come back any time: the clock keeps running and the evaluation is handed in when time is up.',
+    leaveOpen: 'Leave open',
+    leaveOpenHint: 'Back to the list; the session stays open where it is.',
+    openSessions: 'Your open practice',
+    openSessionsHint:
+      'They wait where you left them until you close them; an evaluation is handed in when its time is up.',
+    startedOn: (date: string) => `Started ${date}`,
+    continue: 'Continue',
+    continueEvaluation: 'Continue evaluation',
+    closeSession: 'Close',
+    closing: 'Closing…',
+    confirmClose:
+      'Close this session? Open positions are closed and orders cancelled at the bar it was left on.',
+    closeToStart: 'You have free practice open. Continue it or close it to start another one.',
     resumed:
       'You are back where you left your session: your orders, drawings and the bar you were on.',
     resumeFailed: 'Your open session could not be picked up. Reload the page to try again.',

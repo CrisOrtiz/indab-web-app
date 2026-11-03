@@ -350,7 +350,7 @@ describe('Practice page', () => {
       practice.activeSessions.mockResolvedValue([active({ resume })]);
       practice.sessionTrades.mockResolvedValue([position]);
       await reload();
-      expect(practice.activeSessions).toHaveBeenCalledWith('u1');
+      expect(practice.activeSessions).toHaveBeenCalledWith('u1', expect.any(Number));
       expect(practice.sessionTrades).toHaveBeenCalledWith('s9');
       expect(practice.startSession).not.toHaveBeenCalled();
       // The bar it was on (30 minutes in: the third 15-minute step), its timeframe and speed.
@@ -423,18 +423,107 @@ describe('Practice page', () => {
       expect(chart().hideDates()).toBe(true);
     });
 
-    it('leaves an evaluation whose time is over', async () => {
+    it('closes an evaluation whose time ran out while the student was away', async () => {
       practice.activeSessions.mockResolvedValue([
         active({
           id: 'e1_u1',
           evaluationId: 'e1',
           durationMinutes: 30,
           startedAt: at(Date.now() - 40 * 60_000),
+          resume,
         }),
       ]);
+      practice.sessionTrades.mockResolvedValue([position]);
       await reload();
-      expect(practice.sessionTrades).not.toHaveBeenCalled();
+      // Its position closes at the bar it was left on (103), not where the clock is.
+      expect(practice.closeTrade).toHaveBeenCalledWith(
+        'e1_u1',
+        expect.objectContaining({ id: 't1', exitReason: 'sessionEnd', exitPrice: 103 }),
+      );
+      expect(practice.finishSession).toHaveBeenCalledWith(
+        'e1_u1',
+        expect.objectContaining({ pnl: 2, tradeCount: 1 }),
+      );
+      expect(el.querySelector('.toolbar')).toBeNull();
+      expect(el.querySelector('.open-sessions')).toBeNull();
       expect(el.querySelector('form')).not.toBeNull();
+    });
+
+    it('keeps the session open when the student leaves the page', async () => {
+      practice.activeSessions.mockResolvedValue([active({ resume })]);
+      await reload();
+      await click('Siguiente vela');
+      fixture.destroy();
+      expect(practice.finishSession).not.toHaveBeenCalled();
+      expect(practice.closeTrade).not.toHaveBeenCalled();
+      expect(practice.saveResume).toHaveBeenCalledWith(
+        's9',
+        expect.objectContaining({ time: start + 34 * 60 }),
+      );
+      // Coming back later puts them where they were.
+      practice.activeSessions.mockResolvedValue([active({ resume })]);
+      practice.sessionTrades.mockResolvedValue([position]);
+      fixture = TestBed.createComponent(Practice);
+      el = fixture.nativeElement;
+      await fixture.whenStable();
+      expect(el.querySelector('.toolbar .price')!.textContent).toContain('103');
+      expect(el.textContent).toContain('Retomaste tu sesión donde la dejaste');
+    });
+
+    it('goes back to the list without closing, and on to the session again', async () => {
+      practice.activeSessions.mockResolvedValue([active({ resume })]);
+      practice.sessionTrades.mockResolvedValue([position]);
+      await reload();
+      await click('Salir sin cerrar');
+      expect(practice.finishSession).not.toHaveBeenCalled();
+      expect(el.querySelector('.toolbar')).toBeNull();
+      const open = el.querySelector('.open-sessions')!;
+      expect(open.textContent).toContain('Tus prácticas abiertas');
+      expect(open.textContent).toContain('Práctica libre');
+      // One free practice at a time: no new one until this one is closed.
+      expect(el.querySelector('form')).toBeNull();
+      expect(el.textContent).toContain('Continúala o ciérrala para empezar otra');
+      await click('Continuar');
+      expect(el.querySelector('.toolbar .price')!.textContent).toContain('103');
+      expect(chart().trades()).toEqual([expect.objectContaining({ id: 't1', status: 'open' })]);
+      expect(el.querySelector('.open-sessions')).toBeNull();
+    });
+
+    it('closes an open session from the list', async () => {
+      practice.activeSessions.mockResolvedValue([active({ resume })]);
+      practice.sessionTrades.mockResolvedValue([position]);
+      await reload();
+      await click('Salir sin cerrar');
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      await click('Cerrar');
+      expect(practice.closeTrade).toHaveBeenCalledWith(
+        's9',
+        expect.objectContaining({ id: 't1', exitReason: 'sessionEnd', exitPrice: 103 }),
+      );
+      expect(practice.finishSession).toHaveBeenCalledWith('s9', expect.anything());
+      expect(el.querySelector('.open-sessions')).toBeNull();
+      expect(el.querySelector('form')).not.toBeNull();
+    });
+
+    it('lets the student go back to an evaluation they left, with its time left', async () => {
+      const ev = evaluation('e1', { replayStart });
+      evaluations.get.mockResolvedValue(ev);
+      evaluations.assignedTo.mockResolvedValue([ev]);
+      const attempt = active({ id: 'e1_u1', evaluationId: 'e1', durationMinutes: 30 });
+      practice.myAttempts.mockResolvedValue([attempt]);
+      practice.activeSessions.mockResolvedValue([attempt]);
+      await reload();
+      expect(el.querySelector('.evaluation-bar')!.textContent).toContain(
+        'el tiempo sigue corriendo',
+      );
+      await click('Salir sin cerrar');
+      const open = el.querySelector('.open-sessions')!.textContent!;
+      expect(open).toContain('Evaluación: Evaluación e1');
+      expect(open).toMatch(/Quedan (19:5\d|20:00)/);
+      // The free practice form stays: the open one is an evaluation.
+      expect(el.querySelector('form')).not.toBeNull();
+      await click('Continuar evaluación');
+      expect(el.querySelector('.evaluation-bar')!.textContent).toContain('Evaluación e1');
     });
   });
 

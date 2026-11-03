@@ -45,4 +45,22 @@ describe('evaluationStandings', () => {
     expect(rows[0]).toMatchObject({ pnl: 30, return: 0.15, balance: 230, trades: 2 });
     expect(rows[3]).toMatchObject({ pnl: null, return: null, trades: null });
   });
+
+  it('shows an attempt left open past its time as finished', () => {
+    const now = Date.now();
+    const started = (minutesAgo: number) =>
+      ({ toMillis: () => now - minutesAgo * 60_000 }) as Timestamp;
+    const rows = evaluationStandings(
+      [
+        session('a', 'Ana', 5, { status: 'active', durationMinutes: 30, startedAt: started(10) }),
+        session('b', 'Bea', 3, { status: 'active', durationMinutes: 30, startedAt: started(45) }),
+      ],
+      [],
+      now,
+    );
+    expect(rows.map((r) => [r.name, r.status])).toEqual([
+      ['Ana', 'active'],
+      ['Bea', 'finished'],
+    ]);
+  });
 });

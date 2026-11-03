@@ -37,6 +37,16 @@
 </section>
 
 <section class="container sections">
+  @if (open().length) {
+    <a class="open-practice" routerLink="/academy/practice">
+      <span class="pulse" aria-hidden="true"></span>
+      <span class="open-text">
+        <strong>{{ t.openPractice(open().length) }}</strong>
+        <span>{{ attemptLeft() ? t.openEvaluation(attemptLeft()!) : t.openPracticeText }}</span>
+      </span>
+      <span class="btn">{{ t.continuePractice }} <span aria-hidden="true">→</span></span>
+    </a>
+  }
   <ul class="cards">
     @for (card of cards; track card.key; let i = $index) {
       @let c = t.cards[card.key];

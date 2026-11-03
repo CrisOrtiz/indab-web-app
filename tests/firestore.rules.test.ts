@@ -1027,6 +1027,60 @@ describe('evaluations', () => {
     );
   });
 
+  it('close an attempt left open past its time, and nothing else', async () => {
+    await seed('practiceSessions/e1_enrolled', {
+      ...attempt('enrolled'),
+      startedAt: new Date(Date.now() - 90 * 60 * 1000),
+    });
+    await seed('practiceSessions/e1_enrolled/trades/t1', { ...trade, openedAt: new Date() });
+    await seed('practiceSessions/e1_enrolled/trades/p1', {
+      ...trade,
+      orderType: 'limit',
+      orderPrice: 1790,
+      entryPrice: 1790,
+      status: 'pending',
+      openedAt: new Date(),
+    });
+    const tradeRef = (id: string) =>
+      doc(as('enrolled'), `practiceSessions/e1_enrolled/trades/${id}`);
+    const close = (exitReason: string) => ({
+      status: 'closed',
+      exitPrice: 1810,
+      exitTime: 1_620_001_800,
+      exitReason,
+      pnl: 10,
+      closedAt: serverTimestamp(),
+    });
+    await assertFails(setDoc(tradeRef('t2'), trade));
+    await assertFails(updateDoc(tradeRef('t1'), { stopLoss: 1700 }));
+    await assertFails(updateDoc(tradeRef('t1'), close('manual')));
+    await assertFails(updateDoc(tradeRef('p1'), { orderPrice: 1795, entryPrice: 1795 }));
+    await assertSucceeds(updateDoc(tradeRef('t1'), close('sessionEnd')));
+    await assertSucceeds(
+      updateDoc(tradeRef('p1'), { status: 'cancelled', closedAt: serverTimestamp() }),
+    );
+    // Still active: the summary can only go with closing it.
+    await assertFails(updateDoc(attemptRef('enrolled'), { pnl: 10, balance: 210 }));
+    await assertFails(
+      updateDoc(attemptRef('enrolled'), {
+        status: 'finished',
+        endedAt: serverTimestamp(),
+        resume: { time: 1, interval: '15m', hideDates: true, speed: 1, drawings: [] },
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(attemptRef('enrolled'), {
+        balance: 210,
+        pnl: 10,
+        tradeCount: 1,
+        status: 'finished',
+        endedAt: serverTimestamp(),
+      }),
+    );
+    // Once finished, nothing changes any more.
+    await assertFails(updateDoc(attemptRef('enrolled'), { pnl: 500 }));
+  });
+
   it('take orders while the time runs', async () => {
     await assertSucceeds(setDoc(attemptRef('enrolled'), attempt('enrolled')));
     await assertSucceeds(
