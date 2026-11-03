@@ -1,0 +1,68 @@
+.material-form {
+  max-width: 760px;
+
+  .hint {
+    margin: -8px 0 0;
+    color: var(--color-muted);
+    font-size: 0.9rem;
+
+    &.ok {
+      color: var(--color-up);
+    }
+
+    &.error {
+      color: var(--color-error);
+    }
+  }
+
+  .small {
+    margin-top: -8px;
+    font-size: 0.85rem;
+  }
+
+  .preview h3 {
+    margin: 8px 0 12px;
+    font-size: 1rem;
+  }
+}
+
+.badge.off {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+// Thumbnail on the left, text on the right; stacked on phones.
+.material-cards .card {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 16px;
+  align-items: start;
+
+  .thumb {
+    width: 100%;
+  }
+
+  .info {
+    min-width: 0;
+  }
+
+  h3 {
+    overflow-wrap: anywhere;
+  }
+
+  .description {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  @media (max-width: 560px) {
+    grid-template-columns: 1fr;
+
+    .thumb {
+      max-width: calc(100% - 44px);
+    }
+  }
+}

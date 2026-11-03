@@ -1,0 +1,86 @@
+@let t = i18n.messages().material;
+@let tl = i18n.messages().lists;
+<section class="hero">
+  <div class="container">
+    <a routerLink="/academy" class="back">{{ i18n.messages().academy.back }}</a>
+    <h1>{{ t.title }}</h1>
+    <p class="lead">{{ t.intro }}</p>
+  </div>
+</section>
+
+<section class="container body">
+  @if (loading()) {
+    <p class="muted">{{ t.loading }}</p>
+  } @else if (failed()) {
+    <p class="muted" role="alert">{{ t.loadFailed }}</p>
+  } @else if (!items().length) {
+    <p class="empty">{{ t.empty }}</p>
+  } @else {
+    <div class="filters" role="group" [attr.aria-label]="tl.filters">
+      <div class="search">
+        <input
+          type="search"
+          [attr.aria-label]="t.search"
+          [placeholder]="t.searchPlaceholder"
+          [value]="search()"
+          (input)="search.set($any($event.target).value)"
+        />
+      </div>
+      @if (kinds().length > 1) {
+        <div class="chips" role="group" [attr.aria-label]="t.kindFilter">
+          <button type="button" [attr.aria-pressed]="kind() === ''" (click)="kind.set('')">
+            {{ t.allKinds }}
+          </button>
+          @for (k of kinds(); track k) {
+            <button type="button" [attr.aria-pressed]="kind() === k" (click)="kind.set(k)">
+              {{ t.kindsPlural[k] }}
+            </button>
+          }
+        </div>
+      }
+      @if (categories().length > 1) {
+        <div class="topic">
+          <select
+            [attr.aria-label]="t.category"
+            [value]="category()"
+            (change)="category.set($any($event.target).value)"
+          >
+            <option value="">{{ t.allCategories }}</option>
+            @for (c of categories(); track c) {
+              <option [value]="c">{{ c }}</option>
+            }
+          </select>
+        </div>
+      }
+    </div>
+
+    <p class="muted count" aria-live="polite">{{ t.count(shown()) }}</p>
+
+    @for (group of groups(); track group.category) {
+      <section class="group" [attr.aria-label]="group.category || t.uncategorized">
+        @if (groups().length > 1 || group.category) {
+          <h2>{{ group.category || t.uncategorized }}</h2>
+        }
+        <ul class="grid">
+          @for (m of group.items; track m.id) {
+            <li>
+              <a class="item" [routerLink]="['/academy/material', m.id]">
+                <app-material-thumb [url]="m.url" [kind]="m.kind" />
+                <span class="kind">{{ t.kinds[m.kind] }}</span>
+                <h3>{{ m.title }}</h3>
+                @if (m.description) {
+                  <p>{{ m.description }}</p>
+                }
+              </a>
+            </li>
+          }
+        </ul>
+      </section>
+    } @empty {
+      <p class="muted">
+        {{ t.noMatches }}
+        <button type="button" class="link" (click)="clear()">{{ tl.clear }}</button>
+      </p>
+    }
+  }
+</section>

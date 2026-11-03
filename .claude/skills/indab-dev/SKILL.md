@@ -58,7 +58,7 @@ otherwise create a feature service.
 | `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, staff                                                                                                    | admins (shape validated)                                                                                                                                        |
 | `courses/{id}`                                                   | everyone if `published`, admins                                                                                 | admins                                                                                                                                                          |
 | `courses/{id}/lessons/{id}`                                      | enrolled in course or academy access                                                                            | admins                                                                                                                                                          |
-| `materials/{id}`                                                 | academy access                                                                                                  | admins                                                                                                                                                          |
+| `materials/{id}`                                                 | academy access: staff all, students published + for everyone or assigned (`assignedTo`)                         | trainers and admins                                                                                                                                             |
 | `investors/{uid}` (Eleva)                                        | owner, admins                                                                                                   | admins                                                                                                                                                          |
 | `mentorships/{id}`                                               | staff; members (`users/{uid}.mentorshipIds`)                                                                    | admins (shape validated)                                                                                                                                        |
 | `evaluations/{id}`                                               | staff, assigned students (by uid or mentorship)                                                                 | staff (shape validated)                                                                                                                                         |
@@ -215,11 +215,19 @@ Module notes:
 
 - **Landing (`/`)**: public, no Firestore reads needed except published `courses`. Sections for
   the academy, courses and a link to Eleva. Call to action goes to `/register`.
-- **Material repository (`/academy/material`)**: part of the academy, opened from `/academy`;
-  Cris does not want it as its own header tab (`/repository` only redirects). `materials/{id}` (title, description, category, type
-  such as pdf/video/link, url, createdAt). Gated by `enrolledGuard` + `hasAcademyAccess()` rule.
-  If files are uploaded, use Firebase Storage with `storage.rules` mirroring the same check
-  (add a `FIREBASE_STORAGE` token and emulator wiring in `firebase.providers.ts`).
+- **Study material (`/academy/material`, built)**: part of the academy, opened from `/academy`;
+  Cris does not want it as its own header tab (`/repository` only redirects). `materials/{id}`
+  (`core/models/material.ts`, `features/repository/material.service.ts`): title, description, kind
+  (video, presentation, document, link), https `url`, free-text `category` (the topic the students'
+  page groups by), audience (`all`, or `studentIds` + `mentorshipIds` as forms) and `published`.
+  Staff (trainers and admins) manage it at `/admin/material` (`features/admin/material/`).
+  Nothing is uploaded: Cris wants $0 and Firebase Storage needs the Blaze plan, so staff paste
+  links (YouTube unlisted, Vimeo, Google Drive, Slides, Docs, Canva) and `materialEmbed` turns the
+  known ones into an iframe address built from the site's own pattern (never the typed link);
+  anything else (a PDF elsewhere, a web page) opens in a new tab. `MaterialFrame` shows it and
+  `MaterialThumb` draws the card picture (YouTube's preview or the kind's art). Students read
+  with three queries (everyone, by name, by mentorship) like the forms. Ask Cris before
+  anything that needs Blaze (Storage uploads).
 - **Academy (`/academy`)**: published `courses` and their `lessons`, filtered by
   `enrollment().courses` or full academy access. Shows the pending notice when not enrolled.
   Its home is a grid of illustrated cards, one per section (`cards` in `academy.ts`, inline SVG

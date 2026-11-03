@@ -106,6 +106,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/repository/repository').then((m) => m.Repository),
   },
   {
+    path: 'academy/material/:id',
+    title: 'materialItem',
+    canActivate: [enrolledGuard],
+    loadComponent: () => import('./features/repository/material-view').then((m) => m.MaterialView),
+  },
+  {
     path: 'academy/exams',
     title: 'exams',
     canActivate: [enrolledGuard],
@@ -146,6 +152,13 @@ export const routes: Routes = [
     canActivate: [staffGuard],
     loadComponent: () =>
       import('./features/admin/mentorships/admin-mentorships').then((m) => m.AdminMentorships),
+  },
+  {
+    path: 'admin/material',
+    title: 'adminMaterial',
+    canActivate: [staffGuard],
+    loadComponent: () =>
+      import('./features/admin/material/admin-material').then((m) => m.AdminMaterial),
   },
   {
     path: 'admin/practice',

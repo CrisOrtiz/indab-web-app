@@ -28,6 +28,7 @@ describe('Admin home', () => {
       'Panel del mentor',
       'Usuarios',
       'Mentorías',
+      'Material de estudio',
       'Formularios de evaluación',
       'Evaluaciones de práctica',
       'Revisar prácticas de trading',
@@ -36,6 +37,7 @@ describe('Admin home', () => {
       '/admin/mentor',
       '/admin/users',
       '/admin/mentorships',
+      '/admin/material',
       '/admin/forms',
       '/admin/evaluations',
       '/admin/practice',
@@ -50,6 +52,7 @@ describe('Admin home', () => {
     expect(links()).toEqual([
       '/admin/mentor',
       '/admin/mentorships',
+      '/admin/material',
       '/admin/forms',
       '/admin/evaluations',
       '/admin/practice',
