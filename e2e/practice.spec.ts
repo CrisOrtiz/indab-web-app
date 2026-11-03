@@ -460,3 +460,25 @@ test("the chart keeps each student's indicators for their next sessions", async 
     await expect(item(name)).toHaveAttribute('aria-checked', 'true');
   }
 });
+
+test('the replay plays, pauses and changes speed from its controls', async ({ page }) => {
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+
+  const controls = page.getByRole('group', { name: 'Controles de reproducción' });
+  await controls.getByRole('radio', { name: '1 velas/s' }).click();
+  await expect(controls.getByRole('radio', { name: '1 velas/s' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await controls.getByRole('button', { name: 'Reproducir' }).click();
+  await expect(controls.getByRole('button', { name: 'Pausar' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  // Space pauses, unless a button has the focus (it presses that button instead).
+  await page.locator('h1').click();
+  await page.keyboard.press('Space');
+  await expect(controls.getByRole('button', { name: 'Reproducir' })).toBeVisible();
+});

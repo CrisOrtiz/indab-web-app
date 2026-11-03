@@ -1,0 +1,327 @@
+// Replay transport bar. Colors come from the theme tokens, so it follows light and dark mode.
+:host {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+$ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+// Solid play triangle (the icon's svg belongs to <app-icon>, so it needs ::ng-deep).
+:host ::ng-deep .glyph-play svg {
+  fill: currentColor;
+}
+
+.deck {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+}
+
+button {
+  position: relative;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+// Tooltips (hover with a mouse, keyboard focus); phones rely on the icons.
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 5;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+@media (hover: hover) {
+  [data-tip]:hover::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    transition-delay: 0.35s;
+  }
+}
+
+[data-tip]:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.round {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+}
+
+.step {
+  width: 38px;
+  height: 38px;
+  background: transparent;
+  color: var(--color-text);
+  transition: background-color 0.15s ease;
+
+  app-icon {
+    transition: transform 0.25s $ease;
+  }
+
+  &:hover {
+    background: var(--color-bg);
+  }
+
+  // A small nudge forward on every press.
+  &:active app-icon {
+    transform: translateX(3px) scale(0.92);
+    transition-duration: 0.06s;
+  }
+}
+
+.play {
+  width: 46px;
+  height: 46px;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.18);
+  transition:
+    transform 0.2s $ease,
+    box-shadow 0.2s ease;
+
+  &:hover {
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(0.94);
+  }
+
+  .glyph {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+      opacity 0.2s ease,
+      transform 0.3s $ease;
+  }
+
+  // The play triangle sits a touch right to look centred.
+  .glyph-play {
+    padding-left: 2px;
+  }
+
+  .glyph-pause {
+    opacity: 0;
+    transform: scale(0.4) rotate(-90deg);
+  }
+
+  &.on {
+    .glyph-play {
+      opacity: 0;
+      transform: scale(0.4) rotate(90deg);
+    }
+
+    .glyph-pause {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  // An arc around the button that turns while the replay runs, faster at higher speeds.
+  .ring {
+    position: absolute;
+    inset: -4px;
+    width: calc(100% + 8px);
+    height: calc(100% + 8px);
+    overflow: visible;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.85);
+    transition:
+      opacity 0.25s ease,
+      transform 0.3s $ease;
+
+    circle {
+      fill: none;
+      stroke: var(--color-accent);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-dasharray: 34 104;
+      transform-origin: center;
+      animation: spin var(--spin, 2s) linear infinite;
+      animation-play-state: paused;
+    }
+  }
+
+  &.on .ring {
+    opacity: 0.85;
+    transform: none;
+
+    circle {
+      animation-play-state: running;
+    }
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.speeds {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--n), 36px);
+  margin-left: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--color-bg);
+
+  button {
+    z-index: 1;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: var(--color-text);
+    }
+
+    &.active {
+      color: var(--color-accent-contrast);
+    }
+  }
+}
+
+// The highlight slides under the chosen speed.
+.thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 36px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  transform: translateX(calc(var(--i) * 100%));
+  transition: transform 0.3s $ease;
+}
+
+.finish {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  font-weight: 600;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease;
+
+  app-icon {
+    transition: transform 0.2s $ease;
+  }
+
+  &:hover {
+    border-color: var(--color-down);
+    color: var(--color-down);
+
+    app-icon {
+      transform: scale(0.85);
+    }
+  }
+
+  // On wide screens the label already says it.
+  &::after {
+    display: none;
+  }
+}
+
+// Phones: one row, the end button shrinks to its icon (its text stays for screen readers).
+@media (max-width: 480px) {
+  :host {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .speeds {
+    grid-template-columns: repeat(var(--n), 34px);
+  }
+
+  .thumb {
+    width: 34px;
+  }
+
+  .finish {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+
+    .label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    &::after {
+      display: block;
+      left: auto;
+      right: 0;
+      transform: translateY(4px);
+    }
+
+    &:focus-visible::after {
+      transform: none;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::after,
+  .ring circle {
+    transition-duration: 0.01ms !important;
+    animation: none !important;
+  }
+}
