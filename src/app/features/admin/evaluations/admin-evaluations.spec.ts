@@ -37,8 +37,14 @@ describe('AdminEvaluations', () => {
     update: vi.fn(async () => undefined),
     remove: vi.fn(async () => undefined),
     setResultsPublished: vi.fn(async () => undefined),
+    adjustments: vi.fn(async () => [] as unknown[]),
+    logAdjustment: vi.fn(async () => undefined),
   };
-  const practice = { evaluationSessions: vi.fn() };
+  const practice = {
+    evaluationSessions: vi.fn(),
+    giveExtraTime: vi.fn(async () => undefined),
+    deleteSession: vi.fn(async () => undefined),
+  };
   const mentorships = {
     all: vi.fn(async () => [
       { id: 'm1', name: 'Grupo oro', active: true },
@@ -272,6 +278,83 @@ describe('AdminEvaluations', () => {
     await fixture.whenStable();
     const names = [...el.querySelectorAll('.results tbody td.name')].map((td) => td.textContent);
     expect(names).toEqual(['Ana Gómez']);
+  });
+
+  it('gives an open attempt extra minutes, or restarts an attempt, with a reason', async () => {
+    const started = Date.now() - 50 * 60_000;
+    practice.evaluationSessions.mockResolvedValue([
+      {
+        id: 'e1_jose',
+        uid: 'jose',
+        userName: 'José Pérez',
+        pnl: 0,
+        balance: 200,
+        startingBalance: 200,
+        tradeCount: 0,
+        status: 'active',
+        durationMinutes: 45,
+        startedAt: { toMillis: () => started },
+      },
+    ]);
+    await click('Ver resultados');
+    const rowMenu = () => el.querySelector<HTMLButtonElement>('.results tbody .trigger')!;
+    expect(rowMenu().getAttribute('aria-label')).toContain('José Pérez');
+    rowMenu().click();
+    await fixture.whenStable();
+    button('Dar minutos extra')!.click();
+    await fixture.whenStable();
+    // A reason is required.
+    el.querySelector('form.adjust')!.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    expect(message()).toContain('Escribe el motivo');
+    await type('form.adjust textarea', 'Se le cortó internet');
+    el.querySelector('form.adjust')!.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    // Its 45 minutes ran out 5 minutes ago: the 10 count from now.
+    const [[id, extra]] = practice.giveExtraTime.mock.calls as unknown as [string, number][];
+    expect(id).toBe('e1_jose');
+    expect([15, 16]).toContain(extra);
+    expect(service.logAdjustment).toHaveBeenCalledWith('e1', {
+      uid: 'jose',
+      studentName: 'José Pérez',
+      kind: 'extraTime',
+      minutes: 10,
+      reason: 'Se le cortó internet',
+    });
+    expect(message()).toContain('José Pérez tiene 10 minutos más');
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    rowMenu().click();
+    await fixture.whenStable();
+    button('Reiniciar intento')!.click();
+    await fixture.whenStable();
+    await type('form.adjust textarea', 'Se apagó su computadora');
+    el.querySelector('form.adjust')!.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    expect(practice.deleteSession).toHaveBeenCalledWith('e1_jose');
+    expect(service.logAdjustment).toHaveBeenLastCalledWith(
+      'e1',
+      expect.objectContaining({ kind: 'reset', minutes: null }),
+    );
+  });
+
+  it('lists what staff did to the attempts', async () => {
+    service.adjustments.mockResolvedValue([
+      {
+        id: 'a1',
+        uid: 'jose',
+        studentName: 'José Pérez',
+        kind: 'extraTime',
+        minutes: 10,
+        reason: 'Se le cortó internet',
+        byName: 'Tomás',
+        at: { toDate: () => new Date() },
+      },
+    ]);
+    await click('Ver resultados');
+    expect(el.querySelector('.adjustments')?.textContent).toContain(
+      'José Pérez · +10 min · Se le cortó internet',
+    );
   });
 
   it('opens the results a link names (mentor dashboard)', async () => {

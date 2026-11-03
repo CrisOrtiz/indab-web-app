@@ -211,7 +211,70 @@
                 [standings]="rows"
                 [students]="students()"
                 [mentorships]="mentorships()"
+                (adjust)="startAdjust($event.row, $event.kind)"
               />
+              @if (adjusting(); as a) {
+                <form class="adjust" (submit)="$event.preventDefault(); applyAdjust(ev)">
+                  <h4>
+                    {{
+                      a.kind === 'extraTime'
+                        ? t.giveExtraTimeTitle(a.row.name)
+                        : t.resetAttemptTitle(a.row.name)
+                    }}
+                  </h4>
+                  @if (a.kind === 'extraTime') {
+                    <label>
+                      {{ t.extraMinutesLabel }}
+                      <input
+                        type="number"
+                        min="1"
+                        [max]="maxExtra"
+                        step="1"
+                        required
+                        [value]="adjustMinutes()"
+                        (input)="adjustMinutes.set(+$any($event.target).value)"
+                      />
+                    </label>
+                    <p class="muted">{{ t.extraTimeHint }}</p>
+                  } @else {
+                    <p class="muted">{{ t.resetHint }}</p>
+                  }
+                  <label>
+                    {{ t.adjustReason }}
+                    <textarea
+                      rows="2"
+                      maxlength="500"
+                      required
+                      [placeholder]="t.adjustReasonPlaceholder"
+                      [value]="adjustReason()"
+                      (input)="adjustReason.set($any($event.target).value)"
+                    ></textarea>
+                  </label>
+                  <div class="adjust-actions">
+                    <button type="submit" class="btn" [disabled]="adjustBusy()">
+                      {{ a.kind === 'extraTime' ? t.giveExtraTime : t.resetAttempt }}
+                    </button>
+                    <button type="button" class="btn btn-outline" (click)="adjusting.set(null)">
+                      {{ t.cancel }}
+                    </button>
+                  </div>
+                </form>
+              }
+              @if (adjustments().length) {
+                <h4>{{ t.adjustments }}</h4>
+                <ul class="adjustments">
+                  @for (a of adjustments(); track a.id) {
+                    <li>
+                      <strong>{{ a.studentName }}</strong> ·
+                      {{ a.kind === 'extraTime' ? t.extraBadge(a.minutes ?? 0) : t.resetDone }} ·
+                      {{ a.reason }}
+                      <span class="muted"
+                        >— {{ a.byName }}, {{ a.at?.toDate() | localDate: 'd MMM y, HH:mm' }}</span
+                      >
+                    </li>
+                  }
+                </ul>
+              }
             } @else {
               <p class="muted">{{ t.loadingResults }}</p>
             }

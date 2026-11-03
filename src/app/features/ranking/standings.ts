@@ -13,6 +13,12 @@ export interface EvaluationStanding {
   /** P/L over the starting balance. */
   return: number | null;
   trades: number | null;
+  /** The attempt's session, for staff to adjust; null when not taken. */
+  sessionId: string | null;
+  /** The attempt is still open (active), even if its time is up: staff can add minutes. */
+  open: boolean;
+  /** Minutes staff added to it. */
+  extraMinutes: number;
 }
 
 const byName = (a: { name: string }, b: { name: string }) =>
@@ -44,6 +50,9 @@ export function evaluationStandings(
       pnl: s.pnl,
       return: returnOf(s),
       trades: s.tradeCount,
+      sessionId: s.id,
+      open: s.status === 'active',
+      extraMinutes: s.extraMinutes ?? 0,
     }));
   const taken = new Set(sessions.map((s) => s.uid));
   const missing: EvaluationStanding[] = students
@@ -58,6 +67,9 @@ export function evaluationStandings(
       pnl: null,
       return: null,
       trades: null,
+      sessionId: null,
+      open: false,
+      extraMinutes: 0,
     }));
   return [...ranked, ...missing];
 }

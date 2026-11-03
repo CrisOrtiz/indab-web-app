@@ -65,7 +65,7 @@ export function attemptExpired(session: PracticeSession, now: number): boolean {
     return false;
   }
   const started = session.startedAt?.toMillis() ?? 0;
-  return now >= started + (session.durationMinutes + 2) * MINUTE;
+  return now >= started + (session.durationMinutes + (session.extraMinutes ?? 0) + 2) * MINUTE;
 }
 
 /** When an evaluation attempt's time runs out (ms), or null for free practice. */
@@ -73,7 +73,10 @@ export function attemptDeadline(session: PracticeSession): number | null {
   if (session.durationMinutes == null) {
     return null;
   }
-  return (session.startedAt?.toMillis() ?? 0) + session.durationMinutes * MINUTE;
+  return (
+    (session.startedAt?.toMillis() ?? 0) +
+    (session.durationMinutes + (session.extraMinutes ?? 0)) * MINUTE
+  );
 }
 
 /**

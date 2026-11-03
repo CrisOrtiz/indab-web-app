@@ -52,6 +52,8 @@ export interface PracticeSession {
   evaluationId?: string | null;
   /** An evaluation attempt's time limit, copied from the evaluation. */
   durationMinutes?: number;
+  /** Minutes staff added to an attempt's time limit (after a problem during it). */
+  extraMinutes?: number;
   /** Where the replay was left while active. */
   resume?: SessionResume;
 }

@@ -126,3 +126,48 @@
 .down {
   color: var(--color-down);
 }
+
+// Adding minutes to an attempt, or restarting it, and the record of what staff did.
+.adjust {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+
+  h4 {
+    margin: 0;
+  }
+
+  label {
+    display: grid;
+    gap: 4px;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.adjust-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.adjustments {
+  margin: 8px 0 0;
+  padding-left: 18px;
+
+  li {
+    margin: 4px 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.row-actions {
+  width: 1%;
+  text-align: right;
+}

@@ -427,6 +427,12 @@ export class Practice {
   private liveTimer?: ReturnType<typeof setInterval>;
   /** When the live attempt on screen started (ms, server clock). */
   private liveStart = 0;
+  /** Minutes staff added to the attempt on screen. */
+  private extraMinutes = 0;
+  /** Stops following the attempt on screen for staff changes. */
+  private unwatch?: () => void;
+  /** Something staff did to the attempt on screen (minutes added), told to the student. */
+  protected readonly notice = signal<string | null>(null);
   /** Counts down the open attempts listed on the setup. */
   private openClock?: ReturnType<typeof setInterval>;
   /** The next save of `resume` to Firestore, and when it is due. */
@@ -459,6 +465,7 @@ export class Practice {
       clearInterval(this.clock);
       clearInterval(this.liveTimer);
       this.tabs.close();
+      this.stopWatching();
       clearTimeout(this.quickErrorTimer);
       clearTimeout(this.resumeTimer);
       clearInterval(this.openClock);
@@ -537,8 +544,10 @@ export class Practice {
         : await this.practice.startSession(session);
       this.enter(sessionId, replay, replayStart, timeframe, history, evaluation, []);
       if (evaluation) {
+        this.extraMinutes = 0;
         this.startLive(evaluation, startedAt);
         this.startClock(startedAt + evaluation.durationMinutes * MINUTE);
+        this.watchAttempt(sessionId, startedAt, evaluation.durationMinutes);
       }
     } catch (e) {
       const t = this.i18n.messages().practice;
@@ -572,10 +581,63 @@ export class Practice {
     this.evaluation.set(evaluation);
     this.drawings.set(drawings);
     this.resumed.set(false);
+    this.notice.set(null);
     this.lastResume = null;
     this.resumeSaved = true;
     this.phase.set('playing');
     this.tabs.open(sessionId);
+  }
+
+  /**
+   * Follows the attempt on screen while it runs: minutes staff add move the deadline at once,
+   * and an attempt staff delete (so the student takes it again) leaves the screen.
+   */
+  private watchAttempt(sessionId: string, startedAt: number, durationMinutes: number): void {
+    this.stopWatching();
+    this.unwatch = this.practice.watchSession(sessionId, (session) => {
+      if (this.sessionId() !== sessionId || this.phase() !== 'playing') {
+        return;
+      }
+      const t = this.i18n.messages().practice;
+      if (!session) {
+        this.dropReset(sessionId);
+        return;
+      }
+      const extra = session.extraMinutes ?? 0;
+      if (extra > this.extraMinutes) {
+        const added = extra - this.extraMinutes;
+        this.extraMinutes = extra;
+        this.startClock(startedAt + (durationMinutes + extra) * MINUTE);
+        this.notice.set(t.extraTimeGiven(added));
+      }
+    });
+  }
+
+  private stopWatching(): void {
+    this.unwatch?.();
+    this.unwatch = undefined;
+  }
+
+  /** Staff deleted the attempt on screen so the student can take it again: back to the list. */
+  private dropReset(sessionId: string): void {
+    this.pause();
+    clearInterval(this.clock);
+    clearInterval(this.liveTimer);
+    clearTimeout(this.resumeTimer);
+    this.tabs.close();
+    this.stopWatching();
+    clearLocalResume(sessionId);
+    this.deadline.set(null);
+    this.focused.set(null);
+    this.evaluation.set(null);
+    this.replay.set(null);
+    this.sessionId.set(null);
+    this.resumed.set(false);
+    this.notice.set(null);
+    this.phase.set('setup');
+    this.error.set(this.i18n.messages().practice.attemptReset);
+    this.loadSessions();
+    void this.refreshOpen().then(() => this.loadEvaluations());
   }
 
   /** Moves an attempt at an evaluation with a pace along with the clock, from `startedAt`. */
@@ -602,7 +664,7 @@ export class Practice {
     const shown = liveMinutes(
       this.serverClock.now() - this.liveStart,
       evaluation.pace,
-      evaluation.durationMinutes,
+      evaluation.durationMinutes + this.extraMinutes,
     );
     const target = replay.historyBars - 1 + shown;
     if (replay.cursor() >= target) {
@@ -731,6 +793,7 @@ export class Practice {
     clearInterval(this.clock);
     clearInterval(this.liveTimer);
     this.tabs.close();
+    this.stopWatching();
     this.deadline.set(null);
     this.focused.set(null);
     this.evaluation.set(null);
@@ -853,11 +916,17 @@ export class Practice {
     this.openSessions.update((all) => all.filter((s) => s.id !== session.id));
     this.resumed.set(true);
     const deadline = attemptDeadline(session);
+    this.extraMinutes = session.extraMinutes ?? 0;
     if (evaluation && session.startedAt) {
       this.startLive(evaluation, session.startedAt.toMillis());
     }
     if (deadline !== null) {
       this.startClock(deadline);
+      this.watchAttempt(
+        session.id,
+        session.startedAt?.toMillis() ?? 0,
+        session.durationMinutes ?? 0,
+      );
     }
     if (replay.finished()) {
       void this.finish();
@@ -1269,6 +1338,7 @@ export class Practice {
     clearInterval(this.clock);
     clearInterval(this.liveTimer);
     this.tabs.close();
+    this.stopWatching();
     clearTimeout(this.resumeTimer);
     clearLocalResume(sessionId);
     this.deadline.set(null);

@@ -1207,13 +1207,77 @@ describe('evaluations', () => {
     );
   });
 
-  it('let trainers review sessions and trades, but only admins delete them', async () => {
+  it('let trainers review sessions and trades, and restart attempts but not free practice', async () => {
     await seed('practiceSessions/e1_enrolled', { ...attempt('enrolled'), startedAt: new Date() });
     await seed('practiceSessions/e1_enrolled/trades/t1', { ...trade, openedAt: new Date() });
+    await seed('practiceSessions/free', {
+      ...attempt('enrolled', { evaluationId: null }),
+      startedAt: new Date(),
+    });
+    await seed('practiceSessions/free/trades/t1', { ...trade, openedAt: new Date() });
     await assertSucceeds(getDocs(collection(as('trainer'), 'practiceSessions')));
     await assertSucceeds(getDocs(collection(as('trainer'), 'practiceSessions/e1_enrolled/trades')));
-    await assertFails(deleteDoc(attemptRef('trainer')));
-    await assertFails(deleteDoc(doc(as('trainer'), 'practiceSessions/e1_enrolled/trades/t1')));
+    await assertFails(deleteDoc(doc(as('trainer'), 'practiceSessions/free/trades/t1')));
+    await assertFails(deleteDoc(doc(as('trainer'), 'practiceSessions/free')));
+    await assertFails(deleteDoc(attemptRef('enrolled')));
+    await assertSucceeds(deleteDoc(doc(as('trainer'), 'practiceSessions/e1_enrolled/trades/t1')));
+    await assertSucceeds(deleteDoc(attemptRef('trainer')));
+    // Deleted, the student can take it again.
+    await assertSucceeds(setDoc(attemptRef('enrolled'), attempt('enrolled')));
+  });
+
+  it('let staff add minutes to an open attempt, which then takes orders for longer', async () => {
+    await seed('practiceSessions/e1_enrolled', {
+      ...attempt('enrolled'),
+      startedAt: new Date(Date.now() - 31 * 60 * 1000),
+    });
+    const tradeRef = doc(as('enrolled'), 'practiceSessions/e1_enrolled/trades/t2');
+    await assertFails(setDoc(tradeRef, trade));
+    await assertFails(updateDoc(attemptRef('enrolled'), { extraMinutes: 10 }));
+    await assertFails(updateDoc(attemptRef('trainer'), { extraMinutes: 10.5 }));
+    await assertFails(updateDoc(attemptRef('trainer'), { extraMinutes: 601 }));
+    await assertFails(updateDoc(attemptRef('trainer'), { extraMinutes: 10, pnl: 5 }));
+    await assertSucceeds(updateDoc(attemptRef('trainer'), { extraMinutes: 10 }));
+    await assertSucceeds(setDoc(tradeRef, trade));
+    await assertSucceeds(updateDoc(attemptRef('enrolled'), { pnl: 1, balance: 201 }));
+    // Never fewer minutes.
+    await assertFails(updateDoc(attemptRef('trainer'), { extraMinutes: 5 }));
+    // Not on free practice nor once finished.
+    await seed('practiceSessions/free', {
+      ...attempt('enrolled', { evaluationId: null }),
+      startedAt: new Date(),
+    });
+    await assertFails(updateDoc(doc(as('trainer'), 'practiceSessions/free'), { extraMinutes: 10 }));
+    await seed('practiceSessions/done', { ...attempt('enrolled'), status: 'finished' });
+    await assertFails(updateDoc(doc(as('trainer'), 'practiceSessions/done'), { extraMinutes: 10 }));
+  });
+
+  it('keep a staff-only record of adjustments, signed and never changed', async () => {
+    const ref = (uid: string | null, id = 'a1') => doc(as(uid), `evaluations/e1/adjustments/${id}`);
+    const adjustment = (by: string, extra: Record<string, unknown> = {}) => ({
+      uid: 'enrolled',
+      studentName: 'Ana',
+      kind: 'extraTime',
+      minutes: 10,
+      reason: 'Se cortó internet',
+      by,
+      byName: 'Tomás',
+      at: serverTimestamp(),
+      ...extra,
+    });
+    await assertSucceeds(setDoc(ref('trainer'), adjustment('trainer')));
+    await assertSucceeds(
+      setDoc(ref('admin', 'a2'), adjustment('admin', { kind: 'reset', minutes: null })),
+    );
+    await assertFails(setDoc(ref('trainer', 'a3'), adjustment('admin')));
+    await assertFails(setDoc(ref('trainer', 'a3'), adjustment('trainer', { reason: '' })));
+    await assertFails(setDoc(ref('trainer', 'a3'), adjustment('trainer', { minutes: 0 })));
+    await assertFails(setDoc(ref('trainer', 'a3'), adjustment('trainer', { kind: 'reset' })));
+    await assertFails(setDoc(ref('enrolled', 'a3'), adjustment('enrolled')));
+    await assertSucceeds(getDoc(ref('trainer')));
+    await assertFails(getDoc(ref('enrolled')));
+    await assertFails(updateDoc(ref('trainer'), { reason: 'Otro' }));
+    await assertFails(deleteDoc(ref('admin')));
   });
 });
 

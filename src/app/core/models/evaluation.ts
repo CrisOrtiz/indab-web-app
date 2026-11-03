@@ -47,6 +47,23 @@ export function datesLocked(evaluation: Evaluation | null, now = Date.now()): bo
   return !!evaluation?.hideDates && now < evaluation.closesAt.toMillis();
 }
 
+/**
+ * Stored at `evaluations/{id}/adjustments/{id}`: something staff did to a student's attempt
+ * when it went wrong (a dropped connection, a dead battery), with why. Staff only.
+ */
+export interface EvaluationAdjustment {
+  id: string;
+  uid: string;
+  studentName: string;
+  /** Minutes added to the attempt, or the attempt deleted so the student starts again. */
+  kind: 'extraTime' | 'reset';
+  minutes: number | null;
+  reason: string;
+  by: string;
+  byName: string;
+  at: Timestamp;
+}
+
 export type EvaluationWindow = 'upcoming' | 'open' | 'closed';
 
 /** Where `now` (ms) falls in the evaluation's window. */

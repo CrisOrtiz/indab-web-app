@@ -1,5 +1,6 @@
 import { DecimalPipe, PercentPipe } from '@angular/common';
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { ActionsMenu, MenuAction } from '../../../shared/actions-menu/actions-menu';
 import { I18n } from '../../../core/i18n/i18n.service';
 import { Mentorship, membersOf } from '../../../core/models/mentorship';
 import { MentorshipFilter } from '../audience/mentorship-filter';
@@ -17,7 +18,7 @@ export const RESULTS_PAGE_SIZE = 20;
  */
 @Component({
   selector: 'app-evaluation-results',
-  imports: [DecimalPipe, MentorshipFilter, Pager, PercentPipe],
+  imports: [ActionsMenu, DecimalPipe, MentorshipFilter, Pager, PercentPipe],
   template: `
     @let t = i18n.messages().evaluations;
     @let tl = i18n.messages().lists;
@@ -57,6 +58,7 @@ export const RESULTS_PAGE_SIZE = 20;
           <th>{{ t.pnl }}</th>
           <th>{{ t.return }}</th>
           <th>{{ t.trades }}</th>
+          <th [attr.aria-label]="t.adjustments"></th>
         </tr>
       </thead>
       <tbody>
@@ -64,7 +66,12 @@ export const RESULTS_PAGE_SIZE = 20;
           <tr>
             <td data-label="#">{{ row.rank ?? '—' }}</td>
             <td [attr.data-label]="t.student" class="name">{{ row.name }}</td>
-            <td [attr.data-label]="t.status">{{ t.attemptStates[row.status] }}</td>
+            <td [attr.data-label]="t.status">
+              {{ t.attemptStates[row.status] }}
+              @if (row.extraMinutes) {
+                <span class="badge">{{ t.extraBadge(row.extraMinutes) }}</span>
+              }
+            </td>
             <td
               [attr.data-label]="t.pnl"
               [class.up]="(row.pnl ?? 0) > 0"
@@ -76,10 +83,20 @@ export const RESULTS_PAGE_SIZE = 20;
               {{ row.return === null ? '—' : (row.return | percent: '1.1-1') }}
             </td>
             <td [attr.data-label]="t.trades">{{ row.trades ?? '—' }}</td>
+            <td class="row-actions">
+              @let actions = menus().get(row.uid) ?? [];
+              @if (actions.length) {
+                <app-actions-menu
+                  [actions]="actions"
+                  [label]="t.attemptActions(row.name)"
+                  (picked)="adjust.emit({ row, kind: $any($event) })"
+                />
+              }
+            </td>
           </tr>
         } @empty {
           <tr>
-            <td colspan="6" class="muted empty">
+            <td colspan="7" class="muted empty">
               {{ standings().length ? tl.noMatches : t.noAttempts }}
             </td>
           </tr>
@@ -107,6 +124,8 @@ export class EvaluationResults {
   /** Students with their mentorships and the mentorships to filter by; none hides the filter. */
   readonly students = input<{ uid: string; mentorshipIds: string[] }[]>([]);
   readonly mentorships = input<Mentorship[]>([]);
+  /** Staff picked "add minutes" or "restart" on an attempt. */
+  readonly adjust = output<{ row: EvaluationStanding; kind: 'extraTime' | 'reset' }>();
 
   protected readonly states: EvaluationStanding['status'][] = ['finished', 'active', 'notStarted'];
   protected readonly search = signal('');
@@ -128,6 +147,10 @@ export class EvaluationResults {
   });
   protected readonly pages = computed(() => pageCount(this.matches().length, RESULTS_PAGE_SIZE));
   protected readonly rows = computed(() => pageOf(this.matches(), this.page(), RESULTS_PAGE_SIZE));
+  /** Each row's menu, by student. */
+  protected readonly menus = computed(
+    () => new Map(this.rows().map((row) => [row.uid, this.actionsFor(row)])),
+  );
 
   constructor() {
     // New results start on the first page.
@@ -135,6 +158,17 @@ export class EvaluationResults {
       this.standings();
       this.page.set(0);
     });
+  }
+
+  /** A row's menu: minutes for an open attempt, restart for any attempt taken. */
+  private actionsFor(row: EvaluationStanding): MenuAction[] {
+    const t = this.i18n.messages().evaluations;
+    return [
+      ...(row.open ? [{ id: 'extraTime', label: t.giveExtraTime, icon: 'clock' as const }] : []),
+      ...(row.sessionId
+        ? [{ id: 'reset', label: t.resetAttempt, icon: 'restart' as const, danger: true }]
+        : []),
+    ];
   }
 
   protected filter(field: { set(value: string): void }, event: Event): void {

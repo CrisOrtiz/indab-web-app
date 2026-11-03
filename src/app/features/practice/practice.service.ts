@@ -9,6 +9,7 @@ import {
   getDoc,
   getDocs,
   limit,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -282,7 +283,28 @@ export class PracticeService {
     );
   }
 
-  /** Deletes a session and its trades (admins only). */
+  /**
+   * Follows a session as staff change it (minutes added to an attempt, or the attempt deleted
+   * so the student takes it again: then `next` gets null). Returns the unsubscribe.
+   */
+  watchSession(sessionId: string, next: (session: PracticeSession | null) => void): () => void {
+    return onSnapshot(
+      doc(this.sessions, sessionId),
+      (snapshot) =>
+        next(
+          snapshot.exists() ? { ...(snapshot.data() as PracticeSession), id: snapshot.id } : null,
+        ),
+      // Offline or refused: the attempt goes on as it was.
+      () => undefined,
+    );
+  }
+
+  /** Sets the minutes staff add to an evaluation attempt (only ever more). */
+  giveExtraTime(sessionId: string, extraMinutes: number): Promise<void> {
+    return updateDoc(doc(this.sessions, sessionId), { extraMinutes });
+  }
+
+  /** Deletes a session and its trades (admins; trainers too for evaluation attempts). */
   async deleteSession(sessionId: string): Promise<void> {
     const trades = await getDocs(this.trades(sessionId));
     const refs = [...trades.docs.map((d) => d.ref), doc(this.sessions, sessionId)];

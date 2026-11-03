@@ -813,6 +813,9 @@ export const en: Messages = {
     timeLeft: (time: string) => `${time} left`,
     leavingKeeps:
       'You can leave and come back any time: the clock keeps running and the evaluation is handed in when time is up.',
+    extraTimeGiven: (minutes: number) => `Staff gave you ${minutes} more minutes.`,
+    attemptReset:
+      'Staff restarted your attempt at this evaluation. You can start it again from the list.',
     live: 'Live',
     liveHint:
       'The chart moves on its own with the clock: it cannot be paused or skipped. If you leave, the market goes on and you see it where it is when you come back.',
@@ -943,6 +946,29 @@ export const en: Messages = {
     description: 'Instructions (optional)',
     market: 'Market',
     duration: 'Time limit (minutes)',
+    adjustments: 'Attempt adjustments',
+    extraBadge: (minutes: number) => `+${minutes} min`,
+    attemptActions: (name: string) => `Actions for ${name}'s attempt`,
+    giveExtraTime: 'Give extra minutes',
+    resetAttempt: 'Restart attempt',
+    giveExtraTimeTitle: (name: string) => `Extra minutes for ${name}`,
+    resetAttemptTitle: (name: string) => `Restart ${name}'s attempt`,
+    extraMinutesLabel: 'Minutes',
+    extraTimeHint:
+      'They are added to the time limit, or from now if it already ran out. If the student is on the page, they see them at once.',
+    resetHint:
+      'The attempt and its trades are deleted and the student can start again, on the same market and period (which they already saw).',
+    adjustReason: 'Reason',
+    adjustReasonPlaceholder: 'For example: lost the internet connection after 20 minutes',
+    resetDone: 'attempt restarted',
+    reasonRequired: 'Write the reason; it is kept on record.',
+    extraRange: (max: number) =>
+      `Give between 1 and ${max} minutes, up to 600 extra minutes in all.`,
+    confirmReset: (name: string) =>
+      `Restart ${name}'s attempt? Their result and trades are deleted, and this cannot be undone.`,
+    extraGiven: (minutes: number, name: string) => `${name} has ${minutes} more minutes.`,
+    resetGiven: (name: string) => `${name}'s attempt was restarted: they can start again.`,
+    adjustFailed: 'The adjustment could not be applied. Try again.',
     pace: 'Exam pace',
     paces: {
       60: '1 market minute per second',
