@@ -3,7 +3,12 @@ import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
-import { Evaluation } from '../../core/models/evaluation';
+import {
+  Evaluation,
+  EvaluationRubric,
+  RUBRIC_CRITERIA,
+  rubricAverage,
+} from '../../core/models/evaluation';
 import { EvaluationService } from '../evaluations/evaluation.service';
 import { PracticeService } from '../practice/practice.service';
 import { EvaluationStanding, evaluationStandings } from './standings';
@@ -29,9 +34,18 @@ export class Ranking {
   protected readonly selected = signal<string | null>(null);
   protected readonly results = signal<EvaluationStanding[] | null>(null);
   protected readonly error = signal<string | null>(null);
+  /** The signed-in student's rubric for the selected evaluation, once published. */
+  protected readonly myRubric = signal<EvaluationRubric | null>(null);
+  protected readonly criteria = RUBRIC_CRITERIA;
+  protected readonly average = rubricAverage;
 
   constructor() {
     void this.loadEvaluations();
+  }
+
+  /** Whether the shown ranking has INDAB scores (staff rated the attempts). */
+  protected scored(rows: EvaluationStanding[]): boolean {
+    return rows.some((row) => row.score);
   }
 
   protected isMe(uid: string): boolean {
@@ -41,17 +55,34 @@ export class Ranking {
   protected async select(id: string): Promise<void> {
     this.selected.set(id || null);
     this.results.set(null);
+    this.myRubric.set(null);
     if (!id) {
       return;
     }
+    void this.loadMyRubric(id);
     try {
-      const sessions = await this.practice.evaluationSessions(id);
+      const [sessions, grades] = await Promise.all([
+        this.practice.evaluationSessions(id),
+        this.evaluationService.grades(id).catch(() => undefined),
+      ]);
       if (this.selected() === id) {
-        this.results.set(evaluationStandings(sessions));
+        this.results.set(evaluationStandings(sessions, [], Date.now(), { grades }));
       }
     } catch {
       this.results.set([]);
       this.error.set(this.i18n.messages().ranking.loadFailed);
+    }
+  }
+
+  /** A student's own rubric; staff rate attempts in the evaluation's results instead. */
+  private async loadMyRubric(id: string): Promise<void> {
+    const uid = this.auth.user()?.uid;
+    if (!uid || this.auth.isStaff()) {
+      return;
+    }
+    const rubric = await this.evaluationService.myRubric(id, uid).catch(() => null);
+    if (this.selected() === id) {
+      this.myRubric.set(rubric);
     }
   }
 

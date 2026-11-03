@@ -26,7 +26,23 @@ export interface SessionStats {
   maxDrawdownPct: number;
   /** Starting balance, then the balance after each closed trade, in order of exit. */
   equity: EquityPoint[];
+  /**
+   * Share of the balance each closed trade risked to its stop loss (the one it was placed
+   * with, else the last one), on average and at most; null when no trade had a stop loss.
+   */
+  avgRiskPct: number | null;
+  maxRiskPct: number | null;
+  /** Average planned reward to risk (take profit over stop loss distance), of trades with both. */
+  avgRewardRisk: number | null;
+  /** Closed trades that never had a stop loss. */
+  withoutStopLoss: number;
+  /** The account hit the stop out: positions were closed for lack of margin. */
+  stoppedOut: boolean;
 }
+
+/** The stop loss a trade's risk is measured to: the one it was placed with, else its last one. */
+export const riskStop = (trade: PracticeTrade): number | null =>
+  trade.initialStopLoss ?? trade.stopLoss;
 
 const round = (value: number) => Math.round(value * 100) / 100;
 const average = (values: number[]) =>
@@ -62,6 +78,30 @@ export function sessionStats(
     }
   });
 
+  // Risk is measured against the balance the trade was opened with.
+  const risks: number[] = [];
+  const rewardRisks: number[] = [];
+  for (const t of closed) {
+    const stop = riskStop(t);
+    if (stop === null) {
+      continue;
+    }
+    const distance = Math.abs(t.entryPrice - stop);
+    const before =
+      startingBalance +
+      closed
+        .filter((c) => c !== t && (c.exitTime ?? 0) <= t.entryTime)
+        .reduce((sum, c) => sum + (c.pnl ?? 0), 0);
+    if (before > 0) {
+      risks.push((distance * t.quantity) / before);
+    }
+    if (t.takeProfit !== null && distance > 0) {
+      rewardRisks.push(Math.abs(t.takeProfit - t.entryPrice) / distance);
+    }
+  }
+  const mean = (values: number[]) =>
+    values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : null;
+
   return {
     trades: closed.length,
     wins: wins.length,
@@ -76,5 +116,10 @@ export function sessionStats(
     maxDrawdown,
     maxDrawdownPct,
     equity,
+    avgRiskPct: mean(risks),
+    maxRiskPct: risks.length ? Math.max(...risks) : null,
+    avgRewardRisk: rewardRisks.length ? round(mean(rewardRisks)!) : null,
+    withoutStopLoss: closed.filter((t) => riskStop(t) === null).length,
+    stoppedOut: closed.some((t) => t.exitReason === 'stopOut'),
   };
 }

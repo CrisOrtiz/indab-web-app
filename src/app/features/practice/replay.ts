@@ -365,6 +365,7 @@ export class Replay {
       entryTime: time,
       stopLoss: input.stopLoss,
       takeProfit: input.takeProfit,
+      initialStopLoss: input.stopLoss,
       status: market ? 'open' : 'pending',
     };
     this._trades.update((trades) => [...trades, trade]);

@@ -804,8 +804,35 @@ export const en: Messages = {
     evaluationUpcoming: 'Not open yet',
     evaluationMissed: 'Not taken',
     evaluationTag: 'Evaluation',
-    confirmEvaluation: (title: string, minutes: number) =>
-      `Start "${title}"? You get a single ${minutes}-minute attempt and the clock starts now. You can leave and come back: the clock keeps running and the attempt is handed in when time is up.`,
+    briefing: {
+      title: (title: string) => `Before you start: ${title}`,
+      howTitle: 'How it works',
+      oneAttempt: (minutes: number) =>
+        `You have one attempt of ${minutes} minutes. The time runs from when you press "Start evaluation".`,
+      live: (pace: string, covered: string) =>
+        `The chart moves on its own with the clock (${pace}) and covers ${covered} of market: it cannot be paused, skipped or sped up.`,
+      freeSpeed: 'You pick the replay speed, but the time limit is real time.',
+      account: (balance: number, leverage: number, stopOut: number) =>
+        `You start with ${balance} USD and 1:${leverage} leverage. If your margin falls to ${stopOut}%, positions close on their own (stop out).`,
+      hiddenDates: 'You will not see the chart date until the evaluation closes.',
+      leaving:
+        'If you leave or lose your connection, you can come back: the time keeps running. Open it in one tab or device only.',
+      end: 'When time is up it is handed in: pending orders are cancelled and open positions close at the last price.',
+      warnings: 'We will warn you when 5 minutes and 1 minute are left.',
+      gradeTitle: 'How it is graded',
+      grade:
+        "INDAB score from 0 to 100: 40% return, 30% risk control and 30% your mentor's rubric (entry plan, risk management, respect for SL and TP, reading the context and discipline).",
+      tipStop: 'Set a stop loss on every trade: each trade without one costs risk points.',
+      tipRisk:
+        'Do not risk more than 2% of the account per trade, nor let the account fall more than 10%.',
+      tipStopOut: 'A stop out sets risk control to 0.',
+      read: 'I read the instructions and I am ready',
+      start: 'Start now',
+      cancel: 'Not now',
+    },
+    dismissWarning: 'Dismiss warning',
+    warnFive: '5 minutes of the evaluation left.',
+    warnOne: '1 minute left: open positions close at the end.',
     evaluationStartFailed:
       'The evaluation could not start. You may have taken it already, or it may be closed.',
     evaluationTitle: (title: string) => `Evaluation: ${title}`,
@@ -897,6 +924,8 @@ export const en: Messages = {
     addOrder: (price) => `Add order at ${price}…`,
     drawLine: (price) => `Draw horizontal line at ${price}`,
     closePosition: 'Close position',
+    confirmMove: 'Confirm change',
+    undoMove: 'Undo change',
     cancelOrder: 'Cancel order',
     removeLevel: (level) => `Remove ${level.toLowerCase()}`,
     hints: {
@@ -946,6 +975,52 @@ export const en: Messages = {
     description: 'Instructions (optional)',
     market: 'Market',
     duration: 'Time limit (minutes)',
+    rubric: {
+      rate: 'Rate with rubric',
+      column: 'Rubric',
+      title: (name: string) => `Rubric for ${name}`,
+      scale:
+        'From 1 (very weak) to 5 (excellent) on each criterion. The student sees it once you publish the results.',
+      criteria: {
+        plan: {
+          label: 'Entry plan',
+          hint: 'Entered for a clear reason, at planned zones.',
+        },
+        risk: {
+          label: 'Risk management',
+          hint: 'Position size in line with the stop and the account.',
+        },
+        stops: {
+          label: 'Respect for SL and TP',
+          hint: 'Set stop loss and take profit and did not move them against the trade.',
+        },
+        context: {
+          label: 'Reading the context',
+          hint: 'Read trend, structure and news before trading.',
+        },
+        discipline: {
+          label: 'Discipline',
+          hint: 'Followed the plan without overtrading or trading on impulse.',
+        },
+      },
+      missing: 'Pick a score on each criterion.',
+      save: 'Save rubric',
+      saved: (name: string) => `Saved the rubric for ${name}.`,
+      failed: 'Could not save the rubric. Try again.',
+      average: (value: string) => `${value} / 5`,
+      yours: "Your mentor's rubric",
+      by: (name: string) => `Rated by ${name}`,
+    },
+    score: {
+      column: 'INDAB score',
+      how: 'INDAB score (0 to 100) = 40% return + 30% risk control + 30% mentor rubric. A stop out sets risk control to 0. Attempts without a rubric yet follow, by profit.',
+      missing: 'No rubric yet',
+      parts: (ret: string, risk: string, rubric: string) =>
+        `Return ${ret} · Risk ${risk} · Rubric ${rubric}`,
+    },
+    resultsView: 'What to show',
+    viewRanking: 'Ranking',
+    viewMetrics: 'Risk metrics',
     adjustments: 'Attempt adjustments',
     extraBadge: (minutes: number) => `+${minutes} min`,
     attemptActions: (name: string) => `Actions for ${name}'s attempt`,
@@ -1367,6 +1442,16 @@ export const en: Messages = {
     curve: 'Equity curve',
     curveLabel: (from, to) => `Balance from ${from} to ${to} USD`,
     curveEmpty: 'Close trades to see how your balance evolves.',
+    riskPerTrade: 'Risk per trade',
+    riskMax: (pct: string) => `max ${pct} of the account`,
+    riskHint: 'To the stop loss, over the balance at entry.',
+    rewardRisk: 'Average R:R',
+    rewardRiskHint: 'Take profit over stop loss, of trades with both.',
+    withoutStopLoss: 'Without stop loss',
+    stopOut: 'Stop out',
+    stopOutYes: 'Yes',
+    stopOutHint: 'Positions were closed for lack of margin.',
+    stopOutNo: 'No',
   },
   calendar: {
     title: 'Economic calendar',

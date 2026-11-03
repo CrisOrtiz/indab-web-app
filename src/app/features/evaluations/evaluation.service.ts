@@ -15,7 +15,13 @@ import {
 import { AuthService } from '../../core/auth/auth.service';
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
 import { LoadingService } from '../../core/loading/loading.service';
-import { Evaluation, EvaluationAdjustment } from '../../core/models/evaluation';
+import {
+  Evaluation,
+  EvaluationAdjustment,
+  EvaluationGrade,
+  EvaluationRubric,
+  RubricScores,
+} from '../../core/models/evaluation';
 import { Enrollment, UserProfile } from '../../core/models/user-profile';
 
 /** What a trainer fills in to set up an evaluation. */
@@ -124,6 +130,60 @@ export class EvaluationService {
       byName: (this.auth.profile()?.displayName || user?.email || user?.uid || '').slice(0, 120),
       at: serverTimestamp(),
     });
+  }
+
+  /** The mentor rubrics of an evaluation's attempts, by student (staff). */
+  async rubrics(evaluationId: string): Promise<Map<string, EvaluationRubric>> {
+    const snapshot = await getDocs(collection(this.evaluations, evaluationId, 'rubrics'));
+    return new Map(snapshot.docs.map((d) => [d.id, d.data() as EvaluationRubric]));
+  }
+
+  /** A student's own rubric, once the results are published; null if there is none. */
+  async myRubric(evaluationId: string, uid: string): Promise<EvaluationRubric | null> {
+    const snapshot = await getDoc(doc(this.evaluations, evaluationId, 'rubrics', uid));
+    return snapshot.exists() ? (snapshot.data() as EvaluationRubric) : null;
+  }
+
+  /** Saves the mentor's rating of a student's attempt, signed by the staff member. */
+  async saveRubric(evaluationId: string, uid: string, scores: RubricScores): Promise<void> {
+    const user = this.auth.user();
+    await setDoc(doc(this.evaluations, evaluationId, 'rubrics', uid), {
+      uid,
+      scores,
+      by: user?.uid,
+      byName: (this.auth.profile()?.displayName || user?.email || user?.uid || '').slice(0, 120),
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  /** Removes a rubric (its attempt was restarted). */
+  removeRubric(evaluationId: string, uid: string): Promise<void> {
+    return deleteDoc(doc(this.evaluations, evaluationId, 'rubrics', uid));
+  }
+
+  /** The INDAB scores saved for an evaluation's attempts, by student. */
+  async grades(evaluationId: string): Promise<Map<string, EvaluationGrade>> {
+    const snapshot = await getDocs(collection(this.evaluations, evaluationId, 'grades'));
+    return new Map(snapshot.docs.map((d) => [d.id, d.data() as EvaluationGrade]));
+  }
+
+  /** Saves an attempt's INDAB score for the students' ranking (staff). */
+  async saveGrade(
+    evaluationId: string,
+    uid: string,
+    grade: Pick<EvaluationGrade, 'score' | 'parts'>,
+  ): Promise<void> {
+    await setDoc(doc(this.evaluations, evaluationId, 'grades', uid), {
+      score: grade.score,
+      parts: grade.parts,
+      by: this.auth.user()?.uid,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  /** Removes an attempt's score (its attempt was restarted). */
+  removeGrade(evaluationId: string, uid: string): Promise<void> {
+    return deleteDoc(doc(this.evaluations, evaluationId, 'grades', uid));
   }
 
   /** Deletes the evaluation; its attempts stay in the practice review. */

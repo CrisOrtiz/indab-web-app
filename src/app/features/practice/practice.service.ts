@@ -151,6 +151,7 @@ export class PracticeService {
       entryTime,
       stopLoss: trade.stopLoss,
       takeProfit: trade.takeProfit,
+      initialStopLoss: trade.stopLoss,
       status: trade.status,
       openedAt: serverTimestamp(),
     });

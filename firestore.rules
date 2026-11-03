@@ -613,6 +613,60 @@ service cloud.firestore {
 
       allow delete: if isStaff();
 
+      // The mentor's 1-5 rating of a student's attempt on fixed criteria: written by staff,
+      // read by the student once the results are published.
+      match /rubrics/{uid} {
+        function score(value) {
+          return value is int && value >= 1 && value <= 5;
+        }
+
+        allow read: if isStaff()
+          || (signedIn() && request.auth.uid == uid
+            && get(/databases/$(database)/documents/evaluations/$(evaluationId))
+              .data.resultsPublished == true);
+        allow create, update: if isStaff()
+          && request.resource.data.keys().hasOnly(['uid', 'scores', 'by', 'byName', 'updatedAt'])
+          && request.resource.data.uid == uid
+          && request.resource.data.scores is map
+          && request.resource.data.scores.keys().hasOnly(['plan', 'risk', 'stops', 'context',
+            'discipline'])
+          && score(request.resource.data.scores.plan)
+          && score(request.resource.data.scores.risk)
+          && score(request.resource.data.scores.stops)
+          && score(request.resource.data.scores.context)
+          && score(request.resource.data.scores.discipline)
+          && request.resource.data.by == request.auth.uid
+          && request.resource.data.byName is string && request.resource.data.byName.size() <= 120
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isStaff();
+      }
+
+      // Each attempt's INDAB score (0-100: return, risk control, rubric), worked out by a staff
+      // browser for the students' ranking: read by assigned students once results are out.
+      match /grades/{uid} {
+        function evaluation() {
+          return get(/databases/$(database)/documents/evaluations/$(evaluationId)).data;
+        }
+
+        function points(value) {
+          return value is number && value >= 0 && value <= 100;
+        }
+
+        allow read: if isStaff()
+          || (evaluation().resultsPublished == true && assignedTo(evaluation()));
+        allow create, update: if isStaff()
+          && request.resource.data.keys().hasOnly(['score', 'parts', 'by', 'updatedAt'])
+          && points(request.resource.data.score)
+          && request.resource.data.parts is map
+          && request.resource.data.parts.keys().hasOnly(['return', 'risk', 'rubric'])
+          && points(request.resource.data.parts['return'])
+          && points(request.resource.data.parts.risk)
+          && points(request.resource.data.parts.rubric)
+          && request.resource.data.by == request.auth.uid
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isStaff();
+      }
+
       // What staff did to an attempt that went wrong, and why: read and written by staff only,
       // never changed afterwards.
       match /adjustments/{adjustmentId} {
@@ -933,7 +987,7 @@ service cloud.firestore {
           && inTime(0)
           && request.resource.data.keys().hasOnly(['uid', 'side', 'orderType', 'orderPrice',
             'placedTime', 'quantity', 'entryPrice', 'entryTime', 'stopLoss', 'takeProfit',
-            'status', 'openedAt'])
+            'initialStopLoss', 'status', 'openedAt'])
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.side in ['long', 'short']
           && isPrice(request.resource.data.quantity)
@@ -942,6 +996,9 @@ service cloud.firestore {
           && request.resource.data.entryTime == request.resource.data.placedTime
           && optionalPrice(request.resource.data.stopLoss)
           && optionalPrice(request.resource.data.takeProfit)
+          // The stop loss it was placed with, kept to measure its risk (older apps omit it).
+          && request.resource.data.get('initialStopLoss', request.resource.data.stopLoss)
+            == request.resource.data.stopLoss
           && ((request.resource.data.orderType == 'market'
               && request.resource.data.orderPrice == null
               && request.resource.data.status == 'open')

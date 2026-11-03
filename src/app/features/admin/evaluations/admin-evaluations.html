@@ -213,6 +213,15 @@
                 [mentorships]="mentorships()"
                 (adjust)="startAdjust($event.row, $event.kind)"
               />
+              @if (rating(); as row) {
+                <app-rubric-form
+                  [studentName]="row.name"
+                  [initial]="row.rubric"
+                  [busy]="ratingBusy()"
+                  (saved)="saveRubric(ev, $event)"
+                  (cancelled)="rating.set(null)"
+                />
+              }
               @if (adjusting(); as a) {
                 <form class="adjust" (submit)="$event.preventDefault(); applyAdjust(ev)">
                   <h4>

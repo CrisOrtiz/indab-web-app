@@ -58,10 +58,26 @@ describe('SessionStatsPanel', () => {
     expect(value('Acierto')).toBe('50%');
     expect(value('Factor de beneficio')).toBe('3.00');
     expect(value('Promedio por operación')).toBe('+10.00');
+    expect(value('Riesgo por operación')).toBe('—');
+    expect(value('Sin stop loss')).toBe('2');
+    expect(value('Stop out')).toBe('No');
+
     expect(value('Drawdown máximo')).toBe('10.00 USD');
     const svg = el.querySelector('svg')!;
     expect(svg.getAttribute('aria-label')).toBe('Saldo de 200 a 220 USD');
     expect(svg.querySelector('polyline')!.getAttribute('points')!.split(' ')).toHaveLength(3);
     expect(svg.querySelector('polyline')!.classList).toContain('up');
+  });
+
+  it('shows the risk taken to each stop loss', async () => {
+    const { fixture, host, value } = await render();
+    // A short risking 4 USD to its stop on 5 units from 200: 10 %, aiming 8 away: 1:2.
+    host.trades.set([
+      { ...closed('c', -20, 3), quantity: 5, stopLoss: 104, takeProfit: 92, exitReason: 'stopOut' },
+    ]);
+    await fixture.whenStable();
+    expect(value('Riesgo por operación')).toBe('10.0%');
+    expect(value('R:R promedio')).toBe('1:2');
+    expect(value('Stop out')).toBe('Sí');
   });
 });

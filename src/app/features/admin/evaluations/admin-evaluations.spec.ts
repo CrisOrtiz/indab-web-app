@@ -39,9 +39,16 @@ describe('AdminEvaluations', () => {
     setResultsPublished: vi.fn(async () => undefined),
     adjustments: vi.fn(async () => [] as unknown[]),
     logAdjustment: vi.fn(async () => undefined),
+    rubrics: vi.fn(async () => new Map()),
+    saveRubric: vi.fn(async () => undefined),
+    removeRubric: vi.fn(async () => undefined),
+    grades: vi.fn(async () => new Map()),
+    saveGrade: vi.fn(async () => undefined),
+    removeGrade: vi.fn(async () => undefined),
   };
   const practice = {
     evaluationSessions: vi.fn(),
+    sessionTrades: vi.fn(async () => [] as unknown[]),
     giveExtraTime: vi.fn(async () => undefined),
     deleteSession: vi.fn(async () => undefined),
   };
@@ -332,10 +339,69 @@ describe('AdminEvaluations', () => {
     el.querySelector('form.adjust')!.dispatchEvent(new Event('submit'));
     await fixture.whenStable();
     expect(practice.deleteSession).toHaveBeenCalledWith('e1_jose');
+    expect(service.removeRubric).toHaveBeenCalledWith('e1', 'jose');
+    expect(service.removeGrade).toHaveBeenCalledWith('e1', 'jose');
     expect(service.logAdjustment).toHaveBeenLastCalledWith(
       'e1',
       expect.objectContaining({ kind: 'reset', minutes: null }),
     );
+  });
+
+  it('rates an attempt with the rubric, every criterion required', async () => {
+    practice.evaluationSessions.mockResolvedValue([
+      {
+        id: 'e1_jose',
+        uid: 'jose',
+        userName: 'José Pérez',
+        pnl: 12,
+        balance: 212,
+        startingBalance: 200,
+        tradeCount: 3,
+        status: 'finished',
+      },
+    ]);
+    await click('Ver resultados');
+    el.querySelector<HTMLButtonElement>('.results tbody .trigger')!.click();
+    await fixture.whenStable();
+    button('Calificar con rúbrica')!.click();
+    await fixture.whenStable();
+    const form = () => el.querySelector('form.rubric')!;
+    expect(form().textContent).toContain('Rúbrica de José Pérez');
+    const pick = (criterion: number, value: number) =>
+      form()
+        .querySelectorAll('.scale')
+        [criterion].querySelectorAll<HTMLButtonElement>('button')
+        [value - 1].click();
+    pick(0, 4);
+    await fixture.whenStable();
+    form().dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    expect(form().textContent).toContain('Elige una nota en cada criterio.');
+    expect(service.saveRubric).not.toHaveBeenCalled();
+
+    [3, 5, 2, 4].forEach((value, i) => pick(i + 1, value));
+    service.rubrics.mockResolvedValue(
+      new Map([['jose', { scores: { plan: 4, risk: 3, stops: 5, context: 2, discipline: 4 } }]]),
+    );
+    form().dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    expect(service.saveRubric).toHaveBeenCalledWith('e1', 'jose', {
+      plan: 4,
+      risk: 3,
+      stops: 5,
+      context: 2,
+      discipline: 4,
+    });
+    expect(message()).toContain('Se guardó la rúbrica de José Pérez.');
+    expect(el.querySelector('form.rubric')).toBeNull();
+    expect(el.querySelector('.results tbody')?.textContent).toContain('3.6 / 5');
+    // Return 6 % = 65, no trades loaded = full risk marks, rubric 3.6 = 65: score 75.5,
+    // saved for the students' ranking.
+    expect(el.querySelector('.results tbody td.score')?.textContent?.trim()).toBe('75.5');
+    expect(service.saveGrade).toHaveBeenCalledWith('e1', 'jose', {
+      score: 75.5,
+      parts: { return: 65, risk: 100, rubric: 65 },
+    });
   });
 
   it('lists what staff did to the attempts', async () => {

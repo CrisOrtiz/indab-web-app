@@ -97,6 +97,8 @@ export interface PracticeTrade {
   entryTime: number;
   stopLoss: number | null;
   takeProfit: number | null;
+  /** The stop loss the order was placed with (never changes), to measure its risk. */
+  initialStopLoss?: number | null;
   status: TradeStatus;
   openedAt?: Timestamp;
   filledAt?: Timestamp;

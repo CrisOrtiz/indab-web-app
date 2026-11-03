@@ -457,6 +457,28 @@
           {{ qty.text }}
         </span>
       }
+      @if (label.confirm; as edit) {
+        <button
+          type="button"
+          class="confirm"
+          [attr.aria-label]="t.confirmMove"
+          [title]="t.confirmMove"
+          (pointerdown)="$event.stopPropagation()"
+          (click)="confirmEdit(edit.tradeId)"
+        >
+          ✓
+        </button>
+        <button
+          type="button"
+          class="undo"
+          [attr.aria-label]="t.undoMove"
+          [title]="t.undoMove"
+          (pointerdown)="$event.stopPropagation()"
+          (click)="undoEdit(edit.tradeId)"
+        >
+          ↺
+        </button>
+      }
       @if (label.lots !== undefined) {
         <button
           type="button"

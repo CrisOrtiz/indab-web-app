@@ -64,6 +64,8 @@ otherwise create a feature service.
 | `evaluations/{id}`                                               | staff, assigned students (by uid or mentorship)                                                                 | staff (shape validated)                                                                                                                                                                                                              |
 | `practiceSessions/{id}` + `/trades/{id}`                         | owner, staff (trades also as a collection group); attempts at published evaluations to academy access (ranking) | owner (academy access) while active; evaluation attempts `{evaluationId}_{uid}` once, inside the window and time limit (+ `extraMinutes`, raised only by staff); trades closed once; admins delete, staff delete evaluation attempts |
 | `evaluations/{id}/adjustments/{id}`                              | staff                                                                                                           | staff create only (who, kind, minutes, reason); never edited or deleted                                                                                                                                                              |
+| `evaluations/{id}/rubrics/{uid}`                                 | staff; the student once `resultsPublished`                                                                      | staff (5 criteria, ints 1-5, signed)                                                                                                                                                                                                 |
+| `evaluations/{id}/grades/{uid}`                                  | staff; assigned students once `resultsPublished`                                                                | staff (score and parts 0-100, signed)                                                                                                                                                                                                |
 | `examForms/{id}`                                                 | staff; published + assigned to students                                                                         | staff (shape validated; no answers stored here)                                                                                                                                                                                      |
 | `examKeys/{examId}`                                              | staff; students once `resultsPublished && showAnswers`                                                          | staff                                                                                                                                                                                                                                |
 | `examSubmissions/{examId}_{uid}_{n}`                             | owner, staff                                                                                                    | owner (academy access): attempt n ≤ `maxAttempts`, in window, previous handed in; saves until deadline + 2 min                                                                                                                       |
@@ -306,6 +308,10 @@ Module notes:
   Binance's `volume`); `POINTS` says how many points each takes and `build` turns them into a drawing.
   Cris chose to grow this with FX Replay's best ideas rather than clone it: session
   stats (`stats.ts`, `SessionStatsPanel`), rectangle/Fibonacci, picking the start date.
+  Stats include risk (B1): % of the balance at entry risked to the stop loss the trade was
+  placed with (`initialStopLoss`, set once; `riskStop` falls back to `stopLoss` for old
+  trades), planned R:R, trades without stop loss and stop out. Evaluation results show them per
+  attempt (`EvaluationStanding.stats`, "Métricas de riesgo" view).
   Gold is Binance Futures' XAUUSDT perpetual (PAXGUSDT, a thin token, looked nothing like the
   market and is kept only for old sessions); `MarketDataService` drops bars while spot gold is
   closed and empty minutes (`goldHours`), paging until it has the requested count, and
@@ -334,8 +340,21 @@ Module notes:
   Adjustments (A6): in an evaluation's results, staff give an open attempt extra minutes
   (`extraMinutes`, counted from now or the deadline, whichever is later) or restart an attempt
   (deletes the session and trades so the student can take it again). Both need a reason and
-  are logged in `evaluations/{id}/adjustments`; the student's page watches its session
+  are logged in `evaluations/{id}/adjustments` (a restart also drops the attempt's rubric); the student's page watches its session
   (`PracticeService.watchSession`) to extend the countdown or leave a deleted attempt.
+  Mentor rubric (B3): staff rate each attempt 1-5 on `RUBRIC_CRITERIA` (plan, risk, stops,
+  context, discipline) from the results menu (`RubricForm`), stored at
+  `evaluations/{id}/rubrics/{uid}`; the student sees theirs on `/academy/ranking` once published.
+  INDAB score (B2, Cris 2026-11-03): `ranking/score.ts`, 40% return (0% = 50 pts, ±20% = 0/100),
+  30% risk control (100 less 20 per trade without SL, 10 per 1% of risk over 2%, 2 per 1% of
+  drawdown over 10%; stop out = 0), 30% rubric ((avg - 1) / 4). Standings rank scored attempts
+  first. Students cannot read trades or rubrics, so staff browsers save each score to
+  `evaluations/{id}/grades/{uid}` when they open the results (`syncGrades`), and
+  `/academy/ranking` reads those.
+  Before an attempt starts, `EvaluationBriefing` (modal, "Leí las instrucciones" required)
+  explains time, pace, account, leaving, the end and the grading; the countdown warns at 5 and
+  1 minutes left (`TIME_WARNINGS`). Lines of placed orders/positions moved on the chart wait
+  for a ✓ next to their size (↺ undoes; `levelsMoved` saves them together), as in TradingView.
 - **Evaluation forms (built)**: questionnaires, separate from chart evaluations.
   `core/models/exam.ts` (types, `suggestScore`, `bestGrade`, `attemptDeadline`),
   `features/exams/exam.service.ts`; staff build them at `/admin/forms`

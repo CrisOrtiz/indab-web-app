@@ -173,6 +173,7 @@ describe('PracticeService', () => {
         entryTime: 10,
         stopLoss: 110,
         takeProfit: null,
+        initialStopLoss: 110,
         status: 'open',
         openedAt: 'SERVER_TIMESTAMP',
       },

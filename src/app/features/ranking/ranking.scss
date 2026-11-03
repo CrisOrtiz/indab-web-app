@@ -121,3 +121,37 @@ h1 {
     }
   }
 }
+
+.rubric {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+
+  h2 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    font-size: 1.1rem;
+  }
+
+  ul {
+    display: grid;
+    gap: 6px;
+    margin: 0 0 8px;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  strong {
+    font-variant-numeric: tabular-nums;
+  }
+}

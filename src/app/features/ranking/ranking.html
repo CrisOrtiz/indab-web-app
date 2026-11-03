@@ -23,13 +23,18 @@
           }
         </select>
       </div>
-      <p class="muted">{{ t.evaluationHow }}</p>
       @if (results(); as rows) {
+        @let hasScores = scored(rows);
+        @let ts = i18n.messages().evaluations.score;
+        <p class="muted">{{ hasScores ? ts.how : t.evaluationHow }}</p>
         <table class="ranking">
           <thead>
             <tr>
               <th>#</th>
               <th>{{ t.student }}</th>
+              @if (hasScores) {
+                <th>{{ ts.column }}</th>
+              }
               <th>{{ t.pnl }}</th>
               <th>{{ t.return }}</th>
               <th>{{ t.balance }}</th>
@@ -46,6 +51,15 @@
                     <span class="badge">{{ t.you }}</span>
                   }
                 </td>
+                @if (hasScores) {
+                  <td [attr.data-label]="ts.column" class="score">
+                    @if (row.score; as sc) {
+                      <strong>{{ sc.score | number: '1.1-1' }}</strong>
+                    } @else {
+                      <span class="muted">{{ ts.missing }}</span>
+                    }
+                  </td>
+                }
                 <td
                   [attr.data-label]="t.pnl"
                   [class.up]="(row.pnl ?? 0) > 0"
@@ -59,13 +73,33 @@
               </tr>
             } @empty {
               <tr>
-                <td colspan="6" class="muted empty">{{ t.noAttempts }}</td>
+                <td [attr.colspan]="hasScores ? 7 : 6" class="muted empty">{{ t.noAttempts }}</td>
               </tr>
             }
           </tbody>
         </table>
       } @else {
         <p class="muted">{{ t.loading }}</p>
+      }
+      @if (myRubric(); as rubric) {
+        @let tr = i18n.messages().evaluations.rubric;
+        <section class="rubric" [attr.aria-label]="tr.yours">
+          <h2>
+            {{ tr.yours }}
+            <span class="badge">{{
+              tr.average((average(rubric.scores) | number: '1.1-1') ?? '')
+            }}</span>
+          </h2>
+          <ul>
+            @for (criterion of criteria; track criterion) {
+              <li>
+                <span>{{ tr.criteria[criterion].label }}</span>
+                <strong>{{ rubric.scores[criterion] }} / 5</strong>
+              </li>
+            }
+          </ul>
+          <p class="muted">{{ tr.by(rubric.byName) }}</p>
+        </section>
       }
     } @else {
       <p class="muted">{{ t.noEvaluations }}</p>

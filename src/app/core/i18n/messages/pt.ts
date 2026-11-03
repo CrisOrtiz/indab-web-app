@@ -802,8 +802,34 @@ export const pt: Messages = {
     evaluationUpcoming: 'Ainda não abriu',
     evaluationMissed: 'Não realizada',
     evaluationTag: 'Avaliação',
-    confirmEvaluation: (title: string, minutes: number) =>
-      `Começar "${title}"? Você tem uma única tentativa de ${minutes} minutos e o tempo começa agora. Você pode sair e voltar: o tempo continua correndo e, ao acabar, ela é entregue sozinha.`,
+    briefing: {
+      title: (title: string) => `Antes de começar: ${title}`,
+      howTitle: 'Como funciona',
+      oneAttempt: (minutes: number) =>
+        `Você tem uma única tentativa de ${minutes} minutos. O tempo corre a partir de quando você tocar em «Começar avaliação».`,
+      live: (pace: string, covered: string) =>
+        `O gráfico avança sozinho com o relógio (${pace}) e cobre ${covered} de mercado: não dá para pausar, adiantar nem mudar a velocidade.`,
+      freeSpeed: 'Você escolhe a velocidade do replay, mas o tempo limite é de relógio.',
+      account: (balance: number, leverage: number, stopOut: number) =>
+        `Você começa com ${balance} USD e alavancagem 1:${leverage}. Se sua margem cair a ${stopOut}%, as posições fecham sozinhas (stop out).`,
+      hiddenDates: 'Você não verá a data do gráfico até a avaliação fechar.',
+      leaving:
+        'Se sair ou cair a internet, pode voltar: o tempo continua correndo. Abra em uma só aba ou dispositivo.',
+      end: 'Quando o tempo acaba ela é entregue sozinha: as ordens pendentes são canceladas e as posições abertas fecham no último preço.',
+      warnings: 'Avisaremos quando faltarem 5 minutos e 1 minuto.',
+      gradeTitle: 'Como é avaliada',
+      grade:
+        'Nota INDAB de 0 a 100: 40% rentabilidade, 30% controle de risco e 30% rubrica do seu mentor (plano de entrada, gestão de risco, respeito ao SL e TP, leitura de contexto e disciplina).',
+      tipStop: 'Coloque stop loss em cada operação: cada uma sem stop loss tira pontos de risco.',
+      tipRisk: 'Não arrisque mais de 2% da conta por operação nem deixe a conta cair mais de 10%.',
+      tipStopOut: 'Um stop out zera o controle de risco.',
+      read: 'Li as instruções e estou pronto',
+      start: 'Começar agora',
+      cancel: 'Agora não',
+    },
+    dismissWarning: 'Fechar aviso',
+    warnFive: 'Faltam 5 minutos de avaliação.',
+    warnOne: 'Falta 1 minuto: ao terminar, as posições abertas são fechadas.',
     evaluationStartFailed:
       'Não foi possível começar a avaliação. Talvez você já a tenha feito ou ela esteja fechada.',
     evaluationTitle: (title: string) => `Avaliação: ${title}`,
@@ -896,6 +922,8 @@ export const pt: Messages = {
     addOrder: (price) => `Adicionar ordem em ${price}…`,
     drawLine: (price) => `Desenhar linha horizontal em ${price}`,
     closePosition: 'Fechar posição',
+    confirmMove: 'Confirmar alteração',
+    undoMove: 'Desfazer alteração',
     cancelOrder: 'Cancelar ordem',
     removeLevel: (level) => `Remover ${level.toLowerCase()}`,
     hints: {
@@ -945,6 +973,52 @@ export const pt: Messages = {
     description: 'Instruções (opcional)',
     market: 'Mercado',
     duration: 'Tempo limite (minutos)',
+    rubric: {
+      rate: 'Avaliar com rubrica',
+      column: 'Rubrica',
+      title: (name: string) => `Rubrica de ${name}`,
+      scale:
+        'De 1 (muito fraco) a 5 (excelente) em cada critério. O estudante a vê quando você publicar os resultados.',
+      criteria: {
+        plan: {
+          label: 'Plano de entrada',
+          hint: 'Entrou por um motivo claro, em zonas planejadas.',
+        },
+        risk: {
+          label: 'Gestão de risco',
+          hint: 'Tamanho de posição de acordo com o stop e a conta.',
+        },
+        stops: {
+          label: 'Respeito ao SL e TP',
+          hint: 'Colocou stop loss e take profit e não os moveu contra a operação.',
+        },
+        context: {
+          label: 'Leitura de contexto',
+          hint: 'Leu tendência, estrutura e notícias antes de operar.',
+        },
+        discipline: {
+          label: 'Disciplina',
+          hint: 'Seguiu o plano sem operar demais nem por impulso.',
+        },
+      },
+      missing: 'Escolha uma nota em cada critério.',
+      save: 'Salvar rubrica',
+      saved: (name: string) => `A rubrica de ${name} foi salva.`,
+      failed: 'Não foi possível salvar a rubrica. Tente de novo.',
+      average: (value: string) => `${value} / 5`,
+      yours: 'Rubrica do seu mentor',
+      by: (name: string) => `Avaliado por ${name}`,
+    },
+    score: {
+      column: 'Nota INDAB',
+      how: 'Nota INDAB (0 a 100) = 40% rentabilidade + 30% controle de risco + 30% rubrica do mentor. Um stop out zera o controle de risco. Quem ainda não tem rubrica vem depois, por lucro.',
+      missing: 'Sem rubrica',
+      parts: (ret: string, risk: string, rubric: string) =>
+        `Rentabilidade ${ret} · Risco ${risk} · Rubrica ${rubric}`,
+    },
+    resultsView: 'O que mostrar',
+    viewRanking: 'Ranking',
+    viewMetrics: 'Métricas de risco',
     adjustments: 'Ajustes de tentativas',
     extraBadge: (minutes: number) => `+${minutes} min`,
     attemptActions: (name: string) => `Ações da tentativa de ${name}`,
@@ -1375,6 +1449,16 @@ export const pt: Messages = {
     curve: 'Curva de capital',
     curveLabel: (from, to) => `Saldo de ${from} a ${to} USD`,
     curveEmpty: 'Feche operações para ver como seu saldo evolui.',
+    riskPerTrade: 'Risco por operação',
+    riskMax: (pct: string) => `máx. ${pct} da conta`,
+    riskHint: 'Até o stop loss, sobre o saldo na entrada.',
+    rewardRisk: 'R:R médio',
+    rewardRiskHint: 'Take profit sobre stop loss, das que tinham ambos.',
+    withoutStopLoss: 'Sem stop loss',
+    stopOut: 'Stop out',
+    stopOutYes: 'Sim',
+    stopOutHint: 'Posições foram fechadas por falta de margem.',
+    stopOutNo: 'Não',
   },
   calendar: {
     title: 'Calendário econômico',

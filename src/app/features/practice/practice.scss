@@ -69,6 +69,29 @@ label {
   border-color: var(--color-border);
 }
 
+/* "5 minutes left", "1 minute left": hard to miss, and dismissable. */
+.time-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0;
+  border-color: #f59e0b;
+  background: color-mix(in srgb, #f59e0b 14%, var(--color-bg));
+  color: var(--color-text);
+  font-weight: 600;
+
+  .dismiss {
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+}
+
 .setup {
   display: grid;
   gap: 16px;

@@ -24,7 +24,7 @@ describe('Ranking page', () => {
   let el: HTMLElement;
   const isStaff = signal(false);
   const practice = { evaluationSessions: vi.fn() };
-  const evaluations = { all: vi.fn(), assignedTo: vi.fn() };
+  const evaluations = { all: vi.fn(), assignedTo: vi.fn(), myRubric: vi.fn(), grades: vi.fn() };
 
   const render = async () => {
     fixture = TestBed.createComponent(Ranking);
@@ -46,6 +46,8 @@ describe('Ranking page', () => {
       { id: 'e3', title: 'Semana 2', resultsPublished: true },
     ]);
     evaluations.all.mockResolvedValue([{ id: 'e2', title: 'Sin publicar' }]);
+    evaluations.myRubric.mockResolvedValue(null);
+    evaluations.grades.mockResolvedValue(new Map());
     TestBed.configureTestingModule({
       imports: [Ranking],
       providers: [
@@ -96,6 +98,54 @@ describe('Ranking page', () => {
     await render();
     expect(evaluations.all).toHaveBeenCalled();
     expect(practice.evaluationSessions).toHaveBeenCalledWith('e2');
+    expect(evaluations.myRubric).not.toHaveBeenCalled();
+  });
+
+  it('ranks by the INDAB scores staff saved, when there are any', async () => {
+    evaluations.grades.mockImplementation(async (id: string) =>
+      id === 'e1'
+        ? new Map([['u2', { score: 81.5, parts: { return: 40, risk: 100, rubric: 100 } }]])
+        : new Map(),
+    );
+    await render();
+    expect(el.querySelector('thead')?.textContent).toContain('Nota INDAB');
+    expect(el.textContent).toContain('40 % rentabilidad');
+    expect(el.textContent).not.toContain('ordenado por ganancia');
+    expect(rows()).toEqual([
+      ['1', 'Luis', '81.5'],
+      ['2', 'Ana Tú', 'Falta rúbrica'],
+    ]);
+
+    const select = el.querySelector<HTMLSelectElement>('select')!;
+    select.value = 'e3';
+    select.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(el.querySelector('thead')?.textContent).not.toContain('Nota INDAB');
+  });
+
+  it("shows the student's own rubric from the mentor", async () => {
+    evaluations.myRubric.mockImplementation(async (id: string) =>
+      id === 'e1'
+        ? {
+            uid: 'u1',
+            scores: { plan: 4, risk: 3, stops: 5, context: 2, discipline: 4 },
+            byName: 'Tomás',
+          }
+        : null,
+    );
+    await render();
+    expect(evaluations.myRubric).toHaveBeenCalledWith('e1', 'u1');
+    const rubric = el.querySelector('.rubric')!;
+    expect(rubric.textContent).toContain('Rúbrica de tu mentor');
+    expect(rubric.textContent).toContain('3.6 / 5');
+    expect(rubric.textContent).toContain('Respeto de SL y TP');
+    expect(rubric.textContent).toContain('Calificó Tomás');
+
+    const select = el.querySelector<HTMLSelectElement>('select')!;
+    select.value = 'e3';
+    select.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(el.querySelector('.rubric')).toBeNull();
   });
 
   it('says when no results are published', async () => {

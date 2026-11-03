@@ -5,6 +5,7 @@ import { Candle, OrderType, PracticeTrade } from '../../core/models/practice';
 import { ThemeService } from '../../core/theme/theme.service';
 import {
   LevelMove,
+  LevelsMove,
   LevelRemove,
   OrderAt,
   OrderDraft,
@@ -102,6 +103,7 @@ const position: PracticeTrade = {
     [startTime]="start()"
     [lots]="0.05"
     (levelMoved)="moves.push($event)"
+    (levelsMoved)="saved.push($event)"
     (levelRemoved)="removed.push($event)"
     (levelAdded)="added.push($event)"
     (tradeClosed)="closed.push($event)"
@@ -125,6 +127,7 @@ class Host {
   readonly focus = signal<string | null>(null);
   readonly start = signal<number | null>(null);
   readonly moves: LevelMove[] = [];
+  readonly saved: LevelsMove[] = [];
   readonly removed: LevelRemove[] = [];
   readonly added: LevelRemove[] = [];
   readonly types: OrderType[] = [];
@@ -354,7 +357,17 @@ describe('ReplayChart', () => {
     pointer('pointerup', 392);
     pointer('pointerdown', 380);
     pointer('pointerup', 370);
-    expect(host.moves.slice(1)).toEqual([{ target: 'a', field: 'stopLoss', price: 108 }]);
+    // A placed trade's move waits for the ✓ next to its size, as in TradingView.
+    expect(host.moves).toHaveLength(1);
+    await new Promise((resolve) => setTimeout(resolve));
+    await fixture.whenStable();
+    const confirm = el.querySelector<HTMLButtonElement>('.line-label button.confirm')!;
+    expect(confirm.getAttribute('aria-label')).toBe('Confirmar cambio');
+    confirm.click();
+    await new Promise((resolve) => setTimeout(resolve));
+    await fixture.whenStable();
+    expect(host.saved).toEqual([{ target: 'a', levels: { stopLoss: 108 } }]);
+    expect(el.querySelector('.line-label button.confirm')).toBeNull();
 
     // On a touch screen, a finger dragging a line neither scrolls the page nor pans the chart.
     const touch = (type: string) => {
@@ -367,7 +380,9 @@ describe('ReplayChart', () => {
     expect(touch('touchstart')).toBe(true);
     expect(touch('touchmove')).toBe(true);
     pointer('pointerup', 390);
-    host.moves.pop();
+    await new Promise((resolve) => setTimeout(resolve));
+    await fixture.whenStable();
+    el.querySelector<HTMLButtonElement>('.line-label button.undo')!.click();
 
     // A label is a handle for its line too, even when it is drawn below it so it covers no
     // other label: the line moves as much as the pointer does.
@@ -382,6 +397,53 @@ describe('ReplayChart', () => {
     canvas.dispatchEvent(new MouseEvent('pointermove', { clientY: top + 1, bubbles: true }));
     canvas.dispatchEvent(new MouseEvent('pointerup', { clientY: top + 1, bubbles: true }));
     expect(host.moves.at(-1)).toEqual({ target: 'draft', field: 'price', price: 97 });
+  });
+
+  it('puts back a moved line on ↺, and drops the move if the order fills meanwhile', async () => {
+    const { fixture, host, el } = await render();
+    const order = {
+      ...position,
+      id: 'p',
+      orderType: 'limit' as const,
+      orderPrice: 120,
+      entryPrice: 120,
+      status: 'pending' as const,
+      stopLoss: null,
+    };
+    host.trades.set([order]);
+    await fixture.whenStable();
+    const canvas = el.querySelector('.canvas')!;
+    const pointer = (type: string, clientY: number) =>
+      canvas.dispatchEvent(new MouseEvent(type, { clientY, bubbles: true }));
+    const settle = async () => {
+      await new Promise((resolve) => setTimeout(resolve));
+      await fixture.whenStable();
+    };
+    const button = (name: string) => el.querySelector<HTMLButtonElement>(`.line-label .${name}`);
+
+    // The order's price line (y = 380) moved to 100 waits for its ✓...
+    pointer('pointerdown', 380);
+    pointer('pointermove', 400);
+    pointer('pointerup', 400);
+    await settle();
+    expect(button('confirm')).not.toBeNull();
+    // ...and ↺ puts it back.
+    button('undo')!.click();
+    await settle();
+    expect(button('confirm')).toBeNull();
+    expect(host.moves).toEqual([]);
+    expect(host.saved).toEqual([]);
+
+    // A move left waiting is dropped once the order fills.
+    pointer('pointerdown', 380);
+    pointer('pointermove', 400);
+    pointer('pointerup', 400);
+    await settle();
+    expect(button('confirm')).not.toBeNull();
+    host.trades.set([{ ...order, status: 'open' }]);
+    await settle();
+    expect(button('confirm')).toBeNull();
+    expect(host.saved).toEqual([]);
   });
 
   it('stacks the labels of positions and orders at about the same price, joined to their lines', async () => {
@@ -1119,11 +1181,12 @@ describe('ReplayChart', () => {
     pointer('pointerdown', 498);
     pointer('pointermove', 499);
     pointer('pointerup', 499);
-    expect(host.moves).toEqual([
-      { target: 'a', field: 'takeProfit', price: 140 },
-      { target: 'a', field: 'stopLoss', price: 100 },
-      { target: 'draft', field: 'takeProfit', price: 1 },
-    ]);
+    expect(host.moves).toEqual([{ target: 'draft', field: 'takeProfit', price: 1 }]);
+    // The position's new levels count once its ✓ is pressed.
+    await new Promise((resolve) => setTimeout(resolve));
+    await fixture.whenStable();
+    el.querySelector<HTMLButtonElement>('.line-label button.confirm')!.click();
+    expect(host.saved).toEqual([{ target: 'a', levels: { takeProfit: 140, stopLoss: 100 } }]);
 
     // The side button on the order line places it.
     let submitted = 0;
