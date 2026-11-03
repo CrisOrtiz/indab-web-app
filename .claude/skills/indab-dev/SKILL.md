@@ -306,6 +306,10 @@ Module notes:
   Binance's `volume`); `POINTS` says how many points each takes and `build` turns them into a drawing.
   Cris chose to grow this with FX Replay's best ideas rather than clone it: session
   stats (`stats.ts`, `SessionStatsPanel`), rectangle/Fibonacci, picking the start date.
+  Stats include risk (B1): % of the balance at entry risked to the stop loss the trade was
+  placed with (`initialStopLoss`, set once; `riskStop` falls back to `stopLoss` for old
+  trades), planned R:R, trades without stop loss and stop out. Evaluation results show them per
+  attempt (`EvaluationStanding.stats`, "Métricas de riesgo" view).
   Gold is Binance Futures' XAUUSDT perpetual (PAXGUSDT, a thin token, looked nothing like the
   market and is kept only for old sessions); `MarketDataService` drops bars while spot gold is
   closed and empty minutes (`goldHours`), paging until it has the requested count, and
