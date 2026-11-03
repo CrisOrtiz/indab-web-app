@@ -406,7 +406,12 @@ export const es = {
     notFound: 'Este material no existe o ya no está disponible para ti.',
     added: (date: string) => `Agregado el ${date}`,
     frameTitle: (title: string) => `Material: ${title}`,
-    notShowing: '¿No se ve? Ábrelo en una pestaña nueva.',
+    notShowing: '¿No se ve? Recarga la página o avísale a tu mentor.',
+    fullscreen: 'Pantalla completa',
+    exitFullscreen: 'Salir de pantalla completa',
+    staffOnlyLink: 'El enlace original solo lo ve el equipo.',
+    googleAccess: (email: string) =>
+      `¿Te pide acceso? Inicia sesión en Google con ${email || 'el correo de tu cuenta'} y recarga la página.`,
     externalOnly: 'Este material se abre en otra página.',
     openIn: {
       youtube: 'Abrir en YouTube',
@@ -441,9 +446,25 @@ export const es = {
     url: 'Enlace',
     urlPlaceholder: 'https://youtu.be/… o https://docs.google.com/presentation/…',
     urlHint:
-      'Sin costo: sube el video a YouTube como "No listado" o el archivo a Google Drive o Slides, compártelo como "Cualquier persona con el enlace" y pega aquí el enlace.',
+      'Sin costo: sube el video a YouTube como «No listado» o el archivo a Google Drive o Slides y pega aquí el enlace. Abajo verás cómo protegerlo.',
     detected: (provider: string) => `${provider}: se verá dentro de la academia.`,
     external: 'Este enlace se abrirá en una pestaña nueva.',
+    protectTitle: 'Cómo protegerlo',
+    protect: {
+      youtube:
+        'Súbelo como «No listado» y deja activado «Permitir inserción». YouTube no deja limitar un video a un sitio: quien copie el enlace puede verlo fuera de la academia. Para material sensible usa Google Drive restringido.',
+      vimeo:
+        'En Privacidad elige «Ocultar de Vimeo». Limitar la inserción a indab-academy.web.app (para que no se vea fuera de la academia) requiere un plan de pago de Vimeo.',
+      drive:
+        'Lo más seguro sin costo: en «Compartir» deja el acceso «Restringido» y compártelo solo con el grupo de Google de los alumnos (o con sus correos). En la configuración (⚙) desactiva «Los lectores pueden descargar, imprimir y copiar». Así un enlace copiado no sirve a nadie más.',
+      slides:
+        'Lo más seguro sin costo: en «Compartir» deja el acceso «Restringido» y compártelo solo con el grupo de Google de los alumnos (o con sus correos). En la configuración (⚙) desactiva «Los lectores pueden descargar, imprimir y copiar». No uses «Publicar en la web»: eso lo hace público.',
+      docs: 'Lo más seguro sin costo: en «Compartir» deja el acceso «Restringido» y compártelo solo con el grupo de Google de los alumnos (o con sus correos). En la configuración (⚙) desactiva «Los lectores pueden descargar, imprimir y copiar». No uses «Publicar en la web»: eso lo hace público.',
+      canva:
+        'Canva solo se inserta con «Cualquier persona con el enlace»: quien lo tenga puede verlo fuera de la academia. Para material sensible descárgalo como PDF o presentación y súbelo a Google Drive restringido.',
+      pdf: 'Este enlace se abre fuera de la academia y cualquiera que lo tenga puede abrirlo. Para material sensible súbelo a Google Drive restringido.',
+      web: 'Este enlace se abre fuera de la academia y cualquiera que lo tenga puede abrirlo.',
+    },
     badUrl: 'Pega un enlace completo que empiece con https://',
     name: 'Título',
     description: 'Descripción',

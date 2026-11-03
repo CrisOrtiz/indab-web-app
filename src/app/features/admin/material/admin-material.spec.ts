@@ -1,3 +1,5 @@
+import { signal } from '@angular/core';
+import { AuthService } from '../../../core/auth/auth.service';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
@@ -84,6 +86,10 @@ describe('AdminMaterial', () => {
         { provide: MaterialService, useValue: service },
         { provide: EvaluationService, useValue: directory },
         { provide: MentorshipService, useValue: mentorships },
+        {
+          provide: AuthService,
+          useValue: { isStaff: signal(true), user: signal(null), profile: signal(null) },
+        },
       ],
     });
     fixture = TestBed.createComponent(AdminMaterial);
@@ -147,7 +153,7 @@ describe('AdminMaterial', () => {
     await render();
     button('Nuevo material')!.click();
     await fixture.whenStable();
-    expect(el.textContent).toContain('compártelo como "Cualquier persona con el enlace"');
+    expect(el.textContent).toContain('Abajo verás cómo protegerlo.');
 
     await type('Enlace', 'http://youtu.be/x');
     expect(el.querySelector('.hint.error')?.textContent).toContain('https://');
@@ -157,6 +163,9 @@ describe('AdminMaterial', () => {
       'Google Slides: se verá dentro de la academia.',
     );
     expect(field('Tipo').value).toBe('presentation');
+    // How to keep it to the academy, for this site.
+    expect(el.querySelector('.protect')?.textContent).toContain('«Restringido»');
+    expect(el.querySelector('.protect')?.textContent).toContain('No uses «Publicar en la web»');
     expect(el.querySelector('.preview iframe')?.getAttribute('src')).toBe(
       'https://docs.google.com/presentation/d/1SlideDeckId_x/embed',
     );
