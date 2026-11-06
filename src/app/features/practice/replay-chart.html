@@ -270,6 +270,30 @@
                   [attr.height]="shape.bottom - shape.top"
                 />
               }
+              @case ('gann') {
+                <rect
+                  class="gann-box"
+                  [attr.x]="shape.left"
+                  [attr.y]="shape.top"
+                  [attr.width]="shape.right - shape.left"
+                  [attr.height]="shape.bottom - shape.top"
+                />
+                @for (level of shape.levels; track level.ratio) {
+                  <line
+                    class="gann"
+                    [attr.x1]="shape.left"
+                    [attr.x2]="shape.right"
+                    [attr.y1]="level.y"
+                    [attr.y2]="level.y"
+                  />
+                  <text class="gann-text start" [attr.x]="shape.left - 10" [attr.y]="level.y + 4">
+                    {{ level.ratio }}
+                  </text>
+                  <text class="gann-text" [attr.x]="shape.right + 10" [attr.y]="level.y + 4">
+                    {{ level.ratio }}
+                  </text>
+                }
+              }
               @case ('fib') {
                 <line
                   class="fib-move"
@@ -683,6 +707,10 @@
       }
       @case ('fib') {
         <path d="M1 3h16M1 7h16M1 11h16M1 15h16" />
+      }
+      @case ('gann') {
+        <rect x="2.5" y="2.5" width="13" height="13" />
+        <path d="M2.5 6h13M2.5 9h13M2.5 12h13" />
       }
       @case ('ray') {
         <path d="M4 14 17 3" />

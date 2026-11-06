@@ -509,7 +509,57 @@ test.describe('on a phone', () => {
     await expect(stage.locator('svg.shapes .measure-text').last()).toHaveText(
       'Riesgo/beneficio: 1.00',
     );
+
+    // A Gann box: drag the crosshair to one corner, let go, then drag it to the opposite one.
+    await bar.getByRole('button', { name: 'Borrar dibujo' }).tap();
+    await tools.getByRole('button', { name: 'Herramientas de dibujo' }).tap();
+    await page.getByRole('menuitemradio', { name: 'Cuadrícula de Gann' }).tap();
+    await expect(page.getByRole('status')).toContainText('Marca una esquina de la cuadrícula.');
+    await drag([60, 240], [40, 240]);
+    await expect(page.getByRole('status')).toContainText('Marca la esquina opuesta.');
+    // The crosshair moves as much as the finger, from the first corner.
+    await drag([100, 240], [380, 60]);
+    // Five levels (0, 0.25, 0.5, 0.75, 1) and a handle on each corner to reshape it.
+    await expect(stage.locator('svg.shapes line.gann')).toHaveCount(5);
+    await expect(stage.locator('.handle')).toHaveCount(4);
+    expect((await stage.boundingBox())!.y).toBe(box.y);
+    await page.screenshot({ path: 'test-results/phone-gann.png' });
   });
+});
+
+test('a student draws a Gann box with the mouse and reshapes it', async ({ page }) => {
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+  await expect(page.locator('.market .price')).toHaveText('100.000');
+
+  const chart = page.locator('.workspace app-replay-chart');
+  const stage = chart.locator('.stage');
+  await chart.getByRole('button', { name: 'Herramientas de dibujo' }).click();
+  await expect(page.getByRole('menuitemradio', { name: 'Cuadrícula de Gann' })).toBeVisible();
+  await expect(page.locator('.tool-menu')).toContainText('Gann y Fibonacci');
+  await page.screenshot({ path: 'test-results/desk-gann-menu.png' });
+  await page.getByRole('menuitemradio', { name: 'Cuadrícula de Gann' }).click();
+  await stage.scrollIntoViewIfNeeded();
+  const box = (await stage.boundingBox())!;
+  await page.mouse.click(box.x + box.width * 0.35, box.y + box.height * 0.7);
+  await page.mouse.click(box.x + box.width * 0.75, box.y + box.height * 0.25);
+  const gann = stage.locator('svg.shapes line.gann');
+  await expect(gann).toHaveCount(5);
+  await expect(stage.locator('.handle')).toHaveCount(4);
+
+  // Its top right corner drags further right, and the levels stretch with it.
+  const right = (await stage.locator('.handle').nth(1).boundingBox())!;
+  const x = right.x + right.width / 2;
+  const y = right.y + right.height / 2;
+  const lastColumn = () => gann.last().getAttribute('x2').then(Number);
+  const before = await lastColumn();
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 40, y, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(lastColumn).toBeGreaterThan(before + 30);
+  await page.screenshot({ path: 'test-results/desk-gann.png' });
 });
 
 test("the chart keeps each student's indicators for their next sessions", async ({ page }) => {

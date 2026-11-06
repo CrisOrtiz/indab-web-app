@@ -192,6 +192,7 @@ export type Tool =
   | 'channel'
   | 'rect'
   | 'fib'
+  | 'gann'
   | 'long'
   | 'short'
   | 'range'
@@ -351,6 +352,9 @@ export const FIB_LEVELS: { ratio: number; color: string | null }[] = [
   { ratio: 4.236, color: FIB_RED },
 ];
 
+/** Levels of the Gann box, from its first point (0) to the second (1), as TradingView draws it. */
+export const GANN_LEVELS = [0, 0.25, 0.5, 0.75, 1];
+
 /** How close (px) the pointer must be to a line to grab it; a finger needs more room. */
 const GRAB_DISTANCE = 6;
 const TOUCH_GRAB_DISTANCE = 16;
@@ -401,7 +405,7 @@ export type ToolGroup = 'lines' | 'shapes' | 'fibonacci' | 'patterns' | 'project
 export const TOOL_GROUPS: { group: ToolGroup; tools: Tool[] }[] = [
   { group: 'lines', tools: ['trend', 'ray', 'extended', 'arrow', 'hline', 'hray', 'vline'] },
   { group: 'shapes', tools: ['channel', 'rect'] },
-  { group: 'fibonacci', tools: ['fib'] },
+  { group: 'fibonacci', tools: ['fib', 'gann'] },
   { group: 'patterns', tools: ['elliott', 'abc'] },
   { group: 'projection', tools: ['long', 'short', 'range'] },
   { group: 'volume', tools: ['vprofile'] },
@@ -419,6 +423,7 @@ const POINTS: Record<Tool, number> = {
   channel: 3,
   rect: 2,
   fib: 2,
+  gann: 2,
   long: 2,
   short: 2,
   range: 2,
@@ -1647,6 +1652,15 @@ export class ReplayChart {
           return { ratio, price, y: series.priceToCoordinate(price) ?? 0, color };
         });
         break;
+      case 'gann':
+        // Four corners; the levels split the box evenly between its two prices.
+        shape.handles = this.rectHandles(a, b, shape).filter((h) => h.key.length === 2);
+        shape.levels = GANN_LEVELS.map((ratio) => {
+          const [pa, pb] = d.points;
+          const price = roundPrice(pa.price + (pb.price - pa.price) * ratio);
+          return { ratio, price, y: series.priceToCoordinate(price) ?? 0, color: null };
+        });
+        break;
       case 'long':
       case 'short': {
         const entry = d.points[0].price;
@@ -2292,6 +2306,7 @@ export class ReplayChart {
       tool === 'extended' ||
       tool === 'channel' ||
       tool === 'rect' ||
+      tool === 'gann' ||
       tool === 'vprofile'
     ) {
       points.splice(0, 2, ...points.slice(0, 2).sort((p, q) => p.time - q.time));

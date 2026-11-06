@@ -758,6 +758,37 @@ describe('ReplayChart', () => {
     expect(el.querySelectorAll('svg.shapes rect.rect')).toHaveLength(1);
   });
 
+  it('draws a Gann box with a level every quarter, labelled on both sides', async () => {
+    const r = await render();
+    const { el } = r;
+    const { pick, press } = drawing(r);
+
+    await pick('Cuadrícula de Gann');
+    expect(el.textContent).toContain('Marca una esquina de la cuadrícula.');
+    // From price 100 (y 400) on the first bar to 200 (y 300) ten pixels on.
+    await press(0, 400);
+    expect(el.textContent).toContain('Marca la esquina opuesta.');
+    await press(10, 300);
+
+    // A level every quarter of the way from the first point (0) to the second (1), in the
+    // drawing's color, its ratio on both sides, over a light fill.
+    const rows = [...el.querySelectorAll('svg.shapes line.gann')];
+    expect(rows.map((l) => Number(l.getAttribute('y1')))).toEqual([400, 375, 350, 325, 300]);
+    expect(rows.map((l) => [l.getAttribute('x1'), l.getAttribute('x2')])).toEqual(
+      Array(5).fill(['0', '10']),
+    );
+    const labels = [...el.querySelectorAll('svg.shapes .gann-text')].map((t) =>
+      t.textContent!.trim(),
+    );
+    expect(labels).toEqual(['0', '0', '0.25', '0.25', '0.5', '0.5', '0.75', '0.75', '1', '1']);
+    expect(el.querySelectorAll('svg.shapes rect.gann-box')).toHaveLength(1);
+    expect(el.querySelector('svg.shapes .gann')!.closest('g')!.getAttribute('stroke')).toBe(
+      '#2962ff',
+    );
+    // Selected, it has a handle on each corner to reshape it.
+    expect(el.querySelectorAll('.handle')).toHaveLength(4);
+  });
+
   it('keeps drawings on their prices when the price scale is stretched', async () => {
     const r = await render();
     const { fixture, el } = r;
@@ -801,8 +832,9 @@ describe('ReplayChart', () => {
       'Canales y formas',
       'Canal paralelo',
       'Rectángulo',
-      'Fibonacci',
+      'Gann y Fibonacci',
       'Retroceso de Fibonacci',
+      'Cuadrícula de Gann',
       'Ondas de Elliott',
       'Onda de impulso de Elliott (12345)',
       'Onda de corrección de Elliott (ABC)',

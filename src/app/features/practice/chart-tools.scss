@@ -196,6 +196,25 @@
     stroke-opacity: 0.8;
   }
 
+  // Gann box: a light fill, a line per level and its ratio on both sides, in one color.
+  .gann-box {
+    fill-opacity: 0.15;
+    stroke: none;
+  }
+
+  .gann {
+    stroke-width: 2;
+  }
+
+  .gann-text {
+    font-size: 11px;
+    stroke: none;
+
+    &.start {
+      text-anchor: end;
+    }
+  }
+
   .fib-text {
     stroke: var(--color-bg);
     stroke-width: 3px;
