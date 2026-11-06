@@ -29,6 +29,7 @@ export const pt: Messages = {
     adminMentorships: 'Mentorias | INDAB',
     practiceSession: 'Prática | INDAB',
     adminMentor: 'Painel do mentor | INDAB',
+    adminReviews: 'Depoimentos | INDAB',
   },
 
   seo: {
@@ -201,23 +202,8 @@ export const pt: Messages = {
     },
     testimonialsEyebrow: 'Depoimentos',
     testimonialsTitle: 'O que dizem nossos alunos',
-    testimonials: [
-      {
-        quote: 'Depoimento de exemplo: aqui vai a experiência real de um aluno da INDAB.',
-        name: 'Nome do aluno',
-        role: 'Aluno, Nível 2',
-      },
-      {
-        quote: 'Depoimento de exemplo: o que aprendeu e como mudou sua forma de operar.',
-        name: 'Nome do aluno',
-        role: 'Aluno, Nível 3',
-      },
-      {
-        quote: 'Depoimento de exemplo: opinião sobre a mentoria e a comunidade.',
-        name: 'Nome do aluno',
-        role: 'Formado',
-      },
-    ],
+    testimonialRole: 'Aluno da INDAB',
+    rating: (n: number) => `${n} de 5 estrelas`,
     faqEyebrow: 'Perguntas frequentes',
     faqTitle: 'Tiramos suas dúvidas',
     faqs: [
@@ -514,7 +500,7 @@ export const pt: Messages = {
   admin: {
     title: 'Administração',
     intro:
-      'Gerencie os usuários, as mentorias, o material de estudo, as avaliações e os formulários de avaliação da INDAB.',
+      'Gerencie os usuários, as mentorias, o material de estudo, as avaliações, os formulários de avaliação e os depoimentos da INDAB.',
     eyebrow: 'Painel INDAB',
     open: 'Abrir',
     cards: {
@@ -545,6 +531,10 @@ export const pt: Messages = {
       material: {
         title: 'Material de estudo',
         text: 'Vídeos, apresentações e documentos para os alunos.',
+      },
+      reviews: {
+        title: 'Depoimentos',
+        text: 'Escolha quais depoimentos dos alunos aparecem na página inicial.',
       },
     },
     usersIntro:
@@ -1767,6 +1757,64 @@ export const pt: Messages = {
     saveFailed: 'Não foi possível salvar a nota.',
     removeFailed: 'Não foi possível excluir a nota.',
     loadFailed: 'Não foi possível carregar as notas.',
+  },
+
+  // Reviews of INDAB: written by students in /profile, picked by admins for the landing.
+  reviews: {
+    title: 'Seu depoimento sobre a INDAB',
+    intro:
+      'Conte como está sendo a academia para você. A equipe da INDAB escolhe alguns depoimentos para mostrar na página inicial.',
+    rating: 'Nota',
+    stars: (n: number) => (n === 1 ? '1 estrela' : `${n} estrelas`),
+    name: 'Nome que será exibido',
+    nameHint: 'Você pode usar só o seu nome, ou o nome e a inicial do sobrenome.',
+    text: 'Seu depoimento',
+    textPlaceholder:
+      'O que você aprendeu, como mudou sua forma de operar, o que achou da mentoria…',
+    count: (n: number, max: number) => `${n} / ${max}`,
+    showPhoto: 'Mostrar minha foto de perfil',
+    publish: 'Enviar depoimento',
+    update: 'Salvar alterações',
+    remove: 'Excluir depoimento',
+    confirmRemove: 'Excluir seu depoimento? Se estiver na página inicial, deixará de aparecer.',
+    saved: 'Depoimento enviado. A equipe da INDAB vai revisá-lo.',
+    removed: 'Depoimento excluído.',
+    failed: 'Não foi possível salvar o depoimento. Tente novamente.',
+    loadFailed: 'Não foi possível carregar seu depoimento.',
+    loading: 'Carregando seu depoimento…',
+    pending: 'Em revisão: ainda não aparece na página inicial.',
+    featured: 'Seu depoimento aparece na página inicial. Obrigado!',
+    editHint: 'Se você editá-lo, ele deixa de aparecer até que um administrador o escolha de novo.',
+    problems: {
+      ratingRequired: 'Escolha de 1 a 5 estrelas.',
+      nameRequired: 'Digite o nome que será exibido.',
+      textShort: 'Escreva pelo menos 20 caracteres.',
+      textLong: 'O depoimento pode ter até 600 caracteres.',
+    },
+    adminTitle: 'Depoimentos',
+    adminIntro:
+      'Escolha quais depoimentos dos alunos aparecem na página inicial. Ela mostra os 12 últimos que você escolher; se não escolher nenhum, a seção não aparece.',
+    total: 'Depoimentos',
+    onLanding: 'Na página inicial',
+    average: 'Nota média',
+    show: 'Mostrar',
+    allReviews: 'Todos',
+    shownOnly: 'Na página inicial',
+    notShown: 'Não exibidos',
+    searchLabel: 'Buscar',
+    searchPlaceholder: 'Nome ou texto',
+    badge: 'Na página inicial',
+    feature: 'Mostrar no início',
+    unfeature: 'Tirar do início',
+    featuredMsg: (name: string) => `O depoimento de ${name} agora aparece na página inicial.`,
+    unfeaturedMsg: (name: string) => `O depoimento de ${name} não aparece mais na página inicial.`,
+    delete: 'Excluir',
+    confirmDelete: (name: string) => `Excluir o depoimento de ${name}? Não é possível desfazer.`,
+    deleted: 'Depoimento excluído.',
+    actionFailed: 'Não foi possível concluir a ação. Tente novamente.',
+    written: (date: string) => `Escrito ou editado em ${date}`,
+    empty: 'Ainda não há depoimentos. Os alunos os escrevem no perfil.',
+    adminLoadFailed: 'Não foi possível carregar os depoimentos.',
   },
 
   // One practice session on its own page (notifications link here).

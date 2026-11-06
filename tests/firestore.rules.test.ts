@@ -2283,6 +2283,118 @@ describe('chart settings', () => {
   });
 });
 
+describe('reviews', () => {
+  const review = (uid: string | null, owner: string) => doc(as(uid), `reviews/${owner}`);
+  const data = (extra: Record<string, unknown> = {}) => ({
+    name: 'Ana P.',
+    photoURL: null,
+    rating: 5,
+    text: 'La mentoría me ayudó a operar con un plan claro.',
+    featured: false,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+  const seed = (owner: string, extra: Record<string, unknown> = {}) =>
+    env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), `reviews/${owner}`), {
+        name: 'Ana P.',
+        photoURL: null,
+        rating: 4,
+        text: 'La mentoría me ayudó a operar con un plan claro.',
+        featured: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...extra,
+      }),
+    );
+
+  it('are written by students with academy access, for themselves only', async () => {
+    await assertSucceeds(setDoc(review('enrolled', 'enrolled'), data()));
+    await assertFails(setDoc(review('student', 'student'), data()));
+    await assertFails(setDoc(review('enrolled', 'other'), data()));
+    await assertFails(setDoc(review(null, 'enrolled'), data()));
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), 'enrollments/unverified'), { academy: true, courses: [] }),
+    );
+    await assertFails(setDoc(doc(as('unverified', false), 'reviews/unverified'), data()));
+  });
+
+  it('validate the review and never start on the landing', async () => {
+    const write = (extra: Record<string, unknown>) =>
+      setDoc(review('enrolled', 'enrolled'), data(extra));
+    await assertFails(write({ featured: true }));
+    await assertFails(write({ rating: 0 }));
+    await assertFails(write({ rating: 6 }));
+    await assertFails(write({ rating: 4.5 }));
+    await assertFails(write({ text: 'Muy bueno' }));
+    await assertFails(write({ text: 'x'.repeat(601) }));
+    await assertFails(write({ name: '' }));
+    await assertFails(write({ name: 'x'.repeat(61) }));
+    await assertFails(write({ photoURL: 'https://example.com/me.jpg' }));
+    await assertFails(write({ featuredBy: 'enrolled' }));
+    await assertFails(write({ extra: true }));
+    await assertFails(write({ createdAt: new Date(2020, 0, 1) }));
+    await assertSucceeds(write({ photoURL: 'data:image/jpeg;base64,AAAA' }));
+    await assertSucceeds(deleteDoc(review('enrolled', 'enrolled')));
+    await assertSucceeds(write({ photoURL: 'https://lh3.googleusercontent.com/a/abc=s96-c' }));
+  });
+
+  it('go back to review when the author edits them', async () => {
+    await seed('enrolled', { featured: true, featuredAt: new Date(), featuredBy: 'admin' });
+    const edit = (extra: Record<string, unknown>) =>
+      updateDoc(review('enrolled', 'enrolled'), {
+        text: 'Ahora opero con gestión de riesgo y un diario.',
+        updatedAt: serverTimestamp(),
+        ...extra,
+      });
+    await assertFails(edit({}));
+    await assertFails(edit({ featured: true }));
+    await assertFails(edit({ featured: false, createdAt: serverTimestamp() }));
+    await assertSucceeds(edit({ featured: false }));
+    await assertFails(updateDoc(review('other', 'enrolled'), { rating: 1 }));
+  });
+
+  it('are picked for the landing by admins, who change nothing else', async () => {
+    await seed('enrolled');
+    const pick = (uid: string, extra: Record<string, unknown> = {}) =>
+      updateDoc(review(uid, 'enrolled'), {
+        featured: true,
+        featuredAt: serverTimestamp(),
+        featuredBy: uid,
+        ...extra,
+      });
+    await assertFails(pick('trainer'));
+    await assertFails(pick('enrolled'));
+    await assertFails(pick('admin', { featuredBy: 'trainer' }));
+    await assertFails(pick('admin', { text: 'Texto cambiado por el administrador.' }));
+    await assertSucceeds(pick('admin'));
+    await assertSucceeds(pick('admin', { featured: false }));
+  });
+
+  it('are read by everyone once picked, otherwise by the author and admins', async () => {
+    await seed('enrolled');
+    await seed('ana', { featured: true });
+    await assertSucceeds(getDoc(review('enrolled', 'enrolled')));
+    await assertSucceeds(getDoc(review('admin', 'enrolled')));
+    await assertFails(getDoc(review(null, 'enrolled')));
+    await assertFails(getDoc(review('trainer', 'enrolled')));
+    await assertSucceeds(getDoc(review(null, 'ana')));
+    const reviews = collection(as(null), 'reviews');
+    await assertSucceeds(getDocs(query(reviews, where('featured', '==', true), limit(50))));
+    await assertFails(getDocs(reviews));
+    await assertSucceeds(getDocs(collection(as('admin'), 'reviews')));
+  });
+
+  it('are deleted by the author or an admin', async () => {
+    await seed('enrolled');
+    await seed('ana');
+    await assertFails(deleteDoc(review('trainer', 'enrolled')));
+    await assertSucceeds(deleteDoc(review('enrolled', 'enrolled')));
+    await assertSucceeds(deleteDoc(review('admin', 'ana')));
+  });
+});
+
 describe('unknown collections', () => {
   it('are closed to everyone, admins included', async () => {
     await assertFails(getDoc(doc(as('admin'), 'secrets/s1')));

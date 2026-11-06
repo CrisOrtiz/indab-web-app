@@ -13,6 +13,7 @@ import { DeviceSession } from '../../core/models/user-profile';
 
 import { PhotoError } from '../../shared/avatar/resize-image';
 import { quietNotifications } from '../notifications/testing';
+import { quietReviews } from '../reviews/testing';
 
 type FakeUser = {
   uid: string;
@@ -104,6 +105,7 @@ describe('Profile', () => {
       imports: [Profile],
       providers: [
         ...quietNotifications().providers,
+        ...quietReviews().providers,
         provideRouter([]),
         { provide: AuthService, useValue: auth },
         { provide: ProfileService, useValue: profiles },

@@ -129,6 +129,14 @@ describe('app routes', () => {
   });
 
   it('downloads Firestore only once a visitor heads to sign in or register', async () => {
+    // The landing reads its reviews only once they scroll near (never, here).
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
     await visit('/');
     await visit('/eleva');
     await visit('/calendar');
@@ -138,6 +146,7 @@ describe('app routes', () => {
     firestore.load.mockClear();
     await visit('/register');
     expect(firestore.load).toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 
   it('sends visitors to login from private pages', async () => {

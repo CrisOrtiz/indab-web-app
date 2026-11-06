@@ -34,6 +34,7 @@ export const es = {
     adminMentorships: 'Mentorías | INDAB',
     practiceSession: 'Práctica | INDAB',
     adminMentor: 'Panel del mentor | INDAB',
+    adminReviews: 'Reseñas | INDAB',
   },
 
   // Search engines and link previews (WhatsApp, Facebook...). Keep descriptions under ~160 characters.
@@ -205,23 +206,8 @@ export const es = {
     },
     testimonialsEyebrow: 'Testimonios',
     testimonialsTitle: 'Lo que dicen nuestros estudiantes',
-    testimonials: [
-      {
-        quote: 'Testimonio de ejemplo: aquí irá la experiencia real de un estudiante de INDAB.',
-        name: 'Nombre del estudiante',
-        role: 'Estudiante, Nivel 2',
-      },
-      {
-        quote: 'Testimonio de ejemplo: qué aprendió, cómo cambió su forma de operar.',
-        name: 'Nombre del estudiante',
-        role: 'Estudiante, Nivel 3',
-      },
-      {
-        quote: 'Testimonio de ejemplo: opinión sobre la mentoría y la comunidad.',
-        name: 'Nombre del estudiante',
-        role: 'Egresado',
-      },
-    ],
+    testimonialRole: 'Estudiante de INDAB',
+    rating: (n: number) => `${n} de 5 estrellas`,
     faqEyebrow: 'Preguntas frecuentes',
     faqTitle: 'Resolvemos tus dudas',
     faqs: [
@@ -521,7 +507,7 @@ export const es = {
   admin: {
     title: 'Administración',
     intro:
-      'Gestiona los usuarios, las mentorías, el material de estudio, las evaluaciones y los formularios de evaluación de INDAB.',
+      'Gestiona los usuarios, las mentorías, el material de estudio, las evaluaciones, los formularios de evaluación y las reseñas de INDAB.',
     eyebrow: 'Panel INDAB',
     open: 'Abrir',
     cards: {
@@ -552,6 +538,10 @@ export const es = {
       material: {
         title: 'Material de estudio',
         text: 'Videos, presentaciones y documentos para los estudiantes.',
+      },
+      reviews: {
+        title: 'Reseñas',
+        text: 'Elige qué reseñas de los estudiantes se muestran en la página de inicio.',
       },
     },
     usersIntro:
@@ -1795,6 +1785,64 @@ export const es = {
     saveFailed: 'No se pudo guardar la nota.',
     removeFailed: 'No se pudo eliminar la nota.',
     loadFailed: 'No se pudieron cargar las notas.',
+  },
+
+  // Reviews of INDAB: written by students in /profile, picked by admins for the landing.
+  reviews: {
+    title: 'Tu reseña de INDAB',
+    intro:
+      'Cuéntanos cómo te va en la academia. El equipo de INDAB elige algunas reseñas para mostrarlas en la página de inicio.',
+    rating: 'Calificación',
+    stars: (n: number) => (n === 1 ? '1 estrella' : `${n} estrellas`),
+    name: 'Nombre que se mostrará',
+    nameHint: 'Puedes usar solo tu nombre, o tu nombre y la inicial de tu apellido.',
+    text: 'Tu reseña',
+    textPlaceholder: 'Qué aprendiste, cómo cambió tu forma de operar, qué te pareció la mentoría…',
+    count: (n: number, max: number) => `${n} / ${max}`,
+    showPhoto: 'Mostrar mi foto de perfil',
+    publish: 'Enviar reseña',
+    update: 'Guardar cambios',
+    remove: 'Eliminar reseña',
+    confirmRemove: '¿Eliminar tu reseña? Si está en la página de inicio, dejará de mostrarse.',
+    saved: 'Reseña enviada. El equipo de INDAB la revisará.',
+    removed: 'Reseña eliminada.',
+    failed: 'No se pudo guardar la reseña. Inténtalo de nuevo.',
+    loadFailed: 'No se pudo cargar tu reseña.',
+    loading: 'Cargando tu reseña…',
+    pending: 'En revisión: todavía no se muestra en la página de inicio.',
+    featured: 'Tu reseña se muestra en la página de inicio. ¡Gracias!',
+    editHint: 'Si la editas, deja de mostrarse hasta que un administrador la vuelva a elegir.',
+    problems: {
+      ratingRequired: 'Elige de 1 a 5 estrellas.',
+      nameRequired: 'Escribe el nombre que se mostrará.',
+      textShort: 'Escribe al menos 20 caracteres.',
+      textLong: 'La reseña puede tener hasta 600 caracteres.',
+    },
+    adminTitle: 'Reseñas',
+    adminIntro:
+      'Elige qué reseñas de los estudiantes se muestran en la página de inicio. Se ven las 12 últimas que elijas; si no eliges ninguna, la sección no aparece.',
+    total: 'Reseñas',
+    onLanding: 'En la página de inicio',
+    average: 'Calificación promedio',
+    show: 'Mostrar',
+    allReviews: 'Todas',
+    shownOnly: 'En la página de inicio',
+    notShown: 'No mostradas',
+    searchLabel: 'Buscar',
+    searchPlaceholder: 'Nombre o texto',
+    badge: 'En la página de inicio',
+    feature: 'Mostrar en inicio',
+    unfeature: 'Quitar de inicio',
+    featuredMsg: (name: string) => `La reseña de ${name} ya se muestra en la página de inicio.`,
+    unfeaturedMsg: (name: string) =>
+      `La reseña de ${name} ya no se muestra en la página de inicio.`,
+    delete: 'Eliminar',
+    confirmDelete: (name: string) => `¿Eliminar la reseña de ${name}? No se puede deshacer.`,
+    deleted: 'Reseña eliminada.',
+    actionFailed: 'No se pudo completar la acción. Inténtalo de nuevo.',
+    written: (date: string) => `Escrita o editada el ${date}`,
+    empty: 'Todavía no hay reseñas. Los estudiantes las escriben desde su perfil.',
+    adminLoadFailed: 'No se pudieron cargar las reseñas.',
   },
 
   // One practice session on its own page (notifications link here).

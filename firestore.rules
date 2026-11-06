@@ -53,6 +53,9 @@ rules_version = '2';
 //                                        an event notifies each person once
 //   users/{uid}/settings/notifications   what a trainer or admin follows and which activity they hear of
 //   users/{uid}/settings/chart           the indicators the user keeps on the practice chart
+//   reviews/{uid}                        a student's review of INDAB (stars, text, name shown, photo);
+//                                        the author writes it, admins pick the ones the landing
+//                                        shows and everyone reads those
 //   follows/{kind}/subjects/{id}/followers/{uid}
 //                                        a trainer or admin following a student, a mentorship, an
 //                                        evaluation, a form or everyone ('all'); students read the
@@ -1074,6 +1077,54 @@ service cloud.firestore {
     // win rates. Staff only: students read their own through their session.
     match /{path=**}/trades/{tradeId} {
       allow read: if isStaff();
+    }
+
+    // A student's review of INDAB (one per student, id = uid), written from /profile. Admins
+    // pick the ones the landing shows (featured); visitors read only those. Any edit by the
+    // author takes it off the landing until an admin picks it again.
+    match /reviews/{uid} {
+      function validPhoto(value) {
+        return value == null
+          || (value is string && value.size() <= 100000
+            && (value.matches('data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+')
+              || value.matches('https://[a-z0-9-]+[.]googleusercontent[.]com/.*')));
+      }
+
+      function validReview(data) {
+        return data.keys().hasOnly(['name', 'photoURL', 'rating', 'text', 'featured',
+            'featuredAt', 'featuredBy', 'createdAt', 'updatedAt'])
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 60
+          && validPhoto(data.photoURL)
+          && data.rating is int && data.rating >= 1 && data.rating <= 5
+          && data.text is string && data.text.size() >= 20 && data.text.size() <= 600
+          && data.featured is bool;
+      }
+
+      allow read: if isOwner(uid) || isAdmin() || resource.data.featured == true;
+
+      allow create: if isOwner(uid) && hasAcademyAccess()
+        && validReview(request.resource.data)
+        && request.resource.data.keys().hasOnly(['name', 'photoURL', 'rating', 'text', 'featured',
+          'createdAt', 'updatedAt'])
+        && request.resource.data.featured == false
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      // The author edits what they wrote (which unpicks it); admins only pick or unpick it.
+      allow update: if (isOwner(uid) && hasAcademyAccess()
+          && validReview(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['name', 'photoURL', 'rating', 'text', 'featured', 'updatedAt'])
+          && request.resource.data.featured == false
+          && request.resource.data.updatedAt == request.time)
+        || (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['featured', 'featuredAt', 'featuredBy'])
+          && request.resource.data.featured is bool
+          && request.resource.data.featuredAt == request.time
+          && request.resource.data.featuredBy == request.auth.uid);
+
+      allow delete: if isOwner(uid) || isAdmin();
     }
 
     // Everything else is closed by default.

@@ -17,6 +17,7 @@ import {
 } from '../../shared/personal-details/personal-details';
 import { authErrorMessage } from '../auth/auth-errors';
 import { NotificationSettingsPanel } from '../notifications/notification-settings';
+import { ReviewPanel } from '../reviews/review-panel';
 import { signedMoney } from '../practice/practice-format';
 import { PracticeService } from '../practice/practice.service';
 import { shownStatus } from '../practice/resume';
@@ -34,12 +35,19 @@ type Section = 'photo' | 'name' | 'password' | 'sessions';
 type Status = { kind: 'error' | 'notice'; text: string };
 
 /**
- * `/profile`: the signed-in user's photo, name and details, password, open sessions, language
- * and practice results; trainers and admins also choose what they get notified of.
+ * `/profile`: the signed-in user's photo, name and details, password, open sessions, language,
+ * practice results and (with academy access) their review of INDAB; trainers and admins also choose what they get notified of.
  */
 @Component({
   selector: 'app-profile',
-  imports: [ReactiveFormsModule, RouterLink, Avatar, LocalDatePipe, NotificationSettingsPanel],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    Avatar,
+    LocalDatePipe,
+    NotificationSettingsPanel,
+    ReviewPanel,
+  ],
   templateUrl: './profile.html',
   styleUrl: './profile.scss',
 })
