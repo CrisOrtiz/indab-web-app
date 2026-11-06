@@ -194,6 +194,7 @@ The service account needs the _Firebase Admin_ and _Service Usage Consumer_ role
 | `users/{uid}/notifications/{id}` (the bell)                      | owner                                                                                                                                                  | the sender, once per event (the id names it): a note's author in the same batch as the note; staff for an evaluation or form given to the student or its published results; a student for their own finished practice, evaluation or handed-in form, to staff who follow them for it; the owner marks read and deletes                                                                                                                                                                                                    |
 | `users/{uid}/settings/notifications`                             | owner                                                                                                                                                  | trainers and admins, their own (what they follow and which activity they hear of)                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `users/{uid}/settings/chart`                                     | owner                                                                                                                                                  | everyone, their own (the practice chart's indicators, known ids only)                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `reviews/{uid}`                                                  | author, admins; everyone once `featured`                                                                                                               | the author with academy access (stars 1-5, 20-600 characters, name, optional photo; any edit unpicks it); admins only set `featured`; author or admin deletes                                                                                                                                                                                                                                                                                                                                                             |
 | `follows/{kind}/subjects/{id}/followers/{uid}`                   | that trainer or admin; students, the lists of what concerns them (themselves, their mentorships, their evaluations and forms, `all`)                   | that trainer or admin (`types`: `practiceFinished`, `evaluationFinished`, `examSubmitted`)                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 A user gets access to the academy and the material repository when an admin turns on
@@ -224,7 +225,7 @@ Changing the password does revoke every other session, since Firebase ends them 
 | `/login`, `/register`            | signed-out visitors                                                                                                                                    |
 | `/account-setup`                 | signed-in users who still have to confirm their email or give their birth date (the other guards send them here)                                       |
 | `/academy`                       | signed-in users (shows "pending" until enrolled)                                                                                                       |
-| `/profile`                       | signed-in users (photo, name, birth date, WhatsApp, password, open sessions, language, practice P/L; opened from the avatar menu in the header)        |
+| `/profile`                       | signed-in users (photo, name, birth date, WhatsApp, password, open sessions, language, practice P/L, review of INDAB; opened from the avatar menu)     |
 | `/academy/material`              | enrolled users (study material by topic: videos, presentations, documents, links; `/academy/material/:id` plays or shows one; `/repository` redirects) |
 | `/academy/practice`              | enrolled users (chart-replay trading practice: free practice and assigned evaluations)                                                                 |
 | `/academy/practice/sessions/:id` | enrolled users and staff (one practice session or evaluation attempt with its review and mentor notes; notifications link here)                        |
@@ -235,6 +236,7 @@ Changing the password does revoke every other session, since Firebase ends them 
 | `/admin`                         | trainers and admins (a card per tool; trainers do not get the users card)                                                                              |
 | `/admin/mentor`                  | trainers and admins (mentor dashboard: practice, averages and pending work of each mentorship they lead; admins see all)                               |
 | `/admin/users`                   | admins (users, roles, academy access and each student's mentorships)                                                                                   |
+| `/admin/reviews`                 | admins (students' reviews from `/profile`: pick which ones the landing shows, or delete them)                                                          |
 | `/admin/mentorships`             | trainers and admins (admins create, edit, pause and delete mentorships; trainers see them and their students)                                          |
 | `/admin/material`                | trainers and admins (add study material by link, preview it, choose who sees it, publish, hide or delete it)                                           |
 | `/admin/practice`                | trainers and admins (review students' practice sessions on the chart; admins delete them)                                                              |
@@ -306,7 +308,8 @@ saved in the browser (`localStorage` key `indab.theme`), not in Firestore.
   first download) loads only once someone signs in or opens login/register: `FIRESTORE_LOADER`
   loads it, and `AuthService` awaits it before the guards let a signed-in user in, so the
   services of signed-in pages can still `inject(FIRESTORE)`. A public page that needs Firestore
-  must `await inject(FIRESTORE_LOADER).load()` instead.
+  must `await inject(FIRESTORE_LOADER).load()` instead. The landing does so only once a visitor
+  scrolls near its testimonials (`FEATURED_REVIEWS`), to read the reviews admins picked.
 
 ## Installable app (PWA)
 
@@ -487,6 +490,16 @@ sum of `pnl`; trades: a staff-only collection group query on `trades` by `uid`, 
 `closedAt`, with and without `pnl > 0`), so reads stay a handful per student however much they
 traded. Links open the practice review filtered to the student (`?student=uid`), a form's results
 and an evaluation's results (`/admin/evaluations?results=id`).
+
+### Reviews (testimonials)
+
+Students with academy access write one review of INDAB in `/profile` (stars, text, the name to
+show and, if they want, their profile photo), stored at `reviews/{uid}`. Admins see them all at
+`/admin/reviews` (the "Reseñas" card) and choose which ones the landing's testimonials show
+("Mostrar en inicio"): the latest 12 picks, and no section at all while none is picked. An edit
+by the author takes the review off the landing until an admin picks it again, so nothing
+unreviewed reaches the public page. Visitors read only picked reviews (the rules check
+`featured`); the landing loads them in the browser, so the prerendered page has none.
 
 ### Evaluation forms
 

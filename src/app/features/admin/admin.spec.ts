@@ -32,6 +32,7 @@ describe('Admin home', () => {
       'Formularios de evaluación',
       'Evaluaciones de práctica',
       'Revisar prácticas de trading',
+      'Reseñas',
     ]);
     expect(links()).toEqual([
       '/admin/mentor',
@@ -41,11 +42,12 @@ describe('Admin home', () => {
       '/admin/forms',
       '/admin/evaluations',
       '/admin/practice',
+      '/admin/reviews',
     ]);
     expect(el.querySelector('table')).toBeNull();
   });
 
-  it('shows trainers the evaluations and practice review, not the users', async () => {
+  it('shows trainers the evaluations and practice review, not the users or reviews', async () => {
     isAdmin.set(false);
     await fixture.whenStable();
     expect(el.textContent).toContain('Como entrenador puedes crear evaluaciones');

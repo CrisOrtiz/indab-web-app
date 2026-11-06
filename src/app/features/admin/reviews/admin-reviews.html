@@ -1,0 +1,107 @@
+@let t = i18n.messages().reviews;
+@let ta = i18n.messages().admin;
+@let tl = i18n.messages().lists;
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/admin" class="back">{{ ta.back }}</a>
+    <h1>{{ t.adminTitle }}</h1>
+    <p>{{ t.adminIntro }}</p>
+  </header>
+
+  @if (message(); as msg) {
+    <p class="message" [class.error]="msg.kind === 'error'" role="status">
+      {{ msg.text }}
+      <button
+        type="button"
+        class="dismiss"
+        [attr.aria-label]="ta.close"
+        (click)="message.set(null)"
+      >
+        ×
+      </button>
+    </p>
+  }
+
+  @if (!loading()) {
+    <div class="stats">
+      <div class="stat">
+        <strong>{{ stats().total }}</strong
+        ><span>{{ t.total }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ stats().shown }}</strong
+        ><span>{{ t.onLanding }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ stats().average }}</strong
+        ><span>{{ t.average }}</span>
+      </div>
+    </div>
+
+    <div class="list-filters" role="group" [attr.aria-label]="tl.filters">
+      <label>
+        {{ t.searchLabel }}
+        <input
+          type="search"
+          [placeholder]="t.searchPlaceholder"
+          [value]="search()"
+          (input)="search.set($any($event.target).value)"
+        />
+      </label>
+      <label>
+        {{ t.show }}
+        <select [value]="filter()" (change)="filter.set($any($event.target).value)">
+          <option value="">{{ t.allReviews }}</option>
+          <option value="shown">{{ t.shownOnly }}</option>
+          <option value="hidden">{{ t.notShown }}</option>
+        </select>
+      </label>
+    </div>
+
+    <ul class="cards">
+      @for (r of visible(); track r.id) {
+        <li class="card review" [class.shown]="r.featured">
+          <app-actions-menu
+            class="card-menu"
+            [actions]="menu()"
+            [label]="ta.itemAction(ta.actions, r.name)"
+            (picked)="act(r, $event)"
+          />
+          <div class="author">
+            <app-avatar [photo]="r.photoURL" [name]="r.name" [size]="44" />
+            <div>
+              <h3>{{ r.name }}</h3>
+              @if (emails().get(r.id); as email) {
+                <p class="muted email">{{ email }}</p>
+              }
+            </div>
+          </div>
+          <div class="meta">
+            <app-stars [value]="r.rating" />
+            @if (r.featured) {
+              <span class="badge on">{{ t.badge }}</span>
+            }
+          </div>
+          <blockquote>“{{ r.text }}”</blockquote>
+          <p class="muted small">
+            {{ t.written((r.updatedAt?.toDate?.() | localDate) ?? '') }}
+          </p>
+          <div class="actions">
+            <button
+              type="button"
+              class="btn small"
+              [class.btn-outline]="r.featured"
+              [disabled]="busy() === r.id"
+              (click)="setFeatured(r, !r.featured)"
+            >
+              <app-icon [name]="r.featured ? 'eyeOff' : 'eye'" />
+              {{ r.featured ? t.unfeature : t.feature }}
+            </button>
+          </div>
+        </li>
+      } @empty {
+        <li class="muted">{{ reviews().length ? tl.noMatches : t.empty }}</li>
+      }
+    </ul>
+  }
+</section>

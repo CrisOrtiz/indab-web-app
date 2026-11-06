@@ -130,6 +130,10 @@
     }
   </div>
 
+  @if (auth.hasAcademyAccess()) {
+    <app-review-panel />
+  }
+
   <div class="columns">
     <div class="card">
       <h2>{{ t.personal }}</h2>

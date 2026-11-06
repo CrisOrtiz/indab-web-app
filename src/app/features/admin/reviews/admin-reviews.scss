@@ -1,0 +1,61 @@
+.cards {
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  align-items: start;
+}
+
+.review {
+  display: grid;
+  gap: 8px;
+
+  &.shown {
+    border-color: var(--color-text);
+  }
+}
+
+.author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding-right: 36px;
+
+  h3 {
+    padding-right: 0;
+    overflow-wrap: anywhere;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge.on {
+  margin-left: 0;
+  border-color: var(--color-text);
+}
+
+blockquote {
+  margin: 0;
+  font-style: italic;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.btn.small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+}

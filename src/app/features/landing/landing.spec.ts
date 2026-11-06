@@ -6,17 +6,39 @@ import { vi } from 'vitest';
 import { LandingSections } from '../../shared/layout/landing-sections';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
+import { Review } from '../../core/models/review';
+import { FEATURED_REVIEWS } from '../reviews/featured-reviews-loader';
 import { Landing } from './landing';
 
 describe('Landing', () => {
   const auth = { isLoggedIn: signal(false) };
+  // jsdom has no IntersectionObserver, so the reviews load as soon as the page is drawn.
+  const picked = { reviews: [] as Partial<Review>[], fail: false };
+  const featured = vi.fn(async () => {
+    if (picked.fail) {
+      throw new Error('offline');
+    }
+    return picked.reviews;
+  });
+
+  beforeEach(() => {
+    picked.reviews = [];
+    picked.fail = false;
+    featured.mockClear();
+  });
 
   const render = async () => {
     TestBed.configureTestingModule({
       imports: [Landing],
-      providers: [provideRouter([]), { provide: AuthService, useValue: auth }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: auth },
+        { provide: FEATURED_REVIEWS, useValue: featured },
+      ],
     });
     const fixture = TestBed.createComponent(Landing);
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve));
     await fixture.whenStable();
     return fixture.nativeElement as HTMLElement;
   };
@@ -130,6 +152,7 @@ describe('Landing', () => {
       providers: [
         provideRouter([{ path: '', component: Landing }]),
         { provide: AuthService, useValue: auth },
+        { provide: FEATURED_REVIEWS, useValue: featured },
       ],
     });
     const harness = await RouterTestingHarness.create('/#contacto');
@@ -137,5 +160,44 @@ describe('Landing', () => {
     expect(scroll).toHaveBeenCalledTimes(1);
     expect(scroll.mock.contexts[0]).toBe(document.getElementById('contacto'));
     delete (Element.prototype as Partial<Element>).scrollIntoView;
+  });
+
+  it('shows the reviews admins picked, with stars, name and photo', async () => {
+    picked.reviews = [
+      {
+        id: 'ana',
+        name: 'Ana P.',
+        photoURL: 'data:image/jpeg;base64,AAAA',
+        rating: 5,
+        text: 'Me cambió la forma de operar.',
+      },
+      { id: 'luis', name: 'Luis', photoURL: null, rating: 4, text: 'Gran mentoría.' },
+    ];
+    const el = await render();
+    expect(featured).toHaveBeenCalledTimes(1);
+    const section = el.querySelector('#testimonios')!;
+    expect(section.querySelector('h2')?.textContent).toBe('Lo que dicen nuestros estudiantes');
+    const cards = section.querySelectorAll('li.review');
+    expect(cards.length).toBe(2);
+    expect(cards[0].querySelector('blockquote')?.textContent).toBe(
+      '“Me cambió la forma de operar.”',
+    );
+    expect(cards[0].querySelector('app-stars')?.getAttribute('aria-label')).toBe(
+      '5 de 5 estrellas',
+    );
+    expect(cards[0].querySelector('img')?.getAttribute('src')).toBe('data:image/jpeg;base64,AAAA');
+    expect(cards[0].textContent).toContain('Estudiante de INDAB');
+    expect(cards[1].querySelector('app-avatar')?.textContent?.trim()).toBe('L');
+  });
+
+  it('leaves the testimonials out while none are picked or they cannot load', async () => {
+    let el = await render();
+    expect(el.querySelector('#testimonios')).toBeNull();
+    expect(el.textContent).not.toContain('Testimonio de ejemplo');
+    TestBed.resetTestingModule();
+    picked.fail = true;
+    picked.reviews = [{ id: 'ana', name: 'Ana', rating: 5, text: 'x' }];
+    el = await render();
+    expect(el.querySelector('#testimonios')).toBeNull();
   });
 });

@@ -23,7 +23,6 @@ test('the landing page shows its sections and links to Eleva', async ({ page }) 
     'Programas por niveles',
     'Un proceso en cuatro pasos',
     'Todo tu aprendizaje en un solo lugar',
-    'Lo que dicen nuestros estudiantes',
     'Resolvemos tus dudas',
     'Hablemos',
   ]) {

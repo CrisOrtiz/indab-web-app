@@ -147,24 +147,31 @@
   </div>
 </section>
 
-<section id="testimonios" class="section">
-  <div class="container">
-    <p class="eyebrow" appReveal>{{ m.testimonialsEyebrow }}</p>
-    <h2 appReveal>{{ m.testimonialsTitle }}</h2>
-    <ul class="cards cards-3">
-      @for (t of m.testimonials; track $index) {
-        <li class="card" [appReveal]="$index * 100">
-          <blockquote>“{{ t.quote }}”</blockquote>
-          <p class="author">
-            <strong>{{ t.name }}</strong
-            ><br />
-            {{ t.role }}
-          </p>
-        </li>
-      }
-    </ul>
-  </div>
-</section>
+<div #reviewsAnchor class="reviews-anchor"></div>
+@if (reviews().length) {
+  <section id="testimonios" class="section">
+    <div class="container">
+      <p class="eyebrow" appReveal>{{ m.testimonialsEyebrow }}</p>
+      <h2 appReveal>{{ m.testimonialsTitle }}</h2>
+      <ul class="cards cards-3 reviews">
+        @for (r of reviews(); track r.id) {
+          <li class="card review" [appReveal]="($index % 3) * 100">
+            <app-stars [value]="r.rating" />
+            <blockquote>“{{ r.text }}”</blockquote>
+            <div class="author">
+              <app-avatar [photo]="r.photoURL" [name]="r.name" [size]="44" />
+              <p>
+                <strong>{{ r.name }}</strong
+                ><br />
+                {{ m.testimonialRole }}
+              </p>
+            </div>
+          </li>
+        }
+      </ul>
+    </div>
+  </section>
+}
 
 <section id="preguntas" class="section surface">
   <div class="container narrow">

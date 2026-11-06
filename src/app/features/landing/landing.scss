@@ -317,14 +317,35 @@ ol {
   font-size: 0.9rem;
 }
 
-// Testimonials
+// Testimonials (students' reviews picked by admins)
+.reviews-anchor {
+  height: 0;
+}
+
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 blockquote {
-  margin: 0 0 16px;
+  flex: 1;
+  margin: 0;
   font-style: italic;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
 }
 
 .author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-size: 0.9rem;
+
+  p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
 }
 
 // FAQ

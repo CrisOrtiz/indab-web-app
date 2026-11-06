@@ -74,6 +74,7 @@ otherwise create a feature service.
 | `users/{uid}/notifications/{id}`                                 | owner                                                                                                           | the sender, once per event (id `{type}_{refId}`, `note_{noteId}`); rules check the event and that the sender may tell the owner; owner marks read, deletes                                                                           |
 | `users/{uid}/settings/notifications`                             | owner                                                                                                           | trainers and admins, their own                                                                                                                                                                                                       |
 | `users/{uid}/settings/chart`                                     | owner                                                                                                           | everyone, their own                                                                                                                                                                                                                  |
+| `reviews/{uid}`                                                  | author, admins; everyone once `featured`                                                                        | the author with academy access (any edit sets `featured` false); admins only `featured`/`featuredAt`/`featuredBy`; author or admin deletes                                                                                           |
 | `follows/{kind}/subjects/{id}/followers/{uid}`                   | that staff member; students, the lists that concern them                                                        | that staff member (`types` of activity)                                                                                                                                                                                              |
 
 Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`, `isStaff()`
@@ -223,6 +224,13 @@ Module notes:
 
 - **Landing (`/`)**: public, no Firestore reads needed except published `courses`. Sections for
   the academy, courses and a link to Eleva. Call to action goes to `/register`.
+  Testimonials are students' reviews (Cris, 2026-11-06): `reviews/{uid}` (`core/models/review.ts`,
+  `features/reviews/`), written in `/profile` (`ReviewPanel`, academy access only) and picked by
+  admins at `/admin/reviews` (`features/admin/reviews/`, last `/admin` card, admins only). The
+  landing reads the picked ones through `FEATURED_REVIEWS` once a visitor scrolls near them
+  (that is when the Firestore SDK loads on the landing) and leaves the section out while none is
+  picked. An author's edit unpicks the review. `<app-stars>` (`shared/stars`) draws ratings in
+  `--color-star`. Specs fake the service with `quietReviews()` (`features/reviews/testing.ts`).
 - **Study material (`/academy/material`, built)**: part of the academy, opened from `/academy`;
   Cris does not want it as its own header tab (`/repository` only redirects). `materials/{id}`
   (`core/models/material.ts`, `features/repository/material.service.ts`): title, description, kind

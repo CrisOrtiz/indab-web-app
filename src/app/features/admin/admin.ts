@@ -6,7 +6,14 @@ import { I18n } from '../../core/i18n/i18n.service';
 import { Reveal } from '../../shared/reveal/reveal';
 
 type AdminCard =
-  'mentor' | 'users' | 'mentorships' | 'material' | 'exams' | 'evaluations' | 'practice';
+  | 'mentor'
+  | 'users'
+  | 'mentorships'
+  | 'material'
+  | 'exams'
+  | 'evaluations'
+  | 'practice'
+  | 'reviews';
 
 // Admin home: a card per tool, each opening its own page.
 @Component({
@@ -21,7 +28,7 @@ export class Admin {
 
   /**
    * A card per admin tool, the mentor dashboard first; trainers do not get the users card
-   * (mentorships are read-only).
+   * (mentorships are read-only) or the reviews card.
    */
   protected readonly cards = computed<{ key: AdminCard; link: string }[]>(() => [
     { key: 'mentor', link: '/admin/mentor' },
@@ -31,5 +38,6 @@ export class Admin {
     { key: 'exams', link: '/admin/forms' },
     { key: 'evaluations', link: '/admin/evaluations' },
     { key: 'practice', link: '/admin/practice' },
+    ...(this.auth.isAdmin() ? [{ key: 'reviews' as const, link: '/admin/reviews' }] : []),
   ]);
 }

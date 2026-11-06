@@ -29,6 +29,7 @@ export const en: Messages = {
     adminMentorships: 'Mentorships | INDAB',
     practiceSession: 'Practice | INDAB',
     adminMentor: 'Mentor dashboard | INDAB',
+    adminReviews: 'Reviews | INDAB',
   },
 
   seo: {
@@ -204,23 +205,8 @@ export const en: Messages = {
     },
     testimonialsEyebrow: 'Testimonials',
     testimonialsTitle: 'What our students say',
-    testimonials: [
-      {
-        quote: 'Sample testimonial: the real experience of an INDAB student will go here.',
-        name: 'Student name',
-        role: 'Student, Level 2',
-      },
-      {
-        quote: 'Sample testimonial: what they learned and how it changed the way they trade.',
-        name: 'Student name',
-        role: 'Student, Level 3',
-      },
-      {
-        quote: 'Sample testimonial: their opinion of the mentoring and the community.',
-        name: 'Student name',
-        role: 'Graduate',
-      },
-    ],
+    testimonialRole: 'INDAB student',
+    rating: (n: number) => `${n} out of 5 stars`,
     faqEyebrow: 'Frequently asked questions',
     faqTitle: 'We answer your questions',
     faqs: [
@@ -519,7 +505,8 @@ export const en: Messages = {
 
   admin: {
     title: 'Administration',
-    intro: "Manage INDAB's users, mentorships, study material, evaluations and evaluation forms.",
+    intro:
+      "Manage INDAB's users, mentorships, study material, evaluations, evaluation forms and reviews.",
     eyebrow: 'INDAB panel',
     open: 'Open',
     cards: {
@@ -550,6 +537,10 @@ export const en: Messages = {
       material: {
         title: 'Study material',
         text: 'Videos, presentations and documents for the students.',
+      },
+      reviews: {
+        title: 'Reviews',
+        text: 'Choose which student reviews appear on the home page.',
       },
     },
     usersIntro:
@@ -1754,6 +1745,64 @@ export const en: Messages = {
     saveFailed: 'The note could not be saved.',
     removeFailed: 'The note could not be deleted.',
     loadFailed: 'Notes could not be loaded.',
+  },
+
+  // Reviews of INDAB: written by students in /profile, picked by admins for the landing.
+  reviews: {
+    title: 'Your review of INDAB',
+    intro:
+      'Tell us how the academy is going for you. The INDAB team picks some reviews to show on the home page.',
+    rating: 'Rating',
+    stars: (n: number) => (n === 1 ? '1 star' : `${n} stars`),
+    name: 'Name to show',
+    nameHint: 'You can use just your first name, or your first name and last initial.',
+    text: 'Your review',
+    textPlaceholder:
+      'What you learned, how it changed the way you trade, what you thought of the mentoring…',
+    count: (n: number, max: number) => `${n} / ${max}`,
+    showPhoto: 'Show my profile photo',
+    publish: 'Send review',
+    update: 'Save changes',
+    remove: 'Delete review',
+    confirmRemove: 'Delete your review? If it is on the home page, it will stop showing.',
+    saved: 'Review sent. The INDAB team will look at it.',
+    removed: 'Review deleted.',
+    failed: 'Could not save the review. Please try again.',
+    loadFailed: 'Could not load your review.',
+    loading: 'Loading your review…',
+    pending: 'In review: not on the home page yet.',
+    featured: 'Your review is on the home page. Thank you!',
+    editHint: 'If you edit it, it stops showing until an admin picks it again.',
+    problems: {
+      ratingRequired: 'Choose 1 to 5 stars.',
+      nameRequired: 'Type the name to show.',
+      textShort: 'Write at least 20 characters.',
+      textLong: 'A review can have up to 600 characters.',
+    },
+    adminTitle: 'Reviews',
+    adminIntro:
+      'Choose which student reviews appear on the home page. It shows the latest 12 you pick; if you pick none, the section is hidden.',
+    total: 'Reviews',
+    onLanding: 'On the home page',
+    average: 'Average rating',
+    show: 'Show',
+    allReviews: 'All',
+    shownOnly: 'On the home page',
+    notShown: 'Not shown',
+    searchLabel: 'Search',
+    searchPlaceholder: 'Name or text',
+    badge: 'On the home page',
+    feature: 'Show on home',
+    unfeature: 'Remove from home',
+    featuredMsg: (name: string) => `${name}'s review now shows on the home page.`,
+    unfeaturedMsg: (name: string) => `${name}'s review no longer shows on the home page.`,
+    delete: 'Delete',
+    confirmDelete: (name: string) => `Delete ${name}'s review? This cannot be undone.`,
+    deleted: 'Review deleted.',
+    actionFailed: 'Could not complete the action. Please try again.',
+    written: (date: string) => `Written or edited on ${date}`,
+    empty: 'No reviews yet. Students write them from their profile.',
+    adminLoadFailed: 'Could not load the reviews.',
   },
 
   // One practice session on its own page (notifications link here).
