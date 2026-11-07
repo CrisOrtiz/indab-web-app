@@ -17,20 +17,16 @@ import {
 } from '@angular/core';
 import {
   AutoscaleInfo,
-  BaselineSeries,
   CandlestickSeries,
-  HistogramSeries,
   IChartApi,
   IPriceLine,
   ISeriesApi,
   ISeriesMarkersPluginApi,
-  LineData,
   LineSeries,
   LineStyle,
   Logical,
   SeriesMarker,
   Time,
-  WhitespaceData,
   createChart,
   createSeriesMarkers,
 } from 'lightweight-charts';
@@ -41,24 +37,24 @@ import { TimeZoneService } from '../../core/time-zone/time-zone.service';
 // Registers the month names of every language for the times on the axis.
 import '../../core/i18n/local-date.pipe';
 import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/practice';
+import { ChartIndicators, ShownIndicator } from './chart-indicators';
 import {
   DEFAULT_INDICATORS,
   INDICATORS,
   Indicator,
-  RSI_COLORS,
-  RSI_LEVELS,
-  RSI_OVERBOUGHT,
-  RSI_OVERSOLD,
-  RSI_SMOOTHING,
-  Divergence,
-  IndicatorPoint,
-  rsiDivergences,
-  sma,
-  computeIndicator,
+  IndicatorConfig,
+  indicatorLabel,
+  isDefaultConfig,
+  readConfig,
 } from './indicators';
+import { IndicatorSettings } from './indicator-settings';
+
 import { formatLots, priceDecimals, priceDigits, roundPrice, signedMoney } from './practice-format';
 import { LOT_SIZE, LOT_STEP, tradeLots } from './replay';
 import { filledTrades, tradeBox } from './trade-boxes';
+
+export { fade } from './indicators';
+export { divergenceSegments } from './chart-indicators';
 
 /** The order being set up in the ticket, drawn as draggable lines before it is placed. */
 export interface OrderDraft {
@@ -511,7 +507,7 @@ function formatPercent(value: number, of: number, signed = false): string {
  */
 @Component({
   selector: 'app-replay-chart',
-  imports: [DecimalPipe, NgTemplateOutlet],
+  imports: [DecimalPipe, NgTemplateOutlet, IndicatorSettings],
   host: {
     '[class.drawing]': '!!tool()',
     '(document:pointerdown)': 'closeMenu($event)',
@@ -565,6 +561,10 @@ export class ReplayChart {
   readonly indicators = input<readonly string[] | null>(null);
   /** The indicators after the user switched one on or off, to keep for their next sessions. */
   readonly indicatorsChange = output<string[]>();
+  /** How the user set up indicators (`ChartSettingsService`); the others are as they come. */
+  readonly indicatorConfigs = input<Readonly<Record<string, IndicatorConfig>> | null>(null);
+  /** Every setup after the user changed one in its settings dialog, to keep. */
+  readonly indicatorConfigsChange = output<Record<string, IndicatorConfig>>();
 
   protected readonly i18n = inject(I18n);
   private readonly theme = inject(ThemeService);
@@ -579,6 +579,20 @@ export class ReplayChart {
   protected readonly active = linkedSignal<ReadonlySet<string>>(
     () => new Set(this.indicators() ?? DEFAULT_INDICATORS),
   );
+  /** Setups of indicators: the user's saved ones, then their changes. */
+  private readonly configs = linkedSignal<Readonly<Record<string, IndicatorConfig>>>(
+    () => this.indicatorConfigs() ?? {},
+  );
+  /** The indicator whose settings dialog is open. */
+  protected readonly settingsOf = signal<Indicator | null>(null);
+  /** The indicators drawn: those on, with their setups, unless hidden on this timeframe. */
+  private readonly shownIndicators = computed<ShownIndicator[]>(() => {
+    const active = this.active();
+    const seconds = this.barSeconds();
+    return INDICATORS.filter((indicator) => active.has(indicator.id))
+      .map((indicator) => ({ indicator, config: this.configOf(indicator) }))
+      .filter(({ config }) => !config.hidden.includes(seconds));
+  });
   protected readonly toolGroups = TOOL_GROUPS;
   protected readonly drawingColors = DRAWING_COLORS;
   protected readonly tool = signal<Tool | null>(null);
@@ -687,19 +701,7 @@ export class ReplayChart {
   };
   private gesture?: Gesture;
   private drawn: Candle[] = [];
-  private indicatorSeries = new Map<string, ISeriesApi<'Line'> | ISeriesApi<'Histogram'>>();
-  /** The RSI's smoothing average and divergence lines, in its pane while it is on. */
-  private rsiExtras?: {
-    smoothing: ISeriesApi<'Line'>;
-    /** Shading where the RSI is overbought (above 70) and oversold (below 30). */
-    zones: ISeriesApi<'Baseline'>[];
-    /** One line per kind of divergence, each with its labels. */
-    divergences: {
-      kind: Divergence['kind'];
-      line: ISeriesApi<'Line'>;
-      marks: ISeriesMarkersPluginApi<Time>;
-    }[];
-  };
+  private indicatorLines?: ChartIndicators;
   private colors = { up: '', down: '', text: '', muted: '', candleUp: '', candleDown: '' };
   /** Prices of the focused trade, kept inside the price scale. */
   private focusLevels: number[] = [];
@@ -722,7 +724,8 @@ export class ReplayChart {
       this.draw(untracked(this.candles));
       this.applyDates(untracked(this.hideDates));
       this.drawTrades(untracked(this.trades), untracked(this.draft));
-      this.drawIndicators(untracked(this.candles), untracked(this.active));
+      this.indicatorLines = new ChartIndicators(this.chart, () => this.colors);
+      this.drawIndicators(untracked(this.candles), untracked(this.shownIndicators));
       this.showTrade(untracked(this.focusTrade));
       this.listen();
       // Labels follow their lines when the chart scrolls, zooms or resizes.
@@ -760,7 +763,7 @@ export class ReplayChart {
       this.i18n.messages();
       this.drawTrades(this.trades(), this.draft(), this.drawings());
     });
-    effect(() => this.drawIndicators(this.candles(), this.active()));
+    effect(() => this.drawIndicators(this.candles(), this.shownIndicators()));
     effect(() => {
       const id = this.focusTrade();
       this.positionBoxes();
@@ -788,6 +791,46 @@ export class ReplayChart {
       untracked(() => this.chart?.applyOptions({ handleScroll: !still, handleScale: !still }));
     });
     inject(DestroyRef).onDestroy(() => this.chart?.remove());
+  }
+
+  protected configOf(indicator: Indicator): IndicatorConfig {
+    return readConfig(indicator, this.configs()[indicator.id]);
+  }
+
+  /** The indicator's name in the menu: "EMA 100" for averages and the RSI, else its name. */
+  protected indicatorName(indicator: Indicator): string {
+    const t = this.i18n.messages().chart;
+    return indicator.kind === 'ema' || indicator.kind === 'rsi'
+      ? indicatorLabel(indicator, this.configOf(indicator))!
+      : t.indicatorNames[indicator.kind];
+  }
+
+  /** Its settings next to its name in the menu, for those named in words. */
+  protected indicatorDetail(indicator: Indicator): string | null {
+    if (indicator.kind === 'ema' || indicator.kind === 'rsi' || !indicator.inputs.length) {
+      return null;
+    }
+    // "BB 20 2" reads "20 2" after "Bollinger Bands".
+    return indicatorLabel(indicator, this.configOf(indicator))!.split(' ').slice(1).join(' ');
+  }
+
+  /** Opens the settings dialog of an indicator, from the menu. */
+  protected openSettings(indicator: Indicator): void {
+    this.toolMenu.set(null);
+    this.settingsOf.set(indicator);
+  }
+
+  /** Keeps a new setup of an indicator: back to how it comes is no setup at all. */
+  protected saveSettings(indicator: Indicator, config: IndicatorConfig): void {
+    const next = { ...this.configs() };
+    if (isDefaultConfig(indicator, config)) {
+      delete next[indicator.id];
+    } else {
+      next[indicator.id] = config;
+    }
+    this.configs.set(next);
+    this.settingsOf.set(null);
+    this.indicatorConfigsChange.emit(next);
   }
 
   protected toggleIndicator(id: string): void {
@@ -1946,180 +1989,8 @@ export class ReplayChart {
     });
   }
 
-  private drawIndicators(candles: Candle[], active: ReadonlySet<string>): void {
-    const chart = this.chart;
-    if (!chart) {
-      return;
-    }
-    for (const indicator of INDICATORS) {
-      let series = this.indicatorSeries.get(indicator.id);
-      if (!active.has(indicator.id)) {
-        if (series) {
-          chart.removeSeries(series);
-          this.indicatorSeries.delete(indicator.id);
-          if (indicator.kind === 'rsi') {
-            this.removeRsiExtras(chart);
-          }
-        }
-        continue;
-      }
-      if (!series) {
-        series =
-          indicator.kind === 'volume' ? this.addVolume(chart) : this.addLine(chart, indicator);
-        this.indicatorSeries.set(indicator.id, series);
-      }
-      const points = computeIndicator(indicator, candles);
-      if (indicator.kind === 'volume') {
-        // Each bar in its candle's color, faded so the candles stay in front.
-        const { candleUp, candleDown } = this.colors;
-        series.setData(
-          points.map((p, i) => ({
-            time: p.time as Time,
-            value: p.value,
-            color: fade(candles[i].close >= candles[i].open ? candleUp : candleDown),
-          })),
-        );
-        continue;
-      }
-      if (indicator.kind === 'rsi') {
-        this.drawRsiExtras(chart, candles, points);
-      }
-      series.setData(
-        points.map((p) => ({
-          time: p.time as Time,
-          // Averages at price precision: float noise on flat prices would stretch the scale.
-          value: indicator.kind === 'rsi' ? p.value : roundPrice(p.value),
-        })),
-      );
-    }
-  }
-
-  /**
-   * The RSI's smoothing average (SMA 14, as Cris has TradingView set up), its overbought and
-   * oversold zones shaded red and green, and its divergences as TradingView draws them: green
-   * "Bull" and red "Bear" lines between the RSI pivots that diverge from the price.
-   */
-  private drawRsiExtras(chart: IChartApi, candles: Candle[], points: IndicatorPoint[]): void {
-    if (!this.rsiExtras) {
-      // The RSI alone sets its pane's scale, not these lines, shades or labels.
-      const quiet = {
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: false,
-        autoscaleInfoProvider: () => null,
-      };
-      const line = (color: string, width: 1 | 2, lineStyle = LineStyle.Solid) =>
-        chart.addSeries(LineSeries, { ...quiet, color, lineWidth: width, lineStyle }, 1);
-      const zone = (price: number, color: string, above: boolean) =>
-        chart.addSeries(
-          BaselineSeries,
-          {
-            ...quiet,
-            baseValue: { type: 'price', price },
-            lineVisible: false,
-            topFillColor1: above ? color : 'transparent',
-            topFillColor2: above ? color : 'transparent',
-            bottomFillColor1: above ? 'transparent' : color,
-            bottomFillColor2: above ? 'transparent' : color,
-          },
-          1,
-        );
-      this.rsiExtras = {
-        smoothing: line(RSI_COLORS.smoothing, 1),
-        zones: [
-          zone(RSI_OVERBOUGHT, fade(RSI_COLORS.bear, 0.25), true),
-          zone(RSI_OVERSOLD, fade(RSI_COLORS.bull, 0.25), false),
-        ],
-        divergences: (['bull', 'bear'] as const).map((kind) => {
-          const series = line(RSI_COLORS[kind], 2);
-          return { kind, line: series, marks: createSeriesMarkers(series, []) };
-        }),
-      };
-    }
-    const extras = this.rsiExtras;
-    const rsiData = points.map((p) => ({ time: p.time as Time, value: p.value }));
-    extras.smoothing.setData(
-      sma(points, RSI_SMOOTHING).map((p) => ({ time: p.time as Time, value: p.value })),
-    );
-    extras.zones.forEach((zone) => zone.setData(rsiData));
-    const found = rsiDivergences(candles, points);
-    const times = points.map((p) => p.time);
-    for (const { kind, line, marks } of extras.divergences) {
-      const list = found.filter((d) => d.kind === kind);
-      line.setData(divergenceSegments(list, times));
-      marks.setMarkers(
-        list.map((d) => ({
-          time: d.to.time as Time,
-          position: kind === 'bull' ? 'belowBar' : 'aboveBar',
-          shape: 'square',
-          size: 0,
-          color: RSI_COLORS[kind],
-          text: kind === 'bull' ? 'Bull' : 'Bear',
-        })),
-      );
-    }
-  }
-
-  private removeRsiExtras(chart: IChartApi): void {
-    const extras = this.rsiExtras;
-    if (extras) {
-      [extras.smoothing, ...extras.zones, ...extras.divergences.map((d) => d.line)].forEach((s) =>
-        chart.removeSeries(s),
-      );
-      this.rsiExtras = undefined;
-    }
-  }
-
-  /** An average on the candles, or the RSI in its own pane with its dotted guides. */
-  private addLine(chart: IChartApi, indicator: Indicator): ISeriesApi<'Line'> {
-    const rsi = indicator.kind === 'rsi';
-    const series = chart.addSeries(
-      LineSeries,
-      {
-        color: indicator.color,
-        lineWidth: rsi ? 1 : 2,
-        priceLineVisible: false,
-        lastValueVisible: rsi,
-        crosshairMarkerVisible: false,
-      },
-      rsi ? 1 : 0,
-    );
-    if (rsi) {
-      RSI_LEVELS.forEach((price) =>
-        series.createPriceLine({
-          price,
-          // The overbought and oversold limits in the colors of their zones.
-          color:
-            price === RSI_OVERBOUGHT
-              ? RSI_COLORS.bear
-              : price === RSI_OVERSOLD
-                ? RSI_COLORS.bull
-                : this.colors.muted,
-          lineStyle: LineStyle.Dotted,
-          lineWidth: 1,
-          axisLabelVisible: false,
-          title: '',
-        }),
-      );
-      chart.panes()[1]?.setHeight(RSI_PANE_HEIGHT);
-    }
-    return series;
-  }
-
-  /** Volume bars along the foot of the candles, on a scale of their own, as in TradingView. */
-  private addVolume(chart: IChartApi): ISeriesApi<'Histogram'> {
-    const series = chart.addSeries(
-      HistogramSeries,
-      {
-        priceScaleId: 'volume',
-        priceFormat: { type: 'volume' },
-        priceLineVisible: false,
-        lastValueVisible: false,
-      },
-      0,
-    );
-    series.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-    return series;
+  private drawIndicators(candles: Candle[], shown: ShownIndicator[]): void {
+    this.indicatorLines?.draw(candles, shown);
   }
 
   /** Maps a time to the start of its bar. */
@@ -2657,16 +2528,6 @@ function distanceToSegment(p: Pixel, a: Pixel, b: Pixel): number {
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 
-/** A hex color at 50% opacity, for volume bars behind the candles; others stay as they are. */
-export function fade(color: string, alpha = 0.5): string {
-  const hex = /^#([0-9a-f]{6})$/i.exec(color)?.[1];
-  if (!hex) {
-    return color;
-  }
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 /** A price row of a volume profile: its prices and the volume of rising and falling bars. */
 export interface ProfileBin {
   low: number;
@@ -2738,33 +2599,4 @@ export function volumeProfile(
     bins[next].value = true;
   }
   return { low, high, rows: bins, poc };
-}
-
-/**
- * The divergences as one line series: each one a segment between its two pivots, with a gap
- * (a bar of `times` without value) before the next, or joined to it when they share a pivot. One that
- * starts before the previous ends is left out, as a series' times must go forward.
- */
-export function divergenceSegments(
-  list: Divergence[],
-  times: number[],
-): (LineData<Time> | WhitespaceData<Time>)[] {
-  const data: (LineData<Time> | WhitespaceData<Time>)[] = [];
-  let end = -Infinity;
-  for (const { from, to } of list) {
-    if (from.time < end) {
-      continue;
-    }
-    if (from.time > end) {
-      // Pivots of one kind are over 5 bars apart, so there is a bar between them.
-      const gap = times.find((t) => t > end && t < from.time);
-      if (data.length && gap !== undefined) {
-        data.push({ time: gap as Time });
-      }
-      data.push({ time: from.time as Time, value: from.value });
-    }
-    data.push({ time: to.time as Time, value: to.value });
-    end = to.time;
-  }
-  return data;
 }

@@ -42,19 +42,35 @@
     >
       @if (open.kind === 'indicators') {
         @for (indicator of indicatorList; track indicator.id) {
-          <button
-            type="button"
-            role="menuitemcheckbox"
-            [attr.aria-checked]="active().has(indicator.id)"
-            [class.on]="active().has(indicator.id)"
-            (click)="toggleIndicator(indicator.id)"
-          >
-            <span class="swatch" [style.background]="indicator.color"></span>
-            {{ indicator.kind === 'volume' ? t.volume : indicator.label }}
-            <span class="check" aria-hidden="true">{{
-              active().has(indicator.id) ? '✓' : ''
-            }}</span>
-          </button>
+          @let name = indicatorName(indicator);
+          <div class="menu-row" role="none">
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              [attr.aria-checked]="active().has(indicator.id)"
+              [class.on]="active().has(indicator.id)"
+              (click)="toggleIndicator(indicator.id)"
+            >
+              <span class="swatch" [style.background]="indicator.color"></span>
+              {{ name }}
+              @if (indicatorDetail(indicator); as detail) {
+                <span class="detail">{{ detail }}</span>
+              }
+              <span class="check" aria-hidden="true">{{
+                active().has(indicator.id) ? '✓' : ''
+              }}</span>
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              class="gear"
+              [attr.aria-label]="t.settingsOf(name)"
+              [title]="t.settingsOf(name)"
+              (click)="openSettings(indicator)"
+            >
+              <ng-container *ngTemplateOutlet="icon; context: { $implicit: 'settings' }" />
+            </button>
+          </div>
         }
       } @else {
         @for (section of toolGroups; track section.group) {
@@ -708,6 +724,13 @@
       @case ('fib') {
         <path d="M1 3h16M1 7h16M1 11h16M1 15h16" />
       }
+      @case ('settings') {
+        <circle cx="9" cy="9" r="2.5" />
+        <path
+          d="M9 1.5v2.2M9 14.3v2.2M1.5 9h2.2M14.3 9h2.2M3.7 3.7l1.6 1.6M12.7 12.7l1.6 1.6M3.7 14.3l1.6-1.6M12.7 5.3l1.6-1.6"
+        />
+        <circle cx="9" cy="9" r="5.3" />
+      }
       @case ('gann') {
         <rect x="2.5" y="2.5" width="13" height="13" />
         <path d="M2.5 6h13M2.5 9h13M2.5 12h13" />
@@ -766,3 +789,11 @@
     }
   </svg>
 </ng-template>
+@if (settingsOf(); as indicator) {
+  <app-indicator-settings
+    [indicator]="indicator"
+    [config]="configOf(indicator)"
+    (saved)="saveSettings(indicator, $event)"
+    (closed)="settingsOf.set(null)"
+  />
+}

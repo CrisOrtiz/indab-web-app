@@ -1,6 +1,7 @@
 import { WorkKind } from '../../models/notification';
 import { OrderType, TradeSide } from '../../models/practice';
 import type { Tool, ToolGroup } from '../../../features/practice/replay-chart';
+import type { IndicatorKind } from '../../../features/practice/indicators';
 
 /**
  * Spanish (Latin America) texts: the default language and the source of the `Messages` type.
@@ -880,6 +881,63 @@ export const es = {
     tools: 'Herramientas del gráfico',
     indicators: 'Indicadores',
     volume: 'Volumen',
+    indicatorNames: {
+      ema: 'Media móvil exponencial',
+      rsi: 'Índice de fuerza relativa',
+      volume: 'Volumen',
+      bollinger: 'Bandas de Bollinger',
+      macd: 'MACD',
+      stochastic: 'Estocástico',
+      atr: 'Rango verdadero medio (ATR)',
+      supertrend: 'SuperTrend',
+      vwap: 'VWAP',
+    } as Record<IndicatorKind, string>,
+    settingsOf: (name: string) => `Ajustes de ${name}`,
+    settings: {
+      tabs: { inputs: 'Entradas de datos', style: 'Estilo', visibility: 'Visibilidad' },
+      inputNames: {
+        length: 'Longitud',
+        smoothing: 'Longitud de la media',
+        divergences: 'Mostrar divergencias',
+        mult: 'Desviación estándar',
+        fast: 'Longitud rápida',
+        slow: 'Longitud lenta',
+        signal: 'Suavizado de la señal',
+        kLength: 'Longitud de %K',
+        kSmoothing: 'Suavizado de %K',
+        dSmoothing: 'Suavizado de %D',
+        atrLength: 'Longitud del ATR',
+        factor: 'Factor',
+        signals: 'Mostrar etiquetas BUY/SELL',
+      } as Record<string, string>,
+      plotNames: {
+        ema: 'Línea',
+        rsi: 'RSI',
+        smoothing: 'Media del RSI',
+        basis: 'Base',
+        upper: 'Banda superior',
+        lower: 'Banda inferior',
+        macd: 'MACD',
+        signal: 'Señal',
+        rising: 'Histograma positivo',
+        falling: 'Histograma negativo',
+        k: '%K',
+        d: '%D',
+        atr: 'ATR',
+        up: 'Tendencia alcista',
+        down: 'Tendencia bajista',
+        vwap: 'VWAP',
+      } as Record<string, string>,
+      colorOf: (name: string) => `Color de ${name}`,
+      widthOf: (name: string) => `Grosor de ${name}`,
+      noInputs: 'Este indicador no tiene entradas.',
+      noStyle: 'Las barras toman el color de su vela.',
+      timeframes: 'Mostrar en estas temporalidades:',
+      reset: 'Restablecer',
+      cancel: 'Cancelar',
+      ok: 'Aceptar',
+      close: 'Cerrar',
+    },
     draw: 'Dibujar',
     drawingTools: 'Herramientas de dibujo',
     toolNames: {

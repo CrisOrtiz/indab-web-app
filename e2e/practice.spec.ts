@@ -1,9 +1,25 @@
-import { expect, test } from '@playwright/test';
+import { Locator, expect, test } from '@playwright/test';
 import { createUser, listDocuments, resetEmulators, setDocument } from './emulators';
 import { nav, signIn, signOut } from './helpers';
-import { mockMarket } from './market';
+import { mockMarket, mockWavyMarket } from './market';
 
 let studentUid: string;
+
+/**
+ * Waits until `target` stops moving: once the page scrolls, the sticky header shrinks with an
+ * animation and moves everything under it for a moment, so clicks and touches would miss.
+ */
+async function settled(target: Locator): Promise<void> {
+  let last: number | undefined;
+  await expect
+    .poll(async () => {
+      const y = (await target.boundingBox())!.y;
+      const still = y === last;
+      last = y;
+      return still;
+    })
+    .toBe(true);
+}
 
 test.beforeEach(async ({ page }) => {
   await resetEmulators();
@@ -273,6 +289,7 @@ test('a student adds an order from the chart menu and sets it up on its line', a
   await expect(stage.locator('.line-label')).toHaveCount(0);
   await page.setViewportSize({ width: 1280, height: 1000 });
   await stage.scrollIntoViewIfNeeded();
+  await settled(stage);
   const box = (await stage.boundingBox())!;
   await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.7);
   await page.getByRole('button', { name: 'Opciones en este precio' }).click();
@@ -424,11 +441,13 @@ test.describe('on a phone', () => {
 
     // The chart fills the screen under the header, as when practising on a phone.
     const stage = chart.locator('.stage');
-    const fitChart = () =>
-      page.evaluate(() => {
+    const fitChart = async () => {
+      await page.evaluate(() => {
         const chart = document.querySelector('.workspace app-replay-chart')!;
         window.scrollBy({ top: chart.getBoundingClientRect().top - 100, behavior: 'instant' });
       });
+      await settled(stage);
+    };
     let box = (await stage.boundingBox())!;
     // Real touches, so the chart gets pointer events of a finger.
     const cdp = await page.context().newCDPSession(page);
@@ -525,6 +544,40 @@ test.describe('on a phone', () => {
     expect((await stage.boundingBox())!.y).toBe(box.y);
     await page.screenshot({ path: 'test-results/phone-gann.png' });
   });
+
+  test('a student sets up an indicator on a full-screen sheet', async ({ page }) => {
+    await mockWavyMarket(page);
+    await signIn(page, 'jose@indab.test');
+    await page.getByRole('link', { name: 'Práctica de trading' }).click();
+    await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+    await expect(page.getByRole('button', { name: 'Terminar sesión' })).toBeVisible();
+
+    const chart = page.locator('.workspace app-replay-chart');
+    await chart.getByRole('button', { name: 'Indicadores' }).tap();
+    await page.getByRole('menuitemcheckbox', { name: 'SuperTrend 10 3' }).tap();
+    await page.getByRole('menuitem', { name: 'Ajustes de SuperTrend' }).tap();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('heading')).toHaveText('SuperTrend 10 3');
+    // The sheet covers the screen, as in TradingView's app, and the page stays phone-wide at
+    // gold prices.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+    const box = (await dialog.boundingBox())!;
+    expect([box.x, box.y, box.width]).toEqual([0, 0, 390]);
+    await expect(dialog.getByLabel('Mostrar etiquetas BUY/SELL')).toBeChecked();
+    await dialog.getByLabel('Factor').fill('2');
+    await dialog.getByLabel('Factor').blur();
+    await expect(dialog.getByRole('heading')).toHaveText('SuperTrend 10 2');
+    await page.screenshot({ path: 'test-results/phone-indicator-settings.png' });
+    await dialog.getByRole('button', { name: 'Aceptar' }).tap();
+    await expect(dialog).toBeHidden();
+    await page.evaluate(() => {
+      const top = document
+        .querySelector('.workspace app-replay-chart')!
+        .getBoundingClientRect().top;
+      window.scrollBy({ top: top - 100, behavior: 'instant' });
+    });
+    await page.screenshot({ path: 'test-results/phone-indicators.png' });
+  });
 });
 
 test('a student draws a Gann box with the mouse and reshapes it', async ({ page }) => {
@@ -541,6 +594,7 @@ test('a student draws a Gann box with the mouse and reshapes it', async ({ page 
   await page.screenshot({ path: 'test-results/desk-gann-menu.png' });
   await page.getByRole('menuitemradio', { name: 'Cuadrícula de Gann' }).click();
   await stage.scrollIntoViewIfNeeded();
+  await settled(stage);
   const box = (await stage.boundingBox())!;
   await page.mouse.click(box.x + box.width * 0.35, box.y + box.height * 0.7);
   await page.mouse.click(box.x + box.width * 0.75, box.y + box.height * 0.25);
@@ -594,6 +648,66 @@ test("the chart keeps each student's indicators for their next sessions", async 
   for (const name of ['EMA 100', 'EMA 200', 'RSI 14', 'Volumen']) {
     await expect(item(name)).toHaveAttribute('aria-checked', 'true');
   }
+});
+
+test('a student adds classic indicators and sets one up as in TradingView', async ({ page }) => {
+  await mockWavyMarket(page);
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+  await expect(page.getByRole('button', { name: 'Terminar sesión' })).toBeVisible();
+
+  const chart = page.locator('.workspace app-replay-chart');
+  const menu = () => chart.getByRole('button', { name: 'Indicadores' }).click();
+  const item = (name: string) => page.getByRole('menuitemcheckbox', { name });
+  await page.evaluate(() => {
+    const top = document.querySelector('.workspace app-replay-chart')!.getBoundingClientRect().top;
+    window.scrollBy({ top: top - 80, behavior: 'instant' });
+  });
+  await menu();
+  await item('EMA 100').click();
+  await item('Bandas de Bollinger 20 2').click();
+  await item('MACD 12 26 9').click();
+  await item('SuperTrend 10 3').click();
+  await expect(item('MACD 12 26 9')).toHaveAttribute('aria-checked', 'true');
+  await page.screenshot({ path: 'test-results/desk-indicators-menu.png' });
+
+  // The gear next to EMA 100 opens its settings: inputs, style and visibility.
+  await page.getByRole('menuitem', { name: 'Ajustes de EMA 100' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading')).toHaveText('EMA 100');
+  await expect(dialog.getByRole('tab', { name: 'Entradas de datos' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await dialog.getByLabel('Longitud').fill('50');
+  await dialog.getByLabel('Longitud').blur();
+  await expect(dialog.getByRole('heading')).toHaveText('EMA 50');
+  await page.screenshot({ path: 'test-results/desk-indicator-settings.png' });
+  await dialog.getByRole('tab', { name: 'Estilo' }).click();
+  await dialog.getByLabel('Grosor de Línea').selectOption('3');
+  await dialog.getByRole('tab', { name: 'Visibilidad' }).click();
+  await expect(dialog.getByLabel('4h')).toBeChecked();
+  await dialog.getByRole('button', { name: 'Aceptar' }).click();
+  await expect(dialog).toBeHidden();
+
+  // Kept for the next sessions, with the indicators on.
+  await expect
+    .poll(async () => (await listDocuments(`users/${studentUid}/settings`))[0]?.['configs'])
+    .toEqual({
+      ema100: {
+        inputs: { length: 50 },
+        colors: { ema: '#ff9800' },
+        widths: { ema: 3 },
+        hidden: [],
+      },
+    });
+  await menu();
+  await expect(item('EMA 50')).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+  await page.mouse.click(5, 5);
+  await chart.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/desk-indicators.png' });
 });
 
 test('the replay plays, pauses and changes speed from its controls', async ({ page }) => {

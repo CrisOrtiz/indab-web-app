@@ -2275,8 +2275,18 @@ describe('chart settings', () => {
     await assertFails(setDoc(chart(null, 'ana'), data()));
   });
 
+  it('keep how the user set up known indicators', async () => {
+    const config = { inputs: { length: 20, mult: 2 }, colors: {}, widths: {}, hidden: [60] };
+    await assertSucceeds(
+      setDoc(chart('ana', 'ana'), data({ indicators: ['bollinger', 'macd'], configs: {} })),
+    );
+    await assertSucceeds(setDoc(chart('ana', 'ana'), data({ configs: { bollinger: config } })));
+    await assertFails(setDoc(chart('ana', 'ana'), data({ configs: { ichimoku: config } })));
+    await assertFails(setDoc(chart('ana', 'ana'), data({ configs: [config] })));
+  });
+
   it('only keep known indicators', async () => {
-    await assertFails(setDoc(chart('ana', 'ana'), data({ indicators: ['macd'] })));
+    await assertFails(setDoc(chart('ana', 'ana'), data({ indicators: ['ichimoku'] })));
     await assertFails(setDoc(chart('ana', 'ana'), data({ indicators: 'rsi14' })));
     await assertFails(setDoc(chart('ana', 'ana'), data({ theme: 'dark' })));
     await assertFails(setDoc(chart('ana', 'ana'), data({ updatedAt: 1 })));
