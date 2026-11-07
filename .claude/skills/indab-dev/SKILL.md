@@ -73,7 +73,8 @@ otherwise create a feature service.
 | `mentorNotes/{id}`                                               | staff; the student it is about                                                                                  | admins; staff who mentor one of the student's mentorships (`mentorshipId`); on the student's own session or form attempt; author edits, author or admin deletes                                                                      |
 | `users/{uid}/notifications/{id}`                                 | owner                                                                                                           | the sender, once per event (id `{type}_{refId}`, `note_{noteId}`); rules check the event and that the sender may tell the owner; owner marks read, deletes                                                                           |
 | `users/{uid}/settings/notifications`                             | owner                                                                                                           | trainers and admins, their own                                                                                                                                                                                                       |
-| `users/{uid}/settings/chart`                                     | owner                                                                                                           | everyone, their own                                                                                                                                                                                                                  |
+| `users/{uid}/settings/chart`                                     | owner                                                                                                           | everyone, their own (indicators, `news` on/off)                                                                                                                                                                                      |
+| `marketNews/{YYYY-MM}`                                           | academy access                                                                                                  | nobody: the daily News sync job (service account)                                                                                                                                                                                    |
 | `reviews/{uid}`                                                  | author, admins; everyone once `featured`                                                                        | the author with academy access (any edit sets `featured` false); admins only `featured`/`featuredAt`/`featuredBy`; author or admin deletes                                                                                           |
 | `follows/{kind}/subjects/{id}/followers/{uid}`                   | that staff member; students, the lists that concern them                                                        | that staff member (`types` of activity)                                                                                                                                                                                              |
 
@@ -324,6 +325,14 @@ Module notes:
   market and is kept only for old sessions); `MarketDataService` drops bars while spot gold is
   closed and empty minutes (`goldHours`), paging until it has the requested count, and
   `loadHistory` reads backwards from the replay start. Candles use TradingView's colors.
+  Economic news (Cris, 2026-11-06, README "News on the practice chart"): icons on the time axis
+  per bar (`news-marks.ts`), a card with the releases (figures only once the replay reaches them;
+  with `hideDates` only the impact). Data: Finance Calendar (free key, commercial use with a
+  visible link to financecalendar.com, kept in the card), copied daily into `marketNews/{YYYY-MM}`
+  by `.github/workflows/news-sync.yml` + `scripts/sync-news.mts` (Node strips the types; it
+  imports `core/models/market-news.ts`, which must keep having no imports). Pages read it with
+  `NewsService.feed`; specs get a quiet one from `quietChartSettings()` (`newsEvents`). Never call
+  Finance Calendar from the browser (the key is secret).
   Cris wants exactly XAU/USD, USD/JPY and NASDAQ: only gold (XAUUSDT) is live, the others
   wait for a data source licensed for display to students. Never bundle or serve data whose
   license is personal use only (e.g. Dukascopy). A new timeframe must also be added to the

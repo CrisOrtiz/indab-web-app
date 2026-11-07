@@ -75,6 +75,9 @@
             [trading]="true"
             [indicators]="chartSettings.indicators()"
             (indicatorsChange)="chartSettings.saveIndicators($event)"
+            [news]="news()"
+            [showNews]="chartSettings.news()"
+            (showNewsChange)="chartSettings.saveNews($event)"
             [lots]="lots()"
             (levelMoved)="onLevelMoved($event)"
             (levelsMoved)="onLevelsMoved($event)"
@@ -574,6 +577,9 @@
             [hideDates]="datesHidden()"
             [indicators]="chartSettings.indicators()"
             (indicatorsChange)="chartSettings.saveIndicators($event)"
+            [news]="news()"
+            [showNews]="chartSettings.news()"
+            (showNewsChange)="chartSettings.saveNews($event)"
           />
           @if (filledTrades().length) {
             <app-trade-navigator

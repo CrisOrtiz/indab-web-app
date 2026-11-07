@@ -2281,6 +2281,38 @@ describe('chart settings', () => {
     await assertFails(setDoc(chart('ana', 'ana'), data({ theme: 'dark' })));
     await assertFails(setDoc(chart('ana', 'ana'), data({ updatedAt: 1 })));
   });
+
+  it('keep whether the chart shows the news', async () => {
+    await assertSucceeds(setDoc(chart('ana', 'ana'), data({ news: false })));
+    await assertFails(setDoc(chart('ana', 'ana'), data({ news: 'no' })));
+  });
+});
+
+describe('market news', () => {
+  const month = (uid: string | null) => doc(as(uid), 'marketNews/2026-01');
+
+  beforeEach(() =>
+    env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), 'marketNews/2026-01'), { month: '2026-01', events: [] }),
+    ),
+  );
+
+  it('is read by academy members and staff only', async () => {
+    await assertSucceeds(getDoc(month('enrolled')));
+    await assertSucceeds(getDoc(month('trainer')));
+    await assertSucceeds(getDoc(month('admin')));
+    await assertFails(getDoc(doc(as('enrolled', false), 'marketNews/2026-01')));
+    await assertFails(getDoc(month('partial')));
+    await assertFails(getDoc(month('student')));
+    await assertFails(getDoc(month(null)));
+  });
+
+  it('is written by the sync job only', async () => {
+    const data = { month: '2026-01', events: [] };
+    await assertFails(setDoc(month('admin'), data));
+    await assertFails(setDoc(doc(as('admin'), 'marketNews/2026-02'), data));
+    await assertFails(setDoc(month('enrolled'), data));
+  });
 });
 
 describe('reviews', () => {

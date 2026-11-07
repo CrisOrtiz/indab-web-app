@@ -64,12 +64,38 @@ describe('ChartSettingsService', () => {
     await service.saveIndicators(['ema200', 'rsi14']);
     expect(setDoc).toHaveBeenCalledWith(
       { path: 'users/ana/settings/chart' },
-      { indicators: ['ema200', 'rsi14'], updatedAt: 'NOW' },
+      { indicators: ['ema200', 'rsi14'], news: true, updatedAt: 'NOW' },
     );
     expect(service.indicators()).toEqual(['ema200', 'rsi14']);
 
     vi.mocked(setDoc).mockRejectedValueOnce(new Error('offline'));
     await service.saveIndicators([]);
     expect(service.indicators()).toEqual([]);
+  });
+
+  it('keeps whether the chart shows the news, on by default', async () => {
+    saved({ indicators: ['rsi14'] });
+    await service.load();
+    expect(service.news()).toBe(true);
+
+    user.set({ uid: 'bob' });
+    saved({ indicators: ['rsi14'], news: false });
+    await service.load();
+    expect(service.news()).toBe(false);
+
+    await service.saveNews(true);
+    expect(setDoc).toHaveBeenLastCalledWith(
+      { path: 'users/bob/settings/chart' },
+      { indicators: ['rsi14'], news: true, updatedAt: 'NOW' },
+    );
+    expect(service.news()).toBe(true);
+  });
+
+  it('saves the default indicators with the news switch when none were picked', async () => {
+    await service.saveNews(false);
+    expect(setDoc).toHaveBeenCalledWith(
+      { path: 'users/ana/settings/chart' },
+      { indicators: ['rsi14'], news: false, updatedAt: 'NOW' },
+    );
   });
 });

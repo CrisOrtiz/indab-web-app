@@ -46,3 +46,211 @@
     stroke-width: 1.5;
   }
 }
+
+// Economic news on the time axis: an icon per bar in ForexFactory's impact colors (as on the
+// calendar page), and a card with the releases when one is tapped.
+:host {
+  --impact-high: #e53935;
+  --impact-medium: #fb8c00;
+  --impact-low: #fdd835;
+}
+
+.news-mark,
+.news-line,
+.news-dot {
+  &.high {
+    --impact: var(--impact-high);
+  }
+
+  &.medium {
+    --impact: var(--impact-medium);
+  }
+
+  &.low {
+    --impact: var(--impact-low);
+  }
+}
+
+.news-swatch {
+  background: var(--impact-high);
+}
+
+.news {
+  position: absolute;
+  left: 0;
+  z-index: 3;
+  height: 20px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.news-mark {
+  position: absolute;
+  top: 0;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  border: 2px solid var(--color-bg);
+  border-radius: 999px;
+  background: var(--impact);
+  color: #fff;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  transform: translateX(-50%);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+  cursor: pointer;
+  pointer-events: auto;
+
+  // Still to come: an outline, filled once the replay reaches it.
+  &.upcoming {
+    border-color: var(--impact);
+    background: var(--color-bg);
+    color: var(--impact);
+  }
+
+  &.low,
+  &.low.upcoming {
+    color: #111;
+  }
+
+  &[aria-expanded='true'] {
+    outline: 2px solid var(--impact);
+    outline-offset: 1px;
+  }
+
+  // A bigger target for fingers.
+  &::after {
+    position: absolute;
+    inset: -8px;
+    content: '';
+  }
+}
+
+.news-line {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  border-left: 1.5px dashed var(--impact);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.news-card {
+  position: absolute;
+  z-index: 20;
+  width: 280px;
+  max-width: calc(100% - 8px);
+  min-height: 120px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
+  animation: dropdown-in 0.12s ease-out;
+
+  ul {
+    display: grid;
+    gap: 10px;
+    margin: 8px 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+
+    > div {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+  }
+}
+
+.news-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.news-close {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--color-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface);
+  }
+}
+
+.news-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--impact);
+}
+
+.news-meta,
+.news-note,
+.news-credit {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+
+.news-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 2px 0 0;
+
+  div {
+    display: grid;
+  }
+
+  dt {
+    color: var(--color-muted);
+    font-size: 0.72rem;
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .pending dd {
+    color: var(--color-muted);
+    font-weight: 400;
+  }
+}
+
+.news-note,
+.news-credit {
+  margin: 4px 0 0;
+}
+
+.news-credit a {
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .news-card {
+    animation: none;
+  }
+}

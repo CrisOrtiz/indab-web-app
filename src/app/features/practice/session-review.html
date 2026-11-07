@@ -14,6 +14,9 @@
       [hideDates]="hideDates()"
       [indicators]="chartSettings.indicators()"
       (indicatorsChange)="chartSettings.saveIndicators($event)"
+      [news]="news()"
+      [showNews]="chartSettings.news()"
+      (showNewsChange)="chartSettings.saveNews($event)"
     />
   } @else {
     <p class="muted">{{ t.chartFailed }}</p>
