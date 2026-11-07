@@ -56,6 +56,18 @@
             }}</span>
           </button>
         }
+        <hr />
+        <button
+          type="button"
+          role="menuitemcheckbox"
+          [attr.aria-checked]="newsOn()"
+          [class.on]="newsOn()"
+          (click)="toggleNews()"
+        >
+          <span class="swatch news-swatch"></span>
+          {{ t.news.toggle }}
+          <span class="check" aria-hidden="true">{{ newsOn() ? '✓' : '' }}</span>
+        </button>
       } @else {
         @for (section of toolGroups; track section.group) {
           <p class="menu-heading" role="presentation">{{ t.toolGroups[section.group] }}</p>
@@ -89,6 +101,113 @@
 <div class="stage" #stage>
   <div class="canvas" #canvas></div>
   <img class="watermark" src="logo.jpg" alt="" aria-hidden="true" />
+  @if (openNews(); as open) {
+    <div
+      class="news-line"
+      [class]="open.impact"
+      [style.left.px]="open.x"
+      [style.height.px]="paneSize().height"
+      aria-hidden="true"
+    ></div>
+  }
+  @if (newsMarks().length) {
+    <div class="news" [style.top.px]="paneSize().height - 24" [style.width.px]="paneSize().width">
+      @for (mark of newsMarks(); track mark.key) {
+        <button
+          type="button"
+          class="news-mark"
+          [class]="mark.impact"
+          [class.upcoming]="!mark.released"
+          [style.left.px]="mark.x"
+          [attr.aria-expanded]="openNews()?.key === mark.key"
+          [attr.aria-label]="t.news.markLabel(mark.events.length, t.news.impact[mark.impact])"
+          (click)="toggleNewsCard(mark.key)"
+        >
+          @if (mark.events.length > 1) {
+            {{ mark.events.length }}
+          }
+        </button>
+      }
+    </div>
+  }
+  @if (openNews(); as open) {
+    <div
+      class="news-card"
+      role="dialog"
+      [attr.aria-label]="t.news.title"
+      [style.left.px]="newsCardLeft(open.x)"
+      [style.bottom.px]="stageHeight() - paneSize().height + 30"
+      [style.max-height.px]="paneSize().height - 36"
+    >
+      <div class="news-card-head">
+        <strong>{{ t.news.title }}</strong>
+        <button
+          type="button"
+          class="news-close"
+          [attr.aria-label]="t.news.close"
+          (click)="closeNewsCard()"
+        >
+          ×
+        </button>
+      </div>
+      <ul>
+        @for (item of open.events; track item.event.id) {
+          @let e = item.event;
+          <li>
+            <span class="news-dot" [class]="e.impact" aria-hidden="true"></span>
+            <div>
+              @if (hideDates()) {
+                <strong>{{ t.news.masked[e.impact] }}</strong>
+                <span class="news-meta">{{
+                  item.released ? t.news.released : t.news.upcoming
+                }}</span>
+              } @else {
+                <strong>{{ e.name }}</strong>
+                <span class="news-meta"
+                  >{{ newsTime(e.time) }} · {{ e.country }} · {{ t.news.impact[e.impact] }}</span
+                >
+                <dl class="news-figures">
+                  @if (!item.released) {
+                    <div class="pending">
+                      <dt>{{ t.news.actual }}</dt>
+                      <dd>{{ t.news.upcoming }}</dd>
+                    </div>
+                  } @else if (figure(e.actual, e.unit); as actual) {
+                    <div>
+                      <dt>{{ t.news.actual }}</dt>
+                      <dd>{{ actual }}</dd>
+                    </div>
+                  }
+                  @if (figure(e.consensus, e.unit); as consensus) {
+                    <div>
+                      <dt>{{ t.news.forecast }}</dt>
+                      <dd>{{ consensus }}</dd>
+                    </div>
+                  }
+                  @if (figure(e.prior, e.unit); as prior) {
+                    <div>
+                      <dt>{{ t.news.previous }}</dt>
+                      <dd>{{ prior }}</dd>
+                    </div>
+                  }
+                </dl>
+                @if (e.source) {
+                  <span class="news-meta">{{ t.news.source }}: {{ e.source }}</span>
+                }
+              }
+            </div>
+          </li>
+        }
+      </ul>
+      @if (hideDates()) {
+        <p class="news-note">{{ t.news.maskedNote }}</p>
+      }
+      <p class="news-credit">
+        {{ t.news.dataFrom }}
+        <a [href]="newsSourceUrl" target="_blank" rel="noopener">Finance Calendar</a>
+      </p>
+    </div>
+  }
   @if (boxes().length || startX() !== null) {
     <svg
       class="positions"

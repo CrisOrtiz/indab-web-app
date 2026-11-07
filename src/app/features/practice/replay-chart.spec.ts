@@ -1,6 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
+import { NewsEvent } from '../../core/models/market-news';
 import { Candle, OrderType, PracticeTrade } from '../../core/models/practice';
 import { ThemeService } from '../../core/theme/theme.service';
 import {
@@ -114,6 +115,9 @@ const position: PracticeTrade = {
     (lotsChanged)="lots.push($event)"
     [indicators]="indicators()"
     (indicatorsChange)="picked.push($event)"
+    [news]="news()"
+    [showNews]="showNews()"
+    (showNewsChange)="newsSwitched.push($event)"
     symbol="PAXGUSDT"
   />`,
 })
@@ -137,6 +141,9 @@ class Host {
   readonly lots: string[] = [];
   readonly indicators = signal<readonly string[] | null>(null);
   readonly picked: string[][] = [];
+  readonly news = signal<NewsEvent[]>([]);
+  readonly showNews = signal(true);
+  readonly newsSwitched: boolean[] = [];
   submitted = () => {};
 }
 
@@ -586,7 +593,7 @@ describe('ReplayChart', () => {
       [...el.querySelectorAll('.tool-menu button')].map((b) =>
         b.textContent!.replace(/\s+/g, ' ').trim(),
       ),
-    ).toEqual(['EMA 100', 'EMA 200', 'RSI 14 ✓', 'Volumen']);
+    ).toEqual(['EMA 100', 'EMA 200', 'RSI 14 ✓', 'Volumen', 'Noticias ✓']);
     expect(el.querySelector('.menu-trigger .count')!.textContent).toBe('1');
 
     // The menu stays open to pick several; each change is reported, to be kept.
@@ -1600,5 +1607,147 @@ describe('fade', () => {
   it('halves the opacity of hex colors and leaves others alone', () => {
     expect(fade('#089981')).toBe('rgba(8, 153, 129, 0.5)');
     expect(fade('red')).toBe('red');
+  });
+});
+
+describe('ReplayChart economic news', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const render = async () => {
+    const fixture = TestBed.createComponent(Host);
+    await fixture.whenStable();
+    const el: HTMLElement = fixture.nativeElement;
+    const click = async (name: string) => {
+      [...el.querySelectorAll('button')]
+        .find((b) => b.textContent?.trim().startsWith(name))!
+        .click();
+      await fixture.whenStable();
+    };
+    return { fixture, el, host: fixture.componentInstance, click };
+  };
+
+  const release = (time: number, extra: Partial<NewsEvent> = {}): NewsEvent => ({
+    id: `n${time}`,
+    time,
+    name: 'Nonfarm Payrolls',
+    country: 'US',
+    impact: 'high',
+    period: 'October 2026',
+    actual: '254',
+    prior: '150',
+    consensus: '180',
+    unit: 'K',
+    source: 'U.S. Bureau of Labor Statistics',
+    ...extra,
+  });
+  const marks = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>('.news-mark')];
+  /** The card's text, with a space between its pieces. */
+  const card = (el: HTMLElement) => {
+    const root = el.querySelector('.news-card');
+    if (!root) {
+      return '';
+    }
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const parts: string[] = [];
+    while (walker.nextNode()) {
+      parts.push(walker.currentNode.textContent!.trim());
+    }
+    return parts.filter(Boolean).join(' ').replace(/\s+/g, ' ');
+  };
+
+  it('puts an icon on the bar of each release, and opens its card with the figures', async () => {
+    const { fixture, el, host } = await render();
+    host.hide.set(false);
+    host.candles.set([c(0), c(60), c(120)]);
+    host.barSeconds.set(60);
+    host.news.set([release(70), release(75, { id: 'cpi', name: 'CPI', impact: 'medium' })]);
+    await fixture.whenStable();
+
+    const [mark] = marks(el);
+    expect(marks(el)).toHaveLength(1);
+    expect(mark.style.left).toBe('10px');
+    expect(mark.classList).toContain('high');
+    expect(mark.textContent?.trim()).toBe('2');
+    expect(mark.getAttribute('aria-label')).toBe('2 noticias, impacto alto');
+
+    mark.click();
+    await fixture.whenStable();
+    expect(card(el)).toContain('Nonfarm Payrolls');
+    expect(card(el)).toContain('Actual 254 K');
+    expect(card(el)).toContain('Previsión 180 K');
+    expect(card(el)).toContain('Anterior 150 K');
+    expect(card(el)).toContain('Fuente: U.S. Bureau of Labor Statistics');
+    expect(card(el)).toContain('CPI');
+    expect(el.querySelector<HTMLAnchorElement>('.news-credit a')?.getAttribute('href')).toBe(
+      'https://www.financecalendar.com',
+    );
+
+    // Escape closes it.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await fixture.whenStable();
+    expect(el.querySelector('.news-card')).toBeNull();
+  });
+
+  it('keeps the figure of a release the replay has not reached', async () => {
+    const { fixture, el, host } = await render();
+    host.hide.set(false);
+    host.candles.set([c(0), c(60)]);
+    host.barSeconds.set(60);
+    host.news.set([release(200)]);
+    await fixture.whenStable();
+
+    const [mark] = marks(el);
+    expect(mark.classList).toContain('upcoming');
+    expect(mark.style.left).toBe('30px');
+    mark.click();
+    await fixture.whenStable();
+    expect(card(el)).toContain('Actual Por publicarse');
+    expect(card(el)).not.toContain('254');
+
+    // The replay gets there: the figure is out.
+    host.candles.set([c(0), c(60), c(120), c(180), c(240)]);
+    await fixture.whenStable();
+    expect(marks(el)[0].classList).not.toContain('upcoming');
+    expect(card(el)).toContain('Actual 254 K');
+  });
+
+  it('shows only the impact while dates are hidden', async () => {
+    const { fixture, el, host } = await render();
+    host.candles.set([c(0), c(60), c(120)]);
+    host.barSeconds.set(60);
+    host.news.set([release(70)]);
+    await fixture.whenStable();
+
+    marks(el)[0].click();
+    await fixture.whenStable();
+    expect(card(el)).toContain('Noticia de impacto alto');
+    expect(card(el)).toContain('Publicada');
+    expect(card(el)).toContain('ocultos para no revelar la fecha');
+    for (const hidden of ['Nonfarm', '254', '150', '180', 'Bureau', 'Oct']) {
+      expect(card(el)).not.toContain(hidden);
+    }
+  });
+
+  it('switches the news off and on from the indicators menu', async () => {
+    const { fixture, el, host, click } = await render();
+    host.hide.set(false);
+    host.candles.set([c(0), c(60), c(120)]);
+    host.barSeconds.set(60);
+    host.news.set([release(70)]);
+    await fixture.whenStable();
+    expect(marks(el)).toHaveLength(1);
+
+    el.querySelector<HTMLButtonElement>('[aria-label="Indicadores"]')!.click();
+    await fixture.whenStable();
+    await click('Noticias');
+    expect(host.newsSwitched).toEqual([false]);
+    expect(marks(el)).toHaveLength(0);
+
+    // A saved choice from the settings is followed too.
+    host.showNews.set(false);
+    await fixture.whenStable();
+    host.showNews.set(true);
+    await fixture.whenStable();
+    expect(marks(el)).toHaveLength(1);
   });
 });

@@ -859,6 +859,27 @@ export const en: Messages = {
 
   chart: {
     replayStart: 'Replay start',
+    news: {
+      toggle: 'News',
+      title: 'Economic news',
+      impact: { high: 'High impact', medium: 'Medium impact', low: 'Low impact' },
+      masked: {
+        high: 'High-impact news',
+        medium: 'Medium-impact news',
+        low: 'Low-impact news',
+      },
+      markLabel: (count: number, impact: string) =>
+        `${count === 1 ? '1 news release' : `${count} news releases`}, ${impact.toLowerCase()}`,
+      actual: 'Actual',
+      forecast: 'Forecast',
+      previous: 'Previous',
+      upcoming: 'Not out yet',
+      released: 'Released',
+      source: 'Source',
+      maskedNote: 'Name, time and figures are hidden so the replay date stays secret.',
+      dataFrom: 'Data from',
+      close: 'Close',
+    },
     tools: 'Chart tools',
     indicators: 'Indicators',
     volume: 'Volume',

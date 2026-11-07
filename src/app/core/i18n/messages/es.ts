@@ -877,6 +877,27 @@ export const es = {
 
   chart: {
     replayStart: 'Inicio del replay',
+    news: {
+      toggle: 'Noticias',
+      title: 'Noticias económicas',
+      impact: { high: 'Impacto alto', medium: 'Impacto medio', low: 'Impacto bajo' },
+      masked: {
+        high: 'Noticia de impacto alto',
+        medium: 'Noticia de impacto medio',
+        low: 'Noticia de impacto bajo',
+      },
+      markLabel: (count: number, impact: string) =>
+        `${count === 1 ? '1 noticia' : `${count} noticias`}, ${impact.toLowerCase()}`,
+      actual: 'Actual',
+      forecast: 'Previsión',
+      previous: 'Anterior',
+      upcoming: 'Por publicarse',
+      released: 'Publicada',
+      source: 'Fuente',
+      maskedNote: 'Nombre, hora y cifras ocultos para no revelar la fecha del replay.',
+      dataFrom: 'Datos de',
+      close: 'Cerrar',
+    },
     tools: 'Herramientas del gráfico',
     indicators: 'Indicadores',
     volume: 'Volumen',

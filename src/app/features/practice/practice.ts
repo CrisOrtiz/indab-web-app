@@ -29,6 +29,7 @@ import {
 } from '../../core/models/practice';
 import { EvaluationService } from '../evaluations/evaluation.service';
 import { ChartSettingsService } from './chart-settings.service';
+import { NewsService } from './news.service';
 import { BarBuilder, formatElapsed, nextBarEnd } from './bars';
 import { ReplayControls } from './replay-controls';
 import { EvaluationBriefing } from './evaluation-briefing';
@@ -192,6 +193,11 @@ export class Practice {
   private readonly tabs = inject(SessionTabs);
   /** The indicators the user keeps on the chart. */
   protected readonly chartSettings = inject(ChartSettingsService);
+  /** Economic news around the chart's bars, while the user keeps them on. */
+  protected readonly news = inject(NewsService).feed(
+    () => this.visibleCandles(),
+    () => this.chartSettings.news(),
+  );
   private readonly locale = inject(LOCALE_ID);
   protected readonly i18n = inject(I18n);
 
