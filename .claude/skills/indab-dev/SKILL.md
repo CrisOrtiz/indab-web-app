@@ -295,16 +295,24 @@ Module notes:
   or click puts each point, a finger can drag a crosshair and let go, a tap selects a drawing
   (handles reshape it, a drag moves it, a bar recolors or deletes it). The chart's top bar holds
   the timeframes (projected with `chartToolbar`) and one menu each for indicators and drawings.
-  Indicators are only EMA 100, EMA 200, volume and RSI 14 (Cris, 2026-10-26: no other moving
-  averages). The RSI follows Cris's TradingView settings (2026-10-30): SMA 14 smoothing, dotted
+  Indicators (`INDICATORS` in `indicators.ts`, drawn by `ChartIndicators`): EMA 100 and 200
+  (Cris, 2026-10-26: no other moving averages), volume, RSI 14 and, since 2026-11-06 with
+  TradingView's defaults, Bollinger Bands, MACD, stochastic, ATR, SuperTrend (one line in two
+  colors, BUY/SELL labels) and daily VWAP. Indicators of `pane: 'own'` get a pane each under the
+  candles, in menu order; any change of indicators or setups redraws them all. Each one is set
+  up from the gear in the menu (`IndicatorSettings`, a modal `<dialog>`: inputs, colors and
+  widths, timeframes it is hidden on); `readConfig` makes saved setups safe, and only setups
+  that differ from the defaults are kept (`configs` next to `indicators`). lightweight-charts
+  joins a line over whitespace points: break a line with a transparent color on the point
+  before the gap (a point's color paints the segment to the next). The RSI follows Cris's TradingView settings (2026-10-30): SMA 14 smoothing, dotted
   levels 70/60/50/40/30, red/green shading above 70 and below 30, and divergences
   (`rsiDivergences` = TradingView's built-in RSI "Calculate divergence": RSI pivots 5 bars
   left/right, 6-61 bars apart, price low/high read at the RSI pivot bar, REGULAR only, green Bull /
   red Bear). Cris tried strong/medium/weak/hidden from price swings (#54) and found it too noisy
   (2026-10-30), so do not bring those back without asking. Drawings and labels are re-laid out
-  when the price scale is stretched (`followPriceScale`; the library has no event for it). Defaults are RSI only (`DEFAULT_INDICATORS`); a user's own pick is saved in
-  `users/{uid}/settings/chart` by `ChartSettingsService` and passed to the chart's `indicators`
-  input by the pages (specs fake it with `quietChartSettings()` from `practice/testing.ts`).
+  when the price scale is stretched (`followPriceScale`; the library has no event for it). Defaults are RSI only (`DEFAULT_INDICATORS`); a user's own pick and setups are saved
+  in `users/{uid}/settings/chart` by `ChartSettingsService` and passed to the chart's
+  `indicators` and `indicatorConfigs` inputs by the pages (specs fake it with `quietChartSettings()` from `practice/testing.ts`).
   Placed orders and positions show their size filled in `SIDE_COLORS` (blue buy, red sell) and
   no Buy/Sell text; only the order being set up keeps its Buy/Sell button (Cris, 2026-10-30).
   The drawings menu has TradingView's sections (`TOOL_GROUPS`): trend

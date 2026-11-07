@@ -21,6 +21,8 @@ class FakeChart {
   readonly hideDates = input(false);
   readonly indicators = input<readonly string[] | null>(null);
   readonly indicatorsChange = output<string[]>();
+  readonly indicatorConfigs = input<unknown>(null);
+  readonly indicatorConfigsChange = output<unknown>();
 }
 
 @Component({

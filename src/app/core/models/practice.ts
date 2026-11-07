@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import type { IndicatorConfig } from '../../features/practice/indicators';
 
 /** One OHLC bar. `time` is the bar's open time in seconds (UTC), as lightweight-charts expects. */
 export interface Candle {
@@ -15,6 +16,8 @@ export interface Candle {
 export interface ChartSettings {
   /** Ids of the indicators switched on (`INDICATORS`). */
   indicators: string[];
+  /** How the user set up indicators in their settings dialogs, by id; others as they come. */
+  configs?: Record<string, IndicatorConfig>;
   updatedAt: Timestamp;
 }
 

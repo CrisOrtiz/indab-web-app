@@ -75,6 +75,8 @@
             [trading]="true"
             [indicators]="chartSettings.indicators()"
             (indicatorsChange)="chartSettings.saveIndicators($event)"
+            [indicatorConfigs]="chartSettings.configs()"
+            (indicatorConfigsChange)="chartSettings.saveConfigs($event)"
             [lots]="lots()"
             (levelMoved)="onLevelMoved($event)"
             (levelsMoved)="onLevelsMoved($event)"
@@ -574,6 +576,8 @@
             [hideDates]="datesHidden()"
             [indicators]="chartSettings.indicators()"
             (indicatorsChange)="chartSettings.saveIndicators($event)"
+            [indicatorConfigs]="chartSettings.configs()"
+            (indicatorConfigsChange)="chartSettings.saveConfigs($event)"
           />
           @if (filledTrades().length) {
             <app-trade-navigator

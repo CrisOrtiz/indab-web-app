@@ -50,7 +50,7 @@ describe('ChartSettingsService', () => {
   });
 
   it('keeps the defaults when nothing valid was saved or the read fails', async () => {
-    saved({ indicators: ['macd'] });
+    saved({ indicators: ['ichimoku'] });
     await service.load();
     expect(service.indicators()).toBeNull();
 
@@ -64,12 +64,54 @@ describe('ChartSettingsService', () => {
     await service.saveIndicators(['ema200', 'rsi14']);
     expect(setDoc).toHaveBeenCalledWith(
       { path: 'users/ana/settings/chart' },
-      { indicators: ['ema200', 'rsi14'], updatedAt: 'NOW' },
+      { indicators: ['ema200', 'rsi14'], configs: {}, updatedAt: 'NOW' },
     );
     expect(service.indicators()).toEqual(['ema200', 'rsi14']);
 
     vi.mocked(setDoc).mockRejectedValueOnce(new Error('offline'));
     await service.saveIndicators([]);
     expect(service.indicators()).toEqual([]);
+  });
+
+  it('loads how the user set up indicators, made safe, and dropping unknown ones', async () => {
+    saved({
+      indicators: ['bollinger'],
+      configs: {
+        bollinger: { inputs: { length: 30, mult: 99 }, colors: { basis: '#ABCDEF' }, hidden: [60] },
+        ichimoku: { inputs: {} },
+      },
+    });
+    await service.load();
+    expect(service.configs()).toEqual({
+      bollinger: {
+        // The multiplier is kept within its bounds; what is missing comes as default.
+        inputs: { length: 30, mult: 20 },
+        colors: { basis: '#abcdef', upper: '#2962ff', lower: '#2962ff' },
+        widths: { basis: 1, upper: 1, lower: 1 },
+        hidden: [60],
+      },
+    });
+  });
+
+  it('saves setups with the indicators on, the defaults until the user picks any', async () => {
+    const config = {
+      inputs: { length: 50 },
+      colors: { ema: '#ff9800' },
+      widths: { ema: 3 },
+      hidden: [],
+    };
+    await service.saveConfigs({ ema100: config });
+    expect(setDoc).toHaveBeenLastCalledWith(
+      { path: 'users/ana/settings/chart' },
+      { indicators: ['rsi14'], configs: { ema100: config }, updatedAt: 'NOW' },
+    );
+    expect(service.configs()).toEqual({ ema100: config });
+
+    // Switching indicators keeps the setups.
+    await service.saveIndicators(['ema100']);
+    expect(setDoc).toHaveBeenLastCalledWith(
+      { path: 'users/ana/settings/chart' },
+      { indicators: ['ema100'], configs: { ema100: config }, updatedAt: 'NOW' },
+    );
   });
 });

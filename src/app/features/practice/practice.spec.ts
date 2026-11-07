@@ -36,6 +36,8 @@ class FakeChart {
   readonly startTime = input<number | null>(null);
   readonly indicators = input<readonly string[] | null>(null);
   readonly indicatorsChange = output<string[]>();
+  readonly indicatorConfigs = input<unknown>(null);
+  readonly indicatorConfigsChange = output<unknown>();
   readonly levelMoved = output<LevelMove>();
   readonly levelsMoved = output<LevelsMove>();
   readonly levelRemoved = output<LevelRemove>();

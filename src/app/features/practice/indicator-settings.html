@@ -1,0 +1,118 @@
+@let t = i18n.messages().chart.settings;
+@let ind = indicator();
+@let cfg = current();
+<dialog
+  #dialog
+  class="dialog"
+  aria-labelledby="indicator-settings-title"
+  (cancel)="$event.preventDefault(); closed.emit()"
+  (click)="backdropClick($event)"
+>
+  <header>
+    <h2 id="indicator-settings-title">{{ title() }}</h2>
+    <button type="button" class="close" [attr.aria-label]="t.close" (click)="closed.emit()">
+      ×
+    </button>
+  </header>
+  <div class="tabs" role="tablist" (keydown)="tabKey($event)">
+    @for (item of tabs; track item) {
+      <button
+        type="button"
+        role="tab"
+        [id]="'indicator-tab-' + item"
+        [attr.aria-selected]="tab() === item"
+        [attr.aria-controls]="'indicator-panel-' + item"
+        [attr.tabindex]="tab() === item ? 0 : -1"
+        [class.on]="tab() === item"
+        (click)="tab.set(item)"
+      >
+        {{ t.tabs[item] }}
+      </button>
+    }
+  </div>
+  <div
+    class="panel"
+    role="tabpanel"
+    [id]="'indicator-panel-' + tab()"
+    [attr.aria-labelledby]="'indicator-tab-' + tab()"
+  >
+    @switch (tab()) {
+      @case ('inputs') {
+        @for (input of ind.inputs; track input.key) {
+          @if (input.type === 'bool') {
+            <label class="check">
+              <input
+                type="checkbox"
+                [checked]="cfg.inputs[input.key]"
+                (change)="setBool(input.key, $any($event.target).checked)"
+              />
+              {{ t.inputNames[input.key] }}
+            </label>
+          } @else {
+            <label class="row">
+              <span>{{ t.inputNames[input.key] }}</span>
+              <input
+                type="number"
+                inputmode="decimal"
+                [min]="input.min"
+                [max]="input.max"
+                [step]="input.step"
+                [value]="cfg.inputs[input.key]"
+                (change)="setNumber(input, $any($event.target).value)"
+              />
+            </label>
+          }
+        } @empty {
+          <p class="empty">{{ t.noInputs }}</p>
+        }
+      }
+      @case ('style') {
+        @for (plot of ind.plots; track plot.key) {
+          <div class="row">
+            <span>{{ t.plotNames[plot.key] }}</span>
+            <span class="style">
+              <input
+                type="color"
+                [attr.aria-label]="t.colorOf(t.plotNames[plot.key])"
+                [value]="cfg.colors[plot.key]"
+                (change)="setColor(plot.key, $any($event.target).value)"
+              />
+              @if (plot.width) {
+                <select
+                  [attr.aria-label]="t.widthOf(t.plotNames[plot.key])"
+                  [value]="cfg.widths[plot.key]"
+                  (change)="setWidth(plot.key, $any($event.target).value)"
+                >
+                  @for (w of widths; track w) {
+                    <option [value]="w" [selected]="cfg.widths[plot.key] === w">{{ w }} px</option>
+                  }
+                </select>
+              }
+            </span>
+          </div>
+        } @empty {
+          <p class="empty">{{ t.noStyle }}</p>
+        }
+      }
+      @case ('visibility') {
+        <p class="hint">{{ t.timeframes }}</p>
+        @for (tf of timeframes; track tf.seconds) {
+          <label class="check">
+            <input
+              type="checkbox"
+              [checked]="shownOn(tf.seconds)"
+              (change)="setShownOn(tf.seconds, $any($event.target).checked)"
+            />
+            {{ tf.label }}
+          </label>
+        }
+      }
+    }
+  </div>
+  <footer>
+    <button type="button" class="btn btn-outline reset" (click)="reset()">{{ t.reset }}</button>
+    <span class="spacer"></span>
+    <button type="button" class="btn btn-outline" (click)="closed.emit()">{{ t.cancel }}</button>
+    <button type="button" class="btn" (click)="accept()">{{ t.ok }}</button>
+  </footer>
+</dialog>
