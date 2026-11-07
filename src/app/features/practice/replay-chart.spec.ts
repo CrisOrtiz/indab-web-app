@@ -15,6 +15,7 @@ import {
   stackLabels,
   volumeProfile,
 } from './replay-chart';
+import { IndicatorConfig } from './indicators';
 
 const lw = vi.hoisted(() => {
   const makeSeries = () => ({
@@ -40,7 +41,7 @@ const lw = vi.hoisted(() => {
     options: () => ({ barSpacing: 10 }),
     setVisibleLogicalRange: vi.fn(),
   };
-  const pane = { setHeight: vi.fn(), getHeight: () => 420 };
+  const pane = { setHeight: vi.fn(), setStretchFactor: vi.fn(), getHeight: () => 420 };
   const priceScale = { width: () => 60, applyOptions: vi.fn() };
   const chart = {
     addSeries: vi.fn((type: string) => {
@@ -70,7 +71,10 @@ vi.mock('lightweight-charts', () => ({
   BaselineSeries: 'Baseline',
   LineStyle: { Solid: 0, Dotted: 1, Dashed: 2 },
   createChart: vi.fn(() => lw.chart),
-  createSeriesMarkers: vi.fn(() => lw.markers),
+  // The candles' markers (entries and exits); indicators get their own.
+  createSeriesMarkers: vi.fn((series: unknown) =>
+    series === lw.series ? lw.markers : { setMarkers: vi.fn() },
+  ),
 }));
 
 const c = (time: number, close = 1.5): Candle => ({ time, open: 1, high: 2, low: 0.5, close });
@@ -114,6 +118,8 @@ const position: PracticeTrade = {
     (lotsChanged)="lots.push($event)"
     [indicators]="indicators()"
     (indicatorsChange)="picked.push($event)"
+    [indicatorConfigs]="configs()"
+    (indicatorConfigsChange)="setUps.push($event)"
     symbol="PAXGUSDT"
   />`,
 })
@@ -137,6 +143,8 @@ class Host {
   readonly lots: string[] = [];
   readonly indicators = signal<readonly string[] | null>(null);
   readonly picked: string[][] = [];
+  readonly configs = signal<Record<string, IndicatorConfig> | null>(null);
+  readonly setUps: Record<string, IndicatorConfig>[] = [];
   submitted = () => {};
 }
 
@@ -551,7 +559,7 @@ describe('ReplayChart', () => {
       'Line',
     ]);
     expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 1);
-    expect(lw.pane.setHeight).toHaveBeenCalled();
+    expect(lw.pane.setHeight).toHaveBeenCalledWith(110);
     const [rsi, smoothing, overbought, oversold] = lw.lines;
     expect(rsi.createPriceLine.mock.calls.map(([line]) => [line.price, line.color])).toEqual([
       [70, '#f23645'],
@@ -583,16 +591,37 @@ describe('ReplayChart', () => {
 
     await openMenu('Indicadores');
     expect(
-      [...el.querySelectorAll('.tool-menu button')].map((b) =>
+      [...el.querySelectorAll('.tool-menu [role="menuitemcheckbox"]')].map((b) =>
         b.textContent!.replace(/\s+/g, ' ').trim(),
       ),
-    ).toEqual(['EMA 100', 'EMA 200', 'RSI 14 ✓', 'Volumen']);
+    ).toEqual([
+      'EMA 100',
+      'EMA 200',
+      'RSI 14 ✓',
+      'Volumen',
+      'Bandas de Bollinger 20 2',
+      'MACD 12 26 9',
+      'Estocástico 14 1 3',
+      'Rango verdadero medio (ATR) 14',
+      'SuperTrend 10 3',
+      'VWAP',
+    ]);
+    // Each one has its settings next to it.
+    expect(el.querySelectorAll('.tool-menu .gear')).toHaveLength(10);
+    expect(el.querySelector('.tool-menu .gear')!.getAttribute('aria-label')).toBe(
+      'Ajustes de EMA 100',
+    );
     expect(el.querySelector('.menu-trigger .count')!.textContent).toBe('1');
 
     // The menu stays open to pick several; each change is reported, to be kept.
     item('EMA 200').click();
     await fixture.whenStable();
-    expect(lw.chart.addSeries).toHaveBeenLastCalledWith('Line', expect.anything(), 0);
+    // The indicators are drawn again in menu order: the average on the candles first.
+    expect(lw.chart.addSeries).toHaveBeenCalledWith(
+      'Line',
+      expect.objectContaining({ color: '#2962ff', lineWidth: 2 }),
+      0,
+    );
     const ema200 = lw.lines[6];
     // 250 closes: 51 values of the 200-candle average, from bar 200 with the mean of the first.
     expect(ema200.setData.mock.calls.at(-1)![0]).toHaveLength(51);
@@ -622,6 +651,115 @@ describe('ReplayChart', () => {
     expect(lw.lines.slice(6).map((line) => line.type)).toEqual(['Line', 'Line']);
     // Nothing was picked: nothing to save.
     expect(host.picked).toEqual([]);
+  });
+
+  it('sets an indicator up from its settings dialog, and keeps it', async () => {
+    const r = await render();
+    const { fixture, host, el } = r;
+    const { openMenu } = drawing(r);
+    host.candles.set(Array.from({ length: 250 }, (_, i) => c(i + 1, 100 + i)));
+    host.indicators.set(['ema100']);
+    await fixture.whenStable();
+    await openMenu('Indicadores');
+    el.querySelector<HTMLButtonElement>('.tool-menu .gear')!.click();
+    await fixture.whenStable();
+    const dialog = () => el.querySelector('app-indicator-settings dialog');
+    expect(dialog()!.querySelector('h2')!.textContent).toContain('EMA 100');
+    expect(el.querySelector('.tool-menu')).toBeNull();
+
+    const length = dialog()!.querySelector<HTMLInputElement>('input[type="number"]')!;
+    length.value = '50';
+    length.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(dialog()!.querySelector('h2')!.textContent).toContain('EMA 50');
+    // Nothing changes on the chart until "Aceptar".
+    expect(host.setUps).toEqual([]);
+    [...dialog()!.querySelectorAll('button')]
+      .find((b) => b.textContent!.trim() === 'Aceptar')!
+      .click();
+    await fixture.whenStable();
+    expect(dialog()).toBeNull();
+    expect(host.setUps.at(-1)!['ema100'].inputs).toEqual({ length: 50 });
+    // 250 closes: 201 values of the 50-candle average.
+    expect(lw.lines.at(-1)!.setData.mock.calls.at(-1)![0]).toHaveLength(201);
+
+    // Back to how it comes: nothing left to keep.
+    await openMenu('Indicadores');
+    el.querySelector<HTMLButtonElement>('.tool-menu .gear')!.click();
+    await fixture.whenStable();
+    const button = (name: string) =>
+      [...dialog()!.querySelectorAll('button')].find((b) => b.textContent!.trim() === name)!;
+    button('Restablecer').click();
+    button('Aceptar').click();
+    await fixture.whenStable();
+    expect(host.setUps.at(-1)).toEqual({});
+  });
+
+  it('hides an indicator on the timeframes its setup leaves out', async () => {
+    const { fixture, host } = await render();
+    host.candles.set(Array.from({ length: 250 }, (_, i) => c(i + 1, 100 + i)));
+    await fixture.whenStable();
+    const start = lw.lines.length;
+    host.indicators.set(['ema100']);
+    host.barSeconds.set(60);
+    host.configs.set({
+      ema100: {
+        inputs: { length: 100 },
+        colors: { ema: '#ff9800' },
+        widths: { ema: 2 },
+        hidden: [60],
+      },
+    });
+    await fixture.whenStable();
+    expect(lw.lines.slice(start)).toEqual([]);
+    host.barSeconds.set(900);
+    await fixture.whenStable();
+    expect(lw.lines.slice(start).map((l) => l.type)).toEqual(['Line']);
+  });
+
+  it('draws the MACD and the stochastic each in a pane of its own, and SuperTrend signals', async () => {
+    const { fixture, host } = await render();
+    host.candles.set(
+      Array.from({ length: 120 }, (_, i) => {
+        const close = i < 60 ? 100 + i : 220 - 2 * i;
+        return { time: i + 1, open: close, high: close + 1, low: close - 1, close };
+      }),
+    );
+    await fixture.whenStable();
+    const calls = lw.chart.addSeries.mock.calls.length;
+    const start = lw.lines.length;
+    host.indicators.set(['macd', 'stochastic', 'supertrend']);
+    await fixture.whenStable();
+    const panes = lw.chart.addSeries.mock.calls.slice(calls).map((call) => {
+      const [type, , pane] = call as unknown[];
+      return `${type}@${pane}`;
+    });
+    expect(panes).toEqual([
+      // MACD: its histogram, line and signal, under the candles.
+      'Histogram@1',
+      'Line@1',
+      'Line@1',
+      // Stochastic: %K and %D, in the next pane.
+      'Line@2',
+      'Line@2',
+      // SuperTrend: one line on the candles, green or red by its trend.
+      'Line@0',
+    ]);
+    const [histogram, macdLine, , k] = lw.lines.slice(start);
+    expect(macdLine.createPriceLine).toHaveBeenCalledWith(expect.objectContaining({ price: 0 }));
+    expect(histogram.setData.mock.calls.at(-1)![0][0]).toEqual(
+      expect.objectContaining({ color: expect.any(String) }),
+    );
+    expect(k.createPriceLine.mock.calls.map(([l]) => l.price)).toEqual([80, 50, 20]);
+    // A downtrend after the rise: the SuperTrend line flips, breaks there and labels it.
+    const trend = lw.lines.at(-1)!.setData.mock.calls.at(-1)![0] as { color: string }[];
+    expect(new Set(trend.map((p) => p.color))).toEqual(
+      new Set(['#089981', '#f23645', 'transparent']),
+    );
+    const { createSeriesMarkers } = await import('lightweight-charts');
+    const marks = vi.mocked(createSeriesMarkers).mock.results.at(-1)!.value;
+    const texts = marks.setMarkers.mock.calls.at(-1)![0].map((m: { text: string }) => m.text);
+    expect(texts).toContain('SELL');
   });
 
   it('draws volume bars at the foot of the candles, in their color', async () => {
@@ -758,6 +896,37 @@ describe('ReplayChart', () => {
     expect(el.querySelectorAll('svg.shapes rect.rect')).toHaveLength(1);
   });
 
+  it('draws a Gann box with a level every quarter, labelled on both sides', async () => {
+    const r = await render();
+    const { el } = r;
+    const { pick, press } = drawing(r);
+
+    await pick('Cuadrícula de Gann');
+    expect(el.textContent).toContain('Marca una esquina de la cuadrícula.');
+    // From price 100 (y 400) on the first bar to 200 (y 300) ten pixels on.
+    await press(0, 400);
+    expect(el.textContent).toContain('Marca la esquina opuesta.');
+    await press(10, 300);
+
+    // A level every quarter of the way from the first point (0) to the second (1), in the
+    // drawing's color, its ratio on both sides, over a light fill.
+    const rows = [...el.querySelectorAll('svg.shapes line.gann')];
+    expect(rows.map((l) => Number(l.getAttribute('y1')))).toEqual([400, 375, 350, 325, 300]);
+    expect(rows.map((l) => [l.getAttribute('x1'), l.getAttribute('x2')])).toEqual(
+      Array(5).fill(['0', '10']),
+    );
+    const labels = [...el.querySelectorAll('svg.shapes .gann-text')].map((t) =>
+      t.textContent!.trim(),
+    );
+    expect(labels).toEqual(['0', '0', '0.25', '0.25', '0.5', '0.5', '0.75', '0.75', '1', '1']);
+    expect(el.querySelectorAll('svg.shapes rect.gann-box')).toHaveLength(1);
+    expect(el.querySelector('svg.shapes .gann')!.closest('g')!.getAttribute('stroke')).toBe(
+      '#2962ff',
+    );
+    // Selected, it has a handle on each corner to reshape it.
+    expect(el.querySelectorAll('.handle')).toHaveLength(4);
+  });
+
   it('keeps drawings on their prices when the price scale is stretched', async () => {
     const r = await render();
     const { fixture, el } = r;
@@ -801,8 +970,9 @@ describe('ReplayChart', () => {
       'Canales y formas',
       'Canal paralelo',
       'Rectángulo',
-      'Fibonacci',
+      'Gann y Fibonacci',
       'Retroceso de Fibonacci',
+      'Cuadrícula de Gann',
       'Ondas de Elliott',
       'Onda de impulso de Elliott (12345)',
       'Onda de corrección de Elliott (ABC)',

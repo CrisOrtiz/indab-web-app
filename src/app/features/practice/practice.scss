@@ -180,8 +180,9 @@ label {
   grid-template-columns: minmax(0, 1fr) 260px;
   gap: 16px;
 
+  // minmax(0, …): the chart's wide price scale at gold prices must not widen the page.
   @media (max-width: 800px) {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
