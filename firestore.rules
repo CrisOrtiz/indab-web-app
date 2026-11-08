@@ -52,11 +52,10 @@ rules_version = '2';
 //                                        Senders write them (no server); each id names its event, so
 //                                        an event notifies each person once
 //   users/{uid}/settings/notifications   what a trainer or admin follows and which activity they hear of
-//   users/{uid}/settings/chart           the indicators the user keeps on the practice chart, and
-//                                        whether it shows the news
-//   marketNews/{YYYY-MM}                 economic news of a month for the practice chart, copied
-//                                        daily from Finance Calendar by a GitHub Actions job (the
-//                                        service account writes it; no client does)
+//   users/{uid}/settings/chart           the indicators the user keeps on the practice chart, how
+//                                        they set them up and whether it shows the news
+//   marketNews/{id}                      an economic news release shown on the practice chart, entered
+//                                        by trainers and admins
 //   reviews/{uid}                        a student's review of INDAB (stars, text, name shown, photo);
 //                                        the author writes it, admins pick the ones the landing
 //                                        shows and everyone reads those
@@ -243,13 +242,22 @@ service cloud.firestore {
             && request.resource.data.updatedAt == request.time;
         }
 
-        // The practice chart's indicators (ids of INDICATORS in indicators.ts) and whether it
-        // shows the news, for anyone.
+        // The practice chart's indicators (ids of INDICATORS in indicators.ts) and how the user set
+        // them up (by id; the app checks each value as it reads them), and whether it shows the news,
+        // for anyone.
+        function chartIndicators() {
+          return ['ema100', 'ema200', 'rsi14', 'volume', 'bollinger', 'macd', 'stochastic', 'atr',
+            'supertrend', 'vwap'];
+        }
+
         function chartSettings() {
-          return request.resource.data.keys().hasOnly(['indicators', 'news', 'updatedAt'])
+          return request.resource.data.keys().hasOnly(['indicators', 'configs', 'news', 'updatedAt'])
             && request.resource.data.get('news', true) is bool
             && request.resource.data.indicators is list
-            && request.resource.data.indicators.hasOnly(['ema100', 'ema200', 'rsi14', 'volume'])
+            && request.resource.data.indicators.hasOnly(chartIndicators())
+            && (!('configs' in request.resource.data)
+              || (request.resource.data.configs is map
+                && request.resource.data.configs.keys().hasOnly(chartIndicators())))
             && request.resource.data.updatedAt == request.time;
         }
 

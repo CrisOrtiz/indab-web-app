@@ -3,11 +3,12 @@ import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { AuthService } from '../../core/auth/auth.service';
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
 import { ChartSettings } from '../../core/models/practice';
-import { DEFAULT_INDICATORS, knownIndicators } from './indicators';
+import { DEFAULT_INDICATORS, IndicatorConfig, knownIndicators, readConfigs } from './indicators';
 
 /**
- * Each user's chart settings (`users/{uid}/settings/chart`): the indicators they keep on, so
- * every practice and review opens with them. Until they change any, charts show the defaults.
+ * Each user's chart settings (`users/{uid}/settings/chart`): the indicators they keep on and
+ * how they set them up, so every practice and review opens with them. Until they change any,
+ * charts show the defaults.
  */
 @Injectable({ providedIn: 'root' })
 export class ChartSettingsService {
@@ -19,6 +20,9 @@ export class ChartSettingsService {
   private readonly _news = signal(true);
   /** Whether the chart shows the economic news (on until the user switches it off). */
   readonly news = this._news.asReadonly();
+  private readonly _configs = signal<Readonly<Record<string, IndicatorConfig>>>({});
+  /** How the user set up indicators, by id; the ones missing are as they come. */
+  readonly configs = this._configs.asReadonly();
   /** Whose settings were loaded (or are loading), so each user's are read once. */
   private loaded: string | null = null;
 
@@ -35,6 +39,7 @@ export class ChartSettingsService {
     this.loaded = uid;
     this._indicators.set(null);
     this._news.set(true);
+    this._configs.set({});
     if (!uid) {
       return;
     }
@@ -42,6 +47,7 @@ export class ChartSettingsService {
       const saved = (await getDoc(this.ref(uid))).data() as Partial<ChartSettings> | undefined;
       if (this.loaded === uid && knownIndicators(saved?.indicators)) {
         this._indicators.set(saved.indicators);
+        this._configs.set(readConfigs(saved.configs));
       }
       if (this.loaded === uid && typeof saved?.news === 'boolean') {
         this._news.set(saved.news);
@@ -52,15 +58,21 @@ export class ChartSettingsService {
   }
 
   /** Keeps the indicators the user switched on (or off) for their next sessions. */
-  async saveIndicators(indicators: readonly string[]): Promise<void> {
+  saveIndicators(indicators: readonly string[]): Promise<void> {
     this._indicators.set(indicators);
-    await this.save();
+    return this.save();
   }
 
   /** Keeps whether the chart shows the news. */
-  async saveNews(news: boolean): Promise<void> {
+  saveNews(news: boolean): Promise<void> {
     this._news.set(news);
-    await this.save();
+    return this.save();
+  }
+
+  /** Keeps how the user set up indicators, with the indicators on as they are. */
+  saveConfigs(configs: Readonly<Record<string, IndicatorConfig>>): Promise<void> {
+    this._configs.set(configs);
+    return this.save();
   }
 
   private async save(): Promise<void> {
@@ -72,6 +84,7 @@ export class ChartSettingsService {
       await setDoc(this.ref(uid), {
         indicators: [...(this._indicators() ?? DEFAULT_INDICATORS)],
         news: this._news(),
+        configs: { ...this._configs() },
         updatedAt: serverTimestamp(),
       });
     } catch {

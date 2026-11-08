@@ -24,6 +24,8 @@ class FakeChart {
   readonly news = input<readonly unknown[]>([]);
   readonly showNews = input(true);
   readonly showNewsChange = output<boolean>();
+  readonly indicatorConfigs = input<unknown>(null);
+  readonly indicatorConfigsChange = output<unknown>();
 }
 
 @Component({

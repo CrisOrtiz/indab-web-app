@@ -78,6 +78,8 @@
             [news]="news()"
             [showNews]="chartSettings.news()"
             (showNewsChange)="chartSettings.saveNews($event)"
+            [indicatorConfigs]="chartSettings.configs()"
+            (indicatorConfigsChange)="chartSettings.saveConfigs($event)"
             [lots]="lots()"
             (levelMoved)="onLevelMoved($event)"
             (levelsMoved)="onLevelsMoved($event)"
@@ -580,6 +582,8 @@
             [news]="news()"
             [showNews]="chartSettings.news()"
             (showNewsChange)="chartSettings.saveNews($event)"
+            [indicatorConfigs]="chartSettings.configs()"
+            (indicatorConfigsChange)="chartSettings.saveConfigs($event)"
           />
           @if (filledTrades().length) {
             <app-trade-navigator

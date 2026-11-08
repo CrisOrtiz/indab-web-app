@@ -17,6 +17,8 @@
       [news]="news()"
       [showNews]="chartSettings.news()"
       (showNewsChange)="chartSettings.saveNews($event)"
+      [indicatorConfigs]="chartSettings.configs()"
+      (indicatorConfigsChange)="chartSettings.saveConfigs($event)"
     />
   } @else {
     <p class="muted">{{ t.chartFailed }}</p>

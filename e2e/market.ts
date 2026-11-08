@@ -50,3 +50,32 @@ export async function mockMarket(page: Page, base = 100): Promise<void> {
     return route.fulfill({ json, headers: { 'Access-Control-Allow-Origin': '*' } });
   });
 }
+
+/**
+ * Replaces Binance on `page` with prices that wave up and down around `base`, with volume, so
+ * indicators have something to show (screenshots); no test reads these prices.
+ */
+export async function mockWavyMarket(page: Page, base = 4000): Promise<void> {
+  await page.route(/binance\.(vision|com)\/(api\/v3|fapi\/v1)\/klines/, (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    const seconds = SECONDS[params.get('interval')!];
+    const limit = Number(params.get('limit'));
+    const from = params.has('endTime')
+      ? Math.ceil((Number(params.get('endTime')) + 1) / 1000 / seconds) * seconds - limit * seconds
+      : Math.ceil(Number(params.get('startTime')) / 1000 / seconds) * seconds;
+    // Two waves of different lengths, by time, so every timeframe tells the same story.
+    const price = (t: number) =>
+      base + 30 * Math.sin(t / 40_000) + 8 * Math.sin(t / 7_000) + 3 * Math.sin(t / 1_300);
+    const json = Array.from({ length: limit }, (_, i) => {
+      const time = from + i * seconds;
+      const open = price(time);
+      const close = price(time + seconds);
+      const swing = Math.abs(close - open) / 2 + 0.6 * Math.sqrt(seconds / 60);
+      const high = Math.max(open, close) + swing;
+      const low = Math.min(open, close) - swing;
+      const volume = 100 + 80 * Math.abs(Math.sin(time / 5_000));
+      return [time * 1000, open, high, low, close, volume].map((v, k) => (k ? v.toFixed(2) : v));
+    });
+    return route.fulfill({ json, headers: { 'Access-Control-Allow-Origin': '*' } });
+  });
+}

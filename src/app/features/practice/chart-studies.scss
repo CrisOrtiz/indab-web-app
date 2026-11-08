@@ -254,3 +254,27 @@
     animation: none;
   }
 }
+// An indicator in its menu: switched on or off by its row, set up by the gear next to it.
+.tool-menu .menu-row {
+  display: flex;
+  align-items: stretch;
+
+  button:first-child {
+    flex: 1;
+  }
+
+  .detail {
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    font-weight: 400;
+  }
+
+  .gear {
+    padding: 6px 8px;
+    color: var(--color-muted);
+
+    &:hover {
+      color: var(--color-text);
+    }
+  }
+}

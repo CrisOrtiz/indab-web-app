@@ -28,6 +28,8 @@ class FakeChart {
   readonly news = input<readonly unknown[]>([]);
   readonly showNews = input(true);
   readonly showNewsChange = output<boolean>();
+  readonly indicatorConfigs = input<unknown>(null);
+  readonly indicatorConfigsChange = output<unknown>();
 }
 
 const candle: Candle = { time: 1_620_000_000, open: 1, high: 2, low: 0.5, close: 1.5 };
