@@ -123,6 +123,17 @@
         />
         {{ t.hideDates }}
       </label>
+      <label>
+        {{ t.news }}
+        <select [value]="f.news" (change)="patch({ news: $any($event.target).value })">
+          @for (choice of newsChoices; track choice) {
+            <option [value]="choice" [selected]="choice === f.news">
+              {{ t.newsChoices[choice] }}
+            </option>
+          }
+        </select>
+        <span class="muted">{{ t.newsHint }}</span>
+      </label>
       <div class="row">
         <label>
           {{ t.opensAt }}

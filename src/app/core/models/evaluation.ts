@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import type { EvaluationNews } from './market-news';
 
 /**
  * Stored at `evaluations/{id}`: a timed practice evaluation set up by a trainer or admin.
@@ -22,6 +23,11 @@ export interface Evaluation {
    * the same time. Missing on older evaluations, whose students pick the speed.
    */
   pace?: number;
+  /**
+   * How the chart shows economic news during an attempt (`EVALUATION_NEWS`): revealed at their
+   * time, impact only, or none. Missing on older evaluations: revealed at their time.
+   */
+  news?: EvaluationNews;
   /** Attempts can be started from `opensAt` until `closesAt`. */
   opensAt: Timestamp;
   closesAt: Timestamp;

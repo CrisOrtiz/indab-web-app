@@ -37,6 +37,8 @@ import { TimeZoneService } from '../../core/time-zone/time-zone.service';
 // Registers the month names of every language for the times on the axis.
 import '../../core/i18n/local-date.pipe';
 import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/practice';
+import { NewsEvent, NewsMode } from '../../core/models/market-news';
+import { NewsMark, newsMarks } from './news-marks';
 import { ChartIndicators, ShownIndicator } from './chart-indicators';
 import {
   DEFAULT_INDICATORS,
@@ -195,6 +197,9 @@ export type Tool =
   | 'vprofile'
   | 'elliott'
   | 'abc';
+/** Width of the news card (px), as in chart-studies.scss. */
+const NEWS_CARD_WIDTH = 280;
+
 /** Drawings on the overlay: every tool but the horizontal line, which is a price line. */
 type ShapeKind = Exclude<Tool, 'hline'>;
 export interface ShapeDrawing {
@@ -561,6 +566,17 @@ export class ReplayChart {
   readonly indicators = input<readonly string[] | null>(null);
   /** The indicators after the user switched one on or off, to keep for their next sessions. */
   readonly indicatorsChange = output<string[]>();
+  /**
+   * Economic news around the bars (`NewsService.feed`), shown as icons on the time axis, with
+   * as much detail as `newsMode` allows.
+   */
+  readonly news = input<readonly NewsEvent[]>([]);
+  /** How much of the news shows (see `NewsMode`): all, at their time, impact only, or none. */
+  readonly newsMode = input<NewsMode>('full');
+  /** Whether the news show (`ChartSettingsService.news`). */
+  readonly showNews = input(true);
+  /** The news switched on or off in the indicators menu, to keep for the next sessions. */
+  readonly showNewsChange = output<boolean>();
   /** How the user set up indicators (`ChartSettingsService`); the others are as they come. */
   readonly indicatorConfigs = input<Readonly<Record<string, IndicatorConfig>> | null>(null);
   /** Every setup after the user changed one in its settings dialog, to keep. */
@@ -578,6 +594,14 @@ export class ReplayChart {
   /** Indicators switched on: the user's saved ones, or the defaults until they pick any. */
   protected readonly active = linkedSignal<ReadonlySet<string>>(
     () => new Set(this.indicators() ?? DEFAULT_INDICATORS),
+  );
+  protected readonly newsOn = linkedSignal(() => this.showNews());
+  /** The news icons on screen. */
+  protected readonly newsMarks = signal<NewsMark[]>([]);
+  /** The bar whose news card is open. */
+  private readonly newsOpen = signal<number | null>(null);
+  protected readonly openNews = computed(() =>
+    this.newsMarks().find((mark) => mark.key === this.newsOpen()),
   );
   /** Setups of indicators: the user's saved ones, then their changes. */
   private readonly configs = linkedSignal<Readonly<Record<string, IndicatorConfig>>>(
@@ -765,6 +789,13 @@ export class ReplayChart {
     });
     effect(() => this.drawIndicators(this.candles(), this.shownIndicators()));
     effect(() => {
+      // News arriving or switched on or off.
+      this.news();
+      this.newsOn();
+      this.newsMode();
+      untracked(() => this.layoutLabels());
+    });
+    effect(() => {
       const id = this.focusTrade();
       this.positionBoxes();
       this.startTime();
@@ -842,6 +873,41 @@ export class ReplayChart {
     this.indicatorsChange.emit(INDICATORS.map((i) => i.id).filter((i) => next.has(i)));
   }
 
+  /** The news switch of the indicators menu. */
+  protected toggleNews(): void {
+    const on = !this.newsOn();
+    this.newsOn.set(on);
+    this.newsOpen.set(null);
+    this.showNewsChange.emit(on);
+  }
+
+  /** Opens the card of a news icon, or closes it. */
+  protected toggleNewsCard(key: number): void {
+    this.newsOpen.update((open) => (open === key ? null : key));
+  }
+
+  /** Left of the news card: centred on its icon, inside the candles' pane. */
+  protected newsCardLeft(x: number): number {
+    const width = Math.min(NEWS_CARD_WIDTH, this.paneSize().width - 8);
+    return Math.max(4, Math.min(x - width / 2, this.paneSize().width - width - 4));
+  }
+
+  /** Whether a release shows its name and figures, or only its impact. */
+  protected newsDetailed(released: boolean): boolean {
+    const mode = this.newsMode();
+    return mode === 'full' || (mode === 'reveal' && released);
+  }
+
+  protected closeNewsCard(): void {
+    this.newsOpen.set(null);
+  }
+
+  /** When a release comes out, in the user's language and time zone. */
+  protected newsTime(seconds: number): string {
+    const ms = seconds * 1000;
+    return formatDate(ms, 'EEE d MMM, HH:mm', this.i18n.language(), this.timeZones.offset(ms));
+  }
+
   /** Opens the indicators or drawings menu below its button, or closes it. */
   protected toggleToolMenu(kind: 'indicators' | 'drawings', event: MouseEvent): void {
     if (this.toolMenu()?.kind === kind) {
@@ -898,6 +964,7 @@ export class ReplayChart {
   /** Escape puts down the tool and closes menus; Delete erases the selected drawing. */
   protected onKey(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
+      this.newsOpen.set(null);
       this.menu.set(null);
       this.popup.set(null);
       this.toolMenu.set(null);
@@ -1004,6 +1071,9 @@ export class ReplayChart {
     }
     if (!inside('.tool-menu, .menu-trigger')) {
       this.toolMenu.set(null);
+    }
+    if (!inside('.news-mark, .news-card')) {
+      this.newsOpen.set(null);
     }
   }
 
@@ -1457,6 +1527,7 @@ export class ReplayChart {
     this.zones.set(zones);
     this.boxes.set(this.placeBoxes());
     this.startX.set(this.placeStart());
+    this.newsMarks.set(this.placeNews());
     this.paneSize.set(this.pane()!);
     this.scaleWidth.set(this.chart.priceScale('right').width());
     this.stageHeight.set(this.stage().nativeElement.clientHeight);
@@ -1506,6 +1577,22 @@ export class ReplayChart {
       });
     }
     return boxes;
+  }
+
+  /** The news icons of the bars on screen. */
+  private placeNews(): NewsMark[] {
+    const chart = this.chart;
+    if (!chart || !untracked(this.newsOn) || untracked(this.newsMode) === 'off') {
+      return [];
+    }
+    const scale = chart.timeScale();
+    return newsMarks(
+      untracked(this.news),
+      this.drawn.map((c) => c.time),
+      untracked(this.barSeconds),
+      (index) => scale.logicalToCoordinate(index as Logical),
+      scale.width(),
+    );
   }
 
   /** The replay start line's x, half a bar before the first replayed bar. */

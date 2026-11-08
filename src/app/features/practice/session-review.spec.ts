@@ -21,6 +21,10 @@ class FakeChart {
   readonly hideDates = input(false);
   readonly indicators = input<readonly string[] | null>(null);
   readonly indicatorsChange = output<string[]>();
+  readonly news = input<readonly unknown[]>([]);
+  readonly newsMode = input<unknown>('full');
+  readonly showNews = input(true);
+  readonly showNewsChange = output<boolean>();
   readonly indicatorConfigs = input<unknown>(null);
   readonly indicatorConfigsChange = output<unknown>();
 }

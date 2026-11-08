@@ -32,6 +32,7 @@ describe('Admin home', () => {
       'Formularios de evaluación',
       'Evaluaciones de práctica',
       'Revisar prácticas de trading',
+      'Noticias económicas',
       'Reseñas',
     ]);
     expect(links()).toEqual([
@@ -42,6 +43,7 @@ describe('Admin home', () => {
       '/admin/forms',
       '/admin/evaluations',
       '/admin/practice',
+      '/admin/news',
       '/admin/reviews',
     ]);
     expect(el.querySelector('table')).toBeNull();
@@ -58,6 +60,7 @@ describe('Admin home', () => {
       '/admin/forms',
       '/admin/evaluations',
       '/admin/practice',
+      '/admin/news',
     ]);
     expect(el.textContent).not.toContain('Rol, acceso a la academia y mentorías');
   });

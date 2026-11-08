@@ -147,6 +147,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/users/users').then((m) => m.AdminUsers),
   },
   {
+    path: 'admin/news',
+    title: 'adminNews',
+    canActivate: [staffGuard],
+    loadComponent: () => import('./features/admin/news/admin-news').then((m) => m.AdminNews),
+  },
+  {
     path: 'admin/reviews',
     title: 'adminReviews',
     canActivate: [adminGuard],

@@ -731,3 +731,72 @@ test('the replay plays, pauses and changes speed from its controls', async ({ pa
   await page.keyboard.press('Space');
   await expect(controls.getByRole('button', { name: 'Reproducir' })).toBeVisible();
 });
+
+test('the chart shows the economic news of the replayed days, revealing them on time with hidden dates', async ({
+  page,
+}) => {
+  const release = async (id: string, iso: string, name: string, impact: string) =>
+    setDocument(`marketNews/${id}`, {
+      time: Date.parse(iso) / 1000,
+      name,
+      country: 'US',
+      impact,
+      actual: '151K',
+      forecast: '160K',
+      previous: '125K',
+      updatedBy: 'seed',
+      updatedAt: new Date(),
+    });
+  await release('nfp', '2026-03-03T20:00:00Z', 'Nonfarm Payrolls', 'high');
+  await release('cpi', '2026-03-04T00:30:00Z', 'CPI m/m', 'medium');
+
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await page.getByLabel('Elegir fecha').check();
+  await page.getByLabel('Fecha de inicio', { exact: true }).fill('2026-03-04');
+  await page.getByLabel('Ocultar fechas durante la práctica').uncheck();
+  await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+  await expect(page.locator('.market .price')).toHaveText('100.000');
+
+  // A release the replay passed shows its figures; one still to come does not.
+  const chart = page.locator('.workspace app-replay-chart');
+  await chart.getByRole('button', { name: '1 noticia, impacto alto' }).click();
+  const card = chart.getByRole('dialog', { name: 'Noticias económicas' });
+  await expect(card).toContainText('Nonfarm Payrolls');
+  await expect(card).toContainText('151K');
+  await expect(card.getByRole('link')).toHaveCount(0);
+  await card.getByRole('button', { name: 'Cerrar' }).click();
+  await chart.getByRole('button', { name: '1 noticia, impacto medio' }).click();
+  await expect(card).toContainText('CPI m/m');
+  await expect(card).toContainText('Por publicarse');
+  await expect(card).not.toContainText('151K');
+
+  // Switched off, they stay off for the next sessions.
+  await chart.getByRole('button', { name: 'Indicadores' }).click();
+  await page.getByRole('menuitemcheckbox', { name: 'Noticias' }).click();
+  await expect(chart.locator('.news-mark')).toHaveCount(0);
+  await expect
+    .poll(async () => (await listDocuments(`users/${studentUid}/settings`))[0]?.['news'])
+    .toBe(false);
+  await page.getByRole('menuitemcheckbox', { name: 'Noticias' }).click();
+  await expect(chart.locator('.news-mark')).toHaveCount(2);
+
+  // With the dates hidden, a release shows only its impact until the replay reaches it.
+  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await expect
+    .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
+    .toBe('finished');
+  await page.reload();
+  await page.getByLabel('Elegir fecha').check();
+  await page.getByLabel('Fecha de inicio', { exact: true }).fill('2026-03-04');
+  await page.getByLabel('Ocultar fechas durante la práctica').check();
+  await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+  await chart.getByRole('button', { name: '1 noticia, impacto medio' }).click();
+  await expect(card).toContainText('Noticia de impacto medio');
+  await expect(card).not.toContainText('CPI');
+  await expect(card).toContainText('el nombre y las cifras de cada noticia se revelan');
+  await card.getByRole('button', { name: 'Cerrar' }).click();
+  await chart.getByRole('button', { name: '1 noticia, impacto alto' }).click();
+  await expect(card).toContainText('Nonfarm Payrolls');
+  await expect(card).toContainText('151K');
+});

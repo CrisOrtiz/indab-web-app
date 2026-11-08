@@ -1,0 +1,205 @@
+@let t = i18n.messages().newsAdmin;
+@let tn = i18n.messages().chart.news;
+@let ta = i18n.messages().admin;
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/admin" class="back">{{ ta.back }}</a>
+    <h1>{{ t.title }}</h1>
+    <p>{{ t.intro }}</p>
+    @if (!form()) {
+      <div class="header-actions">
+        <button type="button" class="btn" (click)="create()">
+          <app-icon name="plus" />{{ t.add }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline"
+          [disabled]="busy()"
+          (click)="importOfficial()"
+        >
+          <app-icon name="download" />{{ t.importOfficial }}
+        </button>
+      </div>
+      <p class="muted import-hint">{{ t.importHint }}</p>
+    }
+  </header>
+
+  @if (message(); as msg) {
+    <p class="message" [class.error]="msg.kind === 'error'" role="status">
+      {{ msg.text }}
+      <button
+        type="button"
+        class="dismiss"
+        [attr.aria-label]="ta.close"
+        (click)="message.set(null)"
+      >
+        ×
+      </button>
+    </p>
+  }
+
+  @if (form(); as f) {
+    <form class="evaluation-form" (submit)="$event.preventDefault(); save()">
+      <h2>{{ f.id ? t.editTitle : t.addTitle }}</h2>
+      <label>
+        {{ t.name }}
+        <input
+          type="text"
+          required
+          [attr.maxlength]="nameMax"
+          [placeholder]="t.namePlaceholder"
+          [value]="f.name"
+          (input)="patch({ name: $any($event.target).value })"
+        />
+      </label>
+      <div class="row">
+        <label>
+          {{ t.when }}
+          <input
+            type="datetime-local"
+            required
+            [value]="f.at"
+            (input)="patch({ at: $any($event.target).value })"
+          />
+        </label>
+        <label>
+          {{ t.country }}
+          <select [value]="f.country" (change)="patch({ country: $any($event.target).value })">
+            @for (c of countries; track c) {
+              <option [value]="c" [selected]="c === f.country">{{ t.countries[c] }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          {{ t.impact }}
+          <select [value]="f.impact" (change)="patch({ impact: $any($event.target).value })">
+            @for (i of impacts; track i) {
+              <option [value]="i" [selected]="i === f.impact">{{ tn.impact[i] }}</option>
+            }
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <label>
+          {{ tn.actual }}
+          <input
+            type="text"
+            [attr.maxlength]="figureMax"
+            placeholder="254K"
+            [value]="f.actual"
+            (input)="patch({ actual: $any($event.target).value })"
+          />
+        </label>
+        <label>
+          {{ tn.forecast }}
+          <input
+            type="text"
+            [attr.maxlength]="figureMax"
+            placeholder="180K"
+            [value]="f.forecast"
+            (input)="patch({ forecast: $any($event.target).value })"
+          />
+        </label>
+        <label>
+          {{ tn.previous }}
+          <input
+            type="text"
+            [attr.maxlength]="figureMax"
+            placeholder="150K"
+            [value]="f.previous"
+            (input)="patch({ previous: $any($event.target).value })"
+          />
+        </label>
+      </div>
+      <p class="muted">{{ t.figuresHint }}</p>
+      <div class="actions">
+        <button type="submit" class="btn" [disabled]="busy()">{{ t.save }}</button>
+        <button type="button" class="btn btn-outline" (click)="form.set(null)">
+          {{ t.cancel }}
+        </button>
+      </div>
+    </form>
+  }
+
+  <div class="month-bar" role="group" [attr.aria-label]="t.month">
+    <button
+      type="button"
+      class="btn btn-outline"
+      [attr.aria-label]="t.previousMonth"
+      (click)="shift(-1)"
+    >
+      ‹
+    </button>
+    <input
+      type="month"
+      [attr.aria-label]="t.month"
+      [value]="month()"
+      (change)="setMonth($any($event.target).value)"
+    />
+    <button
+      type="button"
+      class="btn btn-outline"
+      [attr.aria-label]="t.nextMonth"
+      (click)="shift(1)"
+    >
+      ›
+    </button>
+    @if (loaded()) {
+      <span class="muted">{{ t.count(events().length) }}</span>
+    }
+  </div>
+
+  @if (confirmDelete(); as doomed) {
+    <div class="confirm" role="alertdialog" [attr.aria-label]="t.deleteConfirm(doomed.name)">
+      <p>{{ t.deleteConfirm(doomed.name) }}</p>
+      <div class="actions">
+        <button type="button" class="btn danger" (click)="remove(doomed)">{{ t.delete }}</button>
+        <button type="button" class="btn btn-outline" (click)="confirmDelete.set(null)">
+          {{ t.cancel }}
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (loaded() && !events().length) {
+    <p class="empty">{{ t.empty }}</p>
+  }
+  <ul class="news-list">
+    @for (e of events(); track e.id) {
+      <li class="news-row">
+        <span class="news-dot" [class]="e.impact" [title]="tn.impact[e.impact]"></span>
+        <div class="news-main">
+          <strong>{{ e.name }}</strong>
+          <span class="muted"
+            >{{ e.time * 1000 | localDate: 'EEE d MMM, HH:mm' }} · {{ e.country }} ·
+            {{ tn.impact[e.impact] }}</span
+          >
+          @if (e.actual || e.forecast || e.previous) {
+            <span class="figures">
+              @if (e.actual) {
+                <span
+                  >{{ tn.actual }}: <b>{{ e.actual }}</b></span
+                >
+              }
+              @if (e.forecast) {
+                <span
+                  >{{ tn.forecast }}: <b>{{ e.forecast }}</b></span
+                >
+              }
+              @if (e.previous) {
+                <span
+                  >{{ tn.previous }}: <b>{{ e.previous }}</b></span
+                >
+              }
+            </span>
+          }
+        </div>
+        <app-actions-menu
+          [actions]="menu()"
+          [label]="ta.itemAction(ta.actions, e.name)"
+          (picked)="act(e, $event)"
+        />
+      </li>
+    }
+  </ul>
+</section>

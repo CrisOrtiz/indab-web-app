@@ -16,6 +16,8 @@ export interface Candle {
 export interface ChartSettings {
   /** Ids of the indicators switched on (`INDICATORS`). */
   indicators: string[];
+  /** Whether the chart shows the economic news; true when missing. */
+  news?: boolean;
   /** How the user set up indicators in their settings dialogs, by id; others as they come. */
   configs?: Record<string, IndicatorConfig>;
   updatedAt: Timestamp;

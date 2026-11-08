@@ -7,6 +7,7 @@ import { NoteTarget } from '../../core/models/mentor-note';
 import { Candle, PracticeSession, PracticeTrade } from '../../core/models/practice';
 import { MentorNotes } from '../notes/mentor-notes';
 import { ChartSettingsService } from './chart-settings.service';
+import { NewsService } from './news.service';
 import { HISTORY_BARS, MarketDataService, intervalMs } from './market-data.service';
 import { priceDigits } from './practice-format';
 import { PracticeService } from './practice.service';
@@ -46,6 +47,11 @@ export class SessionReview {
   private readonly market = inject(MarketDataService);
   /** The indicators the user keeps on the chart. */
   protected readonly chartSettings = inject(ChartSettingsService);
+  /** Economic news around the chart's bars, while the user keeps them on. */
+  protected readonly news = inject(NewsService).feed(
+    () => this.candles() ?? [],
+    () => this.chartSettings.news(),
+  );
 
   protected readonly i18n = inject(I18n);
   protected readonly priceDigits = priceDigits;

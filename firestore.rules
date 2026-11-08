@@ -52,8 +52,10 @@ rules_version = '2';
 //                                        Senders write them (no server); each id names its event, so
 //                                        an event notifies each person once
 //   users/{uid}/settings/notifications   what a trainer or admin follows and which activity they hear of
-//   users/{uid}/settings/chart           the indicators the user keeps on the practice chart and
-//                                        how they set them up
+//   users/{uid}/settings/chart           the indicators the user keeps on the practice chart, how
+//                                        they set them up and whether it shows the news
+//   marketNews/{id}                      INDAB's economic news calendar: a release shown on the practice
+//                                        chart; trainers and admins keep it, academy members read it
 //   reviews/{uid}                        a student's review of INDAB (stars, text, name shown, photo);
 //                                        the author writes it, admins pick the ones the landing
 //                                        shows and everyone reads those
@@ -241,14 +243,16 @@ service cloud.firestore {
         }
 
         // The practice chart's indicators (ids of INDICATORS in indicators.ts) and how the user set
-        // them up (by id; the app checks each value as it reads them), for anyone.
+        // them up (by id; the app checks each value as it reads them), and whether it shows the news,
+        // for anyone.
         function chartIndicators() {
           return ['ema100', 'ema200', 'rsi14', 'volume', 'bollinger', 'macd', 'stochastic', 'atr',
             'supertrend', 'vwap'];
         }
 
         function chartSettings() {
-          return request.resource.data.keys().hasOnly(['indicators', 'configs', 'updatedAt'])
+          return request.resource.data.keys().hasOnly(['indicators', 'configs', 'news', 'updatedAt'])
+            && request.resource.data.get('news', true) is bool
             && request.resource.data.indicators is list
             && request.resource.data.indicators.hasOnly(chartIndicators())
             && (!('configs' in request.resource.data)
@@ -593,7 +597,7 @@ service cloud.firestore {
     match /evaluations/{evaluationId} {
       function validEvaluation(data) {
         return data.keys().hasOnly(['title', 'description', 'symbol', 'replayStart', 'hideDates',
-            'startingBalance', 'durationMinutes', 'pace', 'opensAt', 'closesAt', 'studentIds',
+            'news', 'startingBalance', 'durationMinutes', 'pace', 'opensAt', 'closesAt', 'studentIds',
             'mentorshipIds', 'resultsPublished', 'createdBy', 'createdAt', 'updatedAt'])
           && data.title is string && data.title.size() > 0 && data.title.size() <= 120
           && data.description is string && data.description.size() <= 2000
@@ -604,6 +608,8 @@ service cloud.firestore {
           && data.durationMinutes is int && data.durationMinutes >= 5 && data.durationMinutes <= 600
           // Market minutes per real minute of an attempt run by the clock (missing: free speed).
           && (!('pace' in data) || data.pace in [1, 60, 900])
+          // How the chart shows economic news during attempts (missing: revealed at their time).
+          && (!('news' in data) || data.news in ['reveal', 'impact', 'off'])
           && data.opensAt is timestamp && data.closesAt is timestamp
           && data.closesAt > data.opensAt
           && data.studentIds is list && data.studentIds.size() <= 500
@@ -1135,6 +1141,30 @@ service cloud.firestore {
           && request.resource.data.featuredBy == request.auth.uid);
 
       allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // INDAB's economic news calendar, shown on the practice chart. Trainers and admins add and
+    // correct releases (from the official schedules or by hand); academy members read them.
+    match /marketNews/{newsId} {
+      function figure(value) {
+        return value == null || (value is string && value.size() <= 20);
+      }
+
+      function validNews(data) {
+        return data.keys().hasOnly(['time', 'name', 'country', 'impact', 'actual', 'forecast',
+            'previous', 'updatedBy', 'updatedAt'])
+          && data.time is int && data.time > 0
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 80
+          && data.country in ['US', 'JP']
+          && data.impact in ['high', 'medium', 'low']
+          && figure(data.actual) && figure(data.forecast) && figure(data.previous)
+          && data.updatedBy == request.auth.uid
+          && data.updatedAt == request.time;
+      }
+
+      allow read: if hasAcademyAccess();
+      allow create, update: if isStaff() && validNews(request.resource.data);
+      allow delete: if isStaff();
     }
 
     // Everything else is closed by default.

@@ -73,7 +73,8 @@ otherwise create a feature service.
 | `mentorNotes/{id}`                                               | staff; the student it is about                                                                                  | admins; staff who mentor one of the student's mentorships (`mentorshipId`); on the student's own session or form attempt; author edits, author or admin deletes                                                                      |
 | `users/{uid}/notifications/{id}`                                 | owner                                                                                                           | the sender, once per event (id `{type}_{refId}`, `note_{noteId}`); rules check the event and that the sender may tell the owner; owner marks read, deletes                                                                           |
 | `users/{uid}/settings/notifications`                             | owner                                                                                                           | trainers and admins, their own                                                                                                                                                                                                       |
-| `users/{uid}/settings/chart`                                     | owner                                                                                                           | everyone, their own                                                                                                                                                                                                                  |
+| `users/{uid}/settings/chart`                                     | owner                                                                                                           | everyone, their own (indicators, `news` on/off)                                                                                                                                                                                      |
+| `marketNews/{id}`                                                | academy access                                                                                                  | trainers, admins (`/admin/news`)                                                                                                                                                                                                     |
 | `reviews/{uid}`                                                  | author, admins; everyone once `featured`                                                                        | the author with academy access (any edit sets `featured` false); admins only `featured`/`featuredAt`/`featuredBy`; author or admin deletes                                                                                           |
 | `follows/{kind}/subjects/{id}/followers/{uid}`                   | that staff member; students, the lists that concern them                                                        | that staff member (`types` of activity)                                                                                                                                                                                              |
 
@@ -332,6 +333,14 @@ Module notes:
   market and is kept only for old sessions); `MarketDataService` drops bars while spot gold is
   closed and empty minutes (`goldHours`), paging until it has the requested count, and
   `loadHistory` reads backwards from the replay start. Candles use TradingView's colors.
+  Economic news (Cris, 2026-11-08, README "News on the practice chart"): INDAB's own calendar,
+  NO third-party feed (Cris rejected Finance Calendar). One `marketNews/{id}` per release, kept at
+  `/admin/news`; "Cargar fechas oficiales" adds `official-schedule.ts` (official US dates, fixed
+  ids, only the missing ones). Icons on the time axis per bar (`news-marks.ts`), a card with the
+  releases (actual only once the replay reaches them). `NewsMode` via `newsModeFor`: hidden dates
+  = `reveal` (impact only until the replay reaches the release, then name and figures, never the
+  date); evaluations pick `reveal` | `impact` | `off` (`Evaluation.news`). Pages read it with
+  `NewsService.feed`; specs get a quiet one from `quietChartSettings()` (`newsEvents`).
   Cris wants exactly XAU/USD, USD/JPY and NASDAQ: only gold (XAUUSDT) is live, the others
   wait for a data source licensed for display to students. Never bundle or serve data whose
   license is personal use only (e.g. Dukascopy). A new timeframe must also be added to the

@@ -36,6 +36,7 @@ export const es = {
     practiceSession: 'Práctica | INDAB',
     adminMentor: 'Panel del mentor | INDAB',
     adminReviews: 'Reseñas | INDAB',
+    adminNews: 'Noticias económicas | INDAB',
   },
 
   // Search engines and link previews (WhatsApp, Facebook...). Keep descriptions under ~160 characters.
@@ -540,6 +541,10 @@ export const es = {
         title: 'Material de estudio',
         text: 'Videos, presentaciones y documentos para los estudiantes.',
       },
+      news: {
+        title: 'Noticias económicas',
+        text: 'El calendario de noticias que ven los estudiantes en el gráfico de práctica.',
+      },
       reviews: {
         title: 'Reseñas',
         text: 'Elige qué reseñas de los estudiantes se muestran en la página de inicio.',
@@ -878,6 +883,27 @@ export const es = {
 
   chart: {
     replayStart: 'Inicio del replay',
+    news: {
+      toggle: 'Noticias',
+      title: 'Noticias económicas',
+      impact: { high: 'Impacto alto', medium: 'Impacto medio', low: 'Impacto bajo' },
+      masked: {
+        high: 'Noticia de impacto alto',
+        medium: 'Noticia de impacto medio',
+        low: 'Noticia de impacto bajo',
+      },
+      markLabel: (count: number, impact: string) =>
+        `${count === 1 ? '1 noticia' : `${count} noticias`}, ${impact.toLowerCase()}`,
+      actual: 'Actual',
+      forecast: 'Previsión',
+      previous: 'Anterior',
+      upcoming: 'Por publicarse',
+      released: 'Publicada',
+      revealNote:
+        'Fechas ocultas: el nombre y las cifras de cada noticia se revelan cuando el replay llega a su hora.',
+      impactNote: 'En esta evaluación solo se muestra el impacto de cada noticia.',
+      close: 'Cerrar',
+    },
     tools: 'Herramientas del gráfico',
     indicators: 'Indicadores',
     volume: 'Volumen',
@@ -1126,6 +1152,13 @@ export const es = {
     startDate: 'Fecha de inicio del replay',
     sameStart: 'Todos los estudiantes practican desde el mismo punto.',
     hideDates: 'Ocultar las fechas durante la evaluación',
+    news: 'Noticias en el gráfico',
+    newsChoices: {
+      reveal: 'Se revelan a su hora (solo el impacto antes)',
+      impact: 'Solo el impacto de cada noticia',
+      off: 'Sin noticias',
+    },
+    newsHint: 'Cómo ven los estudiantes las noticias económicas durante la evaluación.',
     opensAt: 'Abre',
     closesAt: 'Cierra',
     windowHint:
@@ -1848,6 +1881,45 @@ export const es = {
   },
 
   // Reviews of INDAB: written by students in /profile, picked by admins for the landing.
+  newsAdmin: {
+    title: 'Noticias económicas',
+    intro:
+      'El calendario propio de INDAB: estas noticias aparecen en el gráfico de práctica en la hora en que salieron. Agrega las que falten y escribe sus cifras.',
+    add: 'Agregar noticia',
+    importOfficial: 'Cargar fechas oficiales 2026',
+    importHint:
+      'Agrega las fechas publicadas por el gobierno de EE. UU. (BLS, Reserva Federal, BEA, Census, Departamento de Trabajo). No cambia lo que ya está.',
+    imported: (count: number) =>
+      count === 0
+        ? 'Las fechas oficiales ya estaban cargadas.'
+        : count === 1
+          ? 'Se agregó 1 noticia.'
+          : `Se agregaron ${count} noticias.`,
+    addTitle: 'Nueva noticia',
+    editTitle: 'Editar noticia',
+    name: 'Nombre',
+    namePlaceholder: 'Non-Farm Payrolls',
+    when: 'Fecha y hora (tu zona horaria)',
+    country: 'País',
+    countries: { US: 'Estados Unidos', JP: 'Japón' },
+    impact: 'Impacto',
+    figuresHint:
+      'Escribe las cifras como las publica el organismo (ej. 254K, 4.1%). El dato actual solo se muestra cuando el replay llega a la hora de la noticia.',
+    save: 'Guardar',
+    cancel: 'Cancelar',
+    edit: 'Editar',
+    delete: 'Borrar',
+    deleteConfirm: (name: string) => `¿Borrar «${name}»?`,
+    saved: 'Noticia guardada.',
+    deleted: 'Noticia borrada.',
+    invalid: 'Revisa el nombre, la fecha y que las cifras tengan como máximo 20 caracteres.',
+    saveFailed: 'No se pudo guardar. Inténtalo de nuevo.',
+    month: 'Mes',
+    previousMonth: 'Mes anterior',
+    nextMonth: 'Mes siguiente',
+    count: (count: number) => (count === 1 ? '1 noticia' : `${count} noticias`),
+    empty: 'No hay noticias en este mes.',
+  },
   reviews: {
     title: 'Tu reseña de INDAB',
     intro:

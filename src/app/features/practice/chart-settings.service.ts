@@ -17,6 +17,9 @@ export class ChartSettingsService {
   private readonly _indicators = signal<readonly string[] | null>(null);
   /** The user's indicators; null until loaded or while they never chose any (defaults). */
   readonly indicators = this._indicators.asReadonly();
+  private readonly _news = signal(true);
+  /** Whether the chart shows the economic news (on until the user switches it off). */
+  readonly news = this._news.asReadonly();
   private readonly _configs = signal<Readonly<Record<string, IndicatorConfig>>>({});
   /** How the user set up indicators, by id; the ones missing are as they come. */
   readonly configs = this._configs.asReadonly();
@@ -35,6 +38,7 @@ export class ChartSettingsService {
     }
     this.loaded = uid;
     this._indicators.set(null);
+    this._news.set(true);
     this._configs.set({});
     if (!uid) {
       return;
@@ -45,6 +49,9 @@ export class ChartSettingsService {
         this._indicators.set(saved.indicators);
         this._configs.set(readConfigs(saved.configs));
       }
+      if (this.loaded === uid && typeof saved?.news === 'boolean') {
+        this._news.set(saved.news);
+      }
     } catch {
       // Defaults it is: the chart works without them.
     }
@@ -53,6 +60,12 @@ export class ChartSettingsService {
   /** Keeps the indicators the user switched on (or off) for their next sessions. */
   saveIndicators(indicators: readonly string[]): Promise<void> {
     this._indicators.set(indicators);
+    return this.save();
+  }
+
+  /** Keeps whether the chart shows the news. */
+  saveNews(news: boolean): Promise<void> {
+    this._news.set(news);
     return this.save();
   }
 
@@ -70,6 +83,7 @@ export class ChartSettingsService {
     try {
       await setDoc(this.ref(uid), {
         indicators: [...(this._indicators() ?? DEFAULT_INDICATORS)],
+        news: this._news(),
         configs: { ...this._configs() },
         updatedAt: serverTimestamp(),
       });
