@@ -72,18 +72,20 @@
             </button>
           </div>
         }
-        <hr />
-        <button
-          type="button"
-          role="menuitemcheckbox"
-          [attr.aria-checked]="newsOn()"
-          [class.on]="newsOn()"
-          (click)="toggleNews()"
-        >
-          <span class="swatch news-swatch"></span>
-          {{ t.news.toggle }}
-          <span class="check" aria-hidden="true">{{ newsOn() ? '✓' : '' }}</span>
-        </button>
+        @if (newsMode() !== 'off') {
+          <hr />
+          <button
+            type="button"
+            role="menuitemcheckbox"
+            [attr.aria-checked]="newsOn()"
+            [class.on]="newsOn()"
+            (click)="toggleNews()"
+          >
+            <span class="swatch news-swatch"></span>
+            {{ t.news.toggle }}
+            <span class="check" aria-hidden="true">{{ newsOn() ? '✓' : '' }}</span>
+          </button>
+        }
       } @else {
         @for (section of toolGroups; track section.group) {
           <p class="menu-heading" role="presentation">{{ t.toolGroups[section.group] }}</p>
@@ -172,56 +174,54 @@
           <li>
             <span class="news-dot" [class]="e.impact" aria-hidden="true"></span>
             <div>
-              @if (hideDates()) {
-                <strong>{{ t.news.masked[e.impact] }}</strong>
-                <span class="news-meta">{{
-                  item.released ? t.news.released : t.news.upcoming
-                }}</span>
-              } @else {
+              @if (newsDetailed(item.released)) {
                 <strong>{{ e.name }}</strong>
-                <span class="news-meta"
-                  >{{ newsTime(e.time) }} · {{ e.country }} · {{ t.news.impact[e.impact] }}</span
-                >
+                <span class="news-meta">
+                  @if (newsMode() === 'full') {
+                    {{ newsTime(e.time) }} ·
+                  }
+                  {{ e.country }} · {{ t.news.impact[e.impact] }}
+                </span>
                 <dl class="news-figures">
                   @if (!item.released) {
                     <div class="pending">
                       <dt>{{ t.news.actual }}</dt>
                       <dd>{{ t.news.upcoming }}</dd>
                     </div>
-                  } @else if (figure(e.actual, e.unit); as actual) {
+                  } @else if (e.actual) {
                     <div>
                       <dt>{{ t.news.actual }}</dt>
-                      <dd>{{ actual }}</dd>
+                      <dd>{{ e.actual }}</dd>
                     </div>
                   }
-                  @if (figure(e.consensus, e.unit); as consensus) {
+                  @if (e.forecast) {
                     <div>
                       <dt>{{ t.news.forecast }}</dt>
-                      <dd>{{ consensus }}</dd>
+                      <dd>{{ e.forecast }}</dd>
                     </div>
                   }
-                  @if (figure(e.prior, e.unit); as prior) {
+                  @if (e.previous) {
                     <div>
                       <dt>{{ t.news.previous }}</dt>
-                      <dd>{{ prior }}</dd>
+                      <dd>{{ e.previous }}</dd>
                     </div>
                   }
                 </dl>
-                @if (e.source) {
-                  <span class="news-meta">{{ t.news.source }}: {{ e.source }}</span>
-                }
+              } @else {
+                <strong>{{ t.news.masked[e.impact] }}</strong>
+                <span class="news-meta">{{
+                  item.released ? t.news.released : t.news.upcoming
+                }}</span>
               }
             </div>
           </li>
         }
       </ul>
-      @if (hideDates()) {
-        <p class="news-note">{{ t.news.maskedNote }}</p>
+      @if (newsMode() === 'reveal') {
+        <p class="news-note">{{ t.news.revealNote }}</p>
+      } @else if (newsMode() === 'impact') {
+        <p class="news-note">{{ t.news.impactNote }}</p>
       }
-      <p class="news-credit">
-        {{ t.news.dataFrom }}
-        <a [href]="newsSourceUrl" target="_blank" rel="noopener">Finance Calendar</a>
-      </p>
     </div>
   }
   @if (boxes().length || startX() !== null) {

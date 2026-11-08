@@ -1,137 +1,85 @@
-// Economic news shown on the practice chart. This file has no imports so the daily sync script
-// (`scripts/sync-news.mts`, run by Node with its types stripped) can use the same code.
+import type { Timestamp } from 'firebase/firestore';
 
-/** Impact as Finance Calendar rates it: red, orange and yellow on the chart. */
+/** Impact of a release: red, orange and yellow on the chart, as on the calendar page. */
 export type NewsImpact = 'high' | 'medium' | 'low';
 
-/** One release (a figure or a central-bank decision), as stored in `marketNews/{month}`. */
+export const NEWS_IMPACTS: readonly NewsImpact[] = ['high', 'medium', 'low'];
+
+/** Countries trainers pick from: the US moves gold; Japan for USD/JPY later. */
+export const NEWS_COUNTRIES = ['US', 'JP'] as const;
+export type NewsCountry = (typeof NEWS_COUNTRIES)[number];
+
+/**
+ * Stored at `marketNews/{id}`: an economic release (a figure or a central-bank decision) shown
+ * on the practice chart. INDAB's own calendar: trainers and admins enter and correct them at
+ * `/admin/news`, starting from the official US schedules loaded with "Cargar fechas oficiales".
+ * Figures are free text as the publisher writes them ('254K', '4.1%').
+ */
 export interface NewsEvent {
-  /** Finance Calendar's id of the release. */
   id: string;
   /** Release time, seconds since 1970 (UTC), like the candles. */
   time: number;
   name: string;
-  /** ISO alpha-2 code, e.g. 'US'. */
-  country: string;
+  country: NewsCountry;
   impact: NewsImpact;
-  /** The period the figure is about, e.g. 'October 2026'. */
-  period: string | null;
   actual: string | null;
-  prior: string | null;
-  consensus: string | null;
-  unit: string | null;
-  /** The publisher (e.g. 'U.S. Bureau of Labor Statistics'), credited with the figures. */
-  source: string | null;
+  forecast: string | null;
+  previous: string | null;
 }
+
+/** The stored document, with who last changed it. */
+export interface NewsDocument extends Omit<NewsEvent, 'id'> {
+  updatedBy: string;
+  updatedAt: Timestamp;
+}
+
+/** What staff fill in. */
+export type NewsInput = Omit<NewsEvent, 'id'>;
+
+/** Limits, mirrored by `firestore.rules`. */
+export const NEWS_NAME_MAX = 80;
+export const NEWS_FIGURE_MAX = 20;
 
 /**
- * Stored at `marketNews/{YYYY-MM}` (UTC month) by the daily GitHub Actions job: every release
- * of that month the chart shows. Data from financecalendar.com, which allows storing and
- * showing it with a visible link to it (the chart has one).
+ * How the practice chart shows the news. `full`: name, time and figures (dates shown).
+ * `reveal`: dates hidden, so a release shows only its impact until the replay reaches its time,
+ * then its name and figures (never the date). `impact`: only the impact, all along. `off`: none.
+ * Evaluations pick theirs (`Evaluation.news`); free practice follows "hide dates".
  */
-export interface MarketNewsMonth {
-  month: string;
-  events: NewsEvent[];
-}
+export type NewsMode = 'full' | 'reveal' | 'impact' | 'off';
 
-/** Countries whose news is kept: the US moves gold (and USD/JPY and the NASDAQ, for later). */
-export const NEWS_COUNTRIES = ['US'];
-
-/** Impacts kept: low-impact releases would only crowd the chart. */
-export const NEWS_IMPACTS: readonly NewsImpact[] = ['high', 'medium'];
-
-/** Where the figures come from, linked next to them as Finance Calendar's terms ask. */
-export const NEWS_SOURCE_URL = 'https://www.financecalendar.com';
-
-/** The `YYYY-MM` (UTC) a time in seconds falls in, which names its `marketNews` document. */
-export function monthKey(seconds: number): string {
-  return new Date(seconds * 1000).toISOString().slice(0, 7);
-}
-
-/** Month keys from the one of `from` to the one of `to` (seconds), both included. */
-export function monthsBetween(from: number, to: number): string[] {
-  const months: string[] = [];
-  const day = new Date(from * 1000);
-  let year = day.getUTCFullYear();
-  let month = day.getUTCMonth();
-  const last = monthKey(to);
-  for (let guard = 0; guard < 600; guard++) {
-    const key = `${year}-${String(month + 1).padStart(2, '0')}`;
-    if (key > last) {
-      break;
-    }
-    months.push(key);
-    month++;
-    if (month === 12) {
-      month = 0;
-      year++;
-    }
-  }
-  return months;
-}
-
-/** First and last day (`YYYY-MM-DD`) of a month key, as Finance Calendar's `from`/`to`. */
-export function monthRange(month: string): { from: string; to: string } {
-  const [year, m] = month.split('-').map(Number);
-  const days = new Date(Date.UTC(year, m, 0)).getUTCDate();
-  return { from: `${month}-01`, to: `${month}-${String(days).padStart(2, '0')}` };
-}
-
-function text(value: unknown): string | null {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return String(value);
-  }
-  return typeof value === 'string' && value.trim() ? value.trim().slice(0, 200) : null;
-}
+/** What evaluation creators pick from; the first is the default. */
+export const EVALUATION_NEWS = ['reveal', 'impact', 'off'] as const;
+export type EvaluationNews = (typeof EVALUATION_NEWS)[number];
 
 /**
- * A Finance Calendar event as the chart keeps it, or null when it is not shown: another
- * country or impact, a holiday or other category, a cancelled release, or no exact time.
+ * How a chart shows the news. While an evaluation attempt runs, its creator's pick holds
+ * (`reveal` turning into `full` when the evaluation shows dates); otherwise hidden dates mean
+ * `reveal` and shown dates `full`.
  */
-export function toNewsEvent(raw: Record<string, unknown>): NewsEvent | null {
-  const impact = raw['impact'];
-  const country = typeof raw['country'] === 'string' ? raw['country'].toUpperCase() : '';
-  const at = typeof raw['release_at_utc'] === 'string' ? Date.parse(raw['release_at_utc']) : NaN;
-  const name = text(raw['title']) ?? text(raw['name']) ?? text(raw['series_name']);
-  const category = raw['category'];
-  if (
-    !NEWS_IMPACTS.includes(impact as NewsImpact) ||
-    !NEWS_COUNTRIES.includes(country) ||
-    !Number.isFinite(at) ||
-    !name ||
-    raw['status'] === 'cancelled' ||
-    raw['all_day'] === true ||
-    category === 'market-holidays' ||
-    category === 'crypto'
-  ) {
-    return null;
+export function newsModeFor(
+  evaluationNews: EvaluationNews | null,
+  attemptRunning: boolean,
+  datesHidden: boolean,
+): NewsMode {
+  if (evaluationNews && attemptRunning && evaluationNews !== 'reveal') {
+    return evaluationNews;
   }
-  return {
-    id: text(raw['id']) ?? `${country}-${at}-${name}`,
-    time: Math.floor(at / 1000),
-    name,
-    country,
-    impact: impact as NewsImpact,
-    period: text(raw['period']),
-    actual: text(raw['actual']),
-    prior: text(raw['prior']),
-    consensus: text(raw['consensus']),
-    unit: text(raw['unit']),
-    source: text(raw['source_name']),
-  };
+  return datesHidden ? 'reveal' : 'full';
 }
 
-/** A figure with its unit, as the chart prints it: '4.1%', '254 K'. */
-export function formatFigure(value: string | null, unit: string | null): string | null {
-  if (value === null) {
-    return null;
-  }
-  const number = Number(value);
-  const shown = Number.isFinite(number)
-    ? number.toLocaleString('en-US', { maximumFractionDigits: 2 })
-    : value;
-  if (!unit) {
-    return shown;
-  }
-  return unit === '%' ? `${shown}%` : unit.length <= 12 ? `${shown} ${unit}` : shown;
+/** Whether a figure or name typed by staff is acceptable. */
+export function validNews(input: NewsInput): boolean {
+  const figure = (value: string | null) => value === null || value.length <= NEWS_FIGURE_MAX;
+  return (
+    Number.isInteger(input.time) &&
+    input.time > 0 &&
+    input.name.trim().length > 0 &&
+    input.name.length <= NEWS_NAME_MAX &&
+    NEWS_COUNTRIES.includes(input.country) &&
+    NEWS_IMPACTS.includes(input.impact) &&
+    figure(input.actual) &&
+    figure(input.forecast) &&
+    figure(input.previous)
+  );
 }

@@ -1039,6 +1039,15 @@ describe('evaluations', () => {
     await assertFails(create('p5', { pace: '60' }));
   });
 
+  it('say how the chart shows the news, or nothing for revealed at their time', async () => {
+    const create = (id: string, extra: Record<string, unknown>) =>
+      setDoc(evalRef('trainer', id), evaluation(extra));
+    await assertSucceeds(create('n1', { news: 'reveal' }));
+    await assertSucceeds(create('n2', { news: 'impact' }));
+    await assertSucceeds(create('n3', { news: 'off' }));
+    await assertFails(create('n4', { news: 'full' }));
+  });
+
   it('keep their author when edited', async () => {
     await assertSucceeds(
       updateDoc(evalRef('admin'), { title: 'Nuevo', updatedAt: serverTimestamp() }),
@@ -2299,29 +2308,64 @@ describe('chart settings', () => {
 });
 
 describe('market news', () => {
-  const month = (uid: string | null) => doc(as(uid), 'marketNews/2026-01');
+  const news = (uid: string | null, id = 'n1') => doc(as(uid), `marketNews/${id}`);
+  const data = (uid: string, extra: Record<string, unknown> = {}) => ({
+    time: 1767965400,
+    name: 'Non-Farm Payrolls',
+    country: 'US',
+    impact: 'high',
+    actual: '50K',
+    forecast: null,
+    previous: '64K',
+    updatedBy: uid,
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
 
   beforeEach(() =>
     env.withSecurityRulesDisabled((ctx) =>
-      setDoc(doc(ctx.firestore(), 'marketNews/2026-01'), { month: '2026-01', events: [] }),
+      setDoc(doc(ctx.firestore(), 'marketNews/n1'), { ...data('admin'), updatedAt: new Date() }),
     ),
   );
 
   it('is read by academy members and staff only', async () => {
-    await assertSucceeds(getDoc(month('enrolled')));
-    await assertSucceeds(getDoc(month('trainer')));
-    await assertSucceeds(getDoc(month('admin')));
-    await assertFails(getDoc(doc(as('enrolled', false), 'marketNews/2026-01')));
-    await assertFails(getDoc(month('partial')));
-    await assertFails(getDoc(month('student')));
-    await assertFails(getDoc(month(null)));
+    await assertSucceeds(getDoc(news('enrolled')));
+    await assertSucceeds(
+      getDocs(query(collection(as('enrolled'), 'marketNews'), where('time', '>=', 0))),
+    );
+    await assertSucceeds(getDoc(news('trainer')));
+    await assertSucceeds(getDoc(news('admin')));
+    await assertFails(getDoc(doc(as('enrolled', false), 'marketNews/n1')));
+    await assertFails(getDoc(news('partial')));
+    await assertFails(getDoc(news('student')));
+    await assertFails(getDoc(news(null)));
   });
 
-  it('is written by the sync job only', async () => {
-    const data = { month: '2026-01', events: [] };
-    await assertFails(setDoc(month('admin'), data));
-    await assertFails(setDoc(doc(as('admin'), 'marketNews/2026-02'), data));
-    await assertFails(setDoc(month('enrolled'), data));
+  it('is kept by trainers and admins', async () => {
+    await assertSucceeds(setDoc(news('trainer', 'n2'), data('trainer')));
+    await assertSucceeds(setDoc(news('admin'), data('admin', { actual: '51K' })));
+    await assertSucceeds(deleteDoc(news('trainer', 'n2')));
+    await assertFails(setDoc(news('enrolled', 'n3'), data('enrolled')));
+    await assertFails(setDoc(news('student', 'n3'), data('student')));
+    await assertFails(deleteDoc(news('enrolled')));
+  });
+
+  it('only takes well formed releases, signed by who saves them', async () => {
+    const bad = [
+      { updatedBy: 'admin' },
+      { time: 1.5 },
+      { name: '' },
+      { name: 'x'.repeat(81) },
+      { country: 'MX' },
+      { impact: 'huge' },
+      { actual: 'x'.repeat(21) },
+      { forecast: 3 },
+      { source: 'web' },
+      { updatedAt: 1 },
+    ];
+    for (const extra of bad) {
+      await assertFails(setDoc(news('trainer', 'bad'), data('trainer', extra)));
+    }
   });
 });
 

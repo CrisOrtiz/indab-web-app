@@ -1,0 +1,106 @@
+// INDAB's news calendar: a month of releases, each with its impact dot (calendar colors).
+:host {
+  --impact-high: #e53935;
+  --impact-medium: #fb8c00;
+  --impact-low: #fdd835;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.import-hint {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+}
+
+.month-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 24px 0 12px;
+
+  input {
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font: inherit;
+  }
+}
+
+.confirm {
+  margin: 12px 0;
+  padding: 16px;
+  border: 1px solid var(--color-down);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+
+  p {
+    margin: 0 0 12px;
+  }
+
+  .actions {
+    display: flex;
+    gap: 12px;
+  }
+}
+
+.danger {
+  background: var(--color-down);
+  color: #fff;
+}
+
+.news-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.news-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.news-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--impact-medium);
+
+  &.high {
+    background: var(--impact-high);
+  }
+
+  &.low {
+    background: var(--impact-low);
+  }
+}
+
+.news-main {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+
+  .muted {
+    font-size: 0.85rem;
+  }
+}
+
+.figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 0.85rem;
+}

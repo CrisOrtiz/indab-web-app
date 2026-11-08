@@ -7,12 +7,9 @@ const release = (time: number, impact: NewsEvent['impact'] = 'high', name = 'NFP
   name,
   country: 'US',
   impact,
-  period: null,
   actual: null,
-  prior: null,
-  consensus: null,
-  unit: null,
-  source: null,
+  forecast: null,
+  previous: null,
 });
 
 // Bars every 60 s at 0, 60, 120 (the market was closed from 120 to 600), 600; bar i at x = 10i.

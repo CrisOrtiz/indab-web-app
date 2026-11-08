@@ -30,6 +30,7 @@ export const en: Messages = {
     practiceSession: 'Practice | INDAB',
     adminMentor: 'Mentor dashboard | INDAB',
     adminReviews: 'Reviews | INDAB',
+    adminNews: 'Economic news | INDAB',
   },
 
   seo: {
@@ -538,6 +539,10 @@ export const en: Messages = {
         title: 'Study material',
         text: 'Videos, presentations and documents for the students.',
       },
+      news: {
+        title: 'Economic news',
+        text: 'The news calendar students see on the practice chart.',
+      },
       reviews: {
         title: 'Reviews',
         text: 'Choose which student reviews appear on the home page.',
@@ -875,9 +880,9 @@ export const en: Messages = {
       previous: 'Previous',
       upcoming: 'Not out yet',
       released: 'Released',
-      source: 'Source',
-      maskedNote: 'Name, time and figures are hidden so the replay date stays secret.',
-      dataFrom: 'Data from',
+      revealNote:
+        'Dates hidden: each release shows its name and figures once the replay reaches its time.',
+      impactNote: 'This evaluation shows only the impact of each release.',
       close: 'Close',
     },
     tools: 'Chart tools',
@@ -1129,6 +1134,13 @@ export const en: Messages = {
     startDate: 'Replay start date',
     sameStart: 'Every student practises from the same point.',
     hideDates: 'Hide dates during the evaluation',
+    news: 'News on the chart',
+    newsChoices: {
+      reveal: 'Revealed at their time (impact only before)',
+      impact: 'Impact only, no name or figures',
+      off: 'No news',
+    },
+    newsHint: 'How students see economic news during the evaluation.',
     opensAt: 'Opens',
     closesAt: 'Closes',
     windowHint: 'Students can start while the window is open; each attempt lasts the time limit.',
@@ -1828,6 +1840,45 @@ export const en: Messages = {
   },
 
   // Reviews of INDAB: written by students in /profile, picked by admins for the landing.
+  newsAdmin: {
+    title: 'Economic news',
+    intro:
+      "INDAB's own calendar: these releases show on the practice chart at the time they came out. Add any missing ones and type their figures.",
+    add: 'Add release',
+    importOfficial: 'Load 2026 official dates',
+    importHint:
+      'Adds the dates published by the US government (BLS, Federal Reserve, BEA, Census, Department of Labor). It does not change what is already there.',
+    imported: (count: number) =>
+      count === 0
+        ? 'The official dates were already loaded.'
+        : count === 1
+          ? '1 release added.'
+          : `${count} releases added.`,
+    addTitle: 'New release',
+    editTitle: 'Edit release',
+    name: 'Name',
+    namePlaceholder: 'Non-Farm Payrolls',
+    when: 'Date and time (your time zone)',
+    country: 'Country',
+    countries: { US: 'United States', JP: 'Japan' },
+    impact: 'Impact',
+    figuresHint:
+      'Type the figures as the agency publishes them (e.g. 254K, 4.1%). The actual figure only shows once the replay reaches the release time.',
+    save: 'Save',
+    cancel: 'Cancel',
+    edit: 'Edit',
+    delete: 'Delete',
+    deleteConfirm: (name: string) => `Delete "${name}"?`,
+    saved: 'Release saved.',
+    deleted: 'Release deleted.',
+    invalid: 'Check the name, the date and that figures have 20 characters at most.',
+    saveFailed: 'Could not save. Please try again.',
+    month: 'Month',
+    previousMonth: 'Previous month',
+    nextMonth: 'Next month',
+    count: (count: number) => (count === 1 ? '1 release' : `${count} releases`),
+    empty: 'No releases this month.',
+  },
   reviews: {
     title: 'Your review of INDAB',
     intro:

@@ -129,7 +129,7 @@ describe('ChartSettingsService', () => {
     await service.saveConfigs({ ema100: config });
     expect(setDoc).toHaveBeenLastCalledWith(
       { path: 'users/ana/settings/chart' },
-      { indicators: ['rsi14'], configs: { ema100: config }, updatedAt: 'NOW' },
+      { indicators: ['rsi14'], news: true, configs: { ema100: config }, updatedAt: 'NOW' },
     );
     expect(service.configs()).toEqual({ ema100: config });
 
@@ -137,7 +137,7 @@ describe('ChartSettingsService', () => {
     await service.saveIndicators(['ema100']);
     expect(setDoc).toHaveBeenLastCalledWith(
       { path: 'users/ana/settings/chart' },
-      { indicators: ['ema100'], configs: { ema100: config }, updatedAt: 'NOW' },
+      { indicators: ['ema100'], news: true, configs: { ema100: config }, updatedAt: 'NOW' },
     );
   });
 });

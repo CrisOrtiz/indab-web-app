@@ -54,8 +54,8 @@ rules_version = '2';
 //   users/{uid}/settings/notifications   what a trainer or admin follows and which activity they hear of
 //   users/{uid}/settings/chart           the indicators the user keeps on the practice chart, how
 //                                        they set them up and whether it shows the news
-//   marketNews/{id}                      an economic news release shown on the practice chart, entered
-//                                        by trainers and admins
+//   marketNews/{id}                      INDAB's economic news calendar: a release shown on the practice
+//                                        chart; trainers and admins keep it, academy members read it
 //   reviews/{uid}                        a student's review of INDAB (stars, text, name shown, photo);
 //                                        the author writes it, admins pick the ones the landing
 //                                        shows and everyone reads those
@@ -597,7 +597,7 @@ service cloud.firestore {
     match /evaluations/{evaluationId} {
       function validEvaluation(data) {
         return data.keys().hasOnly(['title', 'description', 'symbol', 'replayStart', 'hideDates',
-            'startingBalance', 'durationMinutes', 'pace', 'opensAt', 'closesAt', 'studentIds',
+            'news', 'startingBalance', 'durationMinutes', 'pace', 'opensAt', 'closesAt', 'studentIds',
             'mentorshipIds', 'resultsPublished', 'createdBy', 'createdAt', 'updatedAt'])
           && data.title is string && data.title.size() > 0 && data.title.size() <= 120
           && data.description is string && data.description.size() <= 2000
@@ -608,6 +608,8 @@ service cloud.firestore {
           && data.durationMinutes is int && data.durationMinutes >= 5 && data.durationMinutes <= 600
           // Market minutes per real minute of an attempt run by the clock (missing: free speed).
           && (!('pace' in data) || data.pace in [1, 60, 900])
+          // How the chart shows economic news during attempts (missing: revealed at their time).
+          && (!('news' in data) || data.news in ['reveal', 'impact', 'off'])
           && data.opensAt is timestamp && data.closesAt is timestamp
           && data.closesAt > data.opensAt
           && data.studentIds is list && data.studentIds.size() <= 500
@@ -1141,11 +1143,28 @@ service cloud.firestore {
       allow delete: if isOwner(uid) || isAdmin();
     }
 
-    // Economic news for the practice chart, one document per month. Only the daily sync job
-    // (service account, which skips these rules) writes it.
-    match /marketNews/{month} {
+    // INDAB's economic news calendar, shown on the practice chart. Trainers and admins add and
+    // correct releases (from the official schedules or by hand); academy members read them.
+    match /marketNews/{newsId} {
+      function figure(value) {
+        return value == null || (value is string && value.size() <= 20);
+      }
+
+      function validNews(data) {
+        return data.keys().hasOnly(['time', 'name', 'country', 'impact', 'actual', 'forecast',
+            'previous', 'updatedBy', 'updatedAt'])
+          && data.time is int && data.time > 0
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 80
+          && data.country in ['US', 'JP']
+          && data.impact in ['high', 'medium', 'low']
+          && figure(data.actual) && figure(data.forecast) && figure(data.previous)
+          && data.updatedBy == request.auth.uid
+          && data.updatedAt == request.time;
+      }
+
       allow read: if hasAcademyAccess();
-      allow write: if false;
+      allow create, update: if isStaff() && validNews(request.resource.data);
+      allow delete: if isStaff();
     }
 
     // Everything else is closed by default.

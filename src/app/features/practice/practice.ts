@@ -30,6 +30,7 @@ import {
 import { EvaluationService } from '../evaluations/evaluation.service';
 import { ChartSettingsService } from './chart-settings.service';
 import { NewsService } from './news.service';
+import { newsModeFor } from '../../core/models/market-news';
 import { BarBuilder, formatElapsed, nextBarEnd } from './bars';
 import { ReplayControls } from './replay-controls';
 import { EvaluationBriefing } from './evaluation-briefing';
@@ -196,7 +197,7 @@ export class Practice {
   /** Economic news around the chart's bars, while the user keeps them on. */
   protected readonly news = inject(NewsService).feed(
     () => this.visibleCandles(),
-    () => this.chartSettings.news(),
+    () => this.chartSettings.news() && this.newsMode() !== 'off',
   );
   private readonly locale = inject(LOCALE_ID);
   protected readonly i18n = inject(I18n);
@@ -366,6 +367,14 @@ export class Practice {
     () =>
       this.hideDates() &&
       (this.phase() === 'playing' || datesLocked(this.evaluation(), this.now())),
+  );
+  /** How much of the economic news the chart shows (an evaluation's creator picks it). */
+  protected readonly newsMode = computed(() =>
+    newsModeFor(
+      this.evaluation()?.news ?? (this.evaluation() ? 'reveal' : null),
+      this.phase() === 'playing',
+      this.datesHidden(),
+    ),
   );
   protected readonly closedTrades = computed(() =>
     [...(this.replay()?.closedTrades() ?? [])].reverse(),

@@ -33,6 +33,7 @@ import { STARTING_BALANCE } from '../../practice/replay';
 import { EvaluationStanding, evaluationStandings } from '../../ranking/standings';
 import { TimeZoneService } from '../../../core/time-zone/time-zone.service';
 import { fromLocalInput, toLocalInput } from '../exams/exam-form';
+import { EVALUATION_NEWS, EvaluationNews } from '../../../core/models/market-news';
 import { EvaluationResults } from './evaluation-results';
 import { RubricForm } from './rubric-form';
 
@@ -45,6 +46,8 @@ interface EvaluationForm {
   /** yyyy-mm-dd (UTC) when not random. */
   startDate: string;
   hideDates: boolean;
+  /** How the chart shows economic news during attempts. */
+  news: EvaluationNews;
   durationMinutes: number;
   /** Market minutes per real minute: the attempt runs by the clock at this pace. */
   pace: number;
@@ -97,6 +100,7 @@ export class AdminEvaluations {
   protected readonly instruments = INSTRUMENTS;
   protected readonly minDuration = MIN_DURATION;
   protected readonly maxDuration = MAX_DURATION;
+  protected readonly newsChoices = EVALUATION_NEWS;
   protected readonly paces = EVALUATION_PACES;
   /** "2 d 12 h": the market time an attempt covers at the form's pace and time limit. */
   protected readonly covered = (pace: number, minutes: number) =>
@@ -214,6 +218,7 @@ export class AdminEvaluations {
       randomStart: true,
       startDate: '',
       hideDates: true,
+      news: EVALUATION_NEWS[0],
       durationMinutes: 60,
       pace: DEFAULT_PACE,
       opensAt: toLocalInput(opens, this.zones.zone()),
@@ -233,6 +238,7 @@ export class AdminEvaluations {
       randomStart: false,
       startDate: utcDay(evaluation.replayStart),
       hideDates: evaluation.hideDates,
+      news: evaluation.news ?? EVALUATION_NEWS[0],
       durationMinutes: evaluation.durationMinutes,
       pace: evaluation.pace ?? DEFAULT_PACE,
       opensAt: toLocalInput(evaluation.opensAt.toDate(), this.zones.zone()),
@@ -261,6 +267,7 @@ export class AdminEvaluations {
       randomStart: false,
       startDate: utcDay(evaluation.replayStart),
       hideDates: evaluation.hideDates,
+      news: evaluation.news ?? EVALUATION_NEWS[0],
       durationMinutes: evaluation.durationMinutes,
       pace: evaluation.pace ?? DEFAULT_PACE,
       opensAt: toLocalInput(opens, this.zones.zone()),
@@ -329,6 +336,7 @@ export class AdminEvaluations {
       symbol: form.symbol,
       replayStart,
       hideDates: form.hideDates,
+      news: EVALUATION_NEWS.includes(form.news) ? form.news : EVALUATION_NEWS[0],
       startingBalance: base?.startingBalance ?? STARTING_BALANCE,
       durationMinutes: duration,
       pace: (EVALUATION_PACES as readonly number[]).includes(form.pace) ? form.pace : DEFAULT_PACE,

@@ -30,6 +30,7 @@ export const pt: Messages = {
     practiceSession: 'Prática | INDAB',
     adminMentor: 'Painel do mentor | INDAB',
     adminReviews: 'Depoimentos | INDAB',
+    adminNews: 'Notícias econômicas | INDAB',
   },
 
   seo: {
@@ -532,6 +533,10 @@ export const pt: Messages = {
         title: 'Material de estudo',
         text: 'Vídeos, apresentações e documentos para os alunos.',
       },
+      news: {
+        title: 'Notícias econômicas',
+        text: 'O calendário de notícias que os alunos veem no gráfico de prática.',
+      },
       reviews: {
         title: 'Depoimentos',
         text: 'Escolha quais depoimentos dos alunos aparecem na página inicial.',
@@ -872,9 +877,9 @@ export const pt: Messages = {
       previous: 'Anterior',
       upcoming: 'A publicar',
       released: 'Publicada',
-      source: 'Fonte',
-      maskedNote: 'Nome, hora e números ocultos para não revelar a data do replay.',
-      dataFrom: 'Dados de',
+      revealNote:
+        'Datas ocultas: o nome e os números de cada notícia aparecem quando o replay chega ao seu horário.',
+      impactNote: 'Nesta avaliação só aparece o impacto de cada notícia.',
       close: 'Fechar',
     },
     tools: 'Ferramentas do gráfico',
@@ -1125,6 +1130,13 @@ export const pt: Messages = {
     startDate: 'Data de início do replay',
     sameStart: 'Todos os alunos praticam a partir do mesmo ponto.',
     hideDates: 'Ocultar as datas durante a avaliação',
+    news: 'Notícias no gráfico',
+    newsChoices: {
+      reveal: 'Reveladas no seu horário (só o impacto antes)',
+      impact: 'Só o impacto, sem nome nem números',
+      off: 'Sem notícias',
+    },
+    newsHint: 'Como os alunos veem as notícias econômicas durante a avaliação.',
     opensAt: 'Abre',
     closesAt: 'Fecha',
     windowHint:
@@ -1840,6 +1852,45 @@ export const pt: Messages = {
   },
 
   // Reviews of INDAB: written by students in /profile, picked by admins for the landing.
+  newsAdmin: {
+    title: 'Notícias econômicas',
+    intro:
+      'O calendário próprio da INDAB: estas notícias aparecem no gráfico de prática no horário em que saíram. Adicione as que faltarem e escreva os números.',
+    add: 'Adicionar notícia',
+    importOfficial: 'Carregar datas oficiais 2026',
+    importHint:
+      'Adiciona as datas publicadas pelo governo dos EUA (BLS, Federal Reserve, BEA, Census, Departamento do Trabalho). Não muda o que já existe.',
+    imported: (count: number) =>
+      count === 0
+        ? 'As datas oficiais já estavam carregadas.'
+        : count === 1
+          ? '1 notícia adicionada.'
+          : `${count} notícias adicionadas.`,
+    addTitle: 'Nova notícia',
+    editTitle: 'Editar notícia',
+    name: 'Nome',
+    namePlaceholder: 'Non-Farm Payrolls',
+    when: 'Data e hora (seu fuso horário)',
+    country: 'País',
+    countries: { US: 'Estados Unidos', JP: 'Japão' },
+    impact: 'Impacto',
+    figuresHint:
+      'Escreva os números como o órgão os publica (ex. 254K, 4.1%). O valor atual só aparece quando o replay chega ao horário da notícia.',
+    save: 'Salvar',
+    cancel: 'Cancelar',
+    edit: 'Editar',
+    delete: 'Excluir',
+    deleteConfirm: (name: string) => `Excluir "${name}"?`,
+    saved: 'Notícia salva.',
+    deleted: 'Notícia excluída.',
+    invalid: 'Confira o nome, a data e se os números têm no máximo 20 caracteres.',
+    saveFailed: 'Não foi possível salvar. Tente de novo.',
+    month: 'Mês',
+    previousMonth: 'Mês anterior',
+    nextMonth: 'Próximo mês',
+    count: (count: number) => (count === 1 ? '1 notícia' : `${count} notícias`),
+    empty: 'Não há notícias neste mês.',
+  },
   reviews: {
     title: 'Seu depoimento sobre a INDAB',
     intro:

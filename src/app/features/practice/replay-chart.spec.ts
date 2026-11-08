@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
-import { NewsEvent } from '../../core/models/market-news';
+import { NewsEvent, NewsMode } from '../../core/models/market-news';
 import { Candle, OrderType, PracticeTrade } from '../../core/models/practice';
 import { ThemeService } from '../../core/theme/theme.service';
 import {
@@ -120,6 +120,7 @@ const position: PracticeTrade = {
     [indicators]="indicators()"
     (indicatorsChange)="picked.push($event)"
     [news]="news()"
+    [newsMode]="newsMode()"
     [showNews]="showNews()"
     (showNewsChange)="newsSwitched.push($event)"
     [indicatorConfigs]="configs()"
@@ -148,6 +149,7 @@ class Host {
   readonly indicators = signal<readonly string[] | null>(null);
   readonly picked: string[][] = [];
   readonly news = signal<NewsEvent[]>([]);
+  readonly newsMode = signal<NewsMode>('full');
   readonly showNews = signal(true);
   readonly newsSwitched: boolean[] = [];
   readonly configs = signal<Record<string, IndicatorConfig> | null>(null);
@@ -1803,12 +1805,9 @@ describe('ReplayChart economic news', () => {
     name: 'Nonfarm Payrolls',
     country: 'US',
     impact: 'high',
-    period: 'October 2026',
-    actual: '254',
-    prior: '150',
-    consensus: '180',
-    unit: 'K',
-    source: 'U.S. Bureau of Labor Statistics',
+    actual: '254K',
+    forecast: '180K',
+    previous: '150K',
     ...extra,
   });
   const marks = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>('.news-mark')];
@@ -1844,14 +1843,12 @@ describe('ReplayChart economic news', () => {
     mark.click();
     await fixture.whenStable();
     expect(card(el)).toContain('Nonfarm Payrolls');
-    expect(card(el)).toContain('Actual 254 K');
-    expect(card(el)).toContain('Previsión 180 K');
-    expect(card(el)).toContain('Anterior 150 K');
-    expect(card(el)).toContain('Fuente: U.S. Bureau of Labor Statistics');
+    expect(card(el)).toContain('jue 1 ene, 00:01 · US · Impacto alto');
+    expect(card(el)).toContain('Actual 254K');
+    expect(card(el)).toContain('Previsión 180K');
+    expect(card(el)).toContain('Anterior 150K');
     expect(card(el)).toContain('CPI');
-    expect(el.querySelector<HTMLAnchorElement>('.news-credit a')?.getAttribute('href')).toBe(
-      'https://www.financecalendar.com',
-    );
+    expect(el.querySelector('.news-card a')).toBeNull();
 
     // Escape closes it.
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
@@ -1879,11 +1876,41 @@ describe('ReplayChart economic news', () => {
     host.candles.set([c(0), c(60), c(120), c(180), c(240)]);
     await fixture.whenStable();
     expect(marks(el)[0].classList).not.toContain('upcoming');
-    expect(card(el)).toContain('Actual 254 K');
+    expect(card(el)).toContain('Actual 254K');
   });
 
-  it('shows only the impact while dates are hidden', async () => {
+  it('with dates hidden, reveals each release at its time, never its date', async () => {
     const { fixture, el, host } = await render();
+    host.newsMode.set('reveal');
+    host.candles.set([c(0), c(60)]);
+    host.barSeconds.set(60);
+    host.news.set([release(50), release(200, { id: 'cpi', name: 'CPI' })]);
+    await fixture.whenStable();
+
+    // Passed: name and figures, without the time.
+    marks(el)[0].click();
+    await fixture.whenStable();
+    expect(card(el)).toContain('Nonfarm Payrolls');
+    expect(card(el)).toContain('Actual 254K');
+    expect(card(el)).not.toContain('ene');
+    expect(card(el)).toContain('se revelan cuando el replay llega a su hora');
+    // Still to come: only the impact.
+    marks(el)[1].click();
+    await fixture.whenStable();
+    expect(card(el)).toContain('Noticia de impacto alto Por publicarse');
+    expect(card(el)).not.toContain('CPI');
+    expect(card(el)).not.toContain('180K');
+
+    // Once the replay reaches it, it shows too.
+    host.candles.set([c(0), c(60), c(120), c(180), c(240)]);
+    await fixture.whenStable();
+    expect(card(el)).toContain('CPI');
+    expect(card(el)).toContain('Actual 254K');
+  });
+
+  it('shows only the impact, or no news, as an evaluation says', async () => {
+    const { fixture, el, host } = await render();
+    host.newsMode.set('impact');
     host.candles.set([c(0), c(60), c(120)]);
     host.barSeconds.set(60);
     host.news.set([release(70)]);
@@ -1891,12 +1918,15 @@ describe('ReplayChart economic news', () => {
 
     marks(el)[0].click();
     await fixture.whenStable();
-    expect(card(el)).toContain('Noticia de impacto alto');
-    expect(card(el)).toContain('Publicada');
-    expect(card(el)).toContain('ocultos para no revelar la fecha');
-    for (const hidden of ['Nonfarm', '254', '150', '180', 'Bureau', 'Oct']) {
+    expect(card(el)).toContain('Noticia de impacto alto Publicada');
+    expect(card(el)).toContain('solo se muestra el impacto');
+    for (const hidden of ['Nonfarm', '254', '150', '180']) {
       expect(card(el)).not.toContain(hidden);
     }
+
+    host.newsMode.set('off');
+    await fixture.whenStable();
+    expect(marks(el)).toHaveLength(0);
   });
 
   it('switches the news off and on from the indicators menu', async () => {

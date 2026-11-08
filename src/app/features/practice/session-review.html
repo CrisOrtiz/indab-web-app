@@ -15,6 +15,7 @@
       [indicators]="chartSettings.indicators()"
       (indicatorsChange)="chartSettings.saveIndicators($event)"
       [news]="news()"
+      [newsMode]="hideDates() ? 'reveal' : 'full'"
       [showNews]="chartSettings.news()"
       (showNewsChange)="chartSettings.saveNews($event)"
       [indicatorConfigs]="chartSettings.configs()"

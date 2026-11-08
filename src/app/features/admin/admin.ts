@@ -13,6 +13,7 @@ type AdminCard =
   | 'exams'
   | 'evaluations'
   | 'practice'
+  | 'news'
   | 'reviews';
 
 // Admin home: a card per tool, each opening its own page.
@@ -38,6 +39,7 @@ export class Admin {
     { key: 'exams', link: '/admin/forms' },
     { key: 'evaluations', link: '/admin/evaluations' },
     { key: 'practice', link: '/admin/practice' },
+    { key: 'news', link: '/admin/news' },
     ...(this.auth.isAdmin() ? [{ key: 'reviews' as const, link: '/admin/reviews' }] : []),
   ]);
 }

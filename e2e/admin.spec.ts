@@ -121,3 +121,34 @@ test('promoting a student asks for confirmation', async ({ page }) => {
   await nav(page).getByRole('link', { name: 'Administración' }).click();
   await expect(page).toHaveURL('/admin');
 });
+
+test('trainers keep the economic news calendar the practice chart shows', async ({ page }) => {
+  await createUser('Marta Ruiz', 'marta@indab.test', { role: 'trainer' });
+  await signIn(page, 'marta@indab.test', '/login?returnUrl=%2Fadmin');
+  await expect(page).toHaveURL('/admin');
+  await page.getByRole('link', { name: /Noticias económicas/ }).click();
+  await expect(page).toHaveURL('/admin/news');
+
+  // The official dates load once; loading them again adds nothing.
+  await page.getByRole('button', { name: 'Cargar fechas oficiales 2026' }).click();
+  await expect(page.getByRole('status')).toContainText(/Se agregaron \d+ noticias\./);
+  await page.locator('input[type="month"]').fill('2026-12');
+  await expect(page.locator('.news-row').filter({ hasText: 'FOMC' }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Cargar fechas oficiales 2026' }).click();
+  await expect(page.getByRole('status')).toContainText('Las fechas oficiales ya estaban cargadas.');
+
+  // Staff add a release of their own and write its figure later.
+  await page.getByRole('button', { name: 'Agregar noticia' }).click();
+  await page.getByLabel('Nombre').fill('Discurso de Powell');
+  await page.getByLabel('Fecha y hora (tu zona horaria)').fill('2026-12-01T10:00');
+  await page.getByLabel('Impacto').selectOption('medium');
+  await page.getByRole('button', { name: 'Guardar' }).click();
+  await expect(page.getByRole('status')).toContainText('Noticia guardada.');
+  const powell = page.locator('.news-row').filter({ hasText: 'Discurso de Powell' });
+  await expect(powell).toContainText('Impacto medio');
+  await powell.getByRole('button', { name: 'Acciones: Discurso de Powell' }).click();
+  await page.getByRole('menuitem', { name: 'Editar' }).click();
+  await page.getByLabel('Actual').fill('Hawkish');
+  await page.getByRole('button', { name: 'Guardar' }).click();
+  await expect(powell).toContainText('Actual: Hawkish');
+});

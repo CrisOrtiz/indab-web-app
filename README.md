@@ -194,7 +194,7 @@ The service account needs the _Firebase Admin_ and _Service Usage Consumer_ role
 | `users/{uid}/notifications/{id}` (the bell)                      | owner                                                                                                                                                  | the sender, once per event (the id names it): a note's author in the same batch as the note; staff for an evaluation or form given to the student or its published results; a student for their own finished practice, evaluation or handed-in form, to staff who follow them for it; the owner marks read and deletes                                                                                                                                                                                                    |
 | `users/{uid}/settings/notifications`                             | owner                                                                                                                                                  | trainers and admins, their own (what they follow and which activity they hear of)                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `users/{uid}/settings/chart`                                     | owner                                                                                                                                                  | everyone, their own (the practice chart's indicators and their setups, known ids only)                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `marketNews/{YYYY-MM}`                                           | academy access                                                                                                                                         | nobody (the daily News sync job writes it with the service account)                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `marketNews/{id}` (a release)                                    | academy access                                                                                                                                         | trainers, admins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `reviews/{uid}`                                                  | author, admins; everyone once `featured`                                                                                                               | the author with academy access (stars 1-5, 20-600 characters, name, optional photo; any edit unpicks it); admins only set `featured`; author or admin deletes                                                                                                                                                                                                                                                                                                                                                             |
 | `follows/{kind}/subjects/{id}/followers/{uid}`                   | that trainer or admin; students, the lists of what concerns them (themselves, their mentorships, their evaluations and forms, `all`)                   | that trainer or admin (`types`: `practiceFinished`, `evaluationFinished`, `examSubmitted`)                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
@@ -242,6 +242,7 @@ Changing the password does revoke every other session, since Firebase ends them 
 | `/admin/material`                | trainers and admins (add study material by link, preview it, choose who sees it, publish, hide or delete it)                                           |
 | `/admin/practice`                | trainers and admins (review students' practice sessions on the chart; admins delete them)                                                              |
 | `/admin/evaluations`             | trainers and admins (set up timed evaluations, see and publish their results)                                                                          |
+| `/admin/news`                    | trainers and admins (INDAB's economic news calendar shown on the practice chart; loads the official US dates)                                          |
 | `/admin/forms`                   | trainers and admins (build scored evaluation forms; `/admin/forms/:id` grades submissions and publishes results)                                       |
 
 ## Languages
@@ -429,30 +430,24 @@ Binance) and a session can be deleted with its trades.
 
 ### News on the practice chart
 
-The practice chart (and each session review) shows the US economic news of the replayed days as
-icons on the time axis, in the calendar's impact colors (red high, orange medium; low-impact news
-is left out). Tapping one lists its releases with time, actual, forecast and previous figures and
-the publisher. A release the replay has not reached shows "Por publicarse" instead of its figure,
-and while dates are hidden (evaluations, or the student's choice) only the impact shows, so the
-news cannot give the replay date away. Students switch the news off and on in the indicators menu
-(kept in `users/{uid}/settings/chart`).
+The practice chart (and each session review) shows the economic news of the replayed days as
+icons on the time axis, in the calendar's impact colors (red high, orange medium, yellow low).
+Tapping one lists its releases with time, actual, forecast and previous figures. A release the
+replay has not reached shows "Por publicarse" instead of its actual figure. Students switch the
+news off and on in the indicators menu (kept in `users/{uid}/settings/chart`).
 
-The releases come from [Finance Calendar](https://www.financecalendar.com) (free account,
-commercial use allowed with a visible link to it, which the news card has). The browser never
-calls it: `.github/workflows/news-sync.yml` runs `scripts/sync-news.mts` every day (and by hand)
-and copies each month into `marketNews/{YYYY-MM}` (`core/models/market-news.ts` decides what is
-kept). It needs, once:
+With dates hidden, a release shows only its impact ("Noticia de impacto alto") until the replay
+reaches its time; then its name and figures show, never its date. Each evaluation's creator picks
+how its chart shows the news while an attempt runs (`Evaluation.news`): revealed on time (the
+default), only the impact, or none. `newsModeFor` in `core/models/market-news.ts` decides.
 
-1. A free account at financecalendar.com and its API key, saved as the repository secret
-   `FINANCE_CALENDAR_API_KEY` (GitHub: Settings > Secrets and variables > Actions).
-2. The role **Cloud Datastore User** for the deploy service account (Google Cloud console >
-   IAM, project `indab-academy`, the account in `FIREBASE_SERVICE_ACCOUNT_INDAB_ACADEMY`), so
-   the job can write to Firestore.
-3. One manual run of "News sync" (Actions tab > News sync > Run workflow) with `from` = `2025-11`
-   to copy the months before (the free allowance is 250 requests a day; each month takes one or
-   two).
-
-Try it locally with `NEWS_DRY_RUN=1 FINANCE_CALENDAR_API_KEY=... node scripts/sync-news.mts`.
+The calendar is INDAB's own, with no outside service: one `marketNews/{id}` document per
+release, kept by trainers and admins at `/admin/news` (the "Noticias económicas" card). "Cargar
+fechas oficiales 2026" adds the official US schedules (BLS: payrolls, CPI, PPI, JOLTS, weekly
+jobless claims; Federal Reserve: FOMC decisions and press conferences; BEA: GDP and PCE; Census:
+retail sales) from `features/admin/news/official-schedule.ts`, converted from New York time. It
+only adds the releases that are missing (fixed ids), so loading it again never undoes a change.
+Staff write the actual figures as they come out. Add each new year's dates to that file.
 
 ### Long lists: filters and pages
 

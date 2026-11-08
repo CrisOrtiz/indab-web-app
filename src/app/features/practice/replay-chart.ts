@@ -37,7 +37,7 @@ import { TimeZoneService } from '../../core/time-zone/time-zone.service';
 // Registers the month names of every language for the times on the axis.
 import '../../core/i18n/local-date.pipe';
 import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/practice';
-import { NEWS_SOURCE_URL, NewsEvent, formatFigure } from '../../core/models/market-news';
+import { NewsEvent, NewsMode } from '../../core/models/market-news';
 import { NewsMark, newsMarks } from './news-marks';
 import { ChartIndicators, ShownIndicator } from './chart-indicators';
 import {
@@ -567,10 +567,12 @@ export class ReplayChart {
   /** The indicators after the user switched one on or off, to keep for their next sessions. */
   readonly indicatorsChange = output<string[]>();
   /**
-   * Economic news around the bars (`NewsService.feed`), shown as icons on the time axis. With
-   * `hideDates` they show only their impact: a name would give the replay's date away.
+   * Economic news around the bars (`NewsService.feed`), shown as icons on the time axis, with
+   * as much detail as `newsMode` allows.
    */
   readonly news = input<readonly NewsEvent[]>([]);
+  /** How much of the news shows (see `NewsMode`): all, at their time, impact only, or none. */
+  readonly newsMode = input<NewsMode>('full');
   /** Whether the news show (`ChartSettingsService.news`). */
   readonly showNews = input(true);
   /** The news switched on or off in the indicators menu, to keep for the next sessions. */
@@ -594,8 +596,6 @@ export class ReplayChart {
     () => new Set(this.indicators() ?? DEFAULT_INDICATORS),
   );
   protected readonly newsOn = linkedSignal(() => this.showNews());
-  protected readonly newsSourceUrl = NEWS_SOURCE_URL;
-  protected readonly figure = formatFigure;
   /** The news icons on screen. */
   protected readonly newsMarks = signal<NewsMark[]>([]);
   /** The bar whose news card is open. */
@@ -792,6 +792,7 @@ export class ReplayChart {
       // News arriving or switched on or off.
       this.news();
       this.newsOn();
+      this.newsMode();
       untracked(() => this.layoutLabels());
     });
     effect(() => {
@@ -889,6 +890,12 @@ export class ReplayChart {
   protected newsCardLeft(x: number): number {
     const width = Math.min(NEWS_CARD_WIDTH, this.paneSize().width - 8);
     return Math.max(4, Math.min(x - width / 2, this.paneSize().width - width - 4));
+  }
+
+  /** Whether a release shows its name and figures, or only its impact. */
+  protected newsDetailed(released: boolean): boolean {
+    const mode = this.newsMode();
+    return mode === 'full' || (mode === 'reveal' && released);
   }
 
   protected closeNewsCard(): void {
@@ -1575,7 +1582,7 @@ export class ReplayChart {
   /** The news icons of the bars on screen. */
   private placeNews(): NewsMark[] {
     const chart = this.chart;
-    if (!chart || !untracked(this.newsOn)) {
+    if (!chart || !untracked(this.newsOn) || untracked(this.newsMode) === 'off') {
       return [];
     }
     const scale = chart.timeScale();
