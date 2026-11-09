@@ -8,6 +8,7 @@ import { Reveal } from '../../shared/reveal/reveal';
 type AdminCard =
   | 'mentor'
   | 'users'
+  | 'students'
   | 'mentorships'
   | 'material'
   | 'exams'
@@ -28,12 +29,14 @@ export class Admin {
   protected readonly i18n = inject(I18n);
 
   /**
-   * A card per admin tool, the mentor dashboard first; trainers do not get the users card
-   * (mentorships are read-only) or the reviews card.
+   * A card per admin tool, the mentor dashboard first. Trainers get the users page as
+   * "Estudiantes" (only students, access and mentorships, no roles) and no reviews card.
    */
-  protected readonly cards = computed<{ key: AdminCard; link: string }[]>(() => [
+  protected readonly cards = computed<{ key: AdminCard; link: string; art?: AdminCard }[]>(() => [
     { key: 'mentor', link: '/admin/mentor' },
-    ...(this.auth.isAdmin() ? [{ key: 'users' as const, link: '/admin/users' }] : []),
+    this.auth.isAdmin()
+      ? { key: 'users', link: '/admin/users' }
+      : { key: 'students', link: '/admin/users', art: 'users' },
     { key: 'mentorships', link: '/admin/mentorships' },
     { key: 'material', link: '/admin/material' },
     { key: 'exams', link: '/admin/forms' },

@@ -51,6 +51,10 @@ input {
   color: var(--color-muted);
 }
 
+.google-error {
+  margin-top: 8px;
+}
+
 .divider {
   margin: 16px 0;
   text-align: center;
@@ -60,18 +64,6 @@ input {
 
 .btn {
   width: 100%;
-}
-
-// Google sign-in: the full-color "G" sits left of the label (Google branding: 18px mark,
-// ~10px gap). The colored mark keeps enough contrast on both the light and dark themes.
-.btn-google {
-  gap: 10px;
-}
-
-.google-logo {
-  flex: none;
-  width: 18px;
-  height: 18px;
 }
 
 .links {

@@ -19,6 +19,7 @@ describe('Admin users page', () => {
   let fixture: ComponentFixture<AdminUsers>;
   let el: HTMLElement;
   const rows = signal<AdminUserRow[]>([]);
+  const isAdmin = signal(true);
   const fake = {
     users: computed(() => rows()),
     loading: signal(false),
@@ -38,6 +39,7 @@ describe('Admin users page', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
+    isAdmin.set(true);
     fake.loading.set(false);
     fake.error.set(null);
     rows.set([
@@ -51,7 +53,7 @@ describe('Admin users page', () => {
       imports: [AdminUsers],
       providers: [
         provideRouter([]),
-        { provide: AuthService, useValue: { user: signal({ uid: 'boss' }) } },
+        { provide: AuthService, useValue: { user: signal({ uid: 'boss' }), isAdmin } },
         { provide: MentorshipService, useValue: mentorships },
       ],
     });
@@ -116,6 +118,7 @@ describe('Admin users page', () => {
     fake.loading.set(true);
     await fixture.whenStable();
     expect(el.textContent).toContain('Cargando usuarios…');
+    isAdmin.set(true);
     fake.loading.set(false);
     fake.error.set('No se pudo cargar la lista de usuarios.');
     await fixture.whenStable();
@@ -262,5 +265,42 @@ describe('Admin users page', () => {
     el.querySelector<HTMLButtonElement>('.dismiss')!.click();
     await fixture.whenStable();
     expect(el.querySelector('.message')).toBeNull();
+  });
+
+  describe('for a trainer (mentor)', () => {
+    beforeEach(async () => {
+      isAdmin.set(false);
+      fixture.detectChanges();
+      await fixture.whenStable();
+    });
+
+    it('lists only students, with no roles to change', () => {
+      expect(names()).toEqual(['José Pérez', 'Luis Díaz']);
+      expect(el.textContent).toContain('habilita el acceso a la academia de las cuentas nuevas');
+      expect(el.querySelector('[aria-label^="Rol de"]')).toBeNull();
+      expect(el.querySelector('[aria-label="Filtrar por rol"]')).toBeNull();
+      expect([...el.querySelectorAll('th')].map((th) => th.textContent?.trim())).not.toContain(
+        'Rol',
+      );
+      expect([...el.querySelectorAll('.stat')].map((s) => s.textContent)).toHaveLength(2);
+    });
+
+    it('grants academy access to a pending student but cannot take it away', async () => {
+      await change(accessInput('Luis Díaz'), true);
+      expect(fake.setAcademyAccess).toHaveBeenCalledWith('luis', true);
+      expect(message()).toContain('Luis Díaz ahora tiene acceso a la academia.');
+
+      const jose = accessInput('José Pérez');
+      expect(jose.disabled).toBe(true);
+      expect(jose.title).toBe('Solo un administrador puede quitar el acceso.');
+    });
+
+    it('adds students to mentorships', async () => {
+      const add = el.querySelector<HTMLSelectElement>(
+        '[aria-label="Agregar a José Pérez a una mentoría"]',
+      )!;
+      await change(add, 'm2');
+      expect(fake.setMentorships).toHaveBeenCalledWith('jose', ['m1', 'm2']);
+    });
   });
 });

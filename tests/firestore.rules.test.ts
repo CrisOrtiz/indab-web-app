@@ -925,17 +925,89 @@ describe('trainers', () => {
     await assertFails(updateDoc(doc(as('enrolled'), 'users/student'), { role: 'trainer' }));
   });
 
-  it('read users and enrollments but cannot change access', async () => {
+  it('read users and enrollments', async () => {
     await assertSucceeds(getDocs(collection(as('trainer'), 'users')));
     await assertSucceeds(getDocs(collection(as('trainer'), 'enrollments')));
+    await assertFails(deleteDoc(doc(as('trainer'), 'users/student')));
+  });
+
+  it("set students' mentorships, and nothing else", async () => {
+    await assertSucceeds(
+      updateDoc(doc(as('trainer'), 'users/student'), { mentorshipIds: ['m1', 'm2'] }),
+    );
+    await assertSucceeds(updateDoc(doc(as('trainer'), 'users/student'), { mentorshipIds: [] }));
+    await assertFails(updateDoc(doc(as('trainer'), 'users/student'), { mentorshipIds: 'm1' }));
     await assertFails(
-      setDoc(doc(as('trainer'), 'enrollments/student'), {
-        academy: true,
-        courses: [],
-        updatedBy: 'trainer',
+      updateDoc(doc(as('trainer'), 'users/student'), {
+        mentorshipIds: Array.from({ length: 21 }, (_, i) => `m${i}`),
       }),
     );
-    await assertFails(deleteDoc(doc(as('trainer'), 'users/student')));
+    await assertFails(
+      updateDoc(doc(as('trainer'), 'users/student'), { mentorshipIds: ['m1'], role: 'trainer' }),
+    );
+    await assertFails(updateDoc(doc(as('trainer'), 'users/student'), { displayName: 'X' }));
+    await assertFails(updateDoc(doc(as('trainer'), 'users/admin'), { mentorshipIds: ['m1'] }));
+    await assertFails(updateDoc(doc(as('trainer'), 'users/trainer'), { mentorshipIds: ['m1'] }));
+    await assertFails(updateDoc(doc(as('enrolled'), 'users/student'), { mentorshipIds: ['m1'] }));
+  });
+
+  describe('granting academy access', () => {
+    const grant = (extra: Record<string, unknown> = {}) => ({
+      academy: true,
+      courses: [],
+      updatedAt: serverTimestamp(),
+      updatedBy: 'trainer',
+      ...extra,
+    });
+    const enrollment = (uid: string) => doc(as('trainer'), `enrollments/${uid}`);
+
+    beforeEach(() =>
+      env.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        await setDoc(doc(db, 'users/partial'), { uid: 'partial', role: 'student' });
+        await setDoc(doc(db, 'users/enrolled'), { uid: 'enrolled', role: 'student' });
+      }),
+    );
+
+    it('lets trainers open the academy to a new student', async () => {
+      await assertSucceeds(setDoc(enrollment('student'), grant()));
+    });
+
+    it('lets trainers open it to a pending student, keeping the courses', async () => {
+      await assertSucceeds(setDoc(enrollment('partial'), grant({ courses: ['forex-101'] })));
+    });
+
+    it('only lets trainers grant, signed by them, with the server time', async () => {
+      await assertFails(setDoc(enrollment('student'), grant({ academy: false })));
+      await assertFails(setDoc(enrollment('student'), grant({ updatedBy: 'admin' })));
+      await assertFails(setDoc(enrollment('student'), grant({ updatedAt: new Date(0) })));
+      await assertFails(setDoc(enrollment('student'), grant({ courses: ['forex-101'] })));
+      await assertFails(setDoc(enrollment('student'), grant({ extra: 1 })));
+      await assertFails(setDoc(enrollment('partial'), grant({ courses: [] })));
+      await assertFails(setDoc(enrollment('partial'), grant({ courses: ['forex-101', 'pro'] })));
+    });
+
+    it('never lets trainers take access away or delete it', async () => {
+      await assertFails(setDoc(enrollment('enrolled'), grant({ academy: false })));
+      await assertFails(updateDoc(enrollment('enrolled'), { academy: false }));
+      await assertFails(setDoc(enrollment('enrolled'), grant()));
+      await assertFails(deleteDoc(enrollment('enrolled')));
+    });
+
+    it('keeps trainers away from staff accounts and missing users', async () => {
+      await assertFails(setDoc(enrollment('admin'), grant()));
+      await assertFails(setDoc(enrollment('trainer'), grant()));
+      await assertFails(setDoc(enrollment('nobody'), grant()));
+    });
+
+    it('does not let students grant access', async () => {
+      await assertFails(
+        setDoc(doc(as('student'), 'enrollments/student'), grant({ updatedBy: 'student' })),
+      );
+      await assertFails(
+        setDoc(doc(as('enrolled'), 'enrollments/student'), grant({ updatedBy: 'enrolled' })),
+      );
+    });
   });
 
   it('have academy access', async () => {
@@ -1732,14 +1804,14 @@ describe('mentorships', () => {
     await assertFails(getDoc(ref(null)));
   });
 
-  it('are assigned to students by admins, never by the student or trainers', async () => {
+  it('are assigned to students by admins and trainers, never by the student', async () => {
     await assertSucceeds(
       updateDoc(doc(as('admin'), 'users/other'), { mentorshipIds: ['m1', 'm2'] }),
     );
     await assertSucceeds(updateDoc(doc(as('admin'), 'users/other'), { mentorshipIds: [] }));
     await assertFails(updateDoc(doc(as('admin'), 'users/other'), { mentorshipIds: 'm1' }));
     await assertFails(updateDoc(doc(as('other'), 'users/other'), { mentorshipIds: ['m1'] }));
-    await assertFails(updateDoc(doc(as('trainer'), 'users/other'), { mentorshipIds: ['m1'] }));
+    await assertSucceeds(updateDoc(doc(as('trainer'), 'users/other'), { mentorshipIds: ['m1'] }));
   });
 
   it('give their students the evaluations assigned to the mentorship', async () => {

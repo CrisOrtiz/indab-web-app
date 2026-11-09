@@ -72,6 +72,18 @@ test('registration validates the form and rejects a taken email', async ({ page 
   await expect(page).toHaveURL('/register');
 });
 
+test('sign-up offers Google first, above the email form', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Únete a la academia' }).first().click();
+  await expect(page).toHaveURL('/register');
+  const google = page.getByRole('button', { name: 'Registrarme con Google' });
+  await expect(google).toBeVisible();
+  await expect(page.getByText('o regístrate con tu correo')).toBeVisible();
+  const googleBox = (await google.boundingBox())!;
+  const nameBox = (await page.getByLabel('Nombre completo').boundingBox())!;
+  expect(googleBox.y).toBeLessThan(nameBox.y);
+});
+
 test('login rejects a wrong password', async ({ page }) => {
   await createUser('Ana', 'ana@indab.test');
   await page.goto('/login');

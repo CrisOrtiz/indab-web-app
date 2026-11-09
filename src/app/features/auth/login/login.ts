@@ -3,11 +3,12 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 import { I18n } from '../../../core/i18n/i18n.service';
+import { GoogleButton } from '../../../shared/google-button/google-button';
 import { authErrorMessage } from '../auth-errors';
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [GoogleButton, ReactiveFormsModule, RouterLink],
   templateUrl: './login.html',
   styleUrl: '../auth-form.scss',
 })

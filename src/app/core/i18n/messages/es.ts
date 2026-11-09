@@ -302,6 +302,8 @@ export const es = {
     },
     register: {
       title: 'Crear cuenta',
+      google: 'Registrarme con Google',
+      orEmail: 'o regístrate con tu correo',
       name: 'Nombre completo',
       nameRequired: 'Ingresa tu nombre.',
       passwordHint: 'Mínimo 6 caracteres.',
@@ -521,6 +523,10 @@ export const es = {
         title: 'Usuarios',
         text: 'Rol, acceso a la academia y mentorías de cada persona.',
       },
+      students: {
+        title: 'Estudiantes',
+        text: 'Da acceso a la academia a las cuentas nuevas y agrega estudiantes a sus mentorías.',
+      },
       mentorships: {
         title: 'Mentorías',
         text: 'Grupos de estudiantes con sus mentores, para asignarles formularios y evaluaciones.',
@@ -553,7 +559,9 @@ export const es = {
     usersIntro:
       'Busca a cada persona, cambia su rol, habilita o quita su acceso a la academia y asígnala a sus mentorías.',
     trainerNote:
-      'Como entrenador puedes crear evaluaciones y revisar las prácticas. Los roles, el acceso a la academia y las mentorías los gestiona un administrador.',
+      'Como entrenador puedes crear evaluaciones, revisar las prácticas, dar acceso a la academia a cuentas nuevas y agregar estudiantes a mentorías. Los roles los gestiona un administrador.',
+    usersIntroTrainer:
+      'Busca a cada estudiante, habilita el acceso a la academia de las cuentas nuevas y agrégalo a sus mentorías. Solo un administrador cambia roles o quita el acceso.',
     trainers: 'Entrenadores',
     roles: { student: 'Estudiante', trainer: 'Entrenador', admin: 'Administrador' },
     back: '← Administración',
@@ -585,6 +593,8 @@ export const es = {
     enabled: 'Habilitado',
     pending: 'Pendiente',
     adminsHaveAccess: 'Los administradores ya tienen acceso.',
+    trainersHaveAccess: 'Los entrenadores ya tienen acceso.',
+    onlyAdminsRevoke: 'Solo un administrador puede quitar el acceso.',
     noMatches: 'No hay usuarios que coincidan con la búsqueda.',
     confirmAdmin: (name: string) => `¿Dar permisos de administrador a ${name}?`,
     roleChanged: (name: string, role: string) => `${name} ahora es ${role.toLowerCase()}.`,
@@ -592,7 +602,7 @@ export const es = {
     accessRemoved: (name: string) => `Se quitó el acceso a la academia a ${name}.`,
     saveFailed: (name: string) => `No se pudo guardar el cambio para ${name}. Intenta de nuevo.`,
     loadFailed:
-      'No se pudo cargar la lista de usuarios. Verifica que tu cuenta sea administradora.',
+      'No se pudo cargar la lista de usuarios. Verifica que tu cuenta sea entrenador o administrador.',
   },
 
   review: {

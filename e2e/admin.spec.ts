@@ -31,15 +31,33 @@ test('students cannot open the admin area', async ({ page }) => {
   await expect(page).toHaveURL('/academy');
 });
 
-test('trainers get no users card and cannot open the users page', async ({ page }) => {
-  await createUser('Marta Ruiz', 'marta@indab.test', { role: 'trainer' });
+test('trainers see only students, grant academy access and cannot change roles', async ({
+  page,
+}) => {
+  const trainerUid = await createUser('Marta Ruiz', 'marta@indab.test', { role: 'trainer' });
   await signIn(page, 'marta@indab.test', '/login?returnUrl=%2Fadmin');
   await expect(page).toHaveURL('/admin');
-  await expect(page.getByRole('link', { name: /Formularios de evaluación/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Usuarios/ })).toHaveCount(0);
-  await expect(page.getByRole('table')).toHaveCount(0);
-  await page.goto('/admin/users');
-  await expect(page).toHaveURL('/academy');
+  await page.getByRole('link', { name: /Estudiantes/ }).click();
+  await expect(page).toHaveURL('/admin/users');
+  await expect(page.getByRole('heading', { name: 'Estudiantes' })).toBeVisible();
+  await expect(page.getByText('2 de 2 usuarios')).toBeVisible();
+  await expect(row(page, 'Ana Admin')).toHaveCount(0);
+  await expect(row(page, 'Marta Ruiz')).toHaveCount(0);
+  await expect(page.getByLabel('Rol de Luis Díaz')).toHaveCount(0);
+
+  // Access already given can only be taken away by an admin.
+  await expect(row(page, 'José Pérez').getByRole('checkbox')).toBeDisabled();
+  await row(page, 'Luis Díaz').getByRole('checkbox').check();
+  await expect(page.getByRole('status')).toContainText(
+    'Luis Díaz ahora tiene acceso a la academia.',
+  );
+  expect(await getDocument(`enrollments/${studentUid}`)).toMatchObject({
+    academy: true,
+    courses: [],
+    updatedBy: trainerUid,
+  });
+  await expect(row(page, 'Luis Díaz').getByRole('checkbox')).toBeDisabled();
 });
 
 test('admins see every user with search and filters', async ({ page }) => {

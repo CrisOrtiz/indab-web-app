@@ -143,7 +143,7 @@ export const routes: Routes = [
   {
     path: 'admin/users',
     title: 'adminUsers',
-    canActivate: [adminGuard],
+    canActivate: [staffGuard],
     loadComponent: () => import('./features/admin/users/users').then((m) => m.AdminUsers),
   },
   {

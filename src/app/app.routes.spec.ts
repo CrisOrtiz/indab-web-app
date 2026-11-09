@@ -215,7 +215,9 @@ describe('app routes', () => {
     expect(await visit('/admin/evaluations')).toBe('/admin/evaluations');
     expect(await visit('/admin/mentorships')).toBe('/admin/mentorships');
     expect(await visit('/admin/material')).toBe('/admin/material');
-    expect(await visit('/admin/users')).toBe('/academy');
+    // Their students page: academy access and mentorships of students, no roles.
+    expect(await visit('/admin/users')).toBe('/admin/users');
+    expect(await visit('/admin/reviews')).toBe('/academy');
     expect(await visit('/academy/practice')).toBe('/academy/practice');
   });
 

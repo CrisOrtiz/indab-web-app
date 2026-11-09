@@ -15,9 +15,9 @@ import { Enrollment, UserProfile, UserRole } from '../../core/models/user-profil
 import { AdminUserRow, sortUsers } from './admin-users';
 
 /**
- * Live list of every user and enrollment, for the admin area. Provided by the `Admin`
- * component (not in root) so the listeners stop when the admin leaves the page.
- * Firestore rules only let admins write the changes below; it listens for admins only.
+ * Live list of every user and enrollment, for /admin/users. Provided by the page (not in root)
+ * so the listeners stop when staff leave it. Admins make every change below; trainers (mentors)
+ * only grant academy access and set the mentorships of students, as the Firestore rules allow.
  */
 @Injectable()
 export class AdminService {
@@ -43,8 +43,7 @@ export class AdminService {
   });
 
   constructor() {
-    // Trainers open the admin area too, but only admins manage users.
-    if (!this.auth.isAdmin()) {
+    if (!this.auth.isStaff()) {
       this._loading.set(false);
       return;
     }

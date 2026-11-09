@@ -49,12 +49,14 @@ describe('Admin home', () => {
     expect(el.querySelector('table')).toBeNull();
   });
 
-  it('shows trainers the evaluations and practice review, not the users or reviews', async () => {
+  it('shows trainers their students page, not the roles or reviews', async () => {
     isAdmin.set(false);
     await fixture.whenStable();
     expect(el.textContent).toContain('Como entrenador puedes crear evaluaciones');
+    expect(titles()[1]).toBe('Estudiantes');
     expect(links()).toEqual([
       '/admin/mentor',
+      '/admin/users',
       '/admin/mentorships',
       '/admin/material',
       '/admin/forms',
