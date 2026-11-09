@@ -1750,9 +1750,10 @@ describe('volumeProfile', () => {
 
 describe('divergenceSegments', () => {
   const at = (time: number, value = time) => ({ time, value });
-  const times = Array.from({ length: 40 }, (_, i) => i);
+  const green = '#089981';
+  const hidden = 'transparent';
 
-  it('draws each divergence from pivot to pivot, with gaps between them', () => {
+  it('colors only the line from pivot to pivot of each divergence, never across them', () => {
     expect(
       divergenceSegments(
         [
@@ -1761,18 +1762,21 @@ describe('divergenceSegments', () => {
           { kind: 'bull', from: at(15), to: at(25) },
           { kind: 'bull', from: at(30), to: at(38) },
         ],
-        times,
+        green,
       ),
     ).toEqual([
-      { time: 2, value: 2 },
-      { time: 10, value: 10 },
-      // Shares its pivot with the one before: joined.
-      { time: 20, value: 20 },
-      // (Starting before the previous ended: left out.) A gap, then the next.
-      { time: 21 },
-      { time: 30, value: 30 },
-      { time: 38, value: 38 },
+      { time: 2, value: 2, color: green },
+      // Shares its pivot with the one before: the line goes on.
+      { time: 10, value: 10, color: green },
+      // (Starting before the previous ended: left out.) Hidden up to the next one.
+      { time: 20, value: 20, color: hidden },
+      { time: 30, value: 30, color: green },
+      { time: 38, value: 38, color: hidden },
     ]);
+  });
+
+  it('is empty without divergences', () => {
+    expect(divergenceSegments([], green)).toEqual([]);
   });
 });
 
