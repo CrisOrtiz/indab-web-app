@@ -1,3 +1,4 @@
+import { quietFeatureFlags } from '../../core/features/testing';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -106,6 +107,7 @@ describe('Profile', () => {
       providers: [
         ...quietNotifications().providers,
         ...quietReviews().providers,
+        ...quietFeatureFlags().providers,
         provideRouter([]),
         { provide: AuthService, useValue: auth },
         { provide: ProfileService, useValue: profiles },

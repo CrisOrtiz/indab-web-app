@@ -124,13 +124,13 @@
           </tbody>
         </table>
       </div>
-      @if (auth.hasAcademyAccess()) {
+      @if (auth.hasAcademyAccess() && flags.shown('practice')) {
         <a routerLink="/academy/practice" class="btn btn-outline">{{ t.startPractice }}</a>
       }
     }
   </div>
 
-  @if (auth.hasAcademyAccess()) {
+  @if (auth.hasAcademyAccess() && flags.shown('reviews')) {
     <app-review-panel />
   }
 

@@ -104,7 +104,10 @@ test('granting academy access opens the material to the student', async ({ page 
 
 test('revoking academy access closes the material again', async ({ page }) => {
   await openAdmin(page);
-  await row(page, 'José Pérez').getByRole('checkbox').uncheck();
+  // The access column fills in after the list: wait for it before changing it.
+  const access = row(page, 'José Pérez').getByRole('checkbox');
+  await expect(access).toBeChecked();
+  await access.uncheck();
   await expect(page.getByRole('status')).toContainText(
     'Se quitó el acceso a la academia a José Pérez.',
   );

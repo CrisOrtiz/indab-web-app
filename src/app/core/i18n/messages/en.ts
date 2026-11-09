@@ -31,6 +31,7 @@ export const en: Messages = {
     adminMentor: 'Mentor dashboard | INDAB',
     adminReviews: 'Reviews | INDAB',
     adminNews: 'Economic news | INDAB',
+    adminFeatures: 'Features | INDAB',
   },
 
   seo: {
@@ -552,6 +553,10 @@ export const en: Messages = {
       reviews: {
         title: 'Reviews',
         text: 'Choose which student reviews appear on the home page.',
+      },
+      features: {
+        title: 'Features',
+        text: 'Show or hide academy sections, or open them to staff only to try them out.',
       },
     },
     usersIntro:
@@ -1954,6 +1959,44 @@ export const en: Messages = {
   },
 
   // One practice session on its own page (notifications link here).
+  featureFlags: {
+    title: 'Features',
+    intro:
+      'Choose who sees each section of the academy. A hidden section leaves the cards and its page leads to the academy. Changes are saved right away.',
+    loading: 'Loading features…',
+    modes: { on: 'Visible to everyone', staff: 'Staff only', off: 'Hidden' },
+    whoSees: (feature: string) => `Who sees ${feature}`,
+    items: {
+      material: {
+        title: 'Study material',
+        text: 'Videos, presentations and documents for students.',
+      },
+      practice: {
+        title: 'Trading practice',
+        text: 'The gold chart to practice on and the practice evaluations.',
+      },
+      exams: {
+        title: 'Exams',
+        text: 'The evaluation forms students answer.',
+      },
+      ranking: {
+        title: 'Ranking',
+        text: 'The ranking of practice evaluations.',
+      },
+      calendar: {
+        title: 'Economic calendar',
+        text: 'The calendar inside the academy. The public /calendar page stays open.',
+      },
+      reviews: {
+        title: 'Reviews',
+        text: 'The form where students write their review in their profile.',
+      },
+    },
+    saved: (feature: string, mode: string) => `${feature}: ${mode.toLowerCase()}.`,
+    failed: 'The change could not be saved. Please try again.',
+    note: '"Staff only" keeps it visible to trainers and admins, to try it before opening it to students. Hiding a section does not delete its data.',
+  },
+
   sessionPage: {
     back: '← Back to practice',
     backStaff: '← Back to practice sessions',

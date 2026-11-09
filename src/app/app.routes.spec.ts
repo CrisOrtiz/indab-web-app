@@ -21,6 +21,7 @@ import { es } from './core/i18n/messages/es';
 import { pt } from './core/i18n/messages/pt';
 import { quietNotifications } from './features/notifications/testing';
 import { quietChartSettings } from './features/practice/testing';
+import { quietFeatureFlags } from './core/features/testing';
 
 describe('app routes', () => {
   const auth = {
@@ -36,9 +37,11 @@ describe('app routes', () => {
 
   const firestore = { load: vi.fn(async () => ({})), instance: () => null };
   let harness: RouterTestingHarness | undefined;
+  let flags: ReturnType<typeof quietFeatureFlags>;
 
   beforeEach(() => {
     harness = undefined;
+    flags = quietFeatureFlags();
     firestore.load.mockClear();
     auth.isLoggedIn.set(false);
     auth.hasAcademyAccess.set(false);
@@ -49,6 +52,7 @@ describe('app routes', () => {
       providers: [
         ...quietNotifications().providers,
         ...quietChartSettings().providers,
+        ...flags.providers,
         provideRouter(routes),
         { provide: AuthService, useValue: auth },
         { provide: FIRESTORE_LOADER, useValue: firestore },
@@ -206,6 +210,22 @@ describe('app routes', () => {
     expect(await visit('/admin/evaluations')).toBe('/academy');
     expect(await visit('/admin/mentorships')).toBe('/academy');
     expect(await visit('/admin/material')).toBe('/academy');
+  });
+
+  it('sends hidden features to the academy home, and staff-only ones to students', async () => {
+    flags.flags.set({ practice: 'off', ranking: 'staff', exams: 'off' });
+    signIn({ academy: true });
+    expect(await visit('/academy/practice')).toBe('/academy');
+    expect(await visit('/academy/ranking')).toBe('/academy');
+    expect(await visit('/academy/exams/x')).toBe('/academy');
+    expect(await visit('/academy/material')).toBe('/academy/material');
+  });
+
+  it('opens feature flags to admins only', async () => {
+    signIn({ trainer: true });
+    expect(await visit('/admin/features')).toBe('/academy');
+    signIn({ admin: true });
+    expect(await visit('/admin/features')).toBe('/admin/features');
   });
 
   it('opens the admin area and evaluations to trainers', async () => {

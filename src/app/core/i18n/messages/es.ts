@@ -37,6 +37,7 @@ export const es = {
     adminMentor: 'Panel del mentor | INDAB',
     adminReviews: 'Reseñas | INDAB',
     adminNews: 'Noticias económicas | INDAB',
+    adminFeatures: 'Funciones | INDAB',
   },
 
   // Search engines and link previews (WhatsApp, Facebook...). Keep descriptions under ~160 characters.
@@ -554,6 +555,10 @@ export const es = {
       reviews: {
         title: 'Reseñas',
         text: 'Elige qué reseñas de los estudiantes se muestran en la página de inicio.',
+      },
+      features: {
+        title: 'Funciones',
+        text: 'Muestra u oculta secciones de la academia, o ábrelas solo al staff para probarlas.',
       },
     },
     usersIntro:
@@ -1994,6 +1999,44 @@ export const es = {
   },
 
   // One practice session on its own page (notifications link here).
+  featureFlags: {
+    title: 'Funciones',
+    intro:
+      'Elige quién ve cada sección de la academia. Una sección oculta desaparece de las tarjetas y su página lleva a la academia. El cambio se guarda al instante.',
+    loading: 'Cargando funciones…',
+    modes: { on: 'Visible para todos', staff: 'Solo staff', off: 'Oculto' },
+    whoSees: (feature: string) => `Quién ve ${feature}`,
+    items: {
+      material: {
+        title: 'Material de estudio',
+        text: 'Videos, presentaciones y documentos para los estudiantes.',
+      },
+      practice: {
+        title: 'Práctica de trading',
+        text: 'El gráfico del oro para practicar y las evaluaciones de práctica.',
+      },
+      exams: {
+        title: 'Exámenes',
+        text: 'Los formularios de evaluación que responden los estudiantes.',
+      },
+      ranking: {
+        title: 'Ranking',
+        text: 'El ranking de las evaluaciones de práctica.',
+      },
+      calendar: {
+        title: 'Calendario económico',
+        text: 'El calendario dentro de la academia. La página pública /calendar sigue abierta.',
+      },
+      reviews: {
+        title: 'Reseñas',
+        text: 'El formulario para que los estudiantes escriban su reseña en su perfil.',
+      },
+    },
+    saved: (feature: string, mode: string) => `${feature}: ${mode.toLowerCase()}.`,
+    failed: 'No se pudo guardar el cambio. Inténtalo de nuevo.',
+    note: '"Solo staff" la deja visible para entrenadores y administradores, para probarla antes de abrirla a los estudiantes. Ocultar una sección no borra sus datos.',
+  },
+
   sessionPage: {
     back: '← Volver a la práctica',
     backStaff: '← Volver a las prácticas',

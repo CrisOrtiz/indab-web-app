@@ -2579,6 +2579,44 @@ describe('reviews', () => {
   });
 });
 
+describe('feature flags', () => {
+  const features = (uid: string | null) => doc(as(uid), 'config/features');
+  const data = (uid: string, flags: Record<string, unknown> = { practice: 'staff' }) => ({
+    flags,
+    updatedAt: serverTimestamp(),
+    updatedBy: uid,
+  });
+
+  it('are read by every signed-in user, not by visitors', async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(doc(ctx.firestore(), 'config/features'), { flags: { ranking: 'off' } }),
+    );
+    await assertSucceeds(getDoc(features('student')));
+    await assertSucceeds(getDoc(features('enrolled')));
+    await assertSucceeds(getDoc(features('admin')));
+    await assertFails(getDoc(features(null)));
+    await assertFails(getDocs(collection(as('admin'), 'config')));
+    await assertFails(getDoc(doc(as('admin'), 'config/other')));
+  });
+
+  it('are set by admins only, signed and with known modes', async () => {
+    await assertSucceeds(setDoc(features('admin'), data('admin')));
+    await assertSucceeds(
+      setDoc(features('admin'), data('admin', { ranking: 'off' }), { merge: true }),
+    );
+    await assertFails(setDoc(features('trainer'), data('trainer')));
+    await assertFails(setDoc(features('enrolled'), data('enrolled')));
+    await assertFails(setDoc(features(null), data('admin')));
+    await assertFails(setDoc(features('admin'), data('trainer')));
+    await assertFails(setDoc(features('admin'), data('admin', { practice: 'hidden' })));
+    await assertFails(setDoc(features('admin'), data('admin', { practice: true })));
+    await assertFails(setDoc(features('admin'), { ...data('admin'), note: 'x' }));
+    await assertFails(setDoc(features('admin'), { ...data('admin'), updatedAt: 1 }));
+    await assertFails(setDoc(doc(as('admin'), 'config/other'), data('admin')));
+    await assertFails(deleteDoc(features('admin')));
+  });
+});
+
 describe('unknown collections', () => {
   it('are closed to everyone, admins included', async () => {
     await assertFails(getDoc(doc(as('admin'), 'secrets/s1')));

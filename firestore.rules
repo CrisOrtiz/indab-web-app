@@ -60,6 +60,9 @@ rules_version = '2';
 //   reviews/{uid}                        a student's review of INDAB (stars, text, name shown, photo);
 //                                        the author writes it, admins pick the ones the landing
 //                                        shows and everyone reads those
+//   config/features                      feature flags: who sees each section of the app ('on',
+//                                        'staff' or 'off'); admins set them at /admin/features and
+//                                        every signed-in user reads them (screens only, not security)
 //   follows/{kind}/subjects/{id}/followers/{uid}
 //                                        a trainer or admin following a student, a mentorship, an
 //                                        evaluation, a form or everyone ('all'); students read the
@@ -586,6 +589,23 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt;
 
       allow delete: if isStaff();
+    }
+
+    // Site settings. Only `features` exists: the feature flags of /admin/features. Hiding a
+    // feature is for the screens; each feature's own rules still decide who reads its data.
+    match /config/{configId} {
+      function validFeatures(data) {
+        return data.keys().hasOnly(['flags', 'updatedAt', 'updatedBy'])
+          && data.flags is map
+          && data.flags.size() <= 50
+          && data.flags.values().hasOnly(['on', 'staff', 'off'])
+          && data.updatedBy == request.auth.uid
+          && data.updatedAt == request.time;
+      }
+
+      allow get: if configId == 'features' && signedIn();
+      allow create, update: if configId == 'features' && isAdmin()
+        && validFeatures(request.resource.data);
     }
 
     match /investors/{uid} {

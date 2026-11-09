@@ -2,6 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { FeatureFlags } from '../../core/features/feature-flags.service';
 import { I18n } from '../../core/i18n/i18n.service';
 import { PracticeSession } from '../../core/models/practice';
 import { formatCountdown } from '../practice/practice-format';
@@ -10,6 +11,14 @@ import { attemptDeadline, staleSessions } from '../practice/resume';
 import { Reveal } from '../../shared/reveal/reveal';
 
 type CardKey = 'material' | 'practice' | 'exams' | 'ranking' | 'calendar';
+
+const ACADEMY_CARDS: { key: CardKey; link: string; open?: boolean }[] = [
+  { key: 'material', link: '/academy/material' },
+  { key: 'practice', link: '/academy/practice' },
+  { key: 'exams', link: '/academy/exams' },
+  { key: 'ranking', link: '/academy/ranking' },
+  { key: 'calendar', link: '/academy/calendar', open: true },
+];
 
 // Academy home: a card per section. Without academy access the cards show locked.
 @Component({
@@ -21,6 +30,7 @@ type CardKey = 'material' | 'practice' | 'exams' | 'ranking' | 'calendar';
 export class Academy {
   protected readonly auth = inject(AuthService);
   protected readonly i18n = inject(I18n);
+  protected readonly flags = inject(FeatureFlags);
   private readonly practice = inject(PracticeService);
 
   /** Practice sessions the student left open, to go back to from here. */
@@ -42,7 +52,7 @@ export class Academy {
 
   private async loadOpen(): Promise<void> {
     const uid = this.auth.user()?.uid;
-    if (!uid || !this.auth.hasAcademyAccess()) {
+    if (!uid || !this.auth.hasAcademyAccess() || !this.flags.shown('practice')) {
       return;
     }
     try {
@@ -56,14 +66,13 @@ export class Academy {
     }
   }
 
-  /** `open` cards work without academy access (the calendar is public). */
-  protected readonly cards: { key: CardKey; link: string; open?: boolean }[] = [
-    { key: 'material', link: '/academy/material' },
-    { key: 'practice', link: '/academy/practice' },
-    { key: 'exams', link: '/academy/exams' },
-    { key: 'ranking', link: '/academy/ranking' },
-    { key: 'calendar', link: '/academy/calendar', open: true },
-  ];
+  /**
+   * `open` cards work without academy access (the calendar is public). Sections hidden at
+   * `/admin/features` are left out.
+   */
+  protected readonly cards = computed(() =>
+    ACADEMY_CARDS.filter((card) => this.flags.shown(card.key)),
+  );
 
   // Decorative candles in the greeting band: wick from hi to lo, body from top.
   protected readonly heroCandles = [

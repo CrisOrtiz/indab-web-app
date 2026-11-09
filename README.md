@@ -196,6 +196,7 @@ The service account needs the _Firebase Admin_ and _Service Usage Consumer_ role
 | `users/{uid}/settings/chart`                                     | owner                                                                                                                                                  | everyone, their own (the practice chart's indicators and their setups, known ids only)                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `marketNews/{id}` (a release)                                    | academy access                                                                                                                                         | trainers, admins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `reviews/{uid}`                                                  | author, admins; everyone once `featured`                                                                                                               | the author with academy access (stars 1-5, 20-600 characters, name, optional photo; any edit unpicks it); admins only set `featured`; author or admin deletes                                                                                                                                                                                                                                                                                                                                                             |
+| `config/features` (feature flags)                                | every signed-in user (one document, no lists)                                                                                                          | admins (`flags` map of `on` / `staff` / `off`, signed with `updatedBy` and `updatedAt`)                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `follows/{kind}/subjects/{id}/followers/{uid}`                   | that trainer or admin; students, the lists of what concerns them (themselves, their mentorships, their evaluations and forms, `all`)                   | that trainer or admin (`types`: `practiceFinished`, `evaluationFinished`, `examSubmitted`)                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 A user gets access to the academy and the material repository when an admin or a trainer
@@ -240,6 +241,7 @@ Changing the password does revoke every other session, since Firebase ends them 
 | `/admin/mentor`                  | trainers and admins (mentor dashboard: practice, averages and pending work of each mentorship they lead; admins see all)                               |
 | `/admin/users`                   | admins (users, roles, academy access and each student's mentorships); trainers (students only: grant access, mentorships)                              |
 | `/admin/reviews`                 | admins (students' reviews from `/profile`: pick which ones the landing shows, or delete them)                                                          |
+| `/admin/features`                | admins (feature flags: show each academy section to everyone, to staff only or to nobody)                                                              |
 | `/admin/mentorships`             | trainers and admins (admins create, edit, pause and delete mentorships; trainers see them and their students)                                          |
 | `/admin/material`                | trainers and admins (add study material by link, preview it, choose who sees it, publish, hide or delete it)                                           |
 | `/admin/practice`                | trainers and admins (review students' practice sessions on the chart; admins delete them)                                                              |
@@ -529,6 +531,20 @@ show and, if they want, their profile photo), stored at `reviews/{uid}`. Admins 
 by the author takes the review off the landing until an admin picks it again, so nothing
 unreviewed reaches the public page. Visitors read only picked reviews (the rules check
 `featured`); the landing loads them in the browser, so the prerendered page has none.
+
+### Feature flags
+
+Admins choose at `/admin/features` (the "Funciones" card) who sees each section of the academy:
+**Visible para todos** (the default), **Solo staff** (trainers and admins, to try something
+before students get it) or **Oculto**. A hidden section leaves the academy cards (and links
+such as the open-practice banner) and its pages send users back to `/academy` (`featureGuard`).
+The flags are one document, `config/features`; signed-in users listen to it through
+`FeatureFlags` (`core/features`), one read when they arrive and one per change, and a
+missing document or unknown value means visible. Hiding is for the screens only: each feature's
+Firestore rules still decide who can read its data. To add a feature, add its key to
+`FEATURE_KEYS` (`core/models/feature-flags.ts`) and its texts to `featureFlags.items`; the rules
+accept any key. Public pages (landing, `/eleva`, `/calendar`) have no flags, because reading one
+would load Firestore for every visitor.
 
 ### Evaluation forms
 

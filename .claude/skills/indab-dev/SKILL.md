@@ -96,6 +96,7 @@ otherwise create a feature service.
 | `users/{uid}/settings/chart`                                     | owner                                                                                                           | everyone, their own (indicators, `news` on/off)                                                                                                                                                                                      |
 | `marketNews/{id}`                                                | academy access                                                                                                  | trainers, admins (`/admin/news`)                                                                                                                                                                                                     |
 | `reviews/{uid}`                                                  | author, admins; everyone once `featured`                                                                        | the author with academy access (any edit sets `featured` false); admins only `featured`/`featuredAt`/`featuredBy`; author or admin deletes                                                                                           |
+| `config/features`                                                | signed-in users (get only)                                                                                      | admins (`flags`: `on`/`staff`/`off` per key, signed)                                                                                                                                                                                 |
 | `follows/{kind}/subjects/{id}/followers/{uid}`                   | that staff member; students, the lists that concern them                                                        | that staff member (`types` of activity)                                                                                                                                                                                              |
 
 Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`, `isStaff()`
@@ -106,6 +107,15 @@ they pass `as(uid, false)`.
 Everything not matched is denied. Trainers run evaluations and evaluation forms, grade and review practice, open the
 academy to students and put students in mentorships; roles, revoking access, managing mentorships and deleting practice
 stay admin-only.
+
+Feature flags (Cris, 2026-11-09; README "Feature flags"): admins pick at `/admin/features` who
+sees each academy section (`on` everyone, `staff`, `off`), stored in `config/features` and read
+by `FeatureFlags` (`core/features`, one listener per signed-in account, started by the guards).
+Routes of a flagged section add `featureGuard('<key>')` after their access guard; pages that hide
+parts by flags (academy home, profile) add `featureFlagsReady`, and templates check
+`flags.shown('<key>')`. Specs fake it with `quietFeatureFlags()` (`core/features/testing.ts`).
+A new flag is a key in `FEATURE_KEYS` plus `featureFlags.items` texts; no rules change. Public
+pages have no flags (they would load Firestore for every visitor).
 
 Guards in `src/app/core/auth/auth.guards.ts`: `authGuard` (signed in), `guestGuard`
 (signed out), `enrolledGuard` (academy access), `staffGuard` (trainer or admin), `adminGuard` (admin role).

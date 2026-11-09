@@ -37,7 +37,7 @@
 </section>
 
 <section class="container sections">
-  @if (open().length) {
+  @if (open().length && flags.shown('practice')) {
     <a class="open-practice" routerLink="/academy/practice">
       <span class="pulse" aria-hidden="true"></span>
       <span class="open-text">
@@ -48,7 +48,7 @@
     </a>
   }
   <ul class="cards">
-    @for (card of cards; track card.key; let i = $index) {
+    @for (card of cards(); track card.key; let i = $index) {
       @let c = t.cards[card.key];
       <li [appReveal]="i * 80">
         @if (auth.hasAcademyAccess() || card.open) {

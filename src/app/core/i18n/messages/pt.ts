@@ -31,6 +31,7 @@ export const pt: Messages = {
     adminMentor: 'Painel do mentor | INDAB',
     adminReviews: 'Depoimentos | INDAB',
     adminNews: 'Notícias econômicas | INDAB',
+    adminFeatures: 'Funcionalidades | INDAB',
   },
 
   seo: {
@@ -546,6 +547,10 @@ export const pt: Messages = {
       reviews: {
         title: 'Depoimentos',
         text: 'Escolha quais depoimentos dos alunos aparecem na página inicial.',
+      },
+      features: {
+        title: 'Funcionalidades',
+        text: 'Mostre ou oculte seções da academia, ou abra-as só para a equipe testar.',
       },
     },
     usersIntro:
@@ -1965,6 +1970,44 @@ export const pt: Messages = {
   },
 
   // One practice session on its own page (notifications link here).
+  featureFlags: {
+    title: 'Funcionalidades',
+    intro:
+      'Escolha quem vê cada seção da academia. Uma seção oculta some dos cartões e sua página leva à academia. A mudança é salva na hora.',
+    loading: 'Carregando funcionalidades…',
+    modes: { on: 'Visível para todos', staff: 'Só a equipe', off: 'Oculto' },
+    whoSees: (feature: string) => `Quem vê ${feature}`,
+    items: {
+      material: {
+        title: 'Material de estudo',
+        text: 'Vídeos, apresentações e documentos para os alunos.',
+      },
+      practice: {
+        title: 'Prática de trading',
+        text: 'O gráfico do ouro para praticar e as avaliações de prática.',
+      },
+      exams: {
+        title: 'Provas',
+        text: 'Os formulários de avaliação que os alunos respondem.',
+      },
+      ranking: {
+        title: 'Ranking',
+        text: 'O ranking das avaliações de prática.',
+      },
+      calendar: {
+        title: 'Calendário econômico',
+        text: 'O calendário dentro da academia. A página pública /calendar continua aberta.',
+      },
+      reviews: {
+        title: 'Depoimentos',
+        text: 'O formulário para os alunos escreverem seu depoimento no perfil.',
+      },
+    },
+    saved: (feature: string, mode: string) => `${feature}: ${mode.toLowerCase()}.`,
+    failed: 'Não foi possível salvar a mudança. Tente novamente.',
+    note: '"Só a equipe" deixa visível para treinadores e administradores, para testar antes de abrir aos alunos. Ocultar uma seção não apaga seus dados.',
+  },
+
   sessionPage: {
     back: '← Voltar à prática',
     backStaff: '← Voltar às práticas',

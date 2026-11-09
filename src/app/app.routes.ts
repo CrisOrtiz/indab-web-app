@@ -8,6 +8,7 @@ import {
   setupGuard,
   staffGuard,
 } from './core/auth/auth.guards';
+import { featureFlagsReady, featureGuard } from './core/features/feature.guard';
 import { SeoData } from './core/seo/seo.service';
 
 // Titles are keys of `Messages['titles']`, translated by `I18nTitleStrategy`. Public pages for
@@ -61,21 +62,21 @@ export const routes: Routes = [
   {
     path: 'academy',
     title: 'academy',
-    canActivate: [authGuard],
+    canActivate: [authGuard, featureFlagsReady],
     loadComponent: () => import('./features/academy/academy').then((m) => m.Academy),
   },
   {
     // The public calendar opened from the academy: same page, with a link back to the academy.
     path: 'academy/calendar',
     title: 'calendar',
-    canActivate: [authGuard],
+    canActivate: [authGuard, featureGuard('calendar')],
     data: { fromAcademy: true },
     loadComponent: () => import('./features/calendar/calendar').then((m) => m.Calendar),
   },
   {
     path: 'profile',
     title: 'profile',
-    canActivate: [authGuard],
+    canActivate: [authGuard, featureFlagsReady],
     loadComponent: () => import('./features/profile/profile').then((m) => m.Profile),
   },
 
@@ -83,7 +84,7 @@ export const routes: Routes = [
   {
     path: 'academy/practice',
     title: 'practice',
-    canActivate: [enrolledGuard],
+    canActivate: [enrolledGuard, featureGuard('practice')],
     loadComponent: () => import('./features/practice/practice').then((m) => m.Practice),
   },
   {
@@ -96,31 +97,31 @@ export const routes: Routes = [
   {
     path: 'academy/ranking',
     title: 'ranking',
-    canActivate: [enrolledGuard],
+    canActivate: [enrolledGuard, featureGuard('ranking')],
     loadComponent: () => import('./features/ranking/ranking').then((m) => m.Ranking),
   },
   {
     path: 'academy/material',
     title: 'material',
-    canActivate: [enrolledGuard],
+    canActivate: [enrolledGuard, featureGuard('material')],
     loadComponent: () => import('./features/repository/repository').then((m) => m.Repository),
   },
   {
     path: 'academy/material/:id',
     title: 'materialItem',
-    canActivate: [enrolledGuard],
+    canActivate: [enrolledGuard, featureGuard('material')],
     loadComponent: () => import('./features/repository/material-view').then((m) => m.MaterialView),
   },
   {
     path: 'academy/exams',
     title: 'exams',
-    canActivate: [enrolledGuard],
+    canActivate: [enrolledGuard, featureGuard('exams')],
     loadComponent: () => import('./features/exams/exams').then((m) => m.Exams),
   },
   {
     path: 'academy/exams/:id',
     title: 'exam',
-    canActivate: [enrolledGuard],
+    canActivate: [enrolledGuard, featureGuard('exams')],
     loadComponent: () => import('./features/exams/exam-take').then((m) => m.ExamTake),
   },
   // The material used to be its own section; keep old links working.
@@ -158,6 +159,13 @@ export const routes: Routes = [
     canActivate: [adminGuard],
     loadComponent: () =>
       import('./features/admin/reviews/admin-reviews').then((m) => m.AdminReviews),
+  },
+  {
+    path: 'admin/features',
+    title: 'adminFeatures',
+    canActivate: [adminGuard],
+    loadComponent: () =>
+      import('./features/admin/features/admin-features').then((m) => m.AdminFeatures),
   },
   {
     path: 'admin/mentorships',

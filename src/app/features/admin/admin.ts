@@ -15,7 +15,8 @@ type AdminCard =
   | 'evaluations'
   | 'practice'
   | 'news'
-  | 'reviews';
+  | 'reviews'
+  | 'features';
 
 // Admin home: a card per tool, each opening its own page.
 @Component({
@@ -30,7 +31,8 @@ export class Admin {
 
   /**
    * A card per admin tool, the mentor dashboard first. Trainers get the users page as
-   * "Estudiantes" (only students, access and mentorships, no roles) and no reviews card.
+   * "Estudiantes" (only students, access and mentorships, no roles) and no reviews or features
+   * cards.
    */
   protected readonly cards = computed<{ key: AdminCard; link: string; art?: AdminCard }[]>(() => [
     { key: 'mentor', link: '/admin/mentor' },
@@ -43,6 +45,11 @@ export class Admin {
     { key: 'evaluations', link: '/admin/evaluations' },
     { key: 'practice', link: '/admin/practice' },
     { key: 'news', link: '/admin/news' },
-    ...(this.auth.isAdmin() ? [{ key: 'reviews' as const, link: '/admin/reviews' }] : []),
+    ...(this.auth.isAdmin()
+      ? [
+          { key: 'reviews' as const, link: '/admin/reviews' },
+          { key: 'features' as const, link: '/admin/features' },
+        ]
+      : []),
   ]);
 }

@@ -3,6 +3,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { quietFeatureFlags } from '../../core/features/testing';
 import { PracticeService } from '../practice/practice.service';
 import { Academy } from './academy';
 
@@ -15,11 +16,12 @@ describe('Academy', () => {
     hasAcademyAccess: signal(false),
   };
 
-  const render = async () => {
+  const render = async (flags = quietFeatureFlags()) => {
     TestBed.configureTestingModule({
       imports: [Academy],
       providers: [
         provideRouter([]),
+        ...flags.providers,
         { provide: AuthService, useValue: auth },
         { provide: PracticeService, useValue: practice },
       ],
@@ -104,5 +106,18 @@ describe('Academy', () => {
     expect(practice?.querySelector('h2')?.textContent).toBe('Práctica de trading');
     expect(practice?.textContent).toContain('200 USD');
     expect(el.querySelector('.locked')).toBeNull();
+  });
+
+  it('leaves out the sections hidden at /admin/features, and their banner', async () => {
+    auth.hasAcademyAccess.set(true);
+    auth.profile.set({ displayName: 'Ana' });
+    practice.activeSessions.mockResolvedValue([
+      { id: 's1', status: 'active', startedAt: at(Date.now()) },
+    ]);
+    const el = await render(quietFeatureFlags({ practice: 'off', ranking: 'staff' }));
+    const links = [...el.querySelectorAll('a.card')].map((a) => a.getAttribute('href'));
+    expect(links).toEqual(['/academy/material', '/academy/exams', '/academy/calendar']);
+    expect(practice.activeSessions).not.toHaveBeenCalled();
+    expect(el.querySelector('.open-practice')).toBeNull();
   });
 });

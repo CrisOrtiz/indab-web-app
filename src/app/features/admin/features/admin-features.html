@@ -1,0 +1,54 @@
+@let t = i18n.messages().featureFlags;
+@let ta = i18n.messages().admin;
+<section class="container">
+  <header class="page-header">
+    <a routerLink="/admin" class="back">{{ ta.back }}</a>
+    <h1>{{ t.title }}</h1>
+    <p>{{ t.intro }}</p>
+  </header>
+
+  @if (message(); as msg) {
+    <p class="message" [class.error]="msg.kind === 'error'" role="status">
+      {{ msg.text }}
+      <button
+        type="button"
+        class="dismiss"
+        [attr.aria-label]="ta.close"
+        (click)="message.set(null)"
+      >
+        ×
+      </button>
+    </p>
+  }
+
+  @if (loading()) {
+    <p class="muted">{{ t.loading }}</p>
+  } @else {
+    <ul class="features">
+      @for (key of keys; track key) {
+        @let item = t.items[key];
+        @let current = modeOf(key);
+        <li class="feature" [attr.data-mode]="current">
+          <div class="text">
+            <h2>{{ item.title }}</h2>
+            <p>{{ item.text }}</p>
+          </div>
+          <div class="options" role="group" [attr.aria-label]="t.whoSees(item.title)">
+            @for (mode of modes; track mode) {
+              <button
+                type="button"
+                [class.selected]="current === mode"
+                [attr.aria-pressed]="current === mode"
+                [disabled]="busy() !== null"
+                (click)="choose(key, mode)"
+              >
+                {{ t.modes[mode] }}
+              </button>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+    <p class="muted note">{{ t.note }}</p>
+  }
+</section>
