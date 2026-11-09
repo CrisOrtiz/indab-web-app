@@ -13,6 +13,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
 import { LoadingService } from '../../core/loading/loading.service';
 import { Review, ReviewInput, newestFirst } from '../../core/models/review';
+import { clearFeaturedReviewsCache } from './featured-reviews-loader';
 
 /**
  * Reviews of INDAB (`reviews/{uid}`): students write theirs from `/profile`, admins choose at
@@ -65,6 +66,7 @@ export class ReviewService {
 
   /** Shows the review on the landing, or takes it off (admins). */
   setFeatured(uid: string, featured: boolean): Promise<void> {
+    clearFeaturedReviewsCache();
     return updateDoc(doc(this.reviews, uid), {
       featured,
       featuredAt: serverTimestamp(),

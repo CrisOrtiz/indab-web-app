@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 import { AuthService } from '../../core/auth/auth.service';
 import { FIRESTORE } from '../../core/firebase/firebase.providers';
 import { loadFeaturedReviews } from './featured-reviews';
+import { cacheFeaturedReviews, cachedFeaturedReviews } from './featured-reviews-loader';
 import { ReviewService } from './review.service';
 
 const fb = vi.hoisted(() => ({
@@ -18,6 +19,7 @@ vi.mock('firebase/firestore', () => ({
   query: vi.fn((ref, ...constraints) => ({ ...ref, constraints })),
   where: vi.fn((...args) => ['where', ...args]),
   limit: vi.fn((n) => ['limit', n]),
+  orderBy: vi.fn((...args) => ['orderBy', ...args]),
   getDoc: vi.fn(async (ref: { path: string; id: string }) => {
     const found = Object.values(fb.docs)
       .flat()
@@ -33,7 +35,7 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: vi.fn(() => 'SERVER_TIMESTAMP'),
 }));
 
-import { deleteDoc, limit, setDoc, updateDoc, where } from 'firebase/firestore';
+import { deleteDoc, limit, orderBy, setDoc, updateDoc, where } from 'firebase/firestore';
 
 describe('ReviewService', () => {
   let service: ReviewService;
@@ -90,7 +92,10 @@ describe('ReviewService', () => {
       { id: 'b', data: { updatedAt: at(5) } },
     ];
     expect((await service.all()).map((r) => r.id)).toEqual(['b', 'a']);
+    // The admin's own browser forgets the landing's cached picks, to see the change at once.
+    cacheFeaturedReviews([]);
     await service.setFeatured('a', true);
+    expect(cachedFeaturedReviews()).toBeNull();
     expect(updateDoc).toHaveBeenCalledWith(
       { path: 'reviews/a', id: 'a' },
       { featured: true, featuredAt: 'SERVER_TIMESTAMP', featuredBy: 'boss' },
@@ -99,15 +104,16 @@ describe('ReviewService', () => {
     expect(deleteDoc).toHaveBeenCalledWith({ path: 'reviews/a', id: 'a' });
   });
 
-  it('loads only the picked reviews for the landing, latest picks first, 12 at most', async () => {
-    fb.docs['reviews'] = Array.from({ length: 14 }, (_, i) => ({
-      id: `r${i}`,
-      data: { featured: true, featuredAt: at(i) },
-    }));
+  it('reads only the reviews the landing shows, latest picks first', async () => {
+    // Firestore sorts and cuts the list: each document read counts against the daily quota.
+    fb.docs['reviews'] = [
+      { id: 'r2', data: { featured: true, featuredAt: at(2) } },
+      { id: 'r1', data: { featured: true, featuredAt: at(1) } },
+    ];
     const shown = await loadFeaturedReviews({} as never);
     expect(where).toHaveBeenCalledWith('featured', '==', true);
-    expect(limit).toHaveBeenCalledWith(50);
-    expect(shown.length).toBe(12);
-    expect(shown[0].id).toBe('r13');
+    expect(orderBy).toHaveBeenCalledWith('featuredAt', 'desc');
+    expect(limit).toHaveBeenCalledWith(12);
+    expect(shown.map((r) => r.id)).toEqual(['r2', 'r1']);
   });
 });

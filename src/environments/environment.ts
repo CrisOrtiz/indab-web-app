@@ -2,6 +2,8 @@
 // These values are public identifiers, not secrets: access is enforced by security rules.
 export const environment = {
   production: true,
+  // reCAPTCHA v3 site key for Firebase App Check (public, like the apiKey). Empty: App Check off.
+  appCheckSiteKey: '',
   useEmulators: false,
   firebase: {
     apiKey: 'AIzaSyDic-cDvEjuUbdh7KZcHIH6LrHyIIiruGs',

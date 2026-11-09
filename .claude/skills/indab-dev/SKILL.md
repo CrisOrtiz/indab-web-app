@@ -44,6 +44,26 @@ import `firebase/firestore` values (use `import type`) in code of the main bundl
 awaits `inject(FIRESTORE_LOADER).load()`. Check `ng build`'s initial size (about 440 kB) after
 touching startup code.
 
+### Quota and abuse (Spark plan, $0)
+
+Firestore's free daily quota (50k reads, 20k writes) is shared by the whole site: going over
+stops the app until midnight Pacific time, it never bills. The web API key is public, so anyone
+can call Firestore directly. So:
+
+- Anything a visitor (or any signed-in account) can read must be cheap and bounded: query only
+  what the page shows with `limit()`, and make the rule refuse bigger lists
+  (`request.query.limit <= N`, see `reviews`). Public data that repeats per visit goes through a
+  short browser cache (`FEATURED_REVIEWS`, ten minutes).
+- Staff-only screens may read whole collections, but prefer aggregations and pagination.
+- App Check (reCAPTCHA v3) is wired in `core/firebase/app-check.ts` and starts with the
+  Firestore SDK once `environment.appCheckSiteKey` is set; it is off while that is empty.
+  Enforcement is switched on in the Firebase console, after its metrics show real traffic
+  passing.
+- `firebase.json` sends security headers on every response (`nosniff`, referrer policy,
+  permissions policy, CSP `frame-ancestors`/`object-src`/`base-uri`). A full CSP is not set yet:
+  TradingView, YouTube/Drive frames, Google sign-in and Binance would all need listing; add it
+  as Report-Only first.
+
 For the current user, use `AuthService` (`src/app/core/auth/auth.service.ts`):
 `user()`, `profile()`, `enrollment()`, `isLoggedIn()`, `isAdmin()`, `hasAcademyAccess()`, and
 `whenReady()` before reading them in guards. Add new per-user state there only if it is global;
@@ -231,7 +251,8 @@ Module notes:
   Testimonials are students' reviews (Cris, 2026-11-06): `reviews/{uid}` (`core/models/review.ts`,
   `features/reviews/`), written in `/profile` (`ReviewPanel`, academy access only) and picked by
   admins at `/admin/reviews` (`features/admin/reviews/`, last `/admin` card, admins only). The
-  landing reads the picked ones through `FEATURED_REVIEWS` once a visitor scrolls near them
+  landing reads the 12 latest picks (index `featured`+`featuredAt`, rules cap the list at 12)
+  through `FEATURED_REVIEWS` once a visitor scrolls near them, cached ten minutes per browser
   (that is when the Firestore SDK loads on the landing) and leaves the section out while none is
   picked. An author's edit unpicks the review. `<app-stars>` (`shared/stars`) draws ratings in
   `--color-star`. Specs fake the service with `quietReviews()` (`features/reviews/testing.ts`).

@@ -61,10 +61,11 @@ beforeEach(async () => {
   });
 });
 
-// Every test user has confirmed their email (as Google accounts have) unless it says otherwise.
+// Every test user has confirmed their email (as Google accounts have) unless it says otherwise,
+// and signs in as {uid}@indab.test.
 const as = (uid: string | null, emailVerified = true) =>
   (uid
-    ? env.authenticatedContext(uid, { email_verified: emailVerified })
+    ? env.authenticatedContext(uid, { email: `${uid}@indab.test`, email_verified: emailVerified })
     : env.unauthenticatedContext()
   ).firestore();
 
@@ -73,7 +74,7 @@ describe('users', () => {
     await assertSucceeds(
       setDoc(doc(as('new'), 'users/new'), {
         uid: 'new',
-        email: 'a@b.co',
+        email: 'new@indab.test',
         displayName: 'Nuevo',
         role: 'student',
         createdAt: new Date(),
@@ -85,7 +86,7 @@ describe('users', () => {
     await assertFails(
       setDoc(doc(as('new'), 'users/new'), {
         uid: 'new',
-        email: 'a@b.co',
+        email: 'new@indab.test',
         displayName: 'Nuevo',
         role: 'admin',
         createdAt: new Date(),
@@ -103,7 +104,7 @@ describe('users', () => {
 describe('user profiles', () => {
   const profile = (uid: string, extra: Record<string, unknown> = {}) => ({
     uid,
-    email: 'a@b.co',
+    email: `${uid}@indab.test`,
     displayName: 'Nuevo',
     role: 'student',
     createdAt: new Date(),
@@ -114,6 +115,14 @@ describe('user profiles', () => {
     await assertFails(setDoc(doc(as(null), 'users/new'), profile('new')));
     await assertFails(setDoc(doc(as('new'), 'users/other'), profile('other')));
     await assertFails(setDoc(doc(as('new'), 'users/new'), profile('other')));
+  });
+
+  it('only takes the email of the signed-in account', async () => {
+    await assertFails(
+      setDoc(doc(as('new'), 'users/new'), profile('new', { email: 'admin@indab.test' })),
+    );
+    await assertFails(setDoc(doc(as('new'), 'users/new'), profile('new', { email: '' })));
+    await assertSucceeds(setDoc(doc(as('new'), 'users/new'), profile('new')));
   });
 
   it('validates the new profile shape', async () => {
@@ -168,7 +177,7 @@ describe('user profiles', () => {
 describe('personal details', () => {
   const profile = (extra: Record<string, unknown> = {}) => ({
     uid: 'new',
-    email: 'a@b.co',
+    email: 'new@indab.test',
     displayName: 'Nuevo',
     role: 'student',
     createdAt: new Date(),
@@ -180,7 +189,12 @@ describe('personal details', () => {
     await assertSucceeds(
       setDoc(
         doc(as('other'), 'users/other'),
-        profile({ uid: 'other', birthDate: '1995-04-30', whatsapp: '+5215512345678' }),
+        profile({
+          uid: 'other',
+          email: 'other@indab.test',
+          birthDate: '1995-04-30',
+          whatsapp: '+5215512345678',
+        }),
       ),
     );
   });
@@ -2300,6 +2314,11 @@ describe('mentor notes and notifications', () => {
       await assertSucceeds(list('ana', 'evaluation', 'e1'));
       await assertSucceeds(list('ana', 'exam', 'x1'));
       await assertSucceeds(list('ana', 'all', 'all'));
+      // Only academy members finish work to notify staff of, so nobody else learns who follows.
+      await assertFails(
+        getDocs(collection(as('ana', false), 'follows/all/subjects/all/followers')),
+      );
+      await assertFails(list('stranger', 'all', 'all'));
       await assertFails(list('other', 'student', 'ana'));
       await assertFails(list('ana', 'mentorship', 'm2'));
       await assertFails(list('other', 'evaluation', 'e1'));
@@ -2539,7 +2558,14 @@ describe('reviews', () => {
     await assertFails(getDoc(review('trainer', 'enrolled')));
     await assertSucceeds(getDoc(review(null, 'ana')));
     const reviews = collection(as(null), 'reviews');
-    await assertSucceeds(getDocs(query(reviews, where('featured', '==', true), limit(50))));
+    const picked = (max: number) =>
+      getDocs(
+        query(reviews, where('featured', '==', true), orderBy('featuredAt', 'desc'), limit(max)),
+      );
+    await assertSucceeds(picked(12));
+    // Bigger lists would cost visitors' reads from the free daily quota.
+    await assertFails(picked(50));
+    await assertFails(getDocs(query(reviews, where('featured', '==', true))));
     await assertFails(getDocs(reviews));
     await assertSucceeds(getDocs(collection(as('admin'), 'reviews')));
   });
