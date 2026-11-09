@@ -4,6 +4,8 @@
 // `useEmulators` to false and paste the web app config from the Firebase console.
 export const environment = {
   production: false,
+  // App Check stays off against the emulators.
+  appCheckSiteKey: '',
   useEmulators: true,
   firebase: {
     apiKey: 'demo-api-key',

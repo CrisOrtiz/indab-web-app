@@ -158,6 +158,8 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'createdAt',
           'birthDate', 'whatsapp'])
         && request.resource.data.uid == uid
+        // The email shown to admins is the account's own, never a typed one.
+        && request.resource.data.get('email', '') == request.auth.token.get('email', '')
         && request.resource.data.role == 'student'
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() <= 80
@@ -403,7 +405,7 @@ service cloud.firestore {
     match /follows/{kind}/subjects/{subjectId}/followers/{staffUid} {
       allow read: if isOwner(staffUid)
         || (kind == 'student' && isOwner(subjectId))
-        || (kind == 'all' && subjectId == 'all' && signedIn())
+        || (kind == 'all' && subjectId == 'all' && hasAcademyAccess())
         || (kind == 'mentorship' && subjectId in myMentorships())
         || (kind == 'evaluation' && signedIn()
           && exists(/databases/$(database)/documents/evaluations/$(subjectId))
@@ -1116,7 +1118,10 @@ service cloud.firestore {
           && data.featured is bool;
       }
 
-      allow read: if isOwner(uid) || isAdmin() || resource.data.featured == true;
+      // Visitors list only the landing's few picks per request (LANDING_REVIEWS in review.ts):
+      // each document read counts against the free daily quota.
+      allow get: if isOwner(uid) || isAdmin() || resource.data.featured == true;
+      allow list: if isAdmin() || (resource.data.featured == true && request.query.limit <= 12);
 
       allow create: if isOwner(uid) && hasAcademyAccess()
         && validReview(request.resource.data)

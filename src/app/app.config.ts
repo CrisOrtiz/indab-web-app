@@ -33,6 +33,10 @@ export const appConfig: ApplicationConfig = {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',
     }),
-    provideFirebase({ options: environment.firebase, useEmulators: environment.useEmulators }),
+    provideFirebase({
+      options: environment.firebase,
+      useEmulators: environment.useEmulators,
+      appCheckSiteKey: environment.appCheckSiteKey,
+    }),
   ],
 };

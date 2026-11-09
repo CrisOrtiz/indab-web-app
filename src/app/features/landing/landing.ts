@@ -11,13 +11,12 @@ import {
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
-import type { Review } from '../../core/models/review';
 import { Avatar } from '../../shared/avatar/avatar';
 import { LandingSections } from '../../shared/layout/landing-sections';
 import { Reveal } from '../../shared/reveal/reveal';
 import { SocialLinks } from '../../shared/social/social-links';
 import { Stars } from '../../shared/stars/stars';
-import { FEATURED_REVIEWS } from '../reviews/featured-reviews-loader';
+import { FEATURED_REVIEWS, LandingReview } from '../reviews/featured-reviews-loader';
 
 // Public landing page. Draft: its copy (`landing` in core/i18n/messages) is placeholder content
 // for Cris to review. The testimonials are students' reviews that admins picked
@@ -39,7 +38,7 @@ export class Landing {
   private readonly featuredReviews = inject(FEATURED_REVIEWS);
 
   /** Reviews picked for the landing; empty until loaded (and on the prerendered page). */
-  protected readonly reviews = signal<Review[]>([]);
+  protected readonly reviews = signal<LandingReview[]>([]);
   private readonly reviewsAnchor = viewChild<ElementRef<HTMLElement>>('reviewsAnchor');
 
   constructor() {

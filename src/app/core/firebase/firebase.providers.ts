@@ -11,6 +11,13 @@ import type { Firestore } from 'firebase/firestore';
 export interface FirebaseConfig {
   options: FirebaseOptions;
   useEmulators: boolean;
+  /** reCAPTCHA v3 site key for App Check; empty or missing leaves App Check off. */
+  appCheckSiteKey?: string;
+}
+
+/** App Check runs in the browser against the real project, once a site key is set. */
+export function usesAppCheck(config: FirebaseConfig): boolean {
+  return !!config.appCheckSiteKey && !config.useEmulators && typeof document !== 'undefined';
 }
 
 /** Loads the Firestore SDK on first use; `instance()` is null until then. */
@@ -55,9 +62,15 @@ export function provideFirebase(config: FirebaseConfig): EnvironmentProviders {
         return {
           instance: () => firestore,
           load: () =>
-            (pending ??= import('./firestore').then(
-              (m) => (firestore = m.connectFirestore(app, config.useEmulators)),
-            )),
+            (pending ??= (async () => {
+              // App Check starts before Firestore's first request, so every request has a token.
+              if (usesAppCheck(config)) {
+                const { startAppCheck } = await import('./app-check');
+                startAppCheck(app, config.appCheckSiteKey!);
+              }
+              const m = await import('./firestore');
+              return (firestore = m.connectFirestore(app, config.useEmulators));
+            })()),
         };
       },
     },

@@ -6,6 +6,7 @@ import {
   FIRESTORE,
   FIRESTORE_LOADER,
   provideFirebase,
+  usesAppCheck,
 } from './firebase.providers';
 
 const options = { apiKey: 'demo-key', projectId: 'demo-indab-unit', appId: 'demo-app' };
@@ -50,5 +51,14 @@ describe('provideFirebase', () => {
     const [first, second] = await Promise.all([loader.load(), loader.load()]);
     expect(first).toBe(second);
     expect(loader.instance()).toBe(first);
+  });
+});
+
+describe('usesAppCheck', () => {
+  it('starts App Check only with a site key, against the real project', () => {
+    expect(usesAppCheck({ options, useEmulators: false })).toBe(false);
+    expect(usesAppCheck({ options, useEmulators: false, appCheckSiteKey: '' })).toBe(false);
+    expect(usesAppCheck({ options, useEmulators: true, appCheckSiteKey: 'site-key' })).toBe(false);
+    expect(usesAppCheck({ options, useEmulators: false, appCheckSiteKey: 'site-key' })).toBe(true);
   });
 });
