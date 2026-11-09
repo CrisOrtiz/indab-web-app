@@ -715,6 +715,12 @@ export const pt: Messages = {
     speed: 'Velocidade',
     barsPerSecond: (n) => `${n} candles/s`,
     finish: 'Encerrar sessão',
+    finishConfirm: {
+      title: 'Encerrar a sessão?',
+      text: 'Suas operações abertas e ordens pendentes serão fechadas ao preço atual e você não poderá continuar operando nesta sessão.',
+      keep: 'Continuar operando',
+      confirm: 'Sim, encerrar sessão',
+    },
     replayControls: 'Controles de reprodução',
     spaceKey: 'Espaço',
     elapsed: (time) => `Tempo de mercado decorrido: ${time}`,

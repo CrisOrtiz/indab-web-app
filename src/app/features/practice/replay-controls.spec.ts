@@ -82,10 +82,25 @@ describe('ReplayControls', () => {
     expect(host.playing()).toBe(true);
   });
 
-  it('ends the session', () => {
+  it('asks before ending the session', async () => {
     const finish = el.querySelector<HTMLButtonElement>('button.finish:not(.leave)')!;
     expect(finish.textContent?.trim()).toBe('Terminar sesión');
+    const dialog = el.querySelector<HTMLDialogElement>('dialog.confirm')!;
+    expect(dialog.hasAttribute('open')).toBe(false);
+
     finish.click();
+    await stable();
+    expect(dialog.hasAttribute('open')).toBe(true);
+    expect(dialog.textContent).toContain('¿Terminar la sesión?');
+    expect(host.finished).toBe(false);
+
+    el.querySelector<HTMLButtonElement>('dialog .keep')!.click();
+    expect(dialog.hasAttribute('open')).toBe(false);
+    expect(host.finished).toBe(false);
+
+    finish.click();
+    el.querySelector<HTMLButtonElement>('dialog .confirm-end')!.click();
+    expect(dialog.hasAttribute('open')).toBe(false);
     expect(host.finished).toBe(true);
   });
 

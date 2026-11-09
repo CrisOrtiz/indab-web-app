@@ -736,6 +736,12 @@ export const es = {
     speed: 'Velocidad',
     barsPerSecond: (n: number) => `${n} velas/s`,
     finish: 'Terminar sesión',
+    finishConfirm: {
+      title: '¿Terminar la sesión?',
+      text: 'Tus operaciones abiertas y órdenes pendientes se cerrarán al precio actual y ya no podrás seguir operando en esta sesión.',
+      keep: 'Seguir operando',
+      confirm: 'Sí, terminar sesión',
+    },
     replayControls: 'Controles de reproducción',
     spaceKey: 'Espacio',
     elapsed: (time: string) => `Tiempo de mercado transcurrido: ${time}`,

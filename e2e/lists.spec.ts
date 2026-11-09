@@ -1,6 +1,6 @@
 import { Page, expect, test } from '@playwright/test';
 import { createUser, resetEmulators, setDocument } from './emulators';
-import { signIn } from './helpers';
+import { endSession, signIn } from './helpers';
 import { mockMarket } from './market';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -27,7 +27,7 @@ async function seedSessions(uid: string, userName: string, count: number, prefix
 
 /** The newest active session opens again on the practice page: end it to see the lists. */
 async function endResumedSession(page: Page) {
-  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await endSession(page);
   await page.getByRole('button', { name: 'Nueva práctica' }).click();
 }
 

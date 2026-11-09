@@ -719,6 +719,12 @@ export const en: Messages = {
     speed: 'Speed',
     barsPerSecond: (n) => `${n} bars/s`,
     finish: 'End session',
+    finishConfirm: {
+      title: 'End the session?',
+      text: 'Your open trades and pending orders will be closed at the current price, and you will not be able to keep trading in this session.',
+      keep: 'Keep trading',
+      confirm: 'Yes, end session',
+    },
     replayControls: 'Replay controls',
     spaceKey: 'Space',
     elapsed: (time) => `Market time elapsed: ${time}`,

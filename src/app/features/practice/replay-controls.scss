@@ -307,6 +307,19 @@ button {
     color: var(--color-text);
   }
 
+  // Ending the session is final, so it is a solid red button in both themes.
+  &.end {
+    border-color: var(--color-danger);
+    background: var(--color-danger);
+    color: var(--color-danger-contrast);
+
+    &:hover {
+      border-color: var(--color-danger-hover);
+      background: var(--color-danger-hover);
+      color: var(--color-danger-contrast);
+    }
+  }
+
   // On wide screens the label already says it.
   &::after {
     display: none;
@@ -362,5 +375,68 @@ button {
   .ring circle {
     transition-duration: 0.01ms !important;
     animation: none !important;
+  }
+}
+
+// "End the session?" dialog.
+.confirm {
+  width: min(400px, calc(100% - 32px));
+  padding: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
+
+  &::backdrop {
+    background: rgb(0 0 0 / 0.5);
+  }
+
+  h2 {
+    margin: 0 0 8px;
+    font-size: 1.15rem;
+  }
+
+  p {
+    margin: 0 0 20px;
+    color: var(--color-muted);
+    line-height: 1.5;
+  }
+}
+
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+
+  button {
+    height: 40px;
+    padding: 0 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  .keep:hover {
+    border-color: var(--color-text);
+  }
+
+  .keep {
+    flex: 1 1 auto;
+  }
+
+  .confirm-end {
+    flex: 1 1 auto;
+    border-color: var(--color-danger);
+    background: var(--color-danger);
+    color: var(--color-danger-contrast);
+
+    &:hover {
+      border-color: var(--color-danger-hover);
+      background: var(--color-danger-hover);
+    }
   }
 }
