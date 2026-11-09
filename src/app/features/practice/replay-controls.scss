@@ -307,6 +307,19 @@ button {
     color: var(--color-text);
   }
 
+  // Ending the session is final, so it is a solid red button in both themes.
+  &.end {
+    border-color: var(--color-danger);
+    background: var(--color-danger);
+    color: var(--color-danger-contrast);
+
+    &:hover {
+      border-color: var(--color-danger-hover);
+      background: var(--color-danger-hover);
+      color: var(--color-danger-contrast);
+    }
+  }
+
   // On wide screens the label already says it.
   &::after {
     display: none;
