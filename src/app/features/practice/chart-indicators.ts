@@ -333,10 +333,9 @@ export class ChartIndicators {
         return;
       }
       const found = rsiDivergences(candles, points);
-      const times = points.map((p) => p.time);
       for (const { kind, line: s, marks } of divergences) {
         const list = found.filter((d) => d.kind === kind);
-        s.setData(divergenceSegments(list, times));
+        s.setData(divergenceSegments(list, RSI_COLORS[kind]));
         marks.setMarkers(
           list.map((d) => ({
             time: d.to.time as Time,
@@ -353,30 +352,27 @@ export class ChartIndicators {
 }
 
 /**
- * The divergences as one line series: each one a segment between its two pivots, with a gap
- * (a bar of `times` without value) before the next, or joined to it when they share a pivot. One that
- * starts before the previous ends is left out, as a series' times must go forward.
+ * The divergences as one line series, drawn as TradingView's RSI draws them: a line through its
+ * pivots, seen only from pivot to pivot where they diverge. Lightweight Charts does not break a
+ * line at a bar without value, and colors each piece of line as the point it starts from, so a
+ * pivot that starts a divergence takes its color and the others are transparent; consecutive
+ * divergences share their pivot. One that starts before the previous ends is left out, as a
+ * series' times must go forward.
  */
-export function divergenceSegments(
-  list: Divergence[],
-  times: number[],
-): (LineData<Time> | WhitespaceData<Time>)[] {
-  const data: (LineData<Time> | WhitespaceData<Time>)[] = [];
-  let end = -Infinity;
+export function divergenceSegments(list: Divergence[], color: string): LineData<Time>[] {
+  const data: LineData<Time>[] = [];
+  const hidden = 'transparent';
   for (const { from, to } of list) {
-    if (from.time < end) {
+    const last = data.at(-1);
+    if (last && from.time < (last.time as number)) {
       continue;
     }
-    if (from.time > end) {
-      // Pivots of one kind are over 5 bars apart, so there is a bar between them.
-      const gap = times.find((t) => t > end && t < from.time);
-      if (data.length && gap !== undefined) {
-        data.push({ time: gap as Time });
-      }
-      data.push({ time: from.time as Time, value: from.value });
+    if (last && from.time === last.time) {
+      last.color = color;
+    } else {
+      data.push({ time: from.time as Time, value: from.value, color });
     }
-    data.push({ time: to.time as Time, value: to.value });
-    end = to.time;
+    data.push({ time: to.time as Time, value: to.value, color: hidden });
   }
   return data;
 }
