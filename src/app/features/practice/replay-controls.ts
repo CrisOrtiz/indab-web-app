@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output } from '@angular/core';
+import { Component, ElementRef, computed, inject, input, output, viewChild } from '@angular/core';
 import { I18n } from '../../core/i18n/i18n.service';
 import { Icon } from '../../shared/icon/icon';
 
@@ -7,6 +7,7 @@ import { Icon } from '../../shared/icon/icon';
  * the speed, the speed as a sliding segmented control, the leave-open button and the end-session button. Space plays
  * and pauses (the practice page already steps with the right arrow). A `live` replay (an
  * evaluation run by the clock) only shows that it is live, with the leave and end buttons.
+ * Ending asks first in a modal dialog, so a stray click does not close the session.
  */
 @Component({
   selector: 'app-replay-controls',
@@ -28,6 +29,7 @@ export class ReplayControls {
   readonly speedChange = output<number>();
   /** Back to the list, leaving the session open where it is. */
   readonly leave = output<void>();
+  /** The student confirmed ending the session. */
   readonly finish = output<void>();
 
   protected readonly i18n = inject(I18n);
@@ -35,6 +37,42 @@ export class ReplayControls {
   protected readonly speedIndex = computed(() => Math.max(0, this.speeds().indexOf(this.speed())));
   /** One turn of the play button's ring: 3 s at 1 bar/s, quicker as the speed goes up. */
   protected readonly spin = computed(() => `${(3 / (1 + Math.log2(this.speed()))).toFixed(2)}s`);
+
+  private readonly confirm = viewChild.required<ElementRef<HTMLDialogElement>>('confirm');
+
+  protected askFinish(): void {
+    const dialog = this.confirm().nativeElement;
+    if (dialog.open) {
+      return;
+    }
+    if (dialog.showModal) {
+      dialog.showModal();
+    } else {
+      // Browsers (and test DOMs) without modal dialogs still show it.
+      dialog.setAttribute('open', '');
+    }
+  }
+
+  protected closeConfirm(): void {
+    const dialog = this.confirm().nativeElement;
+    if (dialog.close) {
+      dialog.close();
+    } else {
+      dialog.removeAttribute('open');
+    }
+  }
+
+  protected confirmFinish(): void {
+    this.closeConfirm();
+    this.finish.emit();
+  }
+
+  /** A click on the dimmed backdrop (the dialog element itself) keeps the session going. */
+  protected backdropClick(event: MouseEvent): void {
+    if (event.target === this.confirm().nativeElement) {
+      this.closeConfirm();
+    }
+  }
 
   protected onKey(event: KeyboardEvent): void {
     const target = event.target;

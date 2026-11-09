@@ -1413,6 +1413,8 @@ export class Practice {
     clearLocalResume(sessionId);
     this.deadline.set(null);
     this.phase.set('finished');
+    // Kept here: "Nueva práctica" can clear it while the writes below are still going.
+    const evaluation = this.evaluation();
     const { cancelled, closed } = replay.closeAll('sessionEnd');
     try {
       await Promise.all([
@@ -1420,7 +1422,6 @@ export class Practice {
         ...closed.map((trade) => this.practice.closeTrade(sessionId, trade)),
       ]);
       await this.practice.finishSession(sessionId, this.summary(replay));
-      const evaluation = this.evaluation();
       void this.notifications.notifyActivity({
         type: evaluation ? 'evaluationFinished' : 'practiceFinished',
         kind: evaluation ? 'evaluation' : 'practice',
@@ -1432,7 +1433,7 @@ export class Practice {
       this.error.set(this.i18n.messages().practice.finishFailed);
     }
     this.loadSessions();
-    if (this.evaluation()) {
+    if (evaluation) {
       this.loadEvaluations();
     }
   }

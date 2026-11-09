@@ -1,6 +1,6 @@
 import { Page, expect, test } from '@playwright/test';
 import { createUser, listDocuments, resetEmulators, setDocument, uidOf } from './emulators';
-import { nav, signIn, signOut } from './helpers';
+import { endSession, nav, signIn, signOut } from './helpers';
 import { mockMarket } from './market';
 
 let joseUid: string;
@@ -75,9 +75,9 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
   await expect(page.locator('.evaluation-bar')).toContainText(/Quedan 1\d:\d\d/);
   await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
   // It runs by the clock: nothing to step, pause or speed up.
-  await expect(page.getByText('En vivo')).toBeVisible();
+  await expect(page.getByText('En vivo', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Siguiente vela' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await endSession(page);
   await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
   // The date stays hidden while others can still take it.
   await expect(page.getByText(/fecha oculta hasta que cierre la evaluación/)).toBeVisible();
@@ -135,7 +135,7 @@ test('an evaluation at one market minute a second moves on its own', async ({ pa
   await page.getByRole('button', { name: 'Comenzar evaluación' }).click();
   await page.getByRole('checkbox', { name: 'Leí las instrucciones y estoy listo' }).check();
   await page.getByRole('button', { name: 'Empezar ahora' }).click();
-  await expect(page.getByText('En vivo')).toBeVisible();
+  await expect(page.getByText('En vivo', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Reproducir' })).toHaveCount(0);
   // The first replayed minute comes after a second, with no one pressing play.
   await expect(page.locator('.market .price')).toHaveText('101.000', { timeout: 10_000 });

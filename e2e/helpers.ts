@@ -15,3 +15,11 @@ export async function signOut(page: Page): Promise<void> {
 }
 
 export const nav = (page: Page) => page.getByRole('navigation');
+
+/** Ends the open practice or evaluation session, confirming in the dialog that asks first. */
+export async function endSession(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  const dialog = page.getByRole('dialog', { name: '¿Terminar la sesión?' });
+  await dialog.getByRole('button', { name: 'Sí, terminar sesión' }).click();
+  await expect(dialog).toBeHidden();
+}

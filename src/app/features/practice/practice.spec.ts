@@ -539,6 +539,7 @@ describe('Practice page', () => {
       expect(practice.saveResume).toHaveBeenCalledWith('s9', saved);
       // Finishing forgets it.
       await click('Terminar sesión');
+      await click('Sí, terminar sesión');
       expect(localStorage.getItem('indab.practice.s9')).toBeNull();
     });
 
@@ -986,6 +987,7 @@ describe('Practice page', () => {
       'Cierra operaciones para ver cómo evoluciona tu saldo.',
     );
     await click('Terminar sesión');
+    await click('Sí, terminar sesión');
 
     expect(practice.closeTrade).toHaveBeenCalledWith(
       'session-1',

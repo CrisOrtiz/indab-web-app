@@ -1,6 +1,6 @@
 import { Locator, expect, test } from '@playwright/test';
 import { createUser, listDocuments, resetEmulators, setDocument } from './emulators';
-import { nav, signIn, signOut } from './helpers';
+import { endSession, nav, signIn, signOut } from './helpers';
 import { mockMarket, mockWavyMarket } from './market';
 
 let studentUid: string;
@@ -61,7 +61,13 @@ test('a reload picks the practice up where it was left', async ({ page }) => {
   );
   // Only one session: the same one goes on.
   expect(await listDocuments('practiceSessions')).toHaveLength(1);
+  // Ending asks first; "Seguir operando" keeps the session going.
   await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  const confirm = page.getByRole('dialog', { name: '¿Terminar la sesión?' });
+  await confirm.getByRole('button', { name: 'Seguir operando' }).click();
+  await expect(confirm).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
+  await endSession(page);
   await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
   await expect
     .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
@@ -207,7 +213,7 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   await page.getByRole('button', { name: '15m', exact: true }).click();
   await page.getByRole('button', { name: 'Siguiente vela' }).click();
   await expect(page.locator('.market .price')).toHaveText('103.000');
-  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await endSession(page);
   await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
   await expect(page.locator('.stat strong').first()).toHaveText('199.00');
   await expect(page.getByRole('img', { name: 'Saldo de 200 a 199 USD' })).toBeVisible();
@@ -337,7 +343,7 @@ test('a student adds an order from the chart menu and sets it up on its line', a
   await expect(page.getByRole('button', { name: 'Vender', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Órdenes (1)' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await endSession(page);
   await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
   await expect
     .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
@@ -407,7 +413,7 @@ test('a student holds several positions and orders at gold prices, up to the mar
   await expect(refusal).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Historial (1)' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await endSession(page);
   await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
   await expect
     .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
@@ -637,7 +643,7 @@ test("the chart keeps each student's indicators for their next sessions", async 
     .toEqual(['ema100', 'ema200', 'rsi14', 'volume']);
 
   // The next session opens with them.
-  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await endSession(page);
   await expect
     .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
     .toBe('finished');
@@ -782,7 +788,7 @@ test('the chart shows the economic news of the replayed days, revealing them on 
   await expect(chart.locator('.news-mark')).toHaveCount(2);
 
   // With the dates hidden, a release shows only its impact until the replay reaches it.
-  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await endSession(page);
   await expect
     .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
     .toBe('finished');

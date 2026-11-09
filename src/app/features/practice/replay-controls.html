@@ -62,7 +62,26 @@
   <span class="label">{{ t.leaveOpen }}</span>
 </button>
 
-<button type="button" class="finish end" [attr.data-tip]="t.finish" (click)="finish.emit()">
+<button type="button" class="finish end" [attr.data-tip]="t.finish" (click)="askFinish()">
   <app-icon name="stop" [size]="16" />
   <span class="label">{{ t.finish }}</span>
 </button>
+
+<dialog
+  #confirm
+  class="confirm"
+  aria-labelledby="finish-confirm-title"
+  aria-describedby="finish-confirm-text"
+  (click)="backdropClick($event)"
+>
+  <h2 id="finish-confirm-title">{{ t.finishConfirm.title }}</h2>
+  <p id="finish-confirm-text">{{ t.finishConfirm.text }}</p>
+  <div class="confirm-actions">
+    <button type="button" class="keep" autofocus (click)="closeConfirm()">
+      {{ t.finishConfirm.keep }}
+    </button>
+    <button type="button" class="confirm-end" (click)="confirmFinish()">
+      {{ t.finishConfirm.confirm }}
+    </button>
+  </div>
+</dialog>
