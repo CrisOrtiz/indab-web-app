@@ -41,26 +41,26 @@ class Host {
 describe('AdminService', () => {
   let admin: AdminService;
   let destroy: () => void;
-  const isAdmin = signal(true);
+  const isStaff = signal(true);
 
   const create = () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
         { provide: FIRESTORE, useValue: {} },
-        { provide: AuthService, useValue: { user: signal({ uid: 'boss' }), isAdmin } },
+        { provide: AuthService, useValue: { user: signal({ uid: 'boss' }), isStaff } },
       ],
     });
     admin = TestBed.createComponent(Host).componentInstance.admin;
   };
 
-  it('opens no listeners for trainers', () => {
+  it('opens no listeners for students', () => {
     fb.listeners.clear();
-    isAdmin.set(false);
+    isStaff.set(false);
     create();
     expect(fb.listeners.size).toBe(0);
     expect(admin.loading()).toBe(false);
-    isAdmin.set(true);
+    isStaff.set(true);
   });
 
   beforeEach(() => {
@@ -70,7 +70,7 @@ describe('AdminService', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: FIRESTORE, useValue: {} },
-        { provide: AuthService, useValue: { user: signal({ uid: 'boss' }), isAdmin } },
+        { provide: AuthService, useValue: { user: signal({ uid: 'boss' }), isStaff } },
       ],
     });
     const fixture = TestBed.createComponent(Host);

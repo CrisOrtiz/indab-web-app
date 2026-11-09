@@ -5,6 +5,15 @@
 <section class="auth">
   <div class="card">
     <h1>{{ a.register.title }}</h1>
+    <app-google-button
+      [label]="a.register.google"
+      [disabled]="loading()"
+      (pressed)="signUpWithGoogle()"
+    />
+    @if (googleError()) {
+      <p class="error google-error" role="alert">{{ googleError() }}</p>
+    }
+    <p class="divider">{{ a.register.orEmail }}</p>
     <form [formGroup]="form" (ngSubmit)="submit()">
       <label>
         {{ a.register.name }}

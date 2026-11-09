@@ -3,12 +3,13 @@ rules_version = '2';
 // Data model
 //   users/{uid}                          profile; created by the user, who edits displayName,
 //                                        photoURL (a small data: URL image), birthDate and whatsapp;
-//                                        role and mentorshipIds (the student's mentorships) change
-//                                        by admins only
+//                                        role changes by admins only; mentorshipIds (the student's
+//                                        mentorships) by admins, and by trainers for students
 //   users/{uid}/sessions/{id}            browsers the user is signed in on; the owner signs one out
 //                                        by setting revoked, and that browser then signs itself out
 //   enrollments/{uid}                    { academy: bool, courses: [courseId], updatedAt, updatedBy };
-//                                        admin-managed from the /admin area
+//                                        admin-managed from /admin/users; trainers may only
+//                                        grant academy access to a student there
 //   courses/{courseId}                   course catalog; published courses are public
 //   courses/{courseId}/lessons/{id}      lesson content; enrolled users only
 //   materials/{materialId}               study material: a video, presentation, document or link
@@ -68,7 +69,8 @@ rules_version = '2';
 // their users/{uid} document in the Firebase console; after that, admins manage roles and
 // academy access from the /admin area. Admins cannot remove their own admin role, so the
 // last admin can never lock everyone out. Trainers (role == 'trainer') run evaluations and
-// review practice, but cannot change roles, academy access or mentorships, or delete anything
+// review practice, open the academy to a student and put students in mentorships, but cannot
+// change roles, take academy access away, create or edit mentorships, or delete anything
 // but evaluations, evaluation forms and evaluation attempts (to let a student take one again).
 // Academy content also needs a verified email (emailVerified()), so an account registered with
 // someone else's address never opens it.
@@ -171,9 +173,19 @@ service cloud.firestore {
             && data.photoURL.matches('data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+'));
       }
 
-      // Admins change a user's role and mentorships (never their own). Users can edit their own
-      // name, photo and details but never their role, mentorships or identity fields.
-      allow update: if (isAdmin()
+      function validMentorshipList(data) {
+        return !('mentorshipIds' in data)
+          || (data.mentorshipIds is list && data.mentorshipIds.size() <= 20);
+      }
+
+      // Admins change a user's role and mentorships (never their own). Trainers (mentors) only
+      // change the mentorships of a student. Users can edit their own name, photo and details but
+      // never their role, mentorships or identity fields.
+      allow update: if (role() == 'trainer'
+          && resource.data.role == 'student'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mentorshipIds'])
+          && validMentorshipList(request.resource.data))
+        || (isAdmin()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'mentorshipIds'])
           && request.resource.data.role in ['student', 'trainer', 'admin']
           && (!('mentorshipIds' in request.resource.data)
@@ -495,12 +507,34 @@ service cloud.firestore {
     }
 
     match /enrollments/{uid} {
+      function validEnrollment(data) {
+        return data.keys().hasOnly(['academy', 'courses', 'updatedAt', 'updatedBy'])
+          && data.academy is bool
+          && data.courses is list
+          && (!('updatedBy' in data) || data.updatedBy == request.auth.uid);
+      }
+
+      // Trainers (mentors) only open the academy to a student who does not have it yet: they
+      // set academy to true, sign it, and leave the courses as they were. They never take
+      // access away, and never touch staff accounts.
+      function trainerGrant() {
+        let data = request.resource.data;
+        let target = get(/databases/$(database)/documents/users/$(uid)).data;
+        return role() == 'trainer'
+          && exists(/databases/$(database)/documents/users/$(uid))
+          && target.role == 'student'
+          && data.keys().hasOnly(['academy', 'courses', 'updatedAt', 'updatedBy'])
+          && data.academy == true
+          && data.updatedBy == request.auth.uid
+          && data.updatedAt == request.time
+          && (resource == null
+            ? data.courses == []
+            : resource.data.academy != true && data.courses == resource.data.get('courses', []));
+      }
+
       allow read: if isOwner(uid) || isStaff();
-      allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['academy', 'courses', 'updatedAt', 'updatedBy'])
-        && request.resource.data.academy is bool
-        && request.resource.data.courses is list
-        && (!('updatedBy' in request.resource.data) || request.resource.data.updatedBy == request.auth.uid);
+      allow create, update: if (isAdmin() && validEnrollment(request.resource.data))
+        || trainerGrant();
       allow delete: if isAdmin();
     }
 

@@ -300,6 +300,8 @@ export const en: Messages = {
     },
     register: {
       title: 'Create account',
+      google: 'Sign up with Google',
+      orEmail: 'or sign up with your email',
       name: 'Full name',
       nameRequired: 'Enter your name.',
       passwordHint: 'At least 6 characters.',
@@ -519,6 +521,10 @@ export const en: Messages = {
         title: 'Users',
         text: "Each person's role, academy access and mentorships.",
       },
+      students: {
+        title: 'Students',
+        text: 'Give new accounts academy access and add students to their mentorships.',
+      },
       mentorships: {
         title: 'Mentorships',
         text: 'Groups of students with their mentors, to assign them forms and evaluations.',
@@ -551,7 +557,9 @@ export const en: Messages = {
     usersIntro:
       'Find each person, change their role, turn their academy access on or off and add them to mentorships.',
     trainerNote:
-      'As a trainer you can create evaluations and review practice. Roles, academy access and mentorships are managed by an administrator.',
+      'As a trainer you can create evaluations, review practice, give new accounts academy access and add students to mentorships. Roles are managed by an administrator.',
+    usersIntroTrainer:
+      'Find each student, turn on academy access for new accounts and add them to their mentorships. Only an administrator changes roles or removes access.',
     trainers: 'Trainers',
     roles: { student: 'Student', trainer: 'Trainer', admin: 'Administrator' },
     back: '← Administration',
@@ -583,6 +591,8 @@ export const en: Messages = {
     enabled: 'Enabled',
     pending: 'Pending',
     adminsHaveAccess: 'Administrators already have access.',
+    trainersHaveAccess: 'Trainers already have access.',
+    onlyAdminsRevoke: 'Only an administrator can remove access.',
     noMatches: 'No users match the search.',
     confirmAdmin: (name: string) => `Give administrator permissions to ${name}?`,
     roleChanged: (name: string, role: string) =>
@@ -590,7 +600,8 @@ export const en: Messages = {
     accessGranted: (name: string) => `${name} now has access to the academy.`,
     accessRemoved: (name: string) => `${name} no longer has access to the academy.`,
     saveFailed: (name: string) => `The change for ${name} could not be saved. Please try again.`,
-    loadFailed: 'The user list could not be loaded. Check that your account is an administrator.',
+    loadFailed:
+      'The user list could not be loaded. Check that your account is a trainer or administrator.',
   },
 
   review: {

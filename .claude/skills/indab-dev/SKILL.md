@@ -53,9 +53,9 @@ otherwise create a feature service.
 
 | Collection                                                       | Read                                                                                                            | Write                                                                                                                                                                                                                                |
 | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `users/{uid}`                                                    | owner, staff                                                                                                    | owner creates as `student`, edits `displayName`, `photoURL`, `birthDate`, `whatsapp`; admins change `role` and `mentorshipIds` of others only                                                                                        |
+| `users/{uid}`                                                    | owner, staff                                                                                                    | owner creates as `student`, edits `displayName`, `photoURL`, `birthDate`, `whatsapp`; admins change `role` and `mentorshipIds` of others only; trainers a student's `mentorshipIds`                                                  |
 | `users/{uid}/sessions/{id}`                                      | owner                                                                                                           | each browser records itself; owner sets `revoked` once, deletes; admins delete                                                                                                                                                       |
-| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, staff                                                                                                    | admins (shape validated)                                                                                                                                                                                                             |
+| `enrollments/{uid}` `{academy, courses[], updatedAt, updatedBy}` | owner, staff                                                                                                    | admins (shape validated); trainers only turn `academy` on for a student                                                                                                                                                              |
 | `courses/{id}`                                                   | everyone if `published`, admins                                                                                 | admins                                                                                                                                                                                                                               |
 | `courses/{id}/lessons/{id}`                                      | enrolled in course or academy access                                                                            | admins                                                                                                                                                                                                                               |
 | `materials/{id}`                                                 | academy access: staff all, students published + for everyone or assigned (`assignedTo`)                         | trainers and admins                                                                                                                                                                                                                  |
@@ -83,15 +83,18 @@ Rules helpers in `firestore.rules`: `signedIn()`, `isOwner(uid)`, `isAdmin()`, `
 a verified email), `isEnrolledIn(courseId)`, `myMentorships()` and `assignedTo(data)` (in
 `studentIds` or one of `mentorshipIds`; use it for anything assigned to students). Tests sign in with `email_verified: true` unless
 they pass `as(uid, false)`.
-Everything not matched is denied. Trainers run evaluations and evaluation forms, grade and review practice; anything about
-users, access, mentorships or deleting practice stays admin-only.
+Everything not matched is denied. Trainers run evaluations and evaluation forms, grade and review practice, open the
+academy to students and put students in mentorships; roles, revoking access, managing mentorships and deleting practice
+stay admin-only.
 
 Guards in `src/app/core/auth/auth.guards.ts`: `authGuard` (signed in), `guestGuard`
 (signed out), `enrolledGuard` (academy access), `staffGuard` (trainer or admin), `adminGuard` (admin role).
 All but `guestGuard` first send users with an `AuthService.setupStep()` (`verifyEmail`, then
 `details` while `users/{uid}.birthDate` is missing) to `/account-setup` (`setupGuard`); a new
 guarded page gets that for free. E2e `createUser()` seeds verified users with a birth date.
-`AuthService.isStaff()` mirrors `isStaff()`. Guards are UX only; the rules are the security.
+`AuthService.isStaff()` mirrors `isStaff()`. `/login` and `/register` share `<app-google-button>` (`shared/google-button`,
+official "G"); sign-up offers it first, above the email form (Cris, 2026-11-09), and Google
+sign-ups go on to `/account-setup` for the birth date. Guards are UX only; the rules are the security.
 Users can never grant themselves a role, enrollment or investor data from the client.
 
 ## Layout and conventions
@@ -460,7 +463,9 @@ Module notes:
   summary reads the latest 50 `practiceSessions`. Linking from Google is unit-tested only: the
   emulator's Google window needs internet.
 - **Admin (`/admin`, built)**: `features/admin/`. `/admin` is only the section cards; each tool
-  has its own page. User management is `/admin/users` (`features/admin/users/`, `adminGuard`);
+  has its own page. User management is `/admin/users` (`features/admin/users/`, `staffGuard`): admins see
+  everyone; trainers (Cris, 2026-11-09) see only students (card "Estudiantes", no role column)
+  and can grant academy access (never revoke) and set mentorships;
   mentorships are `/admin/mentorships` (`staffGuard`, writes for admins only).
   `AdminService` is provided by the `AdminUsers`
   component (live `users` + `enrollments` listeners that stop on leave); search/filter is

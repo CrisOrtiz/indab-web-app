@@ -9,7 +9,7 @@ describe('Register', () => {
   let fixture: ComponentFixture<Register>;
   let el: HTMLElement;
   let navigateByUrl: ReturnType<typeof vi.spyOn>;
-  const auth = { registerWithEmail: vi.fn() };
+  const auth = { registerWithEmail: vi.fn(), signInWithGoogle: vi.fn() };
 
   beforeEach(async () => {
     vi.resetAllMocks();
@@ -102,5 +102,39 @@ describe('Register', () => {
     expect(el.querySelector('[role=alert]')?.textContent).toContain(
       'Ya existe una cuenta con este correo.',
     );
+  });
+
+  const googleButton = () =>
+    [...el.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('Registrarme con Google'),
+    )!;
+
+  it('offers Google first, above the email form', () => {
+    const button = googleButton();
+    expect(button).toBeTruthy();
+    expect(button.querySelector('svg.google-logo')).not.toBeNull();
+    const form = el.querySelector('form')!;
+    expect(button.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(el.textContent).toContain('o regístrate con tu correo');
+  });
+
+  it('signs up with Google and goes to the academy (the guards ask for the birth date)', async () => {
+    auth.signInWithGoogle.mockResolvedValue(undefined);
+    googleButton().click();
+    await fixture.whenStable();
+    expect(auth.signInWithGoogle).toHaveBeenCalled();
+    expect(auth.registerWithEmail).not.toHaveBeenCalled();
+    expect(navigateByUrl).toHaveBeenCalledWith('/academy');
+  });
+
+  it('shows the Google error next to the Google button', async () => {
+    auth.signInWithGoogle.mockRejectedValue(new FirebaseError('auth/popup-closed-by-user', ''));
+    googleButton().click();
+    await fixture.whenStable();
+    expect(navigateByUrl).not.toHaveBeenCalled();
+    expect(el.querySelector('.google-error')?.textContent).toContain(
+      'Se cerró la ventana de Google antes de terminar.',
+    );
+    expect(googleButton().disabled).toBe(false);
   });
 });

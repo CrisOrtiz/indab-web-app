@@ -3,8 +3,8 @@
 <section class="container">
   <header class="page-header">
     <a routerLink="/admin" class="back">{{ t.back }}</a>
-    <h1>{{ t.cards.users.title }}</h1>
-    <p>{{ t.usersIntro }}</p>
+    <h1>{{ auth.isAdmin() ? t.cards.users.title : t.cards.students.title }}</h1>
+    <p>{{ auth.isAdmin() ? t.usersIntro : t.usersIntroTrainer }}</p>
   </header>
   <div class="stats">
     <div class="stat">
@@ -15,14 +15,16 @@
       <strong>{{ stats().granted }}</strong
       ><span>{{ t.withAccess }}</span>
     </div>
-    <div class="stat">
-      <strong>{{ stats().trainers }}</strong
-      ><span>{{ t.trainers }}</span>
-    </div>
-    <div class="stat">
-      <strong>{{ stats().admins }}</strong
-      ><span>{{ t.admins }}</span>
-    </div>
+    @if (auth.isAdmin()) {
+      <div class="stat">
+        <strong>{{ stats().trainers }}</strong
+        ><span>{{ t.trainers }}</span>
+      </div>
+      <div class="stat">
+        <strong>{{ stats().admins }}</strong
+        ><span>{{ t.admins }}</span>
+      </div>
+    }
   </div>
 
   <div class="filters">
@@ -33,15 +35,17 @@
       [value]="filter().search"
       (input)="updateFilter({ search: $any($event.target).value })"
     />
-    <select
-      [attr.aria-label]="t.roleFilter"
-      (change)="updateFilter({ role: $any($event.target).value })"
-    >
-      <option value="all">{{ t.allRoles }}</option>
-      <option value="student">{{ t.students }}</option>
-      <option value="trainer">{{ t.trainers }}</option>
-      <option value="admin">{{ t.admins }}</option>
-    </select>
+    @if (auth.isAdmin()) {
+      <select
+        [attr.aria-label]="t.roleFilter"
+        (change)="updateFilter({ role: $any($event.target).value })"
+      >
+        <option value="all">{{ t.allRoles }}</option>
+        <option value="student">{{ t.students }}</option>
+        <option value="trainer">{{ t.trainers }}</option>
+        <option value="admin">{{ t.admins }}</option>
+      </select>
+    }
     <select
       [attr.aria-label]="t.accessFilter"
       (change)="updateFilter({ access: $any($event.target).value })"
@@ -84,7 +88,9 @@
         <tr>
           <th>{{ t.user }}</th>
           <th>{{ t.joined }}</th>
-          <th>{{ t.role }}</th>
+          @if (auth.isAdmin()) {
+            <th>{{ t.role }}</th>
+          }
           <th>{{ t.access }}</th>
           <th>{{ tm.column }}</th>
         </tr>
@@ -113,33 +119,38 @@
             <td [attr.data-label]="t.joined">
               {{ row.profile.createdAt?.toDate() | localDate: 'd MMM y' }}
             </td>
-            <td [attr.data-label]="t.role">
-              <select
-                #roleSelect
-                [attr.aria-label]="t.roleOf(label(row))"
-                [value]="row.profile.role"
-                [disabled]="isSelf(row) || saving().has(row.profile.uid)"
-                [title]="isSelf(row) ? t.ownRole : ''"
-                (change)="changeRole(row, roleSelect)"
-              >
-                <option value="student">{{ t.roles.student }}</option>
-                <option value="trainer">{{ t.roles.trainer }}</option>
-                <option value="admin">{{ t.roles.admin }}</option>
-              </select>
-            </td>
+            @if (auth.isAdmin()) {
+              <td [attr.data-label]="t.role">
+                <select
+                  #roleSelect
+                  [attr.aria-label]="t.roleOf(label(row))"
+                  [value]="row.profile.role"
+                  [disabled]="isSelf(row) || saving().has(row.profile.uid)"
+                  [title]="isSelf(row) ? t.ownRole : ''"
+                  (change)="changeRole(row, roleSelect)"
+                >
+                  <option value="student">{{ t.roles.student }}</option>
+                  <option value="trainer">{{ t.roles.trainer }}</option>
+                  <option value="admin">{{ t.roles.admin }}</option>
+                </select>
+              </td>
+            }
             <td [attr.data-label]="t.access">
               <label class="switch">
                 <input
                   #accessInput
                   type="checkbox"
                   [checked]="hasAcademyAccess(row)"
-                  [disabled]="saving().has(row.profile.uid)"
+                  [disabled]="saving().has(row.profile.uid) || !canToggleAccess(row)"
+                  [title]="canToggleAccess(row) ? '' : t.onlyAdminsRevoke"
                   (change)="toggleAccess(row, accessInput)"
                 />
                 <span>{{ hasAcademyAccess(row) ? t.enabled : t.pending }}</span>
               </label>
-              @if (row.profile.role === 'admin' && !hasAcademyAccess(row)) {
-                <div class="muted hint">{{ t.adminsHaveAccess }}</div>
+              @if (row.profile.role !== 'student' && !hasAcademyAccess(row)) {
+                <div class="muted hint">
+                  {{ row.profile.role === 'admin' ? t.adminsHaveAccess : t.trainersHaveAccess }}
+                </div>
               }
             </td>
             <td [attr.data-label]="tm.column" class="mentorships">
@@ -184,7 +195,7 @@
           </tr>
         } @empty {
           <tr>
-            <td colspan="5" class="muted empty">{{ t.noMatches }}</td>
+            <td [attr.colspan]="auth.isAdmin() ? 5 : 4" class="muted empty">{{ t.noMatches }}</td>
           </tr>
         }
       </tbody>

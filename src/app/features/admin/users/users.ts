@@ -10,7 +10,9 @@ import { MentorshipService } from '../../mentorships/mentorship.service';
 import { AdminService } from '../admin.service';
 import { AdminUserFilter, AdminUserRow, filterUsers, hasAcademyAccess } from '../admin-users';
 
-// User management: roles, academy access and mentorships (admins only, /admin/users).
+// User management at /admin/users. Admins change roles, academy access and mentorships of
+// everyone; trainers (mentors) see only students, grant them academy access and set their
+// mentorships, but never change a role or take access away (the rules enforce the writes).
 @Component({
   selector: 'app-admin-users',
   imports: [Icon, LocalDatePipe, RouterLink],
@@ -35,9 +37,15 @@ export class AdminUsers {
   );
   protected readonly activeMentorships = computed(() => this.mentorships().filter((m) => m.active));
   protected readonly maxMentorships = MAX_MENTORSHIPS_PER_STUDENT;
-  protected readonly visible = computed(() => filterUsers(this.admin.users(), this.filter()));
+  /** Admins see everyone; trainers see only students. */
+  protected readonly rows = computed(() =>
+    this.auth.isAdmin()
+      ? this.admin.users()
+      : this.admin.users().filter((row) => row.profile.role === 'student'),
+  );
+  protected readonly visible = computed(() => filterUsers(this.rows(), this.filter()));
   protected readonly stats = computed(() => {
-    const users = this.admin.users();
+    const users = this.rows();
     return {
       total: users.length,
       granted: users.filter(hasAcademyAccess).length,
@@ -68,6 +76,11 @@ export class AdminUsers {
 
   protected isSelf(row: AdminUserRow): boolean {
     return row.profile.uid === this.auth.user()?.uid;
+  }
+
+  /** Admins switch access both ways; trainers only open it to a pending student. */
+  protected canToggleAccess(row: AdminUserRow): boolean {
+    return this.auth.isAdmin() || (row.profile.role === 'student' && !this.hasAcademyAccess(row));
   }
 
   protected label(row: AdminUserRow): string {

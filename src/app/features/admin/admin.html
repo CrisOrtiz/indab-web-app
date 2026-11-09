@@ -31,7 +31,7 @@
 
 <ng-template #body let-card let-c="c">
   <span class="art" [attr.data-art]="card.key" aria-hidden="true">
-    @switch (card.key) {
+    @switch (card.art ?? card.key) {
       @case ('mentor') {
         <svg viewBox="0 0 96 72">
           <rect x="6" y="8" width="84" height="56" rx="6" />

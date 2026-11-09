@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 import { I18n } from '../../../core/i18n/i18n.service';
+import { GoogleButton } from '../../../shared/google-button/google-button';
 import {
   MIN_BIRTH_DATE,
   detailsForm,
@@ -13,7 +14,7 @@ import { authErrorMessage } from '../auth-errors';
 
 @Component({
   selector: 'app-register',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [GoogleButton, ReactiveFormsModule, RouterLink],
   templateUrl: './register.html',
   styleUrl: '../auth-form.scss',
 })
@@ -33,6 +34,26 @@ export class Register {
   protected readonly maxBirthDate = today();
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
+  /** Shown under the Google button, which sits above the form. */
+  protected readonly googleError = signal<string | null>(null);
+
+  /**
+   * Google accounts come verified; the guards then ask for the birth date on /account-setup
+   * before the academy opens.
+   */
+  protected async signUpWithGoogle(): Promise<void> {
+    this.loading.set(true);
+    this.error.set(null);
+    this.googleError.set(null);
+    try {
+      await this.auth.signInWithGoogle();
+      await this.router.navigateByUrl('/academy');
+    } catch (e) {
+      this.googleError.set(authErrorMessage(e, this.i18n.messages().auth.errors));
+    } finally {
+      this.loading.set(false);
+    }
+  }
 
   protected async submit(): Promise<void> {
     if (this.form.invalid) {

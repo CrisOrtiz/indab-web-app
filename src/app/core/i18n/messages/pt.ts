@@ -295,6 +295,8 @@ export const pt: Messages = {
     },
     register: {
       title: 'Criar conta',
+      google: 'Cadastrar com o Google',
+      orEmail: 'ou cadastre-se com seu e-mail',
       name: 'Nome completo',
       nameRequired: 'Digite seu nome.',
       passwordHint: 'Mínimo de 6 caracteres.',
@@ -513,6 +515,10 @@ export const pt: Messages = {
         title: 'Usuários',
         text: 'Função, acesso à academia e mentorias de cada pessoa.',
       },
+      students: {
+        title: 'Alunos',
+        text: 'Dê acesso à academia às contas novas e adicione os alunos às mentorias.',
+      },
       mentorships: {
         title: 'Mentorias',
         text: 'Grupos de alunos com seus mentores, para atribuir formulários e avaliações.',
@@ -545,7 +551,9 @@ export const pt: Messages = {
     usersIntro:
       'Encontre cada pessoa, altere o papel dela, ative ou remova o acesso à academia e adicione-a às mentorias.',
     trainerNote:
-      'Como treinador você pode criar avaliações e revisar as práticas. Os papéis, o acesso à academia e as mentorias são gerenciados por um administrador.',
+      'Como treinador você pode criar avaliações, revisar as práticas, dar acesso à academia a contas novas e adicionar alunos às mentorias. Os papéis são gerenciados por um administrador.',
+    usersIntroTrainer:
+      'Encontre cada aluno, ative o acesso à academia das contas novas e adicione-o às mentorias. Só um administrador altera papéis ou remove o acesso.',
     trainers: 'Treinadores',
     roles: { student: 'Aluno', trainer: 'Treinador', admin: 'Administrador' },
     back: '← Administração',
@@ -577,6 +585,8 @@ export const pt: Messages = {
     enabled: 'Liberado',
     pending: 'Pendente',
     adminsHaveAccess: 'Os administradores já têm acesso.',
+    trainersHaveAccess: 'Os treinadores já têm acesso.',
+    onlyAdminsRevoke: 'Só um administrador pode remover o acesso.',
     noMatches: 'Nenhum usuário corresponde à busca.',
     confirmAdmin: (name: string) => `Dar permissões de administrador a ${name}?`,
     roleChanged: (name: string, role: string) => `${name} agora é ${role.toLowerCase()}.`,
@@ -585,7 +595,7 @@ export const pt: Messages = {
     saveFailed: (name: string) =>
       `Não foi possível salvar a alteração de ${name}. Tente novamente.`,
     loadFailed:
-      'Não foi possível carregar a lista de usuários. Verifique se sua conta é de administrador.',
+      'Não foi possível carregar a lista de usuários. Verifique se sua conta é de treinador ou administrador.',
   },
 
   review: {
