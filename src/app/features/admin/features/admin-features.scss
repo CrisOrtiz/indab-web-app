@@ -1,0 +1,93 @@
+.features {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 16px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+
+  &[data-mode='off'] h2 {
+    color: var(--color-muted);
+  }
+
+  &[data-mode='off'] {
+    border-style: dashed;
+  }
+}
+
+.text {
+  flex: 1 1 280px;
+  min-width: 0;
+
+  h2 {
+    margin: 0 0 4px;
+    font-size: 1.05rem;
+  }
+
+  p {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.9rem;
+  }
+}
+
+// A segmented control like the theme picker's: the three choices side by side.
+.options {
+  display: grid;
+  flex: 0 1 380px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+
+  @media (max-width: 480px) {
+    flex-basis: 100%;
+  }
+}
+
+.options button {
+  padding: 8px 6px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: none;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    color: var(--color-text);
+  }
+
+  &:disabled {
+    cursor: progress;
+  }
+
+  &.selected {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+  }
+}
+
+.note {
+  margin-top: 16px;
+  font-size: 0.9rem;
+}

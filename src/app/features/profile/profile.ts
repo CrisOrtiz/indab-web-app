@@ -2,6 +2,7 @@ import { Component, DestroyRef, computed, effect, inject, signal, untracked } fr
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { FeatureFlags } from '../../core/features/feature-flags.service';
 import { I18n, LANGUAGES, Language } from '../../core/i18n/i18n.service';
 import { LocalDatePipe } from '../../core/i18n/local-date.pipe';
 import { TimeZoneService } from '../../core/time-zone/time-zone.service';
@@ -57,6 +58,7 @@ export class Profile {
 
   protected readonly auth = inject(AuthService);
   protected readonly i18n = inject(I18n);
+  protected readonly flags = inject(FeatureFlags);
   protected readonly zones = inject(TimeZoneService);
   private readonly profiles = inject(ProfileService);
   private readonly practice = inject(PracticeService);
