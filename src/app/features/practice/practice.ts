@@ -561,6 +561,12 @@ export class Practice {
   private unwatch?: () => void;
   /** Something staff did to the attempt on screen (minutes added), told to the student. */
   protected readonly notice = signal<string | null>(null);
+  /** The last free practice ended without entries, so it was not saved. */
+  protected readonly discarded = signal(false);
+  /** Free practice on screen without a single entry yet: ending it saves nothing. */
+  protected readonly noEntries = computed(
+    () => !this.evaluation() && (this.replay()?.filledCount() ?? 0) === 0,
+  );
   /** Counts down the open attempts listed on the setup. */
   private openClock?: ReturnType<typeof setInterval>;
   /** The next save of `resume` to Firestore, and when it is due. */
@@ -859,6 +865,7 @@ export class Practice {
     this.drawings.set(drawings);
     this.resumed.set(false);
     this.notice.set(null);
+    this.discarded.set(false);
     this.lastResume = null;
     this.resumeSaved = true;
     this.realtime.set(live);
@@ -1094,7 +1101,10 @@ export class Practice {
   /** Closes a session from the list of open ones, without opening it. */
   protected async closeOpen(session: PracticeSession): Promise<void> {
     const t = this.i18n.messages().practice;
-    if (this.closing() || !confirm(t.confirmClose)) {
+    // A free practice without entries is deleted, not kept (a live one is checked again
+    // with what filled while it was left).
+    const empty = !session.evaluationId && !session.tradeCount;
+    if (this.closing() || !confirm(empty ? t.confirmCloseEmpty : t.confirmClose)) {
       return;
     }
     this.closing.set(session.id);
@@ -1133,6 +1143,12 @@ export class Practice {
       }
       await Promise.all(filled.map((trade) => this.practice.fillOrder(session.id, trade)));
       await Promise.all(hit.map((trade) => this.practice.closeTrade(session.id, trade)));
+    }
+    if (!session.evaluationId && replay.filledCount() === 0) {
+      // Free practice without a single entry is not kept (Cris, 2026-11-11).
+      await this.practice.deleteSession(session.id);
+      clearLocalResume(session.id);
+      return;
     }
     const { cancelled, closed } = replay.closeAll('sessionEnd');
     await Promise.all([
@@ -1850,9 +1866,14 @@ export class Practice {
     clearTimeout(this.resumeTimer);
     clearLocalResume(sessionId);
     this.deadline.set(null);
-    this.phase.set('finished');
     // Kept here: "Nueva práctica" can clear it while the writes below are still going.
     const evaluation = this.evaluation();
+    if (!evaluation && replay.filledCount() === 0) {
+      // Free practice without a single entry is not kept (Cris, 2026-11-11).
+      await this.discard(sessionId);
+      return;
+    }
+    this.phase.set('finished');
     const { cancelled, closed } = replay.closeAll('sessionEnd');
     const last = this.lastResume;
     const unsaved = !this.resumeSaved;
@@ -1883,7 +1904,28 @@ export class Practice {
     }
   }
 
+  /**
+   * Ends free practice on screen that never had an entry: the session and its unfilled orders
+   * are deleted, and the setup says why nothing was saved.
+   */
+  private async discard(sessionId: string): Promise<void> {
+    this.phase.set('loading');
+    const deleted = await this.practice.deleteSession(sessionId).then(
+      () => true,
+      () => false,
+    );
+    // Only now, so the list of open sessions no longer has it.
+    this.reset();
+    if (deleted) {
+      this.discarded.set(true);
+    } else {
+      this.error.set(this.i18n.messages().practice.finishFailed);
+    }
+    this.loadSessions();
+  }
+
   protected reset(): void {
+    this.discarded.set(false);
     this.realtime.set(false);
     this.focused.set(null);
     this.evaluation.set(null);

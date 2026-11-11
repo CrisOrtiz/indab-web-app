@@ -10,6 +10,9 @@
   @if (error(); as message) {
     <p class="message error" role="alert">{{ message }}</p>
   }
+  @if (discarded() && phase() === 'setup') {
+    <p class="message warning discarded" role="status">{{ t.discarded }}</p>
+  }
 
   @switch (phase()) {
     @case ('playing') {
@@ -27,6 +30,7 @@
             [speed]="speed()"
             [speeds]="speeds"
             [live]="clockDriven()"
+            [noEntries]="noEntries()"
             (step)="step()"
             (togglePlay)="togglePlay()"
             (speedChange)="setSpeed($event)"

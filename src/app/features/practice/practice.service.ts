@@ -311,7 +311,11 @@ export class PracticeService {
     return updateDoc(doc(this.sessions, sessionId), { extraMinutes });
   }
 
-  /** Deletes a session and its trades (admins; trainers too for evaluation attempts). */
+  /**
+   * Deletes a session and its trades (admins; trainers too for evaluation attempts). The
+   * student also deletes their own free practice while it is active and has no entries
+   * (`tradeCount` 0): ending one so is not saved (Cris, 2026-11-11).
+   */
   async deleteSession(sessionId: string): Promise<void> {
     const trades = await getDocs(this.trades(sessionId));
     const refs = [...trades.docs.map((d) => d.ref), doc(this.sessions, sessionId)];
@@ -321,6 +325,35 @@ export class PracticeService {
       refs.slice(i, i + 500).forEach((ref) => batch.delete(ref));
       await batch.commit();
     }
+  }
+
+  /**
+   * Finished free practice without a single entry (no order ever filled), at most `max`:
+   * admins purge them (Cris, 2026-11-11). `tradeCount` picks the candidates and their trades
+   * confirm it, so a summary that was never saved does not lose a session with entries.
+   */
+  async emptySessions(max = 200): Promise<PracticeSession[]> {
+    const snapshot = await this.loading.track(
+      getDocs(
+        query(
+          this.sessions,
+          where('evaluationId', '==', null),
+          where('status', '==', 'finished'),
+          where('tradeCount', '==', 0),
+          limit(max),
+        ),
+      ),
+    );
+    const candidates = snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
+    const entries = await Promise.all(
+      candidates.map((s) =>
+        getAggregateFromServer(
+          query(this.trades(s.id), where('status', 'in', ['open', 'closed'])),
+          { entries: count() },
+        ).then((r) => r.data().entries),
+      ),
+    );
+    return candidates.filter((_, i) => entries[i] === 0);
   }
 
   async sessionTrades(sessionId: string): Promise<PracticeTrade[]> {

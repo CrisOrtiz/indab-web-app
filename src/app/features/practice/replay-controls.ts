@@ -7,7 +7,8 @@ import { Icon } from '../../shared/icon/icon';
  * the speed, the speed as a sliding segmented control, the leave-open button and the end-session button. Space plays
  * and pauses (the practice page already steps with the right arrow). A `live` replay (an
  * evaluation run by the clock) only shows that it is live, with the leave and end buttons.
- * Ending asks first in a modal dialog, so a stray click does not close the session.
+ * Ending asks first in a modal dialog, so a stray click does not close the session; without
+ * entries it warns that nothing will be saved.
  */
 @Component({
   selector: 'app-replay-controls',
@@ -23,6 +24,8 @@ export class ReplayControls {
   readonly speeds = input.required<readonly number[]>();
   /** The replay runs by the clock: no step, pause or speed. */
   readonly live = input(false);
+  /** Free practice without a single entry yet: the dialog warns that ending saves nothing. */
+  readonly noEntries = input(false);
 
   readonly step = output<void>();
   readonly togglePlay = output<void>();

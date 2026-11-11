@@ -775,11 +775,68 @@ describe('trading practice', () => {
     await assertFails(updateDoc(sessionRef('enrolled', 'done'), { resume: resume() }));
   });
 
-  it('lets only admins delete sessions and trades', async () => {
+  it('lets only admins delete sessions with entries and their trades', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'practiceSessions/s1'), { tradeCount: 1 });
+    });
     await assertFails(deleteDoc(tradeRef('enrolled')));
     await assertFails(deleteDoc(sessionRef('enrolled')));
+    await assertFails(deleteDoc(sessionRef('enrolled', 'done')));
     await assertSucceeds(deleteDoc(tradeRef('admin')));
     await assertSucceeds(deleteDoc(sessionRef('admin')));
+    await assertSucceeds(deleteDoc(sessionRef('admin', 'done')));
+  });
+
+  it('lets the owner discard active free practice without entries', async () => {
+    // Its orders that never filled go with it; an entry (open or closed) never does.
+    await assertFails(deleteDoc(tradeRef('enrolled')));
+    await assertFails(deleteDoc(tradeRef('other', 'p1')));
+    await assertFails(deleteDoc(sessionRef('other')));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await deleteDoc(doc(ctx.firestore(), 'practiceSessions/s1/trades/t1'));
+    });
+    // As the app does it: its orders and the session in one batch.
+    const db = as('enrolled');
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'practiceSessions/s1/trades/p1'));
+    batch.delete(doc(db, 'practiceSessions/s1'));
+    await assertSucceeds(batch.commit());
+    // A finished session stays, whatever its count.
+    await assertFails(deleteDoc(sessionRef('enrolled', 'done')));
+    // So does an evaluation attempt, entries or not.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'evaluations/e9'), { title: 'E9' });
+      await setDoc(doc(db, 'practiceSessions/e9_enrolled'), {
+        ...session('enrolled', { evaluationId: 'e9', durationMinutes: 30 }),
+        startedAt: new Date(),
+      });
+      await setDoc(doc(db, 'practiceSessions/e9_enrolled/trades/p1'), {
+        ...limitOrder('enrolled'),
+        openedAt: new Date(),
+      });
+    });
+    await assertFails(deleteDoc(tradeRef('enrolled', 'p1', 'e9_enrolled')));
+    await assertFails(deleteDoc(sessionRef('enrolled', 'e9_enrolled')));
+  });
+
+  it('lets admins query finished free practice without entries to purge it', async () => {
+    const empty = query(
+      collection(as('admin'), 'practiceSessions'),
+      where('evaluationId', '==', null),
+      where('status', '==', 'finished'),
+      where('tradeCount', '==', 0),
+      limit(200),
+    );
+    await assertSucceeds(getDocs(empty));
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(as('admin'), 'practiceSessions/done/trades'),
+          where('status', 'in', ['open', 'closed']),
+        ),
+      ),
+    );
   });
 
   it('lets the owner open valid trades in an active session', async () => {

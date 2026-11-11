@@ -25,6 +25,14 @@
   gap: 8px;
 }
 
+.purge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 .btn.delete {
   color: var(--color-down);
   border-color: currentColor;

@@ -639,6 +639,14 @@ export const es = {
       `¿Eliminar la práctica de ${name} del ${date}? No se puede deshacer.`,
     loadFailed: 'No se pudieron cargar las prácticas. Verifica que tu cuenta sea administradora.',
     deleteFailed: 'No se pudo eliminar la práctica.',
+    purgeEmpty: 'Depurar sesiones sin entradas',
+    purging: 'Depurando…',
+    purgeNone: 'No hay sesiones de práctica libre terminadas sin entradas.',
+    confirmPurge: (n: number) =>
+      `¿Eliminar ${n} ${n === 1 ? 'sesión' : 'sesiones'} de práctica libre ${n === 1 ? 'terminada' : 'terminadas'} sin ninguna entrada? No se puede deshacer.`,
+    purged: (n: number) =>
+      `Se ${n === 1 ? 'eliminó' : 'eliminaron'} ${n} ${n === 1 ? 'sesión' : 'sesiones'} sin entradas.`,
+    purgeFailed: 'No se pudieron eliminar todas las sesiones sin entradas. Inténtalo de nuevo.',
     tradesFailed: 'No se pudieron cargar las operaciones de la sesión.',
     navigator: 'Recorrer operaciones',
     tradeCounter: (n: number, total: number) => `Operación ${n} de ${total}`,
@@ -743,6 +751,9 @@ export const es = {
       text: 'Tus operaciones abiertas y órdenes pendientes se cerrarán al precio actual y ya no podrás seguir operando en esta sesión.',
       keep: 'Seguir operando',
       confirm: 'Sí, terminar sesión',
+      noEntriesText:
+        'Aún no hiciste ninguna entrada. Si terminas ahora, esta sesión no se guardará: solo se guardan las sesiones con al menos una entrada.',
+      noEntriesConfirm: 'Sí, terminar sin guardar',
     },
     replayControls: 'Controles de reproducción',
     spaceKey: 'Espacio',
@@ -958,6 +969,9 @@ export const es = {
     closing: 'Cerrando…',
     confirmClose:
       '¿Cerrar esta sesión? Las posiciones abiertas se cierran y las órdenes se cancelan en la vela donde quedó.',
+    confirmCloseEmpty:
+      '¿Cerrar esta sesión? No tiene ninguna entrada, así que se eliminará sin guardarse.',
+    discarded: 'La sesión no se guardó porque no hiciste ninguna entrada.',
     closeToStart: 'Tienes una práctica libre abierta. Continúala o ciérrala para empezar otra.',
     resumed: 'Retomaste tu sesión donde la dejaste: tus órdenes, dibujos y la vela en la que ibas.',
     resumeFailed:

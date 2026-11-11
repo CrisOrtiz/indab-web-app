@@ -8,6 +8,7 @@ import { ReplayControls } from './replay-controls';
     [playing]="playing()"
     [speed]="speed()"
     [speeds]="[1, 2, 5, 10]"
+    [noEntries]="noEntries()"
     (step)="steps = steps + 1"
     (togglePlay)="playing.set(!playing())"
     (speedChange)="speed.set($event)"
@@ -18,6 +19,7 @@ import { ReplayControls } from './replay-controls';
 class Host {
   readonly playing = signal(false);
   readonly speed = signal(2);
+  readonly noEntries = signal(false);
   steps = 0;
   finished = false;
   left = false;
@@ -101,6 +103,19 @@ describe('ReplayControls', () => {
     finish.click();
     el.querySelector<HTMLButtonElement>('dialog .confirm-end')!.click();
     expect(dialog.hasAttribute('open')).toBe(false);
+    expect(host.finished).toBe(true);
+  });
+
+  it('warns that ending without entries saves nothing', async () => {
+    host.noEntries.set(true);
+    await stable();
+    el.querySelector<HTMLButtonElement>('button.end')!.click();
+    expect(el.querySelector('dialog')!.textContent).toContain(
+      'Aún no hiciste ninguna entrada. Si terminas ahora, esta sesión no se guardará',
+    );
+    const confirm = el.querySelector<HTMLButtonElement>('dialog .confirm-end')!;
+    expect(confirm.textContent?.trim()).toBe('Sí, terminar sin guardar');
+    confirm.click();
     expect(host.finished).toBe(true);
   });
 

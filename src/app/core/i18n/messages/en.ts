@@ -639,6 +639,13 @@ export const en: Messages = {
     loadFailed:
       'The practice sessions could not be loaded. Check that your account is an administrator.',
     deleteFailed: 'The practice session could not be deleted.',
+    purgeEmpty: 'Purge sessions without entries',
+    purging: 'Purging…',
+    purgeNone: 'There are no finished free practice sessions without entries.',
+    confirmPurge: (n: number) =>
+      `Delete ${n} finished free practice ${n === 1 ? 'session' : 'sessions'} without a single entry? This cannot be undone.`,
+    purged: (n: number) => `${n} ${n === 1 ? 'session' : 'sessions'} without entries deleted.`,
+    purgeFailed: 'Not every session without entries could be deleted. Try again.',
     tradesFailed: "The session's trades could not be loaded.",
     navigator: 'Step through trades',
     tradeCounter: (n: number, total: number) => `Trade ${n} of ${total}`,
@@ -726,6 +733,9 @@ export const en: Messages = {
       text: 'Your open trades and pending orders will be closed at the current price, and you will not be able to keep trading in this session.',
       keep: 'Keep trading',
       confirm: 'Yes, end session',
+      noEntriesText:
+        'You have not made any entry yet. If you end now, this session will not be saved: only sessions with at least one entry are kept.',
+      noEntriesConfirm: 'Yes, end without saving',
     },
     replayControls: 'Replay controls',
     spaceKey: 'Space',
@@ -938,6 +948,8 @@ export const en: Messages = {
     closing: 'Closing…',
     confirmClose:
       'Close this session? Open positions are closed and orders cancelled at the bar it was left on.',
+    confirmCloseEmpty: 'Close this session? It has no entries, so it will be deleted, not saved.',
+    discarded: 'The session was not saved because you made no entries.',
     closeToStart: 'You have free practice open. Continue it or close it to start another one.',
     resumed:
       'You are back where you left your session: your orders, drawings and the bar you were on.',

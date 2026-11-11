@@ -632,6 +632,14 @@ export const pt: Messages = {
       `Excluir a prática de ${name} de ${date}? Não é possível desfazer.`,
     loadFailed: 'Não foi possível carregar as práticas. Verifique se sua conta é de administrador.',
     deleteFailed: 'Não foi possível excluir a prática.',
+    purgeEmpty: 'Limpar sessões sem entradas',
+    purging: 'Limpando…',
+    purgeNone: 'Não há sessões de prática livre encerradas sem entradas.',
+    confirmPurge: (n: number) =>
+      `Excluir ${n} ${n === 1 ? 'sessão' : 'sessões'} de prática livre ${n === 1 ? 'encerrada' : 'encerradas'} sem nenhuma entrada? Não é possível desfazer.`,
+    purged: (n: number) =>
+      `${n} ${n === 1 ? 'sessão excluída' : 'sessões excluídas'} sem entradas.`,
+    purgeFailed: 'Não foi possível excluir todas as sessões sem entradas. Tente novamente.',
     tradesFailed: 'Não foi possível carregar as operações da sessão.',
     navigator: 'Percorrer operações',
     tradeCounter: (n: number, total: number) => `Operação ${n} de ${total}`,
@@ -722,6 +730,9 @@ export const pt: Messages = {
       text: 'Suas operações abertas e ordens pendentes serão fechadas ao preço atual e você não poderá continuar operando nesta sessão.',
       keep: 'Continuar operando',
       confirm: 'Sim, encerrar sessão',
+      noEntriesText:
+        'Você ainda não fez nenhuma entrada. Se encerrar agora, esta sessão não será salva: só ficam salvas as sessões com pelo menos uma entrada.',
+      noEntriesConfirm: 'Sim, encerrar sem salvar',
     },
     replayControls: 'Controles de reprodução',
     spaceKey: 'Espaço',
@@ -936,6 +947,9 @@ export const pt: Messages = {
     closing: 'Fechando…',
     confirmClose:
       'Fechar esta sessão? As posições abertas são fechadas e as ordens canceladas no candle onde ela parou.',
+    confirmCloseEmpty:
+      'Fechar esta sessão? Ela não tem nenhuma entrada, então será excluída sem ser salva.',
+    discarded: 'A sessão não foi salva porque você não fez nenhuma entrada.',
     closeToStart: 'Você tem uma prática livre aberta. Continue ou feche-a para começar outra.',
     resumed:
       'Você voltou para onde deixou sua sessão: suas ordens, desenhos e o candle em que estava.',

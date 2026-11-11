@@ -58,6 +58,7 @@ describe('PracticeReview', () => {
     sessionTotals: vi.fn(),
     sessionTrades: vi.fn(),
     deleteSession: vi.fn(),
+    emptySessions: vi.fn(),
   };
   const evaluations = {
     students: vi.fn(async () => [
@@ -345,6 +346,41 @@ describe('PracticeReview', () => {
     await fixture.whenStable();
     expect(sessionRows()).toHaveLength(2);
     expect(el.textContent).toContain('No se pudo eliminar la práctica.');
+  });
+
+  it('purges finished free practice without entries after confirmation', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValue(true);
+    const purge = () =>
+      [...el.querySelectorAll<HTMLButtonElement>('.purge button')].find(
+        (b) => b.textContent?.trim() === 'Depurar sesiones sin entradas',
+      )!;
+    practice.emptySessions.mockResolvedValue([{ id: 's3' }]);
+    await render();
+
+    purge().click();
+    await fixture.whenStable();
+    expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('¿Eliminar 1 sesión'));
+    expect(practice.deleteSession).not.toHaveBeenCalled();
+
+    purge().click();
+    await fixture.whenStable();
+    expect(practice.deleteSession).toHaveBeenCalledExactlyOnceWith('s3');
+    expect(sessionRows()).toHaveLength(2);
+    expect(el.querySelector('.purge')!.textContent).toContain('Se eliminó 1 sesión sin entradas.');
+
+    practice.emptySessions.mockResolvedValue([]);
+    purge().click();
+    await fixture.whenStable();
+    expect(el.querySelector('.purge')!.textContent).toContain(
+      'No hay sesiones de práctica libre terminadas sin entradas.',
+    );
+  });
+
+  it('shows the purge only to admins', async () => {
+    isAdmin.set(false);
+    await render();
+    expect(el.querySelector('.purge')).toBeNull();
+    isAdmin.set(true);
   });
 
   it('explains when the sessions cannot load', async () => {

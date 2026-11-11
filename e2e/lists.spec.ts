@@ -1,5 +1,5 @@
 import { Page, expect, test } from '@playwright/test';
-import { createUser, resetEmulators, setDocument } from './emulators';
+import { createUser, listDocuments, resetEmulators, setDocument } from './emulators';
 import { endSession, signIn } from './helpers';
 import { mockMarket } from './market';
 
@@ -13,7 +13,7 @@ async function seedSessions(uid: string, userName: string, count: number, prefix
       userName,
       symbol: 'XAUUSDT',
       interval: '15m',
-      replayStart: 1_770_000_000_000,
+      replayStart: 1_769_999_400_000,
       startingBalance: 200,
       balance: 200 + i,
       pnl: i,
@@ -22,6 +22,28 @@ async function seedSessions(uid: string, userName: string, count: number, prefix
       startedAt: new Date(Date.now() - i * DAY),
       evaluationId: null,
     });
+    if (i % 3 === 0) {
+      // Open ones have an entry, so closing them keeps them (free practice without entries
+      // is not saved).
+      await setDocument(`practiceSessions/${prefix}${i}/trades/t1`, {
+        uid,
+        side: 'long',
+        orderType: 'market',
+        orderPrice: null,
+        placedTime: 1_769_999_400,
+        quantity: 0.01,
+        entryPrice: 100,
+        entryTime: 1_769_999_400,
+        stopLoss: null,
+        takeProfit: null,
+        status: 'closed',
+        exitPrice: 101,
+        exitTime: 1_770_000_300,
+        exitReason: 'manual',
+        pnl: 1,
+        openedAt: new Date(),
+      });
+    }
   }
 }
 
@@ -74,6 +96,44 @@ test('staff filter the practice review and page through it', async ({ page }) =>
   await page.getByLabel('Desde').fill(day(1));
   await expect(rows).toHaveCount(4);
   await expect(page.locator('.stat strong').first()).toHaveText('4');
+});
+
+test('an admin purges finished free practice without entries', async ({ page }) => {
+  const empty = {
+    uid: 'gone',
+    userName: 'Sin Entradas',
+    symbol: 'XAUUSDT',
+    interval: '15m',
+    replayStart: 1_770_000_000_000,
+    startingBalance: 200,
+    balance: 200,
+    pnl: 0,
+    tradeCount: 0,
+    status: 'finished',
+    startedAt: new Date(Date.now() - 30 * DAY),
+    evaluationId: null,
+  };
+  // Two without entries; an evaluation attempt without entries stays (it is graded unrated).
+  await setDocument('practiceSessions/empty1', empty);
+  await setDocument('practiceSessions/empty2', empty);
+  await setDocument('practiceSessions/e1_x', { ...empty, evaluationId: 'e1', durationMinutes: 30 });
+  page.on('dialog', (dialog) => dialog.accept());
+  await signIn(page, 'admin@indab.test');
+  await expect(page).toHaveURL('/academy');
+  await page.goto('/admin/practice');
+  await expect(page.locator('.stat strong').first()).toHaveText('31');
+  await page.getByRole('button', { name: 'Depurar sesiones sin entradas' }).click();
+  await expect(page.getByText('Se eliminaron 2 sesiones sin entradas.')).toBeVisible();
+  await expect(page.locator('.stat strong').first()).toHaveText('29');
+  const ids = (await listDocuments('practiceSessions')).map((s) => s['id']);
+  expect(ids).not.toContain('empty1');
+  expect(ids).not.toContain('empty2');
+  expect(ids).toContain('e1_x');
+
+  await page.getByRole('button', { name: 'Depurar sesiones sin entradas' }).click();
+  await expect(
+    page.getByText('No hay sesiones de práctica libre terminadas sin entradas.'),
+  ).toBeVisible();
 });
 
 test('a student pages and filters their own sessions', async ({ page }) => {
