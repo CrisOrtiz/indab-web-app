@@ -1436,22 +1436,30 @@ describe('evaluations', () => {
   it('show the INDAB scores staff save to assigned students once results are out', async () => {
     const ref = (uid: string | null, student = 'enrolled') =>
       doc(as(uid), `evaluations/e1/grades/${student}`);
+    const parts = { result: 60, risk: 80, discipline: 85, rubric: 77.5 };
     const grade = (by: string, extra: Record<string, unknown> = {}) => ({
       score: 71.5,
-      parts: { return: 60, risk: 80, rubric: 77.5 },
+      parts,
+      verdict: 'passed',
+      failedBy: [],
       by,
       updatedAt: serverTimestamp(),
       ...extra,
     });
     await assertSucceeds(setDoc(ref('trainer'), grade('trainer')));
+    await assertSucceeds(
+      setDoc(ref('trainer'), grade('trainer', { verdict: 'failed', failedBy: ['stopOut'] })),
+    );
     await assertFails(setDoc(ref('trainer'), grade('admin')));
     await assertFails(setDoc(ref('trainer'), grade('trainer', { score: 101 })));
+    await assertFails(setDoc(ref('trainer'), grade('trainer', { parts: { ...parts, risk: -1 } })));
+    await assertFails(setDoc(ref('trainer'), grade('trainer', { parts: { ...parts, luck: 50 } })));
+    // The shape before verdicts is no longer written.
     await assertFails(
-      setDoc(ref('trainer'), grade('trainer', { parts: { return: 60, risk: -1, rubric: 50 } })),
+      setDoc(ref('trainer'), grade('trainer', { parts: { return: 60, risk: 80, rubric: 50 } })),
     );
-    await assertFails(
-      setDoc(ref('trainer'), grade('trainer', { parts: { return: 60, risk: 80, luck: 50 } })),
-    );
+    await assertFails(setDoc(ref('trainer'), grade('trainer', { verdict: 'great' })));
+    await assertFails(setDoc(ref('trainer'), grade('trainer', { failedBy: ['luck'] })));
     await assertFails(setDoc(ref('enrolled'), grade('enrolled')));
 
     await assertSucceeds(getDoc(ref('trainer')));

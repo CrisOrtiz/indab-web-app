@@ -80,4 +80,26 @@ describe('SessionStatsPanel', () => {
     expect(value('R:R promedio')).toBe('1:2');
     expect(value('Stop out')).toBe('Sí');
   });
+
+  it('lists the discipline faults by trade, and says when there are none', async () => {
+    const { fixture, el, host } = await render();
+    const clean = { stopLoss: 104, initialStopLoss: 104, takeProfit: 92 };
+    host.trades.set([{ ...closed('a', 8, 60), ...clean }]);
+    await fixture.whenStable();
+    const section = () => el.querySelector('.discipline')!;
+    expect(section().textContent).toContain('Sin faltas de disciplina.');
+
+    // The second trade had its stop moved further against it; the first one to break-even.
+    host.trades.set([
+      { ...closed('a', 8, 60), ...clean, stopLoss: 100 },
+      { ...closed('b', -6, 120), ...clean, entryTime: 90, stopLoss: 106 },
+    ]);
+    await fixture.whenStable();
+    const items = [...section().querySelectorAll('li')].map((li) => li.textContent?.trim());
+    expect(items).toEqual([
+      'Operación 1: movió el stop a breakeven o mejor',
+      'Operación 2: alejó el stop loss en contra',
+    ]);
+    expect(section().querySelector('li.good')?.textContent).toContain('Operación 1');
+  });
 });

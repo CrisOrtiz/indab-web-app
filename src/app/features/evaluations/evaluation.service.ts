@@ -171,11 +171,13 @@ export class EvaluationService {
   async saveGrade(
     evaluationId: string,
     uid: string,
-    grade: Pick<EvaluationGrade, 'score' | 'parts'>,
+    grade: Required<Pick<EvaluationGrade, 'score' | 'parts' | 'verdict' | 'failedBy'>>,
   ): Promise<void> {
     await setDoc(doc(this.evaluations, evaluationId, 'grades', uid), {
       score: grade.score,
       parts: grade.parts,
+      verdict: grade.verdict,
+      failedBy: grade.failedBy,
       by: this.auth.user()?.uid,
       updatedAt: serverTimestamp(),
     });

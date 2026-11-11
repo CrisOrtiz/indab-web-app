@@ -16,8 +16,9 @@ import { MentorshipFilter } from '../audience/mentorship-filter';
 import { Pager } from '../../../shared/pager/pager';
 import { pageCount, pageOf } from '../../../shared/pager/cursor-pages';
 import { rubricAverage } from '../../../core/models/evaluation';
-import { IndabScore } from '../../ranking/score';
-import { EvaluationStanding } from '../../ranking/standings';
+import { faultsOf } from '../../ranking/discipline';
+import { scoreDetails } from '../../ranking/score-details';
+import { EvaluationStanding, ShownScore } from '../../ranking/standings';
 
 /** Students per page of results. */
 export const RESULTS_PAGE_SIZE = 20;
@@ -99,6 +100,7 @@ export const RESULTS_PAGE_SIZE = 20;
             <th>{{ ts.riskPerTrade }}</th>
             <th>{{ ts.rewardRisk }}</th>
             <th>{{ ts.withoutStopLoss }}</th>
+            <th>{{ ts.faultCount }}</th>
             <th>{{ ts.stopOut }}</th>
           }
           <th [attr.aria-label]="t.adjustments"></th>
@@ -139,6 +141,14 @@ export const RESULTS_PAGE_SIZE = 20;
               >
                 {{ m ? m.withoutStopLoss : '—' }}
               </td>
+              @let faults = faultCount(row);
+              <td
+                [attr.data-label]="ts.faultCount"
+                [class.down]="(faults ?? 0) > 0"
+                [attr.title]="faultList(row)"
+              >
+                {{ faults ?? '—' }}
+              </td>
               <td [attr.data-label]="ts.stopOut" [class.down]="!!m?.stoppedOut">
                 {{ m ? (m.stoppedOut ? ts.stopOutYes : ts.stopOutNo) : '—' }}
               </td>
@@ -149,7 +159,14 @@ export const RESULTS_PAGE_SIZE = 20;
                 [attr.title]="row.score ? partsOf(row.score) : null"
               >
                 @if (row.score; as sc) {
-                  <strong>{{ sc.score | number: '1.1-1' }}</strong>
+                  @if (sc.verdict !== 'unrated') {
+                    <strong>{{ sc.score | number: '1.1-1' }}</strong>
+                  }
+                  @if (sc.verdict) {
+                    <span class="verdict" [attr.data-verdict]="sc.verdict">{{
+                      t.score.verdicts[sc.verdict]
+                    }}</span>
+                  }
                 } @else if (row.sessionId) {
                   <span class="muted">{{ t.score.missing }}</span>
                 } @else {
@@ -192,7 +209,7 @@ export const RESULTS_PAGE_SIZE = 20;
           </tr>
         } @empty {
           <tr>
-            <td [attr.colspan]="view() === 'ranking' ? 9 : 10" class="muted empty">
+            <td [attr.colspan]="view() === 'ranking' ? 9 : 11" class="muted empty">
               {{ standings().length ? tl.noMatches : t.noAttempts }}
             </td>
           </tr>
@@ -236,6 +253,28 @@ export const RESULTS_PAGE_SIZE = 20;
       }
     }
 
+    .verdict {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 8px;
+      border-radius: 999px;
+      border: 1px solid currentColor;
+      font-size: 0.75rem;
+      white-space: nowrap;
+
+      &[data-verdict='passed'] {
+        color: var(--color-up);
+      }
+
+      &[data-verdict='failed'] {
+        color: var(--color-down);
+      }
+
+      &[data-verdict='unrated'] {
+        color: var(--color-muted);
+      }
+    }
+
     .score-how {
       margin: 0 0 8px;
       font-size: 0.85rem;
@@ -266,12 +305,27 @@ export class EvaluationResults {
   protected readonly view = signal<'ranking' | 'metrics'>('ranking');
   protected readonly average = rubricAverage;
 
-  /** A score's three parts, for its tooltip. */
-  protected partsOf({ parts }: IndabScore): string {
-    const n = (value: number) => this.decimal.transform(value, '1.0-1') ?? '';
-    return this.i18n
-      .messages()
-      .evaluations.score.parts(n(parts.return), n(parts.risk), n(parts.rubric));
+  /** A score's parts and, when it failed by a rule or is unrated, why; for its tooltip. */
+  protected partsOf(score: ShownScore): string | null {
+    return scoreDetails(
+      this.i18n.messages().evaluations.score,
+      score,
+      (value) => this.decimal.transform(value, '1.0-1') ?? '',
+    );
+  }
+
+  /** How many discipline faults an attempt's trades show; null when they are not loaded. */
+  protected faultCount(row: EvaluationStanding): number | null {
+    return row.marks ? faultsOf(row.marks).length : null;
+  }
+
+  /** An attempt's faults, one per line, for the tooltip. */
+  protected faultList(row: EvaluationStanding): string | null {
+    const ts = this.i18n.messages().stats;
+    const faults = row.marks ? faultsOf(row.marks) : [];
+    return faults.length
+      ? faults.map((f) => ts.markLine(f.trade, ts.marks[f.kind])).join('\n')
+      : null;
   }
   private readonly decimal = new DecimalPipe(inject(LOCALE_ID));
 

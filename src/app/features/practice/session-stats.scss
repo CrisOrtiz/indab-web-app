@@ -36,6 +36,40 @@
   color: var(--color-down);
 }
 
+.discipline {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+
+  h3 {
+    margin: 0 0 6px;
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 0.9rem;
+  }
+
+  li + li {
+    margin-top: 2px;
+  }
+
+  .good,
+  .clean {
+    color: var(--color-up);
+  }
+
+  .clean {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+}
+
 .curve {
   margin: 12px 0 0;
 

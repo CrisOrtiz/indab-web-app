@@ -30,6 +30,7 @@ import {
 } from '../../practice/market-data.service';
 import { PracticeService } from '../../practice/practice.service';
 import { STARTING_BALANCE } from '../../practice/replay';
+import { IndabScore } from '../../ranking/score';
 import { EvaluationStanding, evaluationStandings } from '../../ranking/standings';
 import { TimeZoneService } from '../../../core/time-zone/time-zone.service';
 import { fromLocalInput, toLocalInput } from '../exams/exam-form';
@@ -555,19 +556,27 @@ export class AdminEvaluations {
     saved: Map<string, EvaluationGrade>,
   ): Promise<void> {
     const changed = standings.filter((row) => {
+      const score = row.score;
+      // Only scores worked out here (saved ones have no trades behind them on this page).
+      if (!score?.parts || !score.verdict || !row.stats || !row.rubric) {
+        return false;
+      }
       const before = saved.get(row.uid);
       return (
-        row.score &&
-        (!before ||
-          before.score !== row.score.score ||
-          before.parts.return !== row.score.parts.return ||
-          before.parts.risk !== row.score.parts.risk ||
-          before.parts.rubric !== row.score.parts.rubric)
+        !before ||
+        before.score !== score.score ||
+        before.verdict !== score.verdict ||
+        (before.failedBy ?? []).join() !== score.failedBy.join() ||
+        (['result', 'risk', 'discipline', 'rubric'] as const).some(
+          (part) => before.parts[part] !== score.parts![part],
+        )
       );
     });
     await Promise.all(
       changed.map((row) =>
-        this.service.saveGrade(evaluationId, row.uid, row.score!).catch(() => undefined),
+        this.service
+          .saveGrade(evaluationId, row.uid, row.score as IndabScore)
+          .catch(() => undefined),
       ),
     );
   }

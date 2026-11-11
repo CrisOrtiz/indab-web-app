@@ -102,19 +102,31 @@ describe('Ranking page', () => {
   });
 
   it('ranks by the INDAB scores staff saved, when there are any', async () => {
+    const parts = { result: 40, risk: 100, discipline: 100, rubric: 100 };
     evaluations.grades.mockImplementation(async (id: string) =>
       id === 'e1'
-        ? new Map([['u2', { score: 81.5, parts: { return: 40, risk: 100, rubric: 100 } }]])
+        ? new Map([
+            ['u2', { score: 81.5, parts, verdict: 'passed', failedBy: [] }],
+            ['u1', { score: 72, parts, verdict: 'failed', failedBy: ['stopOut'] }],
+          ])
         : new Map(),
     );
     await render();
     expect(el.querySelector('thead')?.textContent).toContain('Nota INDAB');
-    expect(el.textContent).toContain('40 % rentabilidad');
+    expect(el.textContent).toContain('30\u00a0% resultado en R');
     expect(el.textContent).not.toContain('ordenado por ganancia');
-    expect(rows()).toEqual([
-      ['1', 'Luis', '81.5'],
-      ['2', 'Ana Tú', 'Falta rúbrica'],
+    // Passed first; a failed attempt follows even with more profit.
+    expect(rows().map((r) => r.slice(0, 2))).toEqual([
+      ['1', 'Luis'],
+      ['2', 'Ana Tú'],
     ]);
+    const [luis, ana] = [...el.querySelectorAll<HTMLElement>('tbody td.score')];
+    expect(luis.textContent).toContain('81.5');
+    expect(luis.textContent).toContain('Aprobado');
+    expect(luis.querySelector('.why')).toBeNull();
+    // The student reads why their own attempt failed.
+    expect(ana.textContent).toContain('No aprobado');
+    expect(ana.querySelector('.why')?.textContent).toContain('No aprobado por: stop out');
 
     const select = el.querySelector<HTMLSelectElement>('select')!;
     select.value = 'e3';

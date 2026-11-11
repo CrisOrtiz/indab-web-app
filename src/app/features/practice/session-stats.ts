@@ -2,6 +2,7 @@ import { DecimalPipe, PercentPipe } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { I18n } from '../../core/i18n/i18n.service';
 import { PracticeTrade } from '../../core/models/practice';
+import { disciplineMarks } from '../ranking/discipline';
 import { signedMoney } from './practice-format';
 import { sessionStats } from './stats';
 
@@ -28,6 +29,8 @@ export class SessionStatsPanel {
   protected readonly width = WIDTH;
   protected readonly height = HEIGHT;
   protected readonly stats = computed(() => sessionStats(this.trades(), this.startingBalance()));
+  /** Discipline faults (and break-even stops) of the closed trades, by trade number. */
+  protected readonly marks = computed(() => disciplineMarks(this.trades()));
 
   /** The equity curve as SVG points, one step per closed trade, with the start as baseline. */
   protected readonly curve = computed(() => {

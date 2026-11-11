@@ -52,9 +52,23 @@
                   }
                 </td>
                 @if (hasScores) {
-                  <td [attr.data-label]="ts.column" class="score">
+                  <td
+                    [attr.data-label]="ts.column"
+                    class="score"
+                    [attr.title]="row.score ? details(row.score) : null"
+                  >
                     @if (row.score; as sc) {
-                      <strong>{{ sc.score | number: '1.1-1' }}</strong>
+                      @if (sc.verdict !== 'unrated') {
+                        <strong>{{ sc.score | number: '1.1-1' }}</strong>
+                      }
+                      @if (sc.verdict) {
+                        <span class="verdict" [attr.data-verdict]="sc.verdict">{{
+                          ts.verdicts[sc.verdict]
+                        }}</span>
+                      }
+                      @if (isMe(row.uid) && details(sc); as why) {
+                        <small class="why">{{ why }}</small>
+                      }
                     } @else {
                       <span class="muted">{{ ts.missing }}</span>
                     }

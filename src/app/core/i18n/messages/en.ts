@@ -834,11 +834,17 @@ export const en: Messages = {
       warnings: 'We will warn you when 5 minutes and 1 minute are left.',
       gradeTitle: 'How it is graded',
       grade:
-        "INDAB score from 0 to 100: 40% return, 30% risk control and 30% your mentor's rubric (entry plan, risk management, respect for SL and TP, reading the context and discipline).",
-      tipStop: 'Set a stop loss on every trade: each trade without one costs risk points.',
+        "INDAB score from 0 to 100: 30% result in R (what you made divided by what you risked to your stop), 25% risk control, 15% discipline and 30% your mentor's rubric. You pass with 70.",
+      tipStop:
+        'Set a stop loss and take profit on every trade. Removing the stop loss before closing means "Not passed".',
       tipRisk:
-        'Do not risk more than 2% of the account per trade, nor let the account fall more than 10%.',
-      tipStopOut: 'A stop out sets risk control to 0.',
+        'Risk 1 to 2% of the account per trade and no more than 3% across the trades you have open.',
+      tipDiscipline:
+        'These cost discipline points: moving the stop further against you, raising risk after a loss, jumping back in right after losing, averaging down, holding a buy and a sell at once and leaving positions open at the end. Moving the stop to break-even adds points.',
+      tipFail: (limit: number) =>
+        `A stop out or losing more than ${limit}% of the account means "Not passed", even with a good score.`,
+      tipMin: (trades: number) =>
+        `Close at least ${trades} trades; with fewer you are left "Not rated".`,
       read: 'I read the instructions and I am ready',
       start: 'Start now',
       cancel: 'Not now',
@@ -1106,10 +1112,18 @@ export const en: Messages = {
     },
     score: {
       column: 'INDAB score',
-      how: 'INDAB score (0 to 100) = 40% return + 30% risk control + 30% mentor rubric. A stop out sets risk control to 0. Attempts without a rubric yet follow, by profit.',
+      how: 'INDAB score (0 to 100) = 30% result in R + 25% risk control + 15% discipline + 30% mentor rubric. 70 passes; a stop out, losing more than 5% or removing the stop loss do not pass, and fewer than 2 trades leave it not rated. Attempts without a rubric yet follow, by profit.',
       missing: 'No rubric yet',
-      parts: (ret: string, risk: string, rubric: string) =>
-        `Return ${ret} · Risk ${risk} · Rubric ${rubric}`,
+      parts: (result: string, risk: string, discipline: string, rubric: string) =>
+        `Result ${result} · Risk ${risk} · Discipline ${discipline} · Rubric ${rubric}`,
+      verdicts: { passed: 'Passed', failed: 'Not passed', unrated: 'Not rated' },
+      failedBy: {
+        stopOut: 'stop out',
+        lossLimit: 'lost more than 5%',
+        removedStop: 'removed the stop loss',
+      },
+      failedBecause: (reasons: string) => `Not passed: ${reasons}`,
+      unratedHint: (trades: number) => `Needs at least ${trades} closed trades.`,
     },
     resultsView: 'What to show',
     viewRanking: 'Ranking',
@@ -1552,6 +1566,22 @@ export const en: Messages = {
     stopOutYes: 'Yes',
     stopOutHint: 'Positions were closed for lack of margin.',
     stopOutNo: 'No',
+    discipline: 'Discipline',
+    disciplineHint: 'Faults that cost points in evaluations, and what adds points.',
+    disciplineClean: 'No discipline faults.',
+    faultCount: 'Faults',
+    markLine: (trade: number, text: string) => `Trade ${trade}: ${text}`,
+    marks: {
+      removedStop: 'removed the stop loss before closing',
+      widenedStop: 'moved the stop loss further against the trade',
+      martingale: 'raised the risk right after a loss',
+      averagingDown: 'averaged down (another entry while the first was losing)',
+      revenge: 'entered less than 15 minutes after a loss',
+      hedging: 'held a buy and a sell at once',
+      leftOpen: 'was still open when time ran out',
+      noTakeProfit: 'no take profit',
+      breakeven: 'moved the stop to break-even or better',
+    },
   },
   calendar: {
     title: 'Economic calendar',

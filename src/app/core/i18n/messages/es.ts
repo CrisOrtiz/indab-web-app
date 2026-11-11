@@ -852,11 +852,17 @@ export const es = {
       warnings: 'Te avisaremos cuando queden 5 minutos y 1 minuto.',
       gradeTitle: 'Cómo se califica',
       grade:
-        'Nota INDAB de 0 a 100: 40 % rentabilidad, 30 % control de riesgo y 30 % rúbrica de tu mentor (plan de entrada, gestión de riesgo, respeto de SL y TP, lectura de contexto y disciplina).',
-      tipStop: 'Pon stop loss en cada operación: cada una sin stop loss resta puntos de riesgo.',
+        'Nota INDAB de 0 a 100: 30 % resultado en R (lo que ganaste dividido por lo que arriesgaste hasta tu stop), 25 % control de riesgo, 15 % disciplina y 30 % rúbrica de tu mentor. Apruebas con 70.',
+      tipStop:
+        'Pon stop loss y take profit en cada operación. Quitar el stop loss antes de cerrar te deja «No aprobado».',
       tipRisk:
-        'No arriesgues más del 2 % de la cuenta por operación ni dejes caer la cuenta más de 10 %.',
-      tipStopOut: 'Un stop out deja en 0 el control de riesgo.',
+        'Arriesga de 1 a 2 % de la cuenta por operación y no más de 3 % sumando las que tengas abiertas.',
+      tipDiscipline:
+        'Restan puntos de disciplina: alejar el stop en contra, subir el riesgo tras una pérdida, volver a entrar enseguida tras perder, promediar en contra, abrir compra y venta a la vez y dejar posiciones abiertas al final. Mover el stop a breakeven suma.',
+      tipFail: (limit: number) =>
+        `Un stop out o perder más del ${limit} % de la cuenta te deja «No aprobado», aunque tengas buena nota.`,
+      tipMin: (trades: number) =>
+        `Cierra al menos ${trades} operaciones; con menos quedas «Sin evaluar».`,
       read: 'Leí las instrucciones y estoy listo',
       start: 'Empezar ahora',
       cancel: 'Ahora no',
@@ -1124,10 +1130,18 @@ export const es = {
     },
     score: {
       column: 'Nota INDAB',
-      how: 'Nota INDAB (0 a 100) = 40 % rentabilidad + 30 % control de riesgo + 30 % rúbrica del mentor. Un stop out deja en 0 el control de riesgo. Quien aún no tiene rúbrica se ordena después, por ganancia.',
+      how: 'Nota INDAB (0 a 100) = 30 % resultado en R + 25 % control de riesgo + 15 % disciplina + 30 % rúbrica del mentor. Se aprueba con 70; un stop out, perder más del 5 % o quitar el stop loss no aprueban, y con menos de 2 operaciones queda sin evaluar. Quien aún no tiene rúbrica se ordena después, por ganancia.',
       missing: 'Falta rúbrica',
-      parts: (ret: string, risk: string, rubric: string) =>
-        `Rentabilidad ${ret} · Riesgo ${risk} · Rúbrica ${rubric}`,
+      parts: (result: string, risk: string, discipline: string, rubric: string) =>
+        `Resultado ${result} · Riesgo ${risk} · Disciplina ${discipline} · Rúbrica ${rubric}`,
+      verdicts: { passed: 'Aprobado', failed: 'No aprobado', unrated: 'Sin evaluar' },
+      failedBy: {
+        stopOut: 'stop out',
+        lossLimit: 'perdió más del 5 %',
+        removedStop: 'quitó el stop loss',
+      },
+      failedBecause: (reasons: string) => `No aprobado por: ${reasons}`,
+      unratedHint: (trades: number) => `Necesita al menos ${trades} operaciones cerradas.`,
     },
     resultsView: 'Qué mostrar',
     viewRanking: 'Ranking',
@@ -1581,6 +1595,22 @@ export const es = {
     stopOutYes: 'Sí',
     stopOutHint: 'Se cerraron posiciones por falta de margen.',
     stopOutNo: 'No',
+    discipline: 'Disciplina',
+    disciplineHint: 'Faltas que restan puntos en las evaluaciones, y lo que suma.',
+    disciplineClean: 'Sin faltas de disciplina.',
+    faultCount: 'Faltas',
+    markLine: (trade: number, text: string) => `Operación ${trade}: ${text}`,
+    marks: {
+      removedStop: 'quitó el stop loss antes de cerrar',
+      widenedStop: 'alejó el stop loss en contra',
+      martingale: 'subió el riesgo justo después de una pérdida',
+      averagingDown: 'promedió en contra (otra entrada con la primera en pérdida)',
+      revenge: 'entró menos de 15 minutos después de una pérdida',
+      hedging: 'abrió compra y venta a la vez',
+      leftOpen: 'quedó abierta al terminar el tiempo',
+      noTakeProfit: 'sin take profit',
+      breakeven: 'movió el stop a breakeven o mejor',
+    },
   },
   calendar: {
     title: 'Calendario económico',
