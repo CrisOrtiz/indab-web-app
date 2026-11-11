@@ -201,7 +201,7 @@ test('a student practises on a replay and an admin reviews the trades', async ({
   await expect(page.getByLabel('Precio de la orden')).toHaveValue('102.51');
   await page.getByLabel('Precio de la orden').fill('110');
   await page.getByRole('button', { name: 'Vender 0.03 XAUUSDT LÍMITE 110.000' }).click();
-  await expect(page.getByRole('cell', { name: 'Venta límite' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Venta límite', exact: true })).toBeVisible();
 
   // Switching to 1 hour keeps the replay where it is.
   await page.getByRole('button', { name: '1h', exact: true }).click();
@@ -331,7 +331,7 @@ test('a student adds an order from the chart menu and sets it up on its line', a
   // Its Buy button places it as a pending order, and the line leaves the chart.
   await page.getByRole('button', { name: 'Comprar', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Órdenes (1)' })).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'Compra límite' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Compra límite', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Descartar orden' })).toHaveCount(0);
 
   // An order added and then discarded with its × places nothing.
@@ -427,6 +427,75 @@ test('a student holds several positions and orders at gold prices, up to the mar
   const [session] = await listDocuments('practiceSessions');
   const trades = await listDocuments(`practiceSessions/${session['id']}/trades`);
   expect(trades).toHaveLength(5);
+});
+
+test('a student edits a placed order and a position from the order panel', async ({ page }) => {
+  await page.unrouteAll();
+  await mockMarket(page, 4000);
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+  await expect(page.locator('.market .price')).toHaveText('4,000.00');
+
+  // A buy limit at 3,900 waits below the market.
+  await page.getByRole('button', { name: 'Límite' }).click();
+  await page.getByLabel('Precio de la orden').fill('3900');
+  await page.getByRole('button', { name: 'Comprar 0.01 XAUUSDT LÍMITE 3,900.00' }).click();
+  await expect(page.getByRole('button', { name: 'Órdenes (1)' })).toBeVisible();
+
+  // "Editar" loads it into the ticket: new price, lots and a stop loss, then save.
+  await page.getByRole('button', { name: 'Editar compra límite' }).click();
+  const ticket = page.getByRole('complementary', { name: 'Panel de órdenes' });
+  await expect(ticket.getByRole('status')).toContainText('Editando: Compra límite');
+  await page.getByLabel('Precio de la orden').fill('3950');
+  await page.getByRole('spinbutton', { name: /Lotes \(tamaño/ }).fill('0.03');
+  await ticket.getByRole('switch', { name: 'Stop loss' }).check();
+  await page.getByLabel('Precio del stop loss').fill('3900');
+  await ticket.screenshot({ path: 'test-results/edit-order-ticket.png' });
+  await page.screenshot({ path: 'test-results/edit-order-desk.png' });
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(ticket.getByRole('status')).toHaveCount(0);
+  await expect(page.getByRole('cell', { name: '3,950.00' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: '0.03' })).toBeVisible();
+
+  // An open position only changes its exits.
+  await page.getByRole('button', { name: 'Comprar 0.01 lotes a mercado' }).click();
+  await page.getByRole('button', { name: 'Posiciones (1)' }).click();
+  await page.getByRole('button', { name: 'Editar posición de compra' }).click();
+  await expect(ticket.getByRole('status')).toContainText('Editando posición de compra');
+  await expect(page.getByLabel('Precio de la orden')).toHaveCount(0);
+  await expect(page.getByRole('spinbutton', { name: /Lotes \(tamaño/ })).toBeDisabled();
+  await ticket.getByRole('switch', { name: 'Take profit' }).check();
+  await page.getByLabel('Precio del take profit').fill('4100');
+  await page.screenshot({ path: 'test-results/edit-position-desk.png' });
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(page.getByRole('cell', { name: '4,100.00' })).toBeVisible();
+  // (The one-click box only warns that its order had no stop loss.)
+  await expect(ticket.getByRole('alert')).toHaveCount(0);
+
+  const [session] = await listDocuments('practiceSessions');
+  await expect
+    .poll(async () => {
+      const trades = await listDocuments(`practiceSessions/${session['id']}/trades`);
+      return trades
+        .map((t) => [t['status'], t['orderPrice'], t['quantity'], t['stopLoss'], t['takeProfit']])
+        .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+    })
+    .toEqual([
+      ['open', null, 1, null, 4100],
+      ['pending', 3950, 3, 3900, null],
+    ]);
+
+  // On a phone the ticket comes into view when "Editar" is tapped.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Órdenes (1)' }).click();
+  await page.getByRole('button', { name: 'Editar compra límite' }).click();
+  await expect(ticket.getByRole('status')).toBeInViewport();
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: 'test-results/edit-order-phone.png' });
+  await page.getByRole('button', { name: 'Descartar cambios' }).click();
+  await expect(ticket.getByRole('status')).toHaveCount(0);
 });
 
 test.describe('on a phone', () => {

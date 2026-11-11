@@ -358,6 +358,27 @@ describe('Replay', () => {
     expect(() => replay.modify('m', { stopLoss: 99, takeProfit: null })).toThrow('cerrada');
   });
 
+  it('resizes pending orders within the free margin, never open trades', () => {
+    // 2,000 USD: one lot at 95 ties up 47.50, so 42 lots fit.
+    const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 2, 2_000);
+    replay.open('l', order({ orderType: 'limit', price: 95, lots: 1 }));
+    expect(
+      replay.modify('l', { stopLoss: null, takeProfit: null, orderPrice: 96, lots: 2.5 }),
+    ).toMatchObject({ orderPrice: 96, entryPrice: 96, quantity: 250 });
+    expect(() => replay.modify('l', { stopLoss: null, takeProfit: null, lots: 0.015 })).toThrow(
+      'lotes de 0.01',
+    );
+    // Its own margin counts as free: 2,000 / 48 per lot = 41.66 lots.
+    expect(() => replay.modify('l', { stopLoss: null, takeProfit: null, lots: 50 })).toThrow(
+      'hasta 41.66 lotes',
+    );
+    expect(replay.modify('l', { stopLoss: null, takeProfit: null, lots: 41 }).quantity).toBe(4100);
+
+    replay.cancel('l');
+    replay.open('m', order({ lots: 1 }));
+    expect(replay.modify('m', { stopLoss: 99, takeProfit: null, lots: 3 }).quantity).toBe(100);
+  });
+
   it('keeps a journal entry on any order that was not cancelled', () => {
     const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 2, 10_000);
     replay.open('a', order());

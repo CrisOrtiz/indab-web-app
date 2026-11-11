@@ -1109,10 +1109,11 @@ service cloud.firestore {
         allow update: if isOwner(resource.data.uid) && !inTime(2) && lateClose();
 
         allow update: if isOwner(resource.data.uid) && inTime(2) && (
-          // A pending order moves its price, stop loss or take profit...
+          // A pending order moves its price, size, stop loss or take profit...
           (resource.data.status == 'pending'
-            && changes(['orderPrice', 'entryPrice', 'stopLoss', 'takeProfit'])
+            && changes(['orderPrice', 'entryPrice', 'quantity', 'stopLoss', 'takeProfit'])
             && isPrice(request.resource.data.orderPrice)
+            && isPrice(request.resource.data.quantity)
             && request.resource.data.entryPrice == request.resource.data.orderPrice
             && optionalPrice(request.resource.data.stopLoss)
             && optionalPrice(request.resource.data.takeProfit))

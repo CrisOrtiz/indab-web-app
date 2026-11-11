@@ -25,6 +25,15 @@
 
 .row-actions {
   text-align: right;
+  white-space: nowrap;
+
+  .btn + .btn {
+    margin-left: 6px;
+  }
+
+  @media (max-width: 640px) {
+    justify-content: flex-end !important;
+  }
 }
 
 .remove {
@@ -39,4 +48,9 @@
   &:hover {
     color: var(--color-down);
   }
+}
+
+/* The row whose order or position the ticket is editing. */
+tr.editing {
+  background: var(--color-surface);
 }

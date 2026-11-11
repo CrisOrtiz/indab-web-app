@@ -162,6 +162,17 @@ export const SESSIONS_PAGE_SIZE = 10;
 /** Minutes before the end of an attempt when the student is warned. */
 const TIME_WARNINGS = [5, 1];
 
+/** What the order ticket holds, kept while it edits a placed order. */
+interface TicketState {
+  side: TradeSide;
+  orderType: OrderType;
+  orderPrice: number | null;
+  lots: number;
+  stopLoss: number | null;
+  takeProfit: number | null;
+  drafting: boolean;
+}
+
 @Component({
   selector: 'app-practice',
   imports: [
@@ -324,6 +335,22 @@ export class Practice {
   protected readonly placing = signal(false);
   /** Whether the order being set up is on the chart. */
   protected readonly drafting = signal(false);
+  /**
+   * A placed order or open position loaded into the ticket to change it ("Editar"): a pending
+   * order changes its price, lots, SL and TP; a position only its SL and TP.
+   */
+  protected readonly editing = signal<{ id: string; status: 'pending' | 'open' } | null>(null);
+  protected readonly editingTrade = computed(() => {
+    const id = this.editing()?.id;
+    return id
+      ? (this.replay()
+          ?.trades()
+          .find((t) => t.id === id) ?? null)
+      : null;
+  });
+  protected readonly editingOpen = computed(() => this.editing()?.status === 'open');
+  /** The ticket as the student left it before editing, put back afterwards. */
+  private ticketBeforeEdit: TicketState | null = null;
   /** The drawings on the chart, kept with the session so a reload puts them back. */
   protected readonly drawings = signal<Drawing[]>([]);
   /**
@@ -388,8 +415,15 @@ export class Practice {
     [...(this.replay()?.closedTrades() ?? [])].reverse(),
   );
 
-  /** Where the ticket's order would enter: the market, or its limit/stop price. */
+  /**
+   * Where the ticket's order would enter: the market, or its limit/stop price; for a position
+   * being edited, its entry (its SL/TP P/L and risk/reward count from there).
+   */
   protected readonly reference = computed(() => {
+    const edited = this.editingTrade();
+    if (edited?.status === 'open') {
+      return edited.entryPrice;
+    }
     const current = this.replay()?.current().close ?? 0;
     return this.orderType() === 'market' ? current : (this.orderPrice() ?? current);
   });
@@ -432,7 +466,7 @@ export class Practice {
   /** The ticket's order, drawn on the chart as lines the student can drag. */
   protected readonly draft = computed<OrderDraft | null>(() => {
     const replay = this.replay();
-    if (this.phase() !== 'playing' || !this.drafting() || !replay) {
+    if (this.phase() !== 'playing' || !this.drafting() || this.editing() || !replay) {
       return null;
     }
     const input: OpenTradeInput = {
@@ -506,6 +540,17 @@ export class Practice {
       if (this.phase() === 'playing') {
         this.leaveOpen();
         this.error.set(this.i18n.messages().practice.openedElsewhere);
+      }
+    });
+    // The trade being edited filled, closed or was cancelled meanwhile: the edit is over.
+    effect(() => {
+      const editing = this.editing();
+      if (!editing) {
+        return;
+      }
+      const playing = this.phase() === 'playing';
+      if (!playing || this.editingTrade()?.status !== editing.status) {
+        untracked(() => this.stopEditing(playing ? this.i18n.messages().practice.editEnded : null));
       }
     });
     effect(() => {
@@ -1159,6 +1204,10 @@ export class Practice {
 
   /** Places the order set up in the ticket. */
   protected async openTrade(): Promise<void> {
+    if (this.editing()) {
+      this.saveEdit();
+      return;
+    }
     const placed = await this.place({
       side: this.side(),
       orderType: this.orderType(),
@@ -1365,7 +1414,10 @@ export class Practice {
     }
   }
 
-  /** The take profit / stop loss checkboxes: on adds the level at a default distance. */
+  /**
+   * The take profit / stop loss checkboxes: on adds the level at a default distance (from the
+   * market for a position being edited, so it is on the right side of the price).
+   */
   protected toggleLevel(field: LevelField, on: boolean): void {
     this.drafting.set(true);
     const current = this.replay()?.current().close;
@@ -1373,7 +1425,8 @@ export class Practice {
       this[field].set(null);
       return;
     }
-    this[field].set(defaultLevel(this.side(), field, this.reference()));
+    const from = this.editingOpen() ? current : this.reference();
+    this[field].set(defaultLevel(this.side(), field, from));
   }
 
   /** P/L of the ticket's order if it exits at `price`. */
@@ -1452,18 +1505,91 @@ export class Practice {
     }
   }
 
-  private changeTrade(trade: PracticeTrade, levels: TradeLevels): void {
+  /** Changes a placed order or position; false (and says why) if the change is refused. */
+  private changeTrade(trade: PracticeTrade, levels: TradeLevels): boolean {
     const replay = this.replay();
     if (!replay) {
-      return;
+      return false;
     }
     try {
       const updated = replay.modify(trade.id, levels, this.i18n.messages().orderErrors);
       this.persist((id) => this.practice.updateLevels(id, updated), trade);
       this.orderError.set(null);
+      return true;
     } catch (e) {
       this.orderError.set((e as Error).message);
+      return false;
     }
+  }
+
+  /**
+   * "Editar" on a position or pending order: loads it into the ticket, which then saves the
+   * changes to it instead of placing a new order. Its lines stay on the chart as they are
+   * until the changes are saved.
+   */
+  protected startEdit(trade: PracticeTrade, ticket?: HTMLElement): void {
+    if (trade.status !== 'pending' && trade.status !== 'open') {
+      return;
+    }
+    if (!this.editing()) {
+      this.ticketBeforeEdit = {
+        side: this.side(),
+        orderType: this.orderType(),
+        orderPrice: this.orderPrice(),
+        lots: this.lots(),
+        stopLoss: this.stopLoss(),
+        takeProfit: this.takeProfit(),
+        drafting: this.drafting(),
+      };
+    }
+    this.editing.set({ id: trade.id, status: trade.status });
+    this.side.set(trade.side);
+    this.orderType.set(trade.orderType);
+    this.orderPrice.set(trade.status === 'pending' ? trade.orderPrice : null);
+    this.lots.set(tradeLots(trade));
+    this.stopLoss.set(trade.stopLoss);
+    this.takeProfit.set(trade.takeProfit);
+    this.orderError.set(null);
+    ticket?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }
+
+  /** Saves the ticket's changes to the order or position being edited. */
+  protected saveEdit(): void {
+    const trade = this.editingTrade();
+    if (!trade) {
+      return;
+    }
+    const pending = trade.status === 'pending';
+    if (pending && this.orderPrice() === null) {
+      this.orderError.set(this.i18n.messages().orderErrors.priceRequired);
+      return;
+    }
+    const saved = this.changeTrade(trade, {
+      stopLoss: this.stopLoss(),
+      takeProfit: this.takeProfit(),
+      orderPrice: pending ? this.orderPrice() : trade.orderPrice,
+      ...(pending ? { lots: this.lots() } : {}),
+    });
+    if (saved) {
+      this.stopEditing();
+    }
+  }
+
+  /** Leaves the edit and puts the ticket back as it was; `message` says why, if it ended. */
+  protected stopEditing(message: string | null = null): void {
+    const before = this.ticketBeforeEdit;
+    this.editing.set(null);
+    this.ticketBeforeEdit = null;
+    if (before) {
+      this.side.set(before.side);
+      this.orderType.set(before.orderType);
+      this.orderPrice.set(before.orderPrice);
+      this.lots.set(before.lots);
+      this.stopLoss.set(before.stopLoss);
+      this.takeProfit.set(before.takeProfit);
+      this.drafting.set(before.drafting);
+    }
+    this.orderError.set(message);
   }
 
   /** Closes every open trade at the current price and marks the session finished. */
@@ -1578,6 +1704,9 @@ export class Practice {
 
   /** An order from the chart's "+" menu: its line shows up, ready to adjust and place. */
   protected onOrderAt(order: OrderAt): void {
+    if (this.editing()) {
+      this.stopEditing();
+    }
     this.side.set(order.side);
     this.orderType.set(order.orderType);
     this.orderPrice.set(order.price);

@@ -1366,6 +1366,110 @@ describe('Practice page', () => {
     });
   });
 
+  const typeInto = async (input: HTMLInputElement, value: string) => {
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+  };
+  const ticketInput = (name: string) =>
+    [...el.querySelectorAll<HTMLLabelElement>('.ticket label')]
+      .find((l) => l.querySelector('.field-name')?.textContent?.trim().startsWith(name))
+      ?.querySelector('input') ?? null;
+  const banner = () => el.querySelector('.edit-banner')?.textContent ?? '';
+
+  it('edits a pending order from the order panel: price, lots, SL and TP', async () => {
+    await start();
+    await click('Límite');
+    await submit();
+    const id: string = practice.newTradeId.mock.results.at(-1)!.value;
+    expect(submitLabel()).toBe('Comprar 0.01 XAUUSDT LÍMITE 99.500');
+
+    await click('Editar compra límite');
+    expect(banner()).toContain('Editando: Compra límite');
+    // It saves instead of placing, and keeps its side and order type.
+    expect(el.querySelector('button.submit')).toBeNull();
+    expect(el.querySelector<HTMLButtonElement>('.ticket .side.sell')!.disabled).toBe(true);
+    expect(button('Mercado').disabled).toBe(true);
+    expect(chart().draft()).toBeNull();
+    expect(el.querySelector('tr.editing')!.textContent).toContain('Compra límite');
+
+    // A price on the wrong side of the market is refused and the edit goes on.
+    await typeInto(ticketInput('Precio de la orden')!, '101');
+    await click('Guardar cambios');
+    expect(alert()).toContain('por debajo del precio actual');
+    expect(practice.updateLevels).not.toHaveBeenCalled();
+
+    await typeInto(ticketInput('Precio de la orden')!, '99');
+    await typeInto(ticketInput('Lotes')!, '0.05');
+    await toggle('Stop loss');
+    await setLevel('stop loss', '98');
+    await click('Guardar cambios');
+    expect(practice.updateLevels).toHaveBeenLastCalledWith(
+      'session-1',
+      expect.objectContaining({
+        id,
+        orderPrice: 99,
+        entryPrice: 99,
+        quantity: 5,
+        stopLoss: 98,
+        takeProfit: null,
+      }),
+    );
+    expect(el.textContent).toContain('0.05');
+    // The ticket is back as the student left it.
+    expect(banner()).toBe('');
+    expect(submitLabel()).toBe('Comprar 0.01 XAUUSDT LÍMITE 99.500');
+
+    // Discarding leaves the order as it is.
+    await click('Editar compra límite');
+    expect(ticketInput('Lotes')!.value).toBe('0.05');
+    await typeInto(ticketInput('Lotes')!, '1');
+    await click('Descartar cambios');
+    expect(practice.updateLevels).toHaveBeenCalledTimes(1);
+    expect(banner()).toBe('');
+  });
+
+  it('edits only the SL and TP of an open position from the order panel', async () => {
+    await start();
+    await submit();
+    await click('Editar posición de compra');
+    expect(banner()).toContain('Editando posición de compra');
+    expect(ticketInput('Precio de la orden')).toBeNull();
+    expect(ticketInput('Lotes')!.disabled).toBe(true);
+    expect(el.querySelector('.fractions')).toBeNull();
+
+    await toggle('Take profit');
+    await toggle('Stop loss');
+    await setLevel('stop loss', '101');
+    await click('Guardar cambios');
+    expect(alert()).toContain('stop loss');
+    expect(practice.updateLevels).not.toHaveBeenCalled();
+
+    await setLevel('stop loss', '95');
+    // The P/L at the stop counts from the entry (100), 1 unit.
+    expect(el.querySelector('.bracket .field')!.textContent).toContain('+2.00 USD');
+    await click('Guardar cambios');
+    expect(practice.updateLevels).toHaveBeenLastCalledWith(
+      'session-1',
+      expect.objectContaining({ id: 't1', stopLoss: 95, takeProfit: 102, quantity: 1 }),
+    );
+    expect(banner()).toBe('');
+  });
+
+  it('ends the edit when the order fills meanwhile', async () => {
+    await start();
+    await click('Stop');
+    await submit();
+    await click('Editar compra stop');
+    expect(banner()).toContain('Compra stop');
+    // The next candle opens at 101, above the stop.
+    await click('Siguiente vela');
+    expect(practice.fillOrder).toHaveBeenCalled();
+    expect(banner()).toBe('');
+    expect(alert()).toContain('se ejecutó o se cerró');
+    expect(el.querySelector('button.submit')).not.toBeNull();
+  });
+
   it('ends the session by itself after the last candle', async () => {
     // 50 bars of 15 minutes and no more.
     market.loadCandles.mockImplementation(
