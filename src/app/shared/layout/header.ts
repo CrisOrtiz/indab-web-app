@@ -94,21 +94,31 @@ export class Header {
       window.addEventListener('scroll', onScroll, { passive: true });
       // Link widths change when the web font arrives or the window is resized.
       // The header's height is published as `--header-height`, so anchored sections stop below it.
+      // The work runs in the next frame, not inside the observer callback: changing layout there
+      // makes the browser report "ResizeObserver loop completed with undelivered notifications".
+      let frame = 0;
+      let headerHeight = '';
       const resize =
         typeof ResizeObserver === 'undefined'
           ? null
           : new ResizeObserver(() => {
-              this.placeIndicator();
-              document.documentElement.style.setProperty(
-                '--header-height',
-                `${this.host.nativeElement.offsetHeight}px`,
-              );
+              if (frame) return;
+              frame = requestAnimationFrame(() => {
+                frame = 0;
+                this.placeIndicator();
+                const height = `${this.host.nativeElement.offsetHeight}px`;
+                if (height !== headerHeight) {
+                  headerHeight = height;
+                  document.documentElement.style.setProperty('--header-height', height);
+                }
+              });
             });
       resize?.observe(this.nav().nativeElement);
       resize?.observe(this.host.nativeElement);
       destroyRef.onDestroy(() => {
         window.removeEventListener('scroll', onScroll);
         resize?.disconnect();
+        cancelAnimationFrame(frame);
       });
     });
   }

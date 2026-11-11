@@ -1,5 +1,6 @@
 import {
   ApplicationConfig,
+  ErrorHandler,
   inject,
   isDevMode,
   provideAppInitializer,
@@ -8,6 +9,7 @@ import {
 import { provideServiceWorker } from '@angular/service-worker';
 import { TitleStrategy, provideRouter, withComponentInputBinding } from '@angular/router';
 import { environment } from '../environments/environment';
+import { AppErrorHandler } from './core/errors/app-error-handler';
 import { routes } from './app.routes';
 import { provideFirebase } from './core/firebase/firebase.providers';
 import { I18n } from './core/i18n/i18n.service';
@@ -19,6 +21,7 @@ import { ThemeService } from './core/theme/theme.service';
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
+    { provide: ErrorHandler, useClass: AppErrorHandler },
     provideRouter(routes, withComponentInputBinding()),
     { provide: TitleStrategy, useClass: I18nTitleStrategy },
     provideAppInitializer(() => {
