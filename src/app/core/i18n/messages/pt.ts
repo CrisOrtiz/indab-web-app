@@ -800,6 +800,10 @@ export const pt: Messages = {
     random: 'Um momento aleatório',
     pickDate: 'Escolher data',
     startDate: 'Data de início',
+    startRange: (from: string, to: string) =>
+      `Você pode escolher de ${from} a ${to}: o replay precisa de 30 dias de mercado depois dessa data.`,
+    startOutOfRange: (from: string, to: string) =>
+      `Essa data não está disponível. Escolha um dia de ${from} a ${to}.`,
     hideDates: 'Ocultar datas durante a prática',
     rules: (balance, leverage, lotSize) =>
       `Você começa com ${balance} USD virtuais e alavancagem de 1:${leverage}. Opera em lotes de ${lotSize} oz; se seu patrimônio cair abaixo de 50% da margem usada, suas posições são fechadas (stop out).`,
@@ -1228,6 +1232,8 @@ export const pt: Messages = {
     randomStart: 'Data aleatória',
     pickStart: 'Escolher data',
     startDate: 'Data de início do replay',
+    startRange: (from: string, to: string) =>
+      `Você pode escolher de ${from} a ${to}: o replay precisa de 30 dias de mercado depois dessa data.`,
     sameStart: 'Todos os alunos praticam a partir do mesmo ponto.',
     hideDates: 'Ocultar as datas durante a avaliação',
     news: 'Notícias no gráfico',
@@ -1279,6 +1285,8 @@ export const pt: Messages = {
       `O tempo limite deve estar entre ${min} e ${max} minutos.`,
     windowInvalid: 'A data de fechamento deve ser posterior à de abertura.',
     startRequired: 'Escolha a data de início do replay.',
+    startOutOfRange: (from: string, to: string) =>
+      `Essa data não está disponível. Escolha um dia de ${from} a ${to}.`,
     studentsRequired: 'Atribua pelo menos um aluno ou uma mentoria.',
     saved: (title: string) => `A avaliação ${title} foi salva.`,
     saveFailed: 'Não foi possível salvar a avaliação.',

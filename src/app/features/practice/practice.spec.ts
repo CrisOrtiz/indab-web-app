@@ -799,6 +799,22 @@ describe('Practice page', () => {
     );
   });
 
+  it('says which days can be picked and refuses one too recent for a replay', async () => {
+    const radio = [...el.querySelectorAll('label.check')]
+      .find((l) => l.textContent?.trim() === 'Elegir fecha')!
+      .querySelector('input')!;
+    radio.click();
+    await fixture.whenStable();
+    const date = el.querySelector<HTMLInputElement>('input[aria-label="Fecha de inicio"]')!;
+    expect(date.parentElement!.textContent).toContain('el replay necesita 30 días de mercado');
+    // iPad date pickers ignore max, so the page checks the day itself.
+    date.value = date.max.replace(/^\d{4}/, (y) => String(Number(y) + 1));
+    date.dispatchEvent(new Event('input'));
+    await start();
+    expect(alert()).toContain('Esa fecha no está disponible');
+    expect(practice.startSession).not.toHaveBeenCalled();
+  });
+
   it('switches timeframe during the practice, loading its history once', async () => {
     await start();
     await click('Siguiente vela');
