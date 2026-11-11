@@ -680,55 +680,7 @@ test('a student adds classic indicators and sets one up as in TradingView', asyn
   await item('EMA 100').click();
   await item('Bandas de Bollinger 20 2').click();
   await item('MACD 12 26 9').click();
-  // TEMP diagnostics for CI only.
-  for (let i = 0; i < 4; i++) {
-    console.log(
-      'DIAG',
-      JSON.stringify(
-        await page.evaluate(() => {
-          const el = [...document.querySelectorAll('[role=menuitemcheckbox]')].find((e) =>
-            e.textContent!.includes('SuperTrend'),
-          ) as HTMLElement | undefined;
-          const box = (q: Element | null | undefined) => {
-            if (!q) return null;
-            const r = q.getBoundingClientRect();
-            return [
-              Math.round(r.top),
-              Math.round(r.bottom),
-              Math.round(r.left),
-              Math.round(r.width),
-            ];
-          };
-          const menu = document.querySelector('.tool-menu');
-          return {
-            item: box(el),
-            vis: el ? getComputedStyle(el).visibility : null,
-            menu: box(menu),
-            menuScroll: menu ? [menu.scrollTop, menu.scrollHeight, menu.clientHeight] : null,
-            chart: box(document.querySelector('.workspace app-replay-chart')),
-            aside: box(document.querySelector('.workspace aside')),
-            vh: innerHeight,
-            scroll: scrollY,
-            doc: document.documentElement.scrollHeight,
-          };
-        }),
-      ),
-    );
-    await page.waitForTimeout(150);
-  }
-  await item('SuperTrend 10 3')
-    .click({ timeout: 8000 })
-    .catch(async (e) => {
-      await page.screenshot({ path: 'playwright-report/diag-indicators.png' });
-      console.log(
-        'DIAG-ARIA',
-        await page
-          .locator('.tool-menu')
-          .ariaSnapshot()
-          .catch(() => ''),
-      );
-      throw e;
-    });
+  await item('SuperTrend 10 3').click();
   await expect(item('MACD 12 26 9')).toHaveAttribute('aria-checked', 'true');
   await page.screenshot({ path: 'test-results/desk-indicators-menu.png' });
 
