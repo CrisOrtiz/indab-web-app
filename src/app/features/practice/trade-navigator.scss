@@ -55,6 +55,19 @@
     display: block;
     color: var(--color-muted);
   }
+
+  .journal {
+    grid-column: 1 / -1;
+
+    dd {
+      white-space: pre-line;
+      overflow-wrap: anywhere;
+    }
+
+    .muted {
+      color: var(--color-muted);
+    }
+  }
 }
 
 .side {

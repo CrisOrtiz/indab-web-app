@@ -17,6 +17,7 @@ class FakeChart {
   readonly trades = input<PracticeTrade[]>([]);
   readonly barSeconds = input(0);
   readonly focusTrade = input<string | null>(null);
+  readonly drawings = input<readonly unknown[]>([]);
   readonly startTime = input<number | null>(null);
   readonly hideDates = input(false);
   readonly indicators = input<readonly string[] | null>(null);
@@ -151,6 +152,18 @@ describe('SessionReview', () => {
     const save = vi.spyOn(chartSettings.settings, 'saveIndicators');
     chart()!.indicatorsChange.emit(['ema100', 'volume']);
     expect(save).toHaveBeenCalledWith(['ema100', 'volume']);
+  });
+
+  it('shows what the student drew, as it was when the session ended', async () => {
+    await render();
+    expect(chart()?.drawings()).toEqual([]);
+    const line = { id: 1, kind: 'hline', price: 2010 };
+    fixture.componentInstance.session.update((s) => ({
+      ...s,
+      resume: { time: 0, interval: '15m', hideDates: false, speed: 1, drawings: [line] },
+    }));
+    await fixture.whenStable();
+    expect(chart()?.drawings()).toEqual([line]);
   });
 
   it('says when no order was filled and when the trades cannot load', async () => {

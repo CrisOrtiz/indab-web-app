@@ -1,13 +1,22 @@
 import { Component, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { I18n } from '../../../core/i18n/i18n.service';
-import { RUBRIC_CRITERIA, RubricCriterion, RubricScores } from '../../../core/models/evaluation';
+import {
+  JOURNAL_SCALE_MAX,
+  RUBRIC_CRITERIA,
+  RubricCriterion,
+  RubricScores,
+  SavedRubricScores,
+} from '../../../core/models/evaluation';
 
 /** Scores 1 to 5 a mentor picks from. */
 const SCALE = [1, 2, 3, 4, 5] as const;
+/** Scores 1 to 10 for the trade journal. */
+const JOURNAL_SCALE = Array.from({ length: JOURNAL_SCALE_MAX }, (_, i) => i + 1);
 
 /**
- * The mentor's rubric for one attempt: 1 to 5 on each fixed criterion. Saves only once every
- * criterion has a score.
+ * The mentor's rubric for one attempt: 1 to 5 on each fixed criterion, and 1 to 10 on the trade
+ * journal's quality when the student wrote one (without it that part is 0 on its own). Saves
+ * only once every criterion asked has a score.
  */
 @Component({
   selector: 'app-rubric-form',
@@ -36,6 +45,26 @@ const SCALE = [1, 2, 3, 4, 5] as const;
           </div>
         </fieldset>
       }
+      <fieldset>
+        <legend>
+          <strong>{{ t.criteria.journal.label }}</strong>
+          <span class="muted">{{ journaled() ? t.journalScale : t.noJournal }}</span>
+        </legend>
+        @if (journaled()) {
+          <div class="scale journal" role="radiogroup" [attr.aria-label]="t.criteria.journal.label">
+            @for (value of journalScale; track value) {
+              <button
+                type="button"
+                role="radio"
+                [attr.aria-checked]="journal() === value"
+                (click)="pickJournal(value)"
+              >
+                {{ value }}
+              </button>
+            }
+          </div>
+        }
+      </fieldset>
       @if (incomplete()) {
         <p class="message error" role="alert">{{ t.missing }}</p>
       }
@@ -69,6 +98,7 @@ const SCALE = [1, 2, 3, 4, 5] as const;
 
     .scale {
       display: flex;
+      flex-wrap: wrap;
       gap: 6px;
 
       button {
@@ -95,17 +125,24 @@ export class RubricForm {
   protected readonly i18n = inject(I18n);
 
   readonly studentName = input.required<string>();
-  /** The rubric saved before, if any. */
-  readonly initial = input<RubricScores | null>(null);
+  /** The rubric saved before, if any (one with older criteria keeps the ones still asked). */
+  readonly initial = input<SavedRubricScores | null>(null);
+  /** The student wrote a reason on some trade: the mentor rates the journal 1 to 10. */
+  readonly journaled = input(false);
   readonly busy = input(false);
   readonly saved = output<RubricScores>();
   readonly cancelled = output<void>();
 
   protected readonly criteria = RUBRIC_CRITERIA;
   protected readonly scale = SCALE;
-  protected readonly scores = linkedSignal<Partial<RubricScores>>(() => ({
-    ...(this.initial() ?? {}),
-  }));
+  protected readonly journalScale = JOURNAL_SCALE;
+  protected readonly journal = linkedSignal<number | null>(() => this.initial()?.journal ?? null);
+  protected readonly scores = linkedSignal<Partial<RubricScores>>(() => {
+    const initial = this.initial() ?? {};
+    return Object.fromEntries(
+      RUBRIC_CRITERIA.filter((c) => initial[c]).map((c) => [c, initial[c]]),
+    ) as Partial<RubricScores>;
+  });
   protected readonly incomplete = signal(false);
 
   protected pick(criterion: RubricCriterion, value: number): void {
@@ -113,12 +150,18 @@ export class RubricForm {
     this.incomplete.set(false);
   }
 
+  protected pickJournal(value: number): void {
+    this.journal.set(value);
+    this.incomplete.set(false);
+  }
+
   protected submit(): void {
     const scores = this.scores();
-    if (RUBRIC_CRITERIA.some((c) => !scores[c])) {
+    const journal = this.journal();
+    if (RUBRIC_CRITERIA.some((c) => !scores[c]) || (this.journaled() && !journal)) {
       this.incomplete.set(true);
       return;
     }
-    this.saved.emit(scores as RubricScores);
+    this.saved.emit((this.journaled() ? { ...scores, journal } : { ...scores }) as RubricScores);
   }
 }

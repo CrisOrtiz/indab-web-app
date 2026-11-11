@@ -113,7 +113,7 @@ describe('evaluationStandings', () => {
           ['a-4', [trade(2), trade(2, 3600)]],
           ['b-2', [trade(1), trade(1, 3600)]],
           ['c-20', [trade(20)]],
-          ['d-4', [trade(4)]],
+          ['d-4', []],
         ]),
         rubrics: new Map([
           ['a', rubric(1)],
@@ -122,12 +122,12 @@ describe('evaluationStandings', () => {
         ]),
       },
     );
-    // Bea: result 2 R = 70, risk 100, discipline 100, rubric 100 = 91, passed.
-    // Ana: 4 R = 90, 100, 100, rubric 0 = 67, failed. Dee: one trade, unrated. Carla: no rubric.
+    // No journal. Bea: result 2 R = 70, risk 100, discipline 100, rubric 100 = 82.5, passed.
+    // Ana: 4 R = 90, 100, 100, rubric 0 = 62.5, failed. Dee: no closed trade, unrated. Carla: no rubric.
     expect(rows.map((r) => [r.rank, r.name, r.score?.score ?? null, r.score?.verdict])).toEqual([
-      [1, 'Bea', 91, 'passed'],
-      [2, 'Ana', 67, 'failed'],
-      [3, 'Dee', 97, 'unrated'],
+      [1, 'Bea', 82.5, 'passed'],
+      [2, 'Ana', 62.5, 'failed'],
+      [3, 'Dee', 77.5, 'unrated'],
       [4, 'Carla', null, undefined],
     ]);
     expect(rows[0].marks).toEqual([]);

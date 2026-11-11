@@ -13,8 +13,16 @@ export function scoreDetails(
 ): string | null {
   const lines: string[] = [];
   if (score.parts) {
-    const { result, risk, discipline, rubric } = score.parts;
-    lines.push(t.parts(format(result), format(risk), format(discipline), format(rubric)));
+    const { result, risk, discipline, rubric, journal } = score.parts;
+    lines.push(
+      t.parts(
+        format(result),
+        format(risk),
+        format(discipline),
+        format(rubric),
+        journal === undefined ? null : format(journal),
+      ),
+    );
   }
   if (score.failedBy.length) {
     lines.push(t.failedBecause(score.failedBy.map((rule) => t.failedBy[rule]).join(', ')));

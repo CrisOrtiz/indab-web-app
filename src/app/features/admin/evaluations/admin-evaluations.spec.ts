@@ -135,6 +135,7 @@ describe('AdminEvaluations', () => {
     expect(card).toContain('Final de oro');
     expect(card).toContain('Abierta');
     expect(card).toContain('45 min');
+    expect(card).toContain('aprueba con 70');
     expect(card).toContain('3 estudiantes');
     expect(card).toContain('Mentorías: Grupo 2025');
   });
@@ -158,6 +159,7 @@ describe('AdminEvaluations', () => {
         durationMinutes: 60,
         hideDates: true,
         startingBalance: 200,
+        passingScore: 70,
         studentIds: ['jose'],
         resultsPublished: false,
       }),
@@ -217,6 +219,27 @@ describe('AdminEvaluations', () => {
     await submit();
     expect(message()).toContain('La fecha de cierre debe ser posterior');
     expect(service.create).not.toHaveBeenCalled();
+  });
+
+  it('sets the passing score, from 0 to 100', async () => {
+    await click('Nueva evaluación');
+    await type('input[type=text]', 'Examen final');
+    el.querySelector<HTMLInputElement>('.student-list input')!.click();
+    const passing = () =>
+      [...el.querySelectorAll('label')]
+        .find((l) => l.textContent?.includes('Nota de aprobación'))!
+        .querySelector<HTMLInputElement>('input')!;
+    expect(passing().value).toBe('70');
+    passing().value = '120';
+    passing().dispatchEvent(new Event('input'));
+    await submit();
+    expect(message()).toContain('número entero de 0 a 100');
+    passing().value = '80';
+    passing().dispatchEvent(new Event('input'));
+    await submit();
+    expect(service.create).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Examen final', passingScore: 80 }),
+    );
   });
 
   it('edits an evaluation keeping its replay start', async () => {
@@ -364,7 +387,10 @@ describe('AdminEvaluations', () => {
       exitReason: 'takeProfit',
       pnl,
     });
-    practice.sessionTrades.mockResolvedValue([won('t1', 8, 0), won('t2', 4, 3600)]);
+    practice.sessionTrades.mockResolvedValue([
+      { ...won('t1', 8, 0), journal: 'Rechazo en soporte de H1' },
+      won('t2', 4, 3600),
+    ]);
     practice.evaluationSessions.mockResolvedValue([
       {
         id: 'e1_jose',
@@ -396,30 +422,33 @@ describe('AdminEvaluations', () => {
     expect(form().textContent).toContain('Elige una nota en cada criterio.');
     expect(service.saveRubric).not.toHaveBeenCalled();
 
-    [3, 5, 2, 4].forEach((value, i) => pick(i + 1, value));
+    // One of the trades has its reason written: the journal is rated 1 to 10.
+    [3, 5, 2, 8].forEach((value, i) => pick(i + 1, value));
     service.rubrics.mockResolvedValue(
-      new Map([['jose', { scores: { plan: 4, risk: 3, stops: 5, context: 2, discipline: 4 } }]]),
+      new Map([
+        ['jose', { scores: { plan: 4, context: 3, management: 5, emotions: 2, journal: 8 } }],
+      ]),
     );
     form().dispatchEvent(new Event('submit'));
     await fixture.whenStable();
     expect(service.saveRubric).toHaveBeenCalledWith('e1', 'jose', {
       plan: 4,
-      risk: 3,
-      stops: 5,
-      context: 2,
-      discipline: 4,
+      context: 3,
+      management: 5,
+      emotions: 2,
+      journal: 8,
     });
     expect(message()).toContain('Se guardó la rúbrica de José Pérez.');
     expect(el.querySelector('form.rubric')).toBeNull();
-    expect(el.querySelector('.results tbody')?.textContent).toContain('3.6 / 5');
-    // 4 R + 2 R = 100, full risk and discipline marks, rubric 3.6 = 65: score 89.5, passed,
-    // saved for the students' ranking.
+    expect(el.querySelector('.results tbody')?.textContent).toContain('3.5 / 5');
+    // 4 R + 2 R = 100, full risk and discipline marks, rubric 3.5 = 62.5, one of two trades with
+    // its reason rated 8 = 40 journal: score 84.6, passed, saved for the students' ranking.
     const score = el.querySelector('.results tbody td.score')!;
-    expect(score.textContent).toContain('89.5');
+    expect(score.textContent).toContain('84.6');
     expect(score.textContent).toContain('Aprobado');
     expect(service.saveGrade).toHaveBeenCalledWith('e1', 'jose', {
-      score: 89.5,
-      parts: { result: 100, risk: 100, discipline: 100, rubric: 65 },
+      score: 84.6,
+      parts: { result: 100, risk: 100, discipline: 100, rubric: 62.5, journal: 40 },
       verdict: 'passed',
       failedBy: [],
     });
@@ -479,8 +508,35 @@ describe('AdminEvaluations', () => {
     expect(labels()[0]).toBe('Ocultar resultados');
   });
 
+  it('warns before publishing while some attempts have no rubric', async () => {
+    practice.evaluationSessions.mockResolvedValue([{ uid: 'jose' }, { uid: 'luis' }]);
+    service.rubrics.mockResolvedValue(new Map([['jose', { scores: {} }]]));
+    await click('Publicar resultados');
+    expect(service.setResultsPublished).not.toHaveBeenCalled();
+    const dialog = el.querySelector('dialog.confirm')!;
+    expect(dialog.textContent).toContain('Hay evaluaciones sin calificar');
+    expect([...dialog.querySelectorAll('.unrated li')].map((li) => li.textContent!.trim())).toEqual(
+      ['Luis Díaz'],
+    );
+    // Grading first opens the results instead.
+    await click('Calificar primero');
+    expect(service.setResultsPublished).not.toHaveBeenCalled();
+    expect(el.querySelector('dialog.confirm h2')).toBeNull();
+    expect(practice.evaluationSessions).toHaveBeenCalledTimes(2);
+
+    await click('Publicar resultados');
+    await click('Publicar igual');
+    expect(service.setResultsPublished).toHaveBeenCalledWith('e1', true);
+  });
+
   it('publishes the results and deletes after confirming', async () => {
     practice.evaluationSessions.mockResolvedValue([{ uid: 'jose' }, { uid: 'luis' }]);
+    service.rubrics.mockResolvedValue(
+      new Map([
+        ['jose', { scores: {} }],
+        ['luis', { scores: {} }],
+      ]),
+    );
     await click('Publicar resultados');
     expect(service.setResultsPublished).toHaveBeenCalledWith('e1', true);
     await fixture.whenStable();

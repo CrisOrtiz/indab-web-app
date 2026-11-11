@@ -395,15 +395,21 @@ Module notes:
   context, discipline) from the results menu (`RubricForm`), stored at
   `evaluations/{id}/rubrics/{uid}`; the student sees theirs on `/academy/ranking` once published.
   INDAB score (Cris 2026-11-11, replaces the 40/30/30 of 2026-11-03): `ranking/score.ts`,
-  30% result in R (sum of P/L over USD risked to the farther of first/last stop; no stop = 2%
+  25% result in R (sum of P/L over USD risked to the farther of first/last stop; no stop = 15%
   of balance; 0 R = 50 pts, ±5 R = 100/0), 25% risk control (100 less 20 per trade without SL,
-  10 per 1% over 2% risk on a trade, 10 per 1% over 3% open at once, 2 per 1% drawdown over 10%;
+  5 per 1% over 15% risk on EACH trade (Cris), 5 per 1% over 15% open at once, 2 per 1% drawdown over 10%;
   stop out = 0), 15% discipline (`ranking/discipline.ts`: removed/widened SL, martingale,
   averaging down, revenge within 15 market min, hedging, left open at the end, no TP; +5 per
-  break-even stop; shown per trade in `SessionStatsPanel`), 30% rubric ((avg - 1) / 4). Verdict:
-  stop out, a 5% loss from the start or a removed SL fail whatever the score; fewer than 2
-  closed trades = unrated; else pass at 70. Standings rank passed, failed, unrated, each by
-  score. Planned next: per-trade journal (10%) and a rubric without the criteria now automated.
+  break-even stop; shown per trade in `SessionStatsPanel`), 25% rubric ((avg - 1) / 4) and 10%
+  journal (share of closed trades whose `journal` has 10+ characters). Trade journal: the
+  `TradeJournal` panel under the practice trades; each order's `journal` (≤ 280) can be written
+  or fixed until the session ends, even once closed (Cris); shown in `TradeNavigator`. Rubric
+  criteria since 2026-11-11: plan, context, management, emotions, journal (older rubrics keep
+  risk/stops/discipline and are shown and averaged as saved; `rubricCriteria`). Verdict (flexible, Cris
+  2026-11-11): only a stop out fails whatever the score (score and details kept); losing 40%
+  of the start costs 40 risk points and a removed SL costs discipline on that trade; fewer than 1 closed (Cris: at least 1)
+  trades = unrated; else pass at the evaluation's `passingScore` (staff set it, 0-100, missing =
+  70, `passingScoreOf`). Standings rank passed, failed, unrated, each by score.
   Students cannot read trades or rubrics, so staff browsers save each score (with `verdict`
   and `failedBy`) to `evaluations/{id}/grades/{uid}` when they open the results
   (`syncGrades`), and `/academy/ranking` reads those; older grades show their score only.

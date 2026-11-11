@@ -186,6 +186,11 @@ export class PracticeService {
     return updateDoc(doc(this.trades(sessionId), trade.id), levels);
   }
 
+  /** Saves a trade's journal entry (any time until the session ends). */
+  saveJournal(sessionId: string, trade: PracticeTrade): Promise<void> {
+    return updateDoc(doc(this.trades(sessionId), trade.id), { journal: trade.journal ?? '' });
+  }
+
   closeTrade(sessionId: string, trade: PracticeTrade): Promise<void> {
     return updateDoc(doc(this.trades(sessionId), trade.id), {
       status: 'closed',

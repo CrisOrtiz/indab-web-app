@@ -376,6 +376,10 @@ test('a student holds several positions and orders at gold prices, up to the mar
 
   await page.getByRole('button', { name: 'Comprar 0.02 XAUUSDT MERCADO' }).click();
   await page.getByRole('button', { name: 'Vender 0.02 lotes a mercado' }).click();
+  // A one-click order has no stop loss: the box under it warns, without stopping it.
+  await expect(
+    page.getByRole('group', { name: 'Operación rápida a mercado' }).getByRole('alert'),
+  ).toContainText('Esta orden no tiene stop loss.');
   await page.getByRole('button', { name: 'Comprar 0.02 lotes a mercado' }).click();
   await expect(page.getByRole('button', { name: 'Posiciones (3)' })).toBeVisible();
   // A sell limit at 4,100 (41 USD of margin) waits next to them.
@@ -410,7 +414,9 @@ test('a student holds several positions and orders at gold prices, up to the mar
   await page.getByRole('button', { name: 'Cerrar', exact: true }).first().click();
   await page.getByRole('button', { name: 'Vender 0.02 lotes a mercado' }).click();
   await expect(page.getByRole('button', { name: 'Posiciones (3)' })).toBeVisible();
-  await expect(refusal).toHaveCount(0);
+  // No refusal now, only the warning that it has no stop loss.
+  await expect(refusal).not.toContainText('Margen insuficiente');
+  await expect(refusal).toContainText('Esta orden no tiene stop loss.');
   await expect(page.getByRole('button', { name: 'Historial (1)' })).toBeVisible();
 
   await endSession(page);

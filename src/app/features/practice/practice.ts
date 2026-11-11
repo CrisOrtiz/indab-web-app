@@ -1,4 +1,4 @@
-import { DecimalPipe, PercentPipe, formatNumber } from '@angular/common';
+import { DecimalPipe, PercentPipe, formatNumber, formatPercent } from '@angular/common';
 import {
   Component,
   DestroyRef,
@@ -101,6 +101,9 @@ import { SessionTabs } from './session-tabs';
 import { SessionReview } from './session-review';
 import { SessionStatsPanel } from './session-stats';
 import { filledTrades } from './trade-boxes';
+import { TradeJournal } from './trade-journal';
+import { OrderWarning, WarnedOrder, orderWarnings } from './order-warnings';
+import { RISK_ALLOWED } from '../ranking/score';
 import { TradeNavigator } from './trade-navigator';
 
 type Phase = 'setup' | 'loading' | 'playing' | 'finished';
@@ -173,6 +176,7 @@ const TIME_WARNINGS = [5, 1];
     SessionFilterBar,
     SessionReview,
     SessionStatsPanel,
+    TradeJournal,
     TradeNavigator,
   ],
   providers: [SessionTabs],
@@ -272,6 +276,8 @@ export class Practice {
   protected readonly evaluations = signal<EvaluationCard[]>([]);
   /** The evaluation being taken, if this session is an attempt. */
   protected readonly evaluation = signal<Evaluation | null>(null);
+  /** The trade just placed, whose journal entry gets the focus. */
+  protected readonly journalFocus = signal<string | null>(null);
   /** When the attempt's time runs out (ms), by this device's clock. */
   protected readonly deadline = signal<number | null>(null);
   /** The evaluation whose instructions are shown before its attempt starts. */
@@ -313,6 +319,8 @@ export class Practice {
   protected readonly orderError = signal<string | null>(null);
   /** Why the chart's one-click Buy/Sell was refused, shown under its buttons for a while. */
   protected readonly quickError = signal<string | null>(null);
+  /** The one-click box's message is a warning about the order just sent, not a refusal. */
+  protected readonly quickWarn = signal(false);
   protected readonly placing = signal(false);
   /** Whether the order being set up is on the chart. */
   protected readonly drafting = signal(false);
@@ -398,6 +406,18 @@ export class Practice {
     const risk = Math.abs(this.reference() - stopLoss);
     return risk > 0 ? Math.abs(takeProfit - this.reference()) / risk : null;
   });
+  /**
+   * What to keep in mind before sending the ticket's order: it risks more than 15 % of the
+   * account, has no stop loss or turns around right after a loss (Cris, 2026-11-11).
+   */
+  protected readonly ticketWarnings = computed(() =>
+    this.warningsFor({
+      side: this.side(),
+      entry: this.reference(),
+      stopLoss: this.stopLoss(),
+      units: this.units(),
+    }),
+  );
   /** The order button, as TradingView words it: "0.05 PAXGUSDT MERCADO", "... LÍMITE 2,310.00". */
   protected readonly submitDetail = computed(() => {
     const type = this.orderType();
@@ -1170,6 +1190,12 @@ export class Practice {
 
   /** One-click market order from the chart, with the ticket's size and no SL/TP. */
   protected async quickTrade(side: TradeSide): Promise<void> {
+    const warnings = this.warningsFor({
+      side,
+      entry: this.replay()?.current().close ?? 0,
+      stopLoss: null,
+      units: this.units(),
+    });
     const placed = await this.place(
       {
         side,
@@ -1183,16 +1209,42 @@ export class Practice {
     );
     if (placed) {
       this.tab.set('positions');
+      if (warnings.length) {
+        this.showQuickError(warnings.map((w) => this.warningText(w)).join(' '), true);
+      }
     }
+  }
+
+  /** The warnings for an order about to be sent, while a session is being played. */
+  private warningsFor(order: WarnedOrder): OrderWarning[] {
+    const replay = this.replay();
+    if (!replay || this.phase() !== 'playing') {
+      return [];
+    }
+    return orderWarnings(order, replay.balance(), replay.closedTrades(), replay.current().time);
+  }
+
+  /** A warning in words; in an evaluation it also says it costs points. */
+  protected warningText(warning: OrderWarning): string {
+    const t = this.i18n.messages().practice.orderWarnings;
+    const percent = (value: number) => formatPercent(value, this.locale, '1.0-1');
+    const text =
+      warning.kind === 'risk'
+        ? t.risk(percent(warning.pct), percent(RISK_ALLOWED))
+        : warning.kind === 'noStop'
+          ? t.noStop
+          : t.flip;
+    return this.evaluation() ? `${text} ${t.costsPoints}` : text;
   }
 
   /**
    * The one-click box sits on the chart, far from the ticket on a phone: its refusals show
    * right under it, until the next try or a few seconds later.
    */
-  private showQuickError(message: string | null): void {
+  private showQuickError(message: string | null, warn = false): void {
     clearTimeout(this.quickErrorTimer);
     this.quickError.set(message);
+    this.quickWarn.set(warn);
     if (message) {
       this.quickErrorTimer = setTimeout(() => this.quickError.set(null), QUICK_ERROR_MS);
     }
@@ -1223,6 +1275,8 @@ export class Practice {
     this.placing.set(true);
     try {
       await this.practice.openTrade(sessionId, uid, trade);
+      // Its journal entry is next: why it was entered.
+      this.journalFocus.set(trade.id);
       return trade;
     } catch {
       replay.discard(trade.id);
@@ -1231,6 +1285,21 @@ export class Practice {
     } finally {
       this.placing.set(false);
     }
+  }
+
+  /** Saves why a trade was entered (its journal entry); allowed until the session ends. */
+  protected saveJournal(trade: PracticeTrade, journal: string): void {
+    const replay = this.replay();
+    if (!replay) {
+      return;
+    }
+    let annotated: PracticeTrade;
+    try {
+      annotated = replay.annotate(trade.id, journal);
+    } catch {
+      return;
+    }
+    this.persist((id) => this.practice.saveJournal(id, annotated), trade);
   }
 
   protected closeTrade(trade: PracticeTrade): void {
@@ -1416,7 +1485,14 @@ export class Practice {
     // Kept here: "Nueva práctica" can clear it while the writes below are still going.
     const evaluation = this.evaluation();
     const { cancelled, closed } = replay.closeAll('sessionEnd');
+    const last = this.lastResume;
+    const unsaved = !this.resumeSaved;
     try {
+      // The drawings stay with the session for its review (Cris, 2026-11-11): the last ones
+      // are saved before it is marked finished. Best effort, as while it ran.
+      if (last && unsaved) {
+        await this.practice.saveResume(sessionId, last).catch(() => undefined);
+      }
       await Promise.all([
         ...cancelled.map((order) => this.practice.cancelOrder(sessionId, order)),
         ...closed.map((trade) => this.practice.closeTrade(sessionId, trade)),

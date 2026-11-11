@@ -82,6 +82,19 @@
           </select>
           <small class="muted">{{ t.covers(covered(f.pace, f.durationMinutes || 0)) }}</small>
         </label>
+        <label>
+          {{ t.passingScore }}
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            required
+            [value]="f.passingScore"
+            (input)="patch({ passingScore: +$any($event.target).value })"
+          />
+          <small class="muted">{{ t.passingScoreHint }}</small>
+        </label>
       </div>
       <fieldset>
         <legend>{{ t.start }}</legend>
@@ -200,7 +213,7 @@
             {{ tr.instruments[ev.symbol] ?? ev.symbol }} ·
             {{ ev.replayStart | localDate: 'd MMM y, HH:mm' }} ·
             {{ t.minutes(ev.durationMinutes) }} · {{ ev.pace ? t.paces[ev.pace] : t.freeSpeed }} ·
-            {{ t.studentCount(assigned(ev).length) }}
+            {{ t.passesWith(passingScoreOf(ev)) }} · {{ t.studentCount(assigned(ev).length) }}
           </p>
           @if (ev.mentorshipIds?.length) {
             <p class="muted">
@@ -222,12 +235,14 @@
                 [standings]="rows"
                 [students]="students()"
                 [mentorships]="mentorships()"
+                [passingScore]="passingScoreOf(ev)"
                 (adjust)="startAdjust($event.row, $event.kind)"
               />
               @if (rating(); as row) {
                 <app-rubric-form
                   [studentName]="row.name"
                   [initial]="row.rubric"
+                  [journaled]="!!row.journaled"
                   [busy]="ratingBusy()"
                   (saved)="saveRubric(ev, $event)"
                   (cancelled)="rating.set(null)"
@@ -305,4 +320,30 @@
       }
     </ul>
   }
+
+  <dialog
+    #publishConfirm
+    class="confirm"
+    aria-labelledby="publish-confirm-title"
+    aria-describedby="publish-confirm-text"
+    (click)="publishBackdrop($event)"
+  >
+    @if (unratedPublish(); as pending) {
+      <h2 id="publish-confirm-title">{{ t.publishUnrated.title }}</h2>
+      <p id="publish-confirm-text">{{ t.publishUnrated.text(pending.names.length) }}</p>
+      <ul class="unrated">
+        @for (name of pending.names; track $index) {
+          <li>{{ name }}</li>
+        }
+      </ul>
+      <div class="confirm-actions">
+        <button type="button" class="btn" autofocus (click)="closePublishConfirm('rate')">
+          {{ t.publishUnrated.rate }}
+        </button>
+        <button type="button" class="btn btn-outline" (click)="closePublishConfirm('publish')">
+          {{ t.publishUnrated.publish }}
+        </button>
+      </div>
+    }
+  </dialog>
 </section>

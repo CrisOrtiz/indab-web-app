@@ -64,6 +64,9 @@
 
 .stage {
   position: relative;
+  // The chart library puts its pane separators at z-index 50; keep them, and everything else on
+  // the chart, below the toolbar menus that open over it.
+  isolation: isolate;
   flex: 1;
   min-height: 0;
 }

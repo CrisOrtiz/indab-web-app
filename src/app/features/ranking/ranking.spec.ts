@@ -113,7 +113,7 @@ describe('Ranking page', () => {
     );
     await render();
     expect(el.querySelector('thead')?.textContent).toContain('Nota INDAB');
-    expect(el.textContent).toContain('30\u00a0% resultado en R');
+    expect(el.textContent).toContain('25\u00a0% resultado en R');
     expect(el.textContent).not.toContain('ordenado por ganancia');
     // Passed first; a failed attempt follows even with more profit.
     expect(rows().map((r) => r.slice(0, 2))).toEqual([
