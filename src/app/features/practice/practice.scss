@@ -85,6 +85,12 @@ label {
   border-color: var(--color-border);
 }
 
+/* Free practice ended without entries: why nothing was saved. */
+.message.discarded {
+  border-color: var(--color-warning);
+  border-left-width: 4px;
+}
+
 /* "5 minutes left", "1 minute left": hard to miss, and dismissable. */
 .time-warning {
   display: flex;

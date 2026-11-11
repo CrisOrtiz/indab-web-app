@@ -18,6 +18,22 @@
     </div>
   </div>
 
+  @if (auth.isAdmin()) {
+    <div class="purge">
+      <button
+        type="button"
+        class="btn btn-outline small delete"
+        [disabled]="purging()"
+        (click)="purgeEmpty()"
+      >
+        {{ purging() ? t.purging : t.purgeEmpty }}
+      </button>
+      @if (purgeNotice(); as text) {
+        <span class="muted" role="status">{{ text }}</span>
+      }
+    </div>
+  }
+
   <app-session-filters
     [students]="students()"
     [mentorships]="mentorships()"

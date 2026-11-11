@@ -16,10 +16,17 @@ export async function signOut(page: Page): Promise<void> {
 
 export const nav = (page: Page) => page.getByRole('navigation');
 
-/** Ends the open practice or evaluation session, confirming in the dialog that asks first. */
-export async function endSession(page: Page): Promise<void> {
+/**
+ * Ends the open practice or evaluation session, confirming in the dialog that asks first.
+ * `withoutEntries`: free practice without a single entry, which the dialog warns is not saved.
+ */
+export async function endSession(page: Page, withoutEntries = false): Promise<void> {
   await page.getByRole('button', { name: 'Terminar sesión' }).click();
   const dialog = page.getByRole('dialog', { name: '¿Terminar la sesión?' });
-  await dialog.getByRole('button', { name: 'Sí, terminar sesión' }).click();
+  await dialog
+    .getByRole('button', {
+      name: withoutEntries ? 'Sí, terminar sin guardar' : 'Sí, terminar sesión',
+    })
+    .click();
   await expect(dialog).toBeHidden();
 }

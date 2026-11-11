@@ -343,22 +343,34 @@ test('a student adds an order from the chart menu and sets it up on its line', a
   await expect(page.getByRole('button', { name: 'Vender', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Órdenes (1)' })).toBeVisible();
 
-  await endSession(page);
-  await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
-  await expect
-    .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
-    .toBe('finished');
+  // The order is logged as it is placed...
   const [session] = await listDocuments('practiceSessions');
-  const trades = await listDocuments(`practiceSessions/${session['id']}/trades`);
-  expect(trades).toHaveLength(1);
-  expect(trades[0]).toMatchObject({
-    side: 'long',
-    orderType: 'limit',
-    quantity: 5,
-    stopLoss: null,
-    status: 'cancelled',
-  });
-  expect(trades[0]['takeProfit']).toEqual(expect.any(Number));
+  await expect
+    .poll(() => listDocuments(`practiceSessions/${session['id']}/trades`))
+    .toEqual([
+      expect.objectContaining({
+        side: 'long',
+        orderType: 'limit',
+        quantity: 5,
+        stopLoss: null,
+        takeProfit: expect.any(Number),
+        status: 'pending',
+      }),
+    ]);
+
+  // ...but it never filled: without a single entry, ending warns and keeps nothing.
+  await page.getByRole('button', { name: 'Terminar sesión' }).click();
+  await expect(page.getByRole('dialog', { name: '¿Terminar la sesión?' })).toContainText(
+    'Aún no hiciste ninguna entrada. Si terminas ahora, esta sesión no se guardará',
+  );
+  await page.getByRole('button', { name: 'Seguir operando' }).click();
+  await endSession(page, true);
+  await expect(
+    page.getByText('La sesión no se guardó porque no hiciste ninguna entrada.'),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Comenzar práctica' })).toBeVisible();
+  await expect.poll(() => listDocuments('practiceSessions')).toEqual([]);
+  expect(await listDocuments(`practiceSessions/${session['id']}/trades`)).toEqual([]);
 });
 
 test('a student holds several positions and orders at gold prices, up to the margin', async ({
@@ -718,10 +730,9 @@ test("the chart keeps each student's indicators for their next sessions", async 
     .toEqual(['ema100', 'ema200', 'rsi14', 'volume']);
 
   // The next session opens with them.
-  await endSession(page);
-  await expect
-    .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
-    .toBe('finished');
+  // No entries were made, so the session is not kept.
+  await endSession(page, true);
+  await expect.poll(() => listDocuments('practiceSessions')).toEqual([]);
   await page.reload();
   await page.getByRole('button', { name: 'Comenzar práctica' }).click();
   await expect(page.getByRole('button', { name: 'Terminar sesión' })).toBeVisible();
@@ -863,10 +874,9 @@ test('the chart shows the economic news of the replayed days, revealing them on 
   await expect(chart.locator('.news-mark')).toHaveCount(2);
 
   // With the dates hidden, a release shows only its impact until the replay reaches it.
-  await endSession(page);
-  await expect
-    .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
-    .toBe('finished');
+  // No entries were made, so the session is not kept.
+  await endSession(page, true);
+  await expect.poll(() => listDocuments('practiceSessions')).toEqual([]);
   await page.reload();
   await page.getByLabel('Elegir fecha').check();
   await page.getByLabel('Fecha de inicio', { exact: true }).fill('2026-03-04');

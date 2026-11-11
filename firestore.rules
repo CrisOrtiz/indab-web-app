@@ -1032,9 +1032,14 @@ service cloud.firestore {
         && request.resource.data.extraMinutes <= 600;
 
       // Admins delete any session; trainers too an evaluation attempt, so its student can take
-      // it again after a problem.
+      // it again after a problem. A student ending free practice without a single entry does
+      // not keep it (Cris, 2026-11-11): they delete it while it is still active.
       allow delete: if isAdmin()
-        || (isStaff() && resource.data.get('evaluationId', null) is string);
+        || (isStaff() && resource.data.get('evaluationId', null) is string)
+        || (isOwner(resource.data.uid)
+          && resource.data.get('evaluationId', null) == null
+          && resource.data.status == 'active'
+          && resource.data.tradeCount == 0);
 
       match /trades/{tradeId} {
         function session() {
@@ -1163,8 +1168,14 @@ service cloud.firestore {
             && request.resource.data.pnl is number
             && request.resource.data.closedAt == request.time));
 
+        // ...and the student's orders that never filled, with free practice discarded for
+        // having no entries; an entry (open or closed) is never deleted by its student.
         allow delete: if isAdmin()
-          || (isStaff() && session().get('evaluationId', null) is string);
+          || (isStaff() && session().get('evaluationId', null) is string)
+          || (signedIn() && session().uid == request.auth.uid
+            && session().get('evaluationId', null) == null
+            && session().status == 'active'
+            && resource.data.status in ['pending', 'cancelled']);
       }
     }
 

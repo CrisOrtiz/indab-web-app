@@ -75,13 +75,15 @@
   (click)="backdropClick($event)"
 >
   <h2 id="finish-confirm-title">{{ t.finishConfirm.title }}</h2>
-  <p id="finish-confirm-text">{{ t.finishConfirm.text }}</p>
+  <p id="finish-confirm-text">
+    {{ noEntries() ? t.finishConfirm.noEntriesText : t.finishConfirm.text }}
+  </p>
   <div class="confirm-actions">
     <button type="button" class="keep" autofocus (click)="closeConfirm()">
       {{ t.finishConfirm.keep }}
     </button>
     <button type="button" class="confirm-end" (click)="confirmFinish()">
-      {{ t.finishConfirm.confirm }}
+      {{ noEntries() ? t.finishConfirm.noEntriesConfirm : t.finishConfirm.confirm }}
     </button>
   </div>
 </dialog>

@@ -65,9 +65,10 @@ describe('Practice page', () => {
     closeTrade: vi.fn(async () => undefined),
     updateSummary: vi.fn(async () => undefined),
     finishSession: vi.fn(async () => undefined),
+    deleteSession: vi.fn(async () => undefined),
     sessionsPage: vi.fn(),
     myAttempts: vi.fn(async () => [] as unknown[]),
-    sessionTrades: vi.fn(async () => [] as unknown[]),
+    sessionTrades: vi.fn(async (_id?: string) => [] as unknown[]),
     activeSessions: vi.fn(async () => [] as unknown[]),
     saveResume: vi.fn(async () => undefined),
     watchSession: vi.fn((_id: string, next: (s: unknown) => void) => {
@@ -483,6 +484,7 @@ describe('Practice page', () => {
 
     it('keeps where it is in the browser and in Firestore', async () => {
       practice.activeSessions.mockResolvedValue([active({ resume })]);
+      practice.sessionTrades.mockResolvedValue([position]);
       await reload();
       await click('Siguiente vela');
       chart().drawings.set([{ id: 1, kind: 'hline', price: 100 }]);
@@ -505,6 +507,7 @@ describe('Practice page', () => {
 
     it('saves the last drawings before finishing, for the review', async () => {
       practice.activeSessions.mockResolvedValue([active({ resume })]);
+      practice.sessionTrades.mockResolvedValue([position]);
       await reload();
       await click('Siguiente vela');
       const line = { id: 2, kind: 'hline', price: 99 };
@@ -621,6 +624,9 @@ describe('Practice page', () => {
     it('keeps only the last free practice open and closes older ones', async () => {
       const older = active({ id: 's1', startedAt: at(Date.now() - 3_600_000) });
       practice.activeSessions.mockResolvedValue([active({ resume }), older]);
+      practice.sessionTrades.mockImplementation(async (id?: string) =>
+        id === 's1' ? [position] : [],
+      );
       await reload();
       expect(practice.finishSession).toHaveBeenCalledTimes(1);
       expect(practice.finishSession).toHaveBeenCalledWith('s1', expect.anything());
@@ -628,6 +634,43 @@ describe('Practice page', () => {
       expect(el.querySelector('.toolbar .price')!.textContent).toContain('103');
       await click('Salir sin cerrar');
       expect(el.querySelectorAll('.open-session')).toHaveLength(1);
+    });
+
+    it('deletes an older free practice without entries instead of keeping it', async () => {
+      const older = active({ id: 's1', startedAt: at(Date.now() - 3_600_000) });
+      practice.activeSessions.mockResolvedValue([active({ resume }), older]);
+      await reload();
+      expect(practice.deleteSession).toHaveBeenCalledExactlyOnceWith('s1');
+      expect(practice.finishSession).not.toHaveBeenCalled();
+    });
+
+    it('does not save free practice ended without a single entry', async () => {
+      practice.activeSessions.mockResolvedValue([active({ resume })]);
+      await reload();
+      await click('Terminar sesión');
+      expect(el.querySelector('dialog')!.textContent).toContain('esta sesión no se guardará');
+      practice.activeSessions.mockResolvedValue([]);
+      await click('Sí, terminar sin guardar');
+      expect(practice.deleteSession).toHaveBeenCalledExactlyOnceWith('s9');
+      expect(practice.finishSession).not.toHaveBeenCalled();
+      expect(practice.cancelOrder).not.toHaveBeenCalled();
+      expect(localStorage.getItem('indab.practice.s9')).toBeNull();
+      expect(el.querySelector('.toolbar')).toBeNull();
+      expect(el.querySelector('.message.discarded')!.textContent).toContain(
+        'La sesión no se guardó porque no hiciste ninguna entrada.',
+      );
+      expect(el.querySelector('form')).not.toBeNull();
+    });
+
+    it('deletes an open free practice without entries closed from the list', async () => {
+      practice.activeSessions.mockResolvedValue([active({ resume, tradeCount: 0 })]);
+      await reload();
+      await click('Salir sin cerrar');
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      await click('Cerrar');
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('No tiene ninguna entrada'));
+      expect(practice.deleteSession).toHaveBeenCalledExactlyOnceWith('s9');
+      expect(practice.finishSession).not.toHaveBeenCalled();
     });
 
     it('lets the student go back to an evaluation they left, with its time left', async () => {
@@ -1456,8 +1499,10 @@ describe('Practice page', () => {
       button('Siguiente vela').click();
     }
     await fixture.whenStable();
-    expect(practice.finishSession).toHaveBeenCalledTimes(1);
-    expect(el.textContent).toContain('Sesión terminada');
+    // No entry was made, so nothing is kept.
+    expect(practice.finishSession).not.toHaveBeenCalled();
+    expect(practice.deleteSession).toHaveBeenCalledExactlyOnceWith('session-1');
+    expect(el.textContent).toContain('La sesión no se guardó');
   });
 });
 

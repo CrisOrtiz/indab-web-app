@@ -64,6 +64,10 @@ export class PracticeReview {
   protected readonly selected = signal<string | null>(null);
   /** Session being deleted. */
   protected readonly deleting = signal<string | null>(null);
+  /** Finished free practice without entries is being looked for or deleted. */
+  protected readonly purging = signal(false);
+  /** What the last purge did. */
+  protected readonly purgeNotice = signal<string | null>(null);
 
   constructor() {
     void this.show(this.pages.first()).finally(() => this.loading.set(false));
@@ -132,6 +136,47 @@ export class PracticeReview {
       this.error.set(t.deleteFailed);
     } finally {
       this.deleting.set(null);
+    }
+  }
+
+  /**
+   * Deletes finished free practice without a single entry (Cris, 2026-11-11: only sessions
+   * with an entry count). Admins only, after confirming how many; evaluation attempts stay.
+   */
+  protected async purgeEmpty(): Promise<void> {
+    const t = this.i18n.messages().review;
+    if (this.purging()) {
+      return;
+    }
+    this.error.set(null);
+    this.purgeNotice.set(null);
+    this.purging.set(true);
+    try {
+      const empty = await this.practice.emptySessions();
+      if (!empty.length) {
+        this.purgeNotice.set(t.purgeNone);
+        return;
+      }
+      if (!confirm(t.confirmPurge(empty.length))) {
+        return;
+      }
+      const results = await Promise.allSettled(empty.map((s) => this.practice.deleteSession(s.id)));
+      const deleted = empty.filter((_, i) => results[i].status === 'fulfilled').map((s) => s.id);
+      this.purgeNotice.set(t.purged(deleted.length));
+      if (deleted.length < empty.length) {
+        this.error.set(t.purgeFailed);
+      }
+      if (deleted.length) {
+        this.pages.remove((s) => deleted.includes(s.id));
+        if (deleted.includes(this.selected() ?? '')) {
+          this.selected.set(null);
+        }
+        this.count();
+      }
+    } catch {
+      this.error.set(t.purgeFailed);
+    } finally {
+      this.purging.set(false);
     }
   }
 
