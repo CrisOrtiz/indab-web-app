@@ -18,6 +18,7 @@ const standing = (i: number, status: EvaluationStanding['status']): EvaluationSt
   extraMinutes: 0,
   stats: null,
   rubric: null,
+  marks: null,
   score: null,
 });
 
@@ -115,6 +116,10 @@ describe('EvaluationResults', () => {
       {
         ...standing(0, 'finished'),
         stats: sessionStats([closed(20, 95), closed(-10, null, 'stopOut')], 200),
+        marks: [
+          { kind: 'noTakeProfit', trade: 2 },
+          { kind: 'breakeven', trade: 1 },
+        ],
       },
       standing(1, 'notStarted'),
     ]);
@@ -131,7 +136,37 @@ describe('EvaluationResults', () => {
     expect(cells).toContain('1:2');
     expect(cells.some((c) => c?.startsWith('5.0%'))).toBe(true);
     expect(cells).toContain('Sí');
+    // One fault (the break-even stop is a good habit), listed in the tooltip.
+    const faults = [...rows()[0].querySelectorAll('td')].find(
+      (td) => td.getAttribute('data-label') === 'Faltas',
+    )!;
+    expect(faults.textContent?.trim()).toBe('1');
+    expect(faults.title).toBe('Operación 2: sin take profit');
     expect(rows()[1].textContent).toContain('—');
+  });
+
+  it('shows the verdict beside the score, and why an attempt failed', async () => {
+    const parts = { result: 70, risk: 0, discipline: 100, rubric: 75 };
+    await render([
+      {
+        ...standing(0, 'finished'),
+        score: { score: 58.5, parts, verdict: 'failed', failedBy: ['stopOut'] },
+      },
+      {
+        ...standing(1, 'finished'),
+        score: { score: 90, parts, verdict: 'unrated', failedBy: [] },
+      },
+    ]);
+    const [failed, unrated] = rows().map((r) => r.querySelector<HTMLElement>('.score')!);
+    expect(failed.textContent).toContain('58.5');
+    expect(failed.textContent).toContain('No aprobado');
+    expect(failed.title).toBe(
+      'Resultado 70 · Riesgo 0 · Disciplina 100 · Rúbrica 75\nNo aprobado por: stop out',
+    );
+    // An unrated attempt shows no score.
+    expect(unrated.textContent).not.toContain('90');
+    expect(unrated.textContent).toContain('Sin evaluar');
+    expect(unrated.title).toContain('Necesita al menos 2 operaciones cerradas.');
   });
 
   it('says when nobody took the evaluation', async () => {

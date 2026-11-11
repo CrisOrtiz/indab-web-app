@@ -1,5 +1,5 @@
 import { DecimalPipe, PercentPipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, LOCALE_ID, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
@@ -11,7 +11,8 @@ import {
 } from '../../core/models/evaluation';
 import { EvaluationService } from '../evaluations/evaluation.service';
 import { PracticeService } from '../practice/practice.service';
-import { EvaluationStanding, evaluationStandings } from './standings';
+import { scoreDetails } from './score-details';
+import { EvaluationStanding, ShownScore, evaluationStandings } from './standings';
 
 /**
  * Practice ranking, part of the academy: the ranking of each timed evaluation once its results
@@ -47,6 +48,16 @@ export class Ranking {
   protected scored(rows: EvaluationStanding[]): boolean {
     return rows.some((row) => row.score);
   }
+
+  /** A score's parts and why it failed or is unrated, for its tooltip and the student's row. */
+  protected details(score: ShownScore): string | null {
+    return scoreDetails(
+      this.i18n.messages().evaluations.score,
+      score,
+      (value) => this.decimal.transform(value, '1.0-1') ?? '',
+    );
+  }
+  private readonly decimal = new DecimalPipe(inject(LOCALE_ID));
 
   protected isMe(uid: string): boolean {
     return uid === this.auth.user()?.uid;

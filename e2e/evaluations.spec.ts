@@ -241,9 +241,9 @@ test('a mentor rates an attempt and the student sees the INDAB score and the rub
     interval: '15m',
     replayStart: 1_770_000_000_000,
     startingBalance: 200,
-    balance: 212,
-    pnl: 12,
-    tradeCount: 1,
+    balance: 218,
+    pnl: 18,
+    tradeCount: 2,
     status: 'finished',
     startedAt: new Date(Date.now() - 2 * hour),
     endedAt: new Date(Date.now() - 2 * hour + 30 * 60_000),
@@ -269,6 +269,25 @@ test('a mentor rates an attempt and the student sees the INDAB score and the rub
     exitReason: 'manual',
     pnl: 12,
   });
+  // An hour later, risking 2 USD (1 %) and making 6: 3 R.
+  await setDocument(`practiceSessions/e1_${joseUid}/trades/t2`, {
+    uid: joseUid,
+    side: 'long',
+    orderType: 'market',
+    orderPrice: null,
+    placedTime: 1_770_003_600,
+    quantity: 1,
+    entryPrice: 4000,
+    entryTime: 1_770_003_600,
+    stopLoss: 3998,
+    takeProfit: 4006,
+    initialStopLoss: 3998,
+    status: 'closed',
+    exitPrice: 4006,
+    exitTime: 1_770_004_200,
+    exitReason: 'takeProfit',
+    pnl: 6,
+  });
 
   await openEvaluations(page);
   await page.getByRole('button', { name: 'Acciones: Final de oro' }).click();
@@ -292,8 +311,10 @@ test('a mentor rates an attempt and the student sees the INDAB score and the rub
   }
   await page.getByRole('button', { name: 'Guardar rúbrica' }).click();
   await expect(page.getByRole('status')).toContainText('Se guardó la rúbrica de José Pérez.');
-  // Return 6 % = 65, risk 5 % per trade = 70, rubric 4 = 75: 69.5.
-  await expect(results.locator('td.score')).toHaveText('69.5');
+  // Result 1.2 R + 3 R = 92; risk 5 % on one trade = -30 and -20 for open risk = 50;
+  // discipline 100; rubric 4 = 75: 77.6, passed.
+  await expect(results.locator('td.score')).toContainText('77.6');
+  await expect(results.locator('td.score')).toContainText('Aprobado');
   await expect(results).toContainText('4.0 / 5');
 
   await page.getByRole('button', { name: 'Métricas de riesgo' }).click();
@@ -309,7 +330,8 @@ test('a mentor rates an attempt and the student sees the INDAB score and the rub
   await page.getByRole('link', { name: 'Ranking de evaluaciones' }).click();
   const ranking = page.locator('table.ranking');
   await expect(ranking.locator('thead')).toContainText('Nota INDAB');
-  await expect(ranking.locator('td.score')).toHaveText('69.5');
+  await expect(ranking.locator('td.score')).toContainText('77.6');
+  await expect(ranking.locator('td.score')).toContainText('Aprobado');
   const rubric = page.locator('section.rubric');
   await expect(rubric).toContainText('Rúbrica de tu mentor');
   await expect(rubric).toContainText('4.0 / 5');

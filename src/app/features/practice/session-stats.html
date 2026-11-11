@@ -65,6 +65,23 @@
   </div>
 </div>
 
+@if (s.trades) {
+  <section class="discipline" [attr.aria-label]="t.discipline">
+    <h3 [title]="t.disciplineHint">{{ t.discipline }}</h3>
+    @if (marks().length) {
+      <ul>
+        @for (mark of marks(); track $index) {
+          <li [class.good]="mark.kind === 'breakeven'" [class.down]="mark.kind !== 'breakeven'">
+            {{ t.markLine(mark.trade, t.marks[mark.kind]) }}
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="clean">{{ t.disciplineClean }}</p>
+    }
+  </section>
+}
+
 <figure class="curve">
   <figcaption>{{ t.curve }}</figcaption>
   @if (s.equity.length > 1) {

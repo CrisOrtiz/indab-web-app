@@ -99,9 +99,17 @@ export function rubricAverage(scores: RubricScores): number {
  * the students' ranking can show it once the results are published.
  */
 export interface EvaluationGrade {
-  /** 0 to 100: 40 % return, 30 % risk control, 30 % mentor rubric. */
+  /** 0 to 100: 30 % result in R, 25 % risk control, 15 % discipline, 30 % mentor rubric. */
   score: number;
-  parts: { return: number; risk: number; rubric: number };
+  /**
+   * Each part, 0 to 100. Grades saved before 2026-11-11 hold `return`, `risk` and `rubric`
+   * instead, and no verdict; staff opening the results saves them again.
+   */
+  parts: { result: number; risk: number; discipline: number; rubric: number };
+  /** Passed, failed or unrated (too few trades); missing on grades saved before verdicts. */
+  verdict?: 'passed' | 'failed' | 'unrated';
+  /** Rules that failed the attempt whatever its score. */
+  failedBy?: ('stopOut' | 'lossLimit' | 'removedStop')[];
   by: string;
   updatedAt: Timestamp;
 }

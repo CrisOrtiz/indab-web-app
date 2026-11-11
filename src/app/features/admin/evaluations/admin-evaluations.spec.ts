@@ -348,6 +348,23 @@ describe('AdminEvaluations', () => {
   });
 
   it('rates an attempt with the rubric, every criterion required', async () => {
+    // Two winners that each risked 2 USD to their stop: +8 = 4 R and +4 = 2 R.
+    const won = (id: string, pnl: number, entryTime: number) => ({
+      id,
+      status: 'closed',
+      side: 'long',
+      entryPrice: 100,
+      entryTime,
+      placedTime: entryTime,
+      quantity: 1,
+      stopLoss: 98,
+      initialStopLoss: 98,
+      takeProfit: 108,
+      exitTime: entryTime + 60,
+      exitReason: 'takeProfit',
+      pnl,
+    });
+    practice.sessionTrades.mockResolvedValue([won('t1', 8, 0), won('t2', 4, 3600)]);
     practice.evaluationSessions.mockResolvedValue([
       {
         id: 'e1_jose',
@@ -395,12 +412,16 @@ describe('AdminEvaluations', () => {
     expect(message()).toContain('Se guardó la rúbrica de José Pérez.');
     expect(el.querySelector('form.rubric')).toBeNull();
     expect(el.querySelector('.results tbody')?.textContent).toContain('3.6 / 5');
-    // Return 6 % = 65, no trades loaded = full risk marks, rubric 3.6 = 65: score 75.5,
+    // 4 R + 2 R = 100, full risk and discipline marks, rubric 3.6 = 65: score 89.5, passed,
     // saved for the students' ranking.
-    expect(el.querySelector('.results tbody td.score')?.textContent?.trim()).toBe('75.5');
+    const score = el.querySelector('.results tbody td.score')!;
+    expect(score.textContent).toContain('89.5');
+    expect(score.textContent).toContain('Aprobado');
     expect(service.saveGrade).toHaveBeenCalledWith('e1', 'jose', {
-      score: 75.5,
-      parts: { return: 65, risk: 100, rubric: 65 },
+      score: 89.5,
+      parts: { result: 100, risk: 100, discipline: 100, rubric: 65 },
+      verdict: 'passed',
+      failedBy: [],
     });
   });
 

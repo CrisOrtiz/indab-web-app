@@ -1,7 +1,7 @@
 import { PracticeTrade } from '../../core/models/practice';
-import { sessionStats } from '../practice/stats';
-import { indabScore, returnPoints, riskPoints, rubricPoints } from './score';
+import { indabScore, resultPoints, riskPoints, rubricPoints, tradingRecord } from './score';
 
+/** A closed long from 100 that risks 2 USD a unit to its stop at 98. */
 const closed = (pnl: number, extra: Partial<PracticeTrade> = {}) =>
   ({
     status: 'closed',
@@ -10,53 +10,102 @@ const closed = (pnl: number, extra: Partial<PracticeTrade> = {}) =>
     entryTime: 0,
     quantity: 1,
     stopLoss: 98,
+    initialStopLoss: 98,
     takeProfit: 104,
-    exitTime: 1,
+    exitTime: 60,
     exitReason: 'manual',
     pnl,
     ...extra,
   }) as PracticeTrade;
+/** The same trade an hour later. */
+const later = (pnl: number, extra: Partial<PracticeTrade> = {}) =>
+  closed(pnl, { entryTime: 3600, exitTime: 3660, ...extra });
+const all = (n: number) => ({ plan: n, risk: n, stops: n, context: n, discipline: n });
 
 describe('INDAB score', () => {
-  it('gives 50 return points at break-even, 0 and 100 at -20 % and +20 %', () => {
-    expect(returnPoints(0)).toBe(50);
-    expect(returnPoints(0.1)).toBe(75);
-    expect(returnPoints(0.5)).toBe(100);
-    expect(returnPoints(-0.2)).toBe(0);
-    expect(returnPoints(-0.9)).toBe(0);
+  it('gives 50 result points at 0 R, 0 and 100 at -5 R and +5 R', () => {
+    expect(resultPoints(0)).toBe(50);
+    expect(resultPoints(2)).toBe(70);
+    expect(resultPoints(9)).toBe(100);
+    expect(resultPoints(-5)).toBe(0);
+    expect(resultPoints(-9)).toBe(0);
   });
 
-  it('takes risk points off for missing stops, oversized trades and deep drawdown', () => {
+  it('measures the result in R: P/L over what each trade risked to its stop', () => {
+    // +4 on 2 risked = 2 R; -2 on 2 = -1 R.
+    expect(tradingRecord([closed(4), later(-2)], 200).r).toBeCloseTo(1);
+    // The same +4 with ten times the stop is 0.2 R: a big win from a big risk is worth less.
+    expect(tradingRecord([closed(4, { stopLoss: 80, initialStopLoss: 80 })], 200).r).toBeCloseTo(
+      0.2,
+    );
+    // A stop widened later counts the wider one.
+    expect(tradingRecord([closed(4, { stopLoss: 96 })], 200).r).toBeCloseTo(1);
+    // Without a stop it counts as if it risked 2 % of 200 = 4 USD.
+    expect(
+      tradingRecord([closed(4, { stopLoss: null, initialStopLoss: null })], 200).r,
+    ).toBeCloseTo(1);
+  });
+
+  it('takes risk points off for missing stops, oversized trades, open risk and drawdown', () => {
+    const risk = (trades: PracticeTrade[]) => riskPoints(tradingRecord(trades, 200));
     // 2 USD risked of 200 (1 %), no drawdown: full marks.
-    expect(riskPoints(sessionStats([closed(4)], 200))).toBe(100);
+    expect(risk([closed(4)])).toBe(100);
     // A trade without stop loss: -20.
-    expect(riskPoints(sessionStats([closed(4), closed(2, { stopLoss: null })], 200))).toBe(80);
-    // 10 USD risked a unit on 2 units from 200 = 10 %: 8 points over 2 % = -80.
-    expect(riskPoints(sessionStats([closed(4, { stopLoss: 90, quantity: 2 })], 200))).toBe(20);
+    expect(risk([closed(4), later(2, { stopLoss: null, initialStopLoss: null })])).toBe(80);
+    // 10 USD a unit on 2 units of 200 = 10 %: 8 points over 2 % = -80, and the same over the
+    // 3 % open at once = -70: 0.
+    expect(risk([closed(4, { stopLoss: 90, initialStopLoss: 90, quantity: 2 })])).toBe(0);
+    // Three trades of 2 % each open at once: 6 %, 3 over 3 % = -30.
+    const together = { quantity: 2, entryTime: 0, exitTime: 600 };
+    expect(risk([closed(1, together), closed(1, together), closed(1, together)])).toBeCloseTo(
+      100 - 3 * 10,
+    );
     // Down 30 USD from 200 = 15 % drawdown: 5 over 10 % = -10.
-    expect(riskPoints(sessionStats([closed(-30, { stopLoss: 99.9 })], 200))).toBeCloseTo(90);
+    expect(risk([closed(-30, { stopLoss: 99.9, initialStopLoss: 99.9 })])).toBeCloseTo(90);
   });
 
   it('leaves risk control at 0 after a stop out', () => {
-    expect(riskPoints(sessionStats([closed(-50, { exitReason: 'stopOut' })], 200))).toBe(0);
+    expect(riskPoints(tradingRecord([closed(-50, { exitReason: 'stopOut' })], 200))).toBe(0);
   });
 
   it('maps the rubric from 1 to 5 onto 0 to 100', () => {
-    const all = (n: number) => ({ plan: n, risk: n, stops: n, context: n, discipline: n });
     expect(rubricPoints(all(1))).toBe(0);
     expect(rubricPoints(all(3))).toBe(50);
     expect(rubricPoints(all(5))).toBe(100);
   });
 
-  it('weighs 40 % return, 30 % risk and 30 % rubric', () => {
-    const score = indabScore(0.1, sessionStats([closed(20)], 200), {
-      plan: 5,
-      risk: 4,
-      stops: 4,
-      context: 3,
-      discipline: 4,
+  it('weighs 30 % result, 25 % risk, 15 % discipline and 30 % rubric, and passes at 70', () => {
+    // +4 and +2 on 2 risked = 3 R = 80; no faults; rubric 4 = 75.
+    const score = indabScore([closed(4), later(2)], 200, all(4));
+    expect(score).toEqual({
+      score: 86.5,
+      parts: { result: 80, risk: 100, discipline: 100, rubric: 75 },
+      verdict: 'passed',
+      failedBy: [],
     });
-    // Return 75, risk 100, rubric (4 - 1) / 4 = 75.
-    expect(score).toEqual({ score: 82.5, parts: { return: 75, risk: 100, rubric: 75 } });
+    expect(indabScore([closed(4), later(2)], 200, all(1)).verdict).toBe('failed');
+  });
+
+  it('leaves attempts with fewer than 2 closed trades unrated', () => {
+    expect(indabScore([], 200, all(5)).verdict).toBe('unrated');
+    expect(indabScore([closed(4)], 200, all(5)).verdict).toBe('unrated');
+  });
+
+  it('fails a stop out, a loss over 5 % or a removed stop loss, whatever the score', () => {
+    expect(
+      indabScore([closed(4), later(-60, { exitReason: 'stopOut' })], 200, all(5)).failedBy,
+    ).toEqual(['stopOut', 'lossLimit']);
+    // 200 down to 189 = 5.5 %.
+    expect(indabScore([closed(-6), later(-5)], 200, all(5))).toMatchObject({
+      verdict: 'failed',
+      failedBy: ['lossLimit'],
+    });
+    // Down exactly 5 % does not fail by itself.
+    expect(indabScore([closed(-6), later(-4)], 200, all(5)).failedBy).toEqual([]);
+    // Placed with a stop, closed without it.
+    expect(indabScore([closed(4), later(4, { stopLoss: null })], 200, all(5))).toMatchObject({
+      verdict: 'failed',
+      failedBy: ['removedStop'],
+    });
   });
 });

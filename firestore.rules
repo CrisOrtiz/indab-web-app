@@ -710,13 +710,20 @@ service cloud.firestore {
         allow read: if isStaff()
           || (evaluation().resultsPublished == true && assignedTo(evaluation()));
         allow create, update: if isStaff()
-          && request.resource.data.keys().hasOnly(['score', 'parts', 'by', 'updatedAt'])
+          && request.resource.data.keys().hasOnly(['score', 'parts', 'verdict', 'failedBy', 'by',
+            'updatedAt'])
           && points(request.resource.data.score)
           && request.resource.data.parts is map
-          && request.resource.data.parts.keys().hasOnly(['return', 'risk', 'rubric'])
-          && points(request.resource.data.parts['return'])
+          && request.resource.data.parts.keys().hasOnly(['result', 'risk', 'discipline', 'rubric'])
+          && points(request.resource.data.parts.result)
           && points(request.resource.data.parts.risk)
+          && points(request.resource.data.parts.discipline)
           && points(request.resource.data.parts.rubric)
+          && request.resource.data.verdict in ['passed', 'failed', 'unrated']
+          && request.resource.data.failedBy is list
+          && request.resource.data.failedBy.size() <= 3
+          && request.resource.data.failedBy.toSet()
+            .hasOnly(['stopOut', 'lossLimit', 'removedStop'])
           && request.resource.data.by == request.auth.uid
           && request.resource.data.updatedAt == request.time;
         allow delete: if isStaff();

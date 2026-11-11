@@ -155,3 +155,33 @@ h1 {
     font-variant-numeric: tabular-nums;
   }
 }
+
+.verdict {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+
+  &[data-verdict='passed'] {
+    color: var(--color-up);
+  }
+
+  &[data-verdict='failed'] {
+    color: var(--color-down);
+  }
+
+  &[data-verdict='unrated'] {
+    color: var(--color-muted);
+  }
+}
+
+.why {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  white-space: pre-line;
+}

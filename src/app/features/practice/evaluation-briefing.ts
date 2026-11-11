@@ -12,6 +12,7 @@ import { I18n } from '../../core/i18n/i18n.service';
 import { Evaluation } from '../../core/models/evaluation';
 import { formatElapsed } from './bars';
 import { marketCovered } from './live';
+import { LOSS_LIMIT, MIN_TRADES } from '../ranking/score';
 import { LEVERAGE, STARTING_BALANCE, STOP_OUT_LEVEL } from './replay';
 
 /**
@@ -59,7 +60,9 @@ import { LEVERAGE, STARTING_BALANCE, STOP_OUT_LEVEL } from './replay';
       <ul>
         <li>{{ t.tipStop }}</li>
         <li>{{ t.tipRisk }}</li>
-        <li>{{ t.tipStopOut }}</li>
+        <li>{{ t.tipDiscipline }}</li>
+        <li>{{ t.tipFail(lossLimit) }}</li>
+        <li>{{ t.tipMin(minTrades) }}</li>
       </ul>
 
       <label class="read">
@@ -161,6 +164,8 @@ export class EvaluationBriefing {
   protected readonly startingBalance = STARTING_BALANCE;
   protected readonly leverage = LEVERAGE;
   protected readonly stopOut = STOP_OUT_LEVEL * 100;
+  protected readonly lossLimit = Math.round(LOSS_LIMIT * 100);
+  protected readonly minTrades = MIN_TRADES;
   private readonly startButton = viewChild<ElementRef<HTMLButtonElement>>('start');
 
   constructor() {

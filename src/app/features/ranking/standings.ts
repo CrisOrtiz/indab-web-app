@@ -2,7 +2,17 @@ import { EvaluationGrade, EvaluationRubric, RubricScores } from '../../core/mode
 import { PracticeSession, PracticeTrade } from '../../core/models/practice';
 import { shownStatus } from '../practice/resume';
 import { SessionStats, sessionStats } from '../practice/stats';
-import { IndabScore, indabScore } from './score';
+import { DisciplineMark, disciplineMarks } from './discipline';
+import { IndabScore, Verdict, indabScore } from './score';
+
+/**
+ * A score as a row shows it: worked out from the trades and rubric, or saved. Grades saved
+ * before verdicts existed have no parts in today's shape and no verdict.
+ */
+export type ShownScore = Omit<IndabScore, 'parts' | 'verdict'> & {
+  parts: IndabScore['parts'] | null;
+  verdict: Verdict | null;
+};
 
 /** One assigned student's line in an evaluation's ranking. */
 export interface EvaluationStanding {
@@ -26,8 +36,10 @@ export interface EvaluationStanding {
   stats: SessionStats | null;
   /** The mentor's rubric, when staff loaded it and the attempt was rated. */
   rubric: RubricScores | null;
+  /** Faults and good habits of its trades, when they were loaded. */
+  marks: DisciplineMark[] | null;
   /** The INDAB score: worked out when the trades and rubric are loaded, else the saved one. */
-  score: IndabScore | null;
+  score: ShownScore | null;
 }
 
 /** What is loaded besides the attempts: trades (by session id), rubrics and grades (by student). */
@@ -60,46 +72,53 @@ export function evaluationStandings(
   { trades, rubrics, grades }: StandingExtras = {},
 ): EvaluationStanding[] {
   const rows = sessions.map((s) => {
-    const stats = trades?.has(s.id) ? sessionStats(trades.get(s.id)!, s.startingBalance) : null;
+    const list = trades?.get(s.id);
+    const stats = list ? sessionStats(list, s.startingBalance) : null;
     const rubric = rubrics?.get(s.uid)?.scores ?? null;
     const saved = grades?.get(s.uid);
-    return {
-      session: s,
-      stats,
-      rubric,
-      score:
-        stats && rubric
-          ? indabScore(returnOf(s), stats, rubric)
-          : saved
-            ? { score: saved.score, parts: saved.parts }
-            : null,
-    };
+    const score: ShownScore | null =
+      list && rubric
+        ? indabScore(list, s.startingBalance, rubric)
+        : saved
+          ? {
+              score: saved.score,
+              parts: saved.verdict ? saved.parts : null,
+              verdict: saved.verdict ?? null,
+              failedBy: saved.failedBy ?? [],
+            }
+          : null;
+    return { session: s, stats, rubric, marks: list ? disciplineMarks(list) : null, score };
   });
-  // Scored attempts first, by score; the rest by P/L, then fewer trades.
+  // Scored attempts first: passed, failed, then unrated, each by score; the rest by P/L, then
+  // fewer trades.
   rows.sort(
     (a, b) =>
       (b.score ? 1 : 0) - (a.score ? 1 : 0) ||
+      verdictOrder(a.score) - verdictOrder(b.score) ||
       (b.score?.score ?? 0) - (a.score?.score ?? 0) ||
       b.session.pnl - a.session.pnl ||
       a.session.tradeCount - b.session.tradeCount ||
       byName(nameOf(a.session), nameOf(b.session)),
   );
-  const ranked: EvaluationStanding[] = rows.map(({ session: s, stats, rubric, score }, i) => ({
-    rank: i + 1,
-    uid: s.uid,
-    name: s.userName,
-    status: shownStatus(s, now),
-    balance: s.balance,
-    pnl: s.pnl,
-    return: returnOf(s),
-    trades: s.tradeCount,
-    sessionId: s.id,
-    open: s.status === 'active',
-    extraMinutes: s.extraMinutes ?? 0,
-    stats,
-    rubric,
-    score,
-  }));
+  const ranked: EvaluationStanding[] = rows.map(
+    ({ session: s, stats, rubric, marks, score }, i) => ({
+      rank: i + 1,
+      uid: s.uid,
+      name: s.userName,
+      status: shownStatus(s, now),
+      balance: s.balance,
+      pnl: s.pnl,
+      return: returnOf(s),
+      trades: s.tradeCount,
+      sessionId: s.id,
+      open: s.status === 'active',
+      extraMinutes: s.extraMinutes ?? 0,
+      stats,
+      rubric,
+      marks,
+      score,
+    }),
+  );
   const taken = new Set(sessions.map((s) => s.uid));
   const missing: EvaluationStanding[] = students
     .filter((student) => !taken.has(student.uid))
@@ -118,9 +137,14 @@ export function evaluationStandings(
       extraMinutes: 0,
       stats: null,
       rubric: null,
+      marks: null,
       score: null,
     }));
   return [...ranked, ...missing];
 }
+
+/** Where a score's verdict ranks: passed, then failed, then unrated (older grades with passed). */
+const verdictOrder = (score: ShownScore | null) =>
+  score?.verdict === 'failed' ? 1 : score?.verdict === 'unrated' ? 2 : 0;
 
 const nameOf = (session: PracticeSession) => ({ name: session.userName });
