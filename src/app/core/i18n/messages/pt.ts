@@ -834,13 +834,15 @@ export const pt: Messages = {
       grade: (passing: number) =>
         `Nota INDAB de 0 a 100: 25% resultado em R (o que você ganhou dividido pelo que arriscou até o stop), 25% controle de risco, 15% disciplina, 25% rubrica do seu mentor e 10% diário de operações. Você é aprovado com ${passing}.`,
       tipStop:
-        'Coloque stop loss e take profit em cada operação. Tirar o stop loss antes de fechar deixa você «Não aprovado».',
+        'Coloque stop loss e take profit em cada operação. Tirar ou afastar o stop loss tira pontos de disciplina nessa operação.',
       tipRisk:
         'Arrisque de 1 a 2% da conta por operação e no máximo 3% somando as que estiverem abertas.',
       tipDiscipline:
         'Tiram pontos de disciplina: afastar o stop contra você, aumentar o risco depois de uma perda, entrar de novo logo após perder, fazer preço médio contra, abrir compra e venda ao mesmo tempo e deixar posições abertas no final. Mover o stop para o breakeven soma.',
-      tipFail: (limit: number) =>
-        `Um stop out ou perder mais de ${limit}% da conta deixa você «Não aprovado», mesmo com nota boa.`,
+      tipLoss: (limit: number) =>
+        `Se a conta perder mais de ${limit}% tira pontos de risco, mas você ainda pode se recuperar.`,
+      tipFail:
+        'Um stop out deixa você «Não aprovado»; sua nota e todo o detalhe são mantidos para você ver o que aconteceu.',
       tipMin: (trades: number) =>
         `Feche pelo menos ${trades} operações; com menos você fica «Sem avaliação».`,
       tipJournal:
@@ -1141,7 +1143,7 @@ export const pt: Messages = {
     score: {
       column: 'Nota INDAB',
       how: (passing: number) =>
-        `Nota INDAB (0 a 100) = 25% resultado em R + 25% controle de risco + 15% disciplina + 25% rubrica do mentor + 10% diário. Aprova com ${passing}; um stop out, perder mais de 5% ou tirar o stop loss não aprovam, e com menos de 2 operações fica sem avaliação. Quem ainda não tem rubrica vem depois, por lucro.`,
+        `Nota INDAB (0 a 100) = 25% resultado em R + 25% controle de risco + 15% disciplina + 25% rubrica do mentor + 10% diário. Aprova com ${passing}; um stop out não aprova (a nota é mantida), perder mais de 40% tira pontos de risco, e com menos de 2 operações fica sem avaliação. Quem ainda não tem rubrica vem depois, por lucro.`,
       missing: 'Sem rubrica',
       parts: (
         result: string,

@@ -856,13 +856,15 @@ export const es = {
       grade: (passing: number) =>
         `Nota INDAB de 0 a 100: 25 % resultado en R (lo que ganaste dividido por lo que arriesgaste hasta tu stop), 25 % control de riesgo, 15 % disciplina, 25 % rúbrica de tu mentor y 10 % bitácora. Apruebas con ${passing}.`,
       tipStop:
-        'Pon stop loss y take profit en cada operación. Quitar el stop loss antes de cerrar te deja «No aprobado».',
+        'Pon stop loss y take profit en cada operación. Quitar o alejar el stop loss resta puntos de disciplina en esa operación.',
       tipRisk:
         'Arriesga de 1 a 2 % de la cuenta por operación y no más de 3 % sumando las que tengas abiertas.',
       tipDiscipline:
         'Restan puntos de disciplina: alejar el stop en contra, subir el riesgo tras una pérdida, volver a entrar enseguida tras perder, promediar en contra, abrir compra y venta a la vez y dejar posiciones abiertas al final. Mover el stop a breakeven suma.',
-      tipFail: (limit: number) =>
-        `Un stop out o perder más del ${limit} % de la cuenta te deja «No aprobado», aunque tengas buena nota.`,
+      tipLoss: (limit: number) =>
+        `Si la cuenta pierde más del ${limit} % resta puntos de riesgo, pero puedes recuperarte.`,
+      tipFail:
+        'Un stop out te deja «No aprobado»; tu nota y todo el detalle se conservan para que veas qué pasó.',
       tipMin: (trades: number) =>
         `Cierra al menos ${trades} operaciones; con menos quedas «Sin evaluar».`,
       tipJournal:
@@ -1162,7 +1164,7 @@ export const es = {
     score: {
       column: 'Nota INDAB',
       how: (passing: number) =>
-        `Nota INDAB (0 a 100) = 25 % resultado en R + 25 % control de riesgo + 15 % disciplina + 25 % rúbrica del mentor + 10 % bitácora. Se aprueba con ${passing}; un stop out, perder más del 5 % o quitar el stop loss no aprueban, y con menos de 2 operaciones queda sin evaluar. Quien aún no tiene rúbrica se ordena después, por ganancia.`,
+        `Nota INDAB (0 a 100) = 25 % resultado en R + 25 % control de riesgo + 15 % disciplina + 25 % rúbrica del mentor + 10 % bitácora. Se aprueba con ${passing}; un stop out no aprueba (la nota se conserva), perder más del 40 % resta puntos de riesgo, y con menos de 2 operaciones queda sin evaluar. Quien aún no tiene rúbrica se ordena después, por ganancia.`,
       missing: 'Falta rúbrica',
       parts: (
         result: string,

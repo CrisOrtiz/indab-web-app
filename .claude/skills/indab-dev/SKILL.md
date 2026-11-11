@@ -405,8 +405,9 @@ Module notes:
   `TradeJournal` panel under the practice trades; each order's `journal` (≤ 280) can be written
   or fixed until the session ends, even once closed (Cris); shown in `TradeNavigator`. Rubric
   criteria since 2026-11-11: plan, context, management, emotions, journal (older rubrics keep
-  risk/stops/discipline and are shown and averaged as saved; `rubricCriteria`). Verdict: stop
-  out, a 5% loss from the start or a removed SL fail whatever the score; fewer than 2 closed
+  risk/stops/discipline and are shown and averaged as saved; `rubricCriteria`). Verdict (flexible, Cris
+  2026-11-11): only a stop out fails whatever the score (score and details kept); losing 40%
+  of the start costs 40 risk points and a removed SL costs discipline on that trade; fewer than 2 closed
   trades = unrated; else pass at the evaluation's `passingScore` (staff set it, 0-100, missing =
   70, `passingScoreOf`). Standings rank passed, failed, unrated, each by score.
   Students cannot read trades or rubrics, so staff browsers save each score (with `verdict`

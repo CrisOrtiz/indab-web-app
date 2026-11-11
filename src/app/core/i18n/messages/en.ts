@@ -838,13 +838,15 @@ export const en: Messages = {
       grade: (passing: number) =>
         `INDAB score from 0 to 100: 25% result in R (what you made divided by what you risked to your stop), 25% risk control, 15% discipline, 25% your mentor's rubric and 10% trade journal. You pass with ${passing}.`,
       tipStop:
-        'Set a stop loss and take profit on every trade. Removing the stop loss before closing means "Not passed".',
+        'Set a stop loss and take profit on every trade. Removing or widening the stop loss costs discipline points on that trade.',
       tipRisk:
         'Risk 1 to 2% of the account per trade and no more than 3% across the trades you have open.',
       tipDiscipline:
         'These cost discipline points: moving the stop further against you, raising risk after a loss, jumping back in right after losing, averaging down, holding a buy and a sell at once and leaving positions open at the end. Moving the stop to break-even adds points.',
-      tipFail: (limit: number) =>
-        `A stop out or losing more than ${limit}% of the account means "Not passed", even with a good score.`,
+      tipLoss: (limit: number) =>
+        `If the account loses more than ${limit}% it costs risk points, but you can still recover.`,
+      tipFail:
+        'A stop out means "Not passed"; your score and every detail are kept so you can see what happened.',
       tipMin: (trades: number) =>
         `Close at least ${trades} trades; with fewer you are left "Not rated".`,
       tipJournal:
@@ -1144,7 +1146,7 @@ export const en: Messages = {
     score: {
       column: 'INDAB score',
       how: (passing: number) =>
-        `INDAB score (0 to 100) = 25% result in R + 25% risk control + 15% discipline + 25% mentor rubric + 10% trade journal. ${passing} passes; a stop out, losing more than 5% or removing the stop loss do not pass, and fewer than 2 trades leave it not rated. Attempts without a rubric yet follow, by profit.`,
+        `INDAB score (0 to 100) = 25% result in R + 25% risk control + 15% discipline + 25% mentor rubric + 10% trade journal. ${passing} passes; a stop out does not pass (the score is kept), losing more than 40% costs risk points, and fewer than 2 trades leave it not rated. Attempts without a rubric yet follow, by profit.`,
       missing: 'No rubric yet',
       parts: (
         result: string,

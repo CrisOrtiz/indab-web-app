@@ -301,7 +301,7 @@ describe('Practice page', () => {
     const briefing = el.querySelector('app-evaluation-briefing [role="dialog"]')!;
     expect(briefing.textContent).toContain('Tienes un solo intento de 30 minutos');
     expect(briefing.textContent).toContain('25\u00a0% resultado en R');
-    expect(briefing.textContent).toContain('perder más del 5\u00a0% de la cuenta');
+    expect(briefing.textContent).toContain('pierde más del 40\u00a0% resta puntos de riesgo');
     expect(button('Empezar ahora').disabled).toBe(true);
     expect(practice.startSession).not.toHaveBeenCalled();
     briefing.querySelector<HTMLInputElement>('input')!.click();

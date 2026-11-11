@@ -29,8 +29,12 @@ export const OPEN_RISK_ALLOWED = 0.03;
 export const DRAWDOWN_ALLOWED = 0.1;
 /** Points lost for each closed trade without a stop loss. */
 export const NO_STOP_PENALTY = 20;
-/** Losing this share of the starting balance fails the evaluation. */
-export const LOSS_LIMIT = 0.05;
+/**
+ * Losing this share of the starting balance costs `DEEP_LOSS_PENALTY` risk points; it does not
+ * fail the attempt, so the student can still recover (Cris, 2026-11-11).
+ */
+export const DEEP_LOSS = 0.4;
+export const DEEP_LOSS_PENALTY = 40;
 /** Fewer closed trades than this leave an attempt unrated. */
 export const MIN_TRADES = 2;
 /** A journal entry this long (characters, trimmed) counts as written. */
@@ -38,7 +42,10 @@ export const JOURNAL_MIN_LENGTH = 10;
 
 /** Passed, failed (by score or a rule in `failedBy`), or too few trades to rate. */
 export type Verdict = 'passed' | 'failed' | 'unrated';
-/** Rules that fail an evaluation whatever the score. */
+/**
+ * Rules that fail an evaluation whatever the score: only a stop out since 2026-11-11 (its score
+ * and every detail are kept). Grades saved before may also name `lossLimit` or `removedStop`.
+ */
 export type FailRule = 'stopOut' | 'lossLimit' | 'removedStop';
 
 /** The parts of an attempt's INDAB score, each 0 to 100, the weighted total and the verdict. */
@@ -116,10 +123,13 @@ export function resultPoints(r: number): number {
 
 /**
  * Risk control: 100 points, less 20 per trade without a stop loss, 10 per 1 % of the account
- * risked above 2 % on the riskiest trade, 10 per 1 % above 3 % by trades open at once and 2
- * per 1 % of drawdown above 10 %. A stop out (Cris's choice) leaves it at 0.
+ * risked above 2 % on the riskiest trade, 10 per 1 % above 3 % by trades open at once, 2
+ * per 1 % of drawdown above 10 % and 40 once the account lost 40 % of its start. A stop out
+ * (Cris's choice) leaves it at 0.
  */
-export function riskPoints(record: Pick<TradingRecord, 'stats' | 'maxOpenRiskPct'>): number {
+export function riskPoints(
+  record: Pick<TradingRecord, 'stats' | 'maxOpenRiskPct'> & { maxLossPct?: number },
+): number {
   const { stats } = record;
   if (stats.stoppedOut) {
     return 0;
@@ -132,7 +142,9 @@ export function riskPoints(record: Pick<TradingRecord, 'stats' | 'maxOpenRiskPct
       NO_STOP_PENALTY * stats.withoutStopLoss -
       10 * overRisk -
       10 * overOpen -
-      2 * overDrawdown,
+      2 * overDrawdown -
+      // A hair of tolerance so exactly 40 % (rounded balances) is not a deep loss.
+      ((record.maxLossPct ?? 0) >= DEEP_LOSS + 1e-9 ? DEEP_LOSS_PENALTY : 0),
   );
 }
 
@@ -155,14 +167,12 @@ export function rubricPoints(scores: SavedRubricScores): number {
   return clamp(((rubricAverage(scores) - 1) / 4) * 100);
 }
 
-/** The rules an attempt broke that fail it whatever the score. */
+/**
+ * The rules an attempt broke that fail it whatever the score: a stop out (Cris, 2026-11-11).
+ * A deep loss and a removed stop loss cost points instead (risk and discipline).
+ */
 export function failRules(record: TradingRecord): FailRule[] {
-  return [
-    ...(record.stats.stoppedOut ? (['stopOut'] as const) : []),
-    // A hair of tolerance so exactly 5 % (rounded balances) does not fail.
-    ...(record.maxLossPct >= LOSS_LIMIT + 1e-9 ? (['lossLimit'] as const) : []),
-    ...(record.marks.some((m) => m.kind === 'removedStop') ? (['removedStop'] as const) : []),
-  ];
+  return record.stats.stoppedOut ? ['stopOut'] : [];
 }
 
 /** An attempt's INDAB score, from its trades and the mentor's rubric. */

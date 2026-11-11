@@ -114,21 +114,39 @@ describe('INDAB score', () => {
     expect(indabScore([closed(4)], 200, all(5)).verdict).toBe('unrated');
   });
 
-  it('fails a stop out, a loss over 5 % or a removed stop loss, whatever the score', () => {
+  it('fails only a stop out, keeping its score; a deep loss or removed stop cost points', () => {
+    const why = { journal: 'Ruptura y retesteo' };
+    const stoppedOut = indabScore(
+      [closed(4, why), later(-90, { ...why, exitReason: 'stopOut' })],
+      200,
+      all(5),
+    );
+    expect(stoppedOut).toMatchObject({ verdict: 'failed', failedBy: ['stopOut'] });
+    expect(stoppedOut.score).toBeGreaterThan(0);
+    // 200 down to 110 = 45 %: -40 risk points (and drawdown), but no fail.
+    const deep = indabScore(
+      [
+        closed(-90, { ...why, stopLoss: 10, initialStopLoss: 10 }),
+        later(1, { ...why, stopLoss: 99.9, initialStopLoss: 99.9 }),
+      ],
+      200,
+      all(5),
+    );
+    expect(deep.failedBy).toEqual([]);
     expect(
-      indabScore([closed(4), later(-60, { exitReason: 'stopOut' })], 200, all(5)).failedBy,
-    ).toEqual(['stopOut', 'lossLimit']);
-    // 200 down to 189 = 5.5 %.
-    expect(indabScore([closed(-6), later(-5)], 200, all(5))).toMatchObject({
-      verdict: 'failed',
-      failedBy: ['lossLimit'],
-    });
-    // Down exactly 5 % does not fail by itself.
-    expect(indabScore([closed(-6), later(-4)], 200, all(5)).failedBy).toEqual([]);
-    // Placed with a stop, closed without it.
-    expect(indabScore([closed(4), later(4, { stopLoss: null })], 200, all(5))).toMatchObject({
-      verdict: 'failed',
-      failedBy: ['removedStop'],
-    });
+      riskPoints(tradingRecord([closed(-90, { stopLoss: 10, initialStopLoss: 10 })], 200)),
+    ).toBe(0);
+    expect(
+      riskPoints({
+        ...tradingRecord([closed(4)], 200),
+        maxLossPct: 0.45,
+      }),
+    ).toBe(60);
+    // Exactly 40 % is not a deep loss.
+    expect(riskPoints({ ...tradingRecord([closed(4)], 200), maxLossPct: 0.4 })).toBe(100);
+    // Placed with a stop, closed without it: -40 discipline on that trade, no fail.
+    const removed = indabScore([closed(4, why), later(4, { ...why, stopLoss: null })], 200, all(5));
+    expect(removed).toMatchObject({ verdict: 'passed', failedBy: [] });
+    expect(removed.parts.discipline).toBe(60);
   });
 });
