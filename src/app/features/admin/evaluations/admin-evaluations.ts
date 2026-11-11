@@ -30,6 +30,7 @@ import {
   replayStartAt,
   replayWindow,
 } from '../../practice/market-data.service';
+import { dayRange, inRange } from '../../practice/practice-format';
 import { PracticeService } from '../../practice/practice.service';
 import { STARTING_BALANCE } from '../../practice/replay';
 import { IndabScore } from '../../ranking/score';
@@ -150,6 +151,8 @@ export class AdminEvaluations {
     const { earliest, latest } = replayWindow(instrument);
     return { min: utcDay(earliest), max: utcDay(latest) };
   });
+  /** The first and last replay start days, written out for the hint and the error. */
+  protected readonly startRange = computed(() => dayRange(this.dateRange(), this.i18n.language()));
   /** Mentorship names by id, for the cards. */
   private readonly mentorshipNames = computed(
     () => new Map(this.mentorships().map((m) => [m.id, m.name])),
@@ -301,6 +304,12 @@ export class AdminEvaluations {
     return audienceIds(evaluation, this.students());
   }
 
+  /** Whether an edit or copy kept the replay day it already had, which may now be out of range. */
+  private keepsDay(day: string): boolean {
+    const base = this.editing() ?? this.cloning();
+    return !!base && utcDay(base.replayStart) === day;
+  }
+
   protected async save(): Promise<void> {
     const form = this.form();
     const t = this.i18n.messages().evaluations;
@@ -322,6 +331,13 @@ export class AdminEvaluations {
       problem = t.windowInvalid;
     } else if (!form.randomStart && !form.startDate) {
       problem = t.startRequired;
+    } else if (
+      !form.randomStart &&
+      !inRange(form.startDate, this.dateRange()) &&
+      // An edit or copy may keep the day it already had.
+      !this.keepsDay(form.startDate)
+    ) {
+      problem = t.startOutOfRange(this.startRange().from, this.startRange().to);
     } else if (!form.studentIds.length && !form.mentorshipIds.length) {
       problem = t.studentsRequired;
     }
@@ -681,7 +697,7 @@ export class AdminEvaluations {
     try {
       const [, students, mentorships] = await Promise.all([
         this.reload(),
-        this.service.students(),
+        this.service.assignable(),
         this.mentorshipService.all(),
       ]);
       this.students.set(students);

@@ -6,7 +6,8 @@ import { StudentOption } from '../../evaluations/evaluation.service';
 /**
  * Who a form or practice evaluation is for: whole mentorships and students picked by name.
  * Students already in a ticked mentorship show as included; the total counts each student once.
- * Only students with academy access are offered (the others cannot take it).
+ * Only students with academy access are offered (the others cannot take it). Practice
+ * evaluations also offer trainers and admins (`role` set), marked with their role.
  */
 @Component({
   selector: 'app-audience-picker',
@@ -22,6 +23,10 @@ export class AudiencePicker {
   readonly mentorshipIds = model.required<string[]>();
 
   protected readonly search = signal('');
+
+  /** Whether trainers or admins are offered too, so the list is of people, not students. */
+  protected readonly withStaff = computed(() => this.students().some((s) => s.role));
+  protected readonly roles = computed(() => this.i18n.messages().admin.roles);
 
   private readonly eligible = computed(() => this.students().filter((s) => s.academy));
 

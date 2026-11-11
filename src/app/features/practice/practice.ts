@@ -50,8 +50,10 @@ import {
   replayWindow,
 } from './market-data.service';
 import {
+  dayRange,
   formatCountdown,
   formatLots,
+  inRange,
   priceDigits,
   roundPrice,
   signedMoney,
@@ -268,6 +270,8 @@ export class Practice {
     const day = (time: number) => new Date(time).toISOString().slice(0, 10);
     return { min: day(earliest), max: day(latest) };
   });
+  /** The first and last replay start days, written out for the hint and the error. */
+  protected readonly startRange = computed(() => dayRange(this.dateRange(), this.i18n.language()));
 
   // Session
   protected readonly phase = signal<Phase>('setup');
@@ -620,6 +624,11 @@ export class Practice {
       return this.beginLive();
     }
     const instrument = this.instrument();
+    if (!this.randomStart() && this.startDate() && !inRange(this.startDate(), this.dateRange())) {
+      const { from, to } = this.startRange();
+      this.error.set(this.i18n.messages().practice.startOutOfRange(from, to));
+      return;
+    }
     const replayStart =
       this.randomStart() || !this.startDate()
         ? randomReplayStart(instrument)

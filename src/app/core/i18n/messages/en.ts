@@ -805,6 +805,10 @@ export const en: Messages = {
     random: 'A random moment',
     pickDate: 'Pick a date',
     startDate: 'Start date',
+    startRange: (from: string, to: string) =>
+      `You can pick from ${from} to ${to}: the replay needs 30 days of market after that date.`,
+    startOutOfRange: (from: string, to: string) =>
+      `That date isn't available. Pick a day from ${from} to ${to}.`,
     hideDates: 'Hide dates during the practice',
     rules: (balance, leverage, lotSize) =>
       `You start with ${balance} virtual USD and 1:${leverage} leverage. You trade lots of ${lotSize} oz; if your equity falls below 50% of the used margin, your positions are closed (stop out).`,
@@ -1249,6 +1253,8 @@ export const en: Messages = {
     randomStart: 'Random date',
     pickStart: 'Pick a date',
     startDate: 'Replay start date',
+    startRange: (from: string, to: string) =>
+      `You can pick from ${from} to ${to}: the replay needs 30 days of market after that date.`,
     sameStart: 'Every student practises from the same point.',
     hideDates: 'Hide dates during the evaluation',
     news: 'News on the chart',
@@ -1299,6 +1305,8 @@ export const en: Messages = {
       `The time limit must be between ${min} and ${max} minutes.`,
     windowInvalid: 'The closing date must be after the opening date.',
     startRequired: 'Pick the replay start date.',
+    startOutOfRange: (from: string, to: string) =>
+      `That date isn't available. Pick a day from ${from} to ${to}.`,
     studentsRequired: 'Assign at least one student or mentorship.',
     saved: (title: string) => `The evaluation ${title} was saved.`,
     saveFailed: 'The evaluation could not be saved.',
@@ -1734,9 +1742,12 @@ export const en: Messages = {
     noMentorships: 'There are no active mentorships yet. An admin creates them in Mentorships.',
     students: (n: number) => `Students picked one by one (${n})`,
     search: 'Search students',
+    people: (n: number) => `Students, trainers and admins picked one by one (${n})`,
+    searchPeople: 'Search students, trainers or admins',
     selectAll: 'Select those shown',
     noStudents: 'No students have academy access.',
     via: (name: string) => `via ${name}`,
+    totalPeople: (n: number) => (n === 1 ? 'In total: 1 person' : `In total: ${n} people`),
     total: (n: number) => (n === 1 ? 'In total: 1 student' : `In total: ${n} students`),
     mentorshipList: 'Mentorships',
     deleted: 'Deleted mentorship',

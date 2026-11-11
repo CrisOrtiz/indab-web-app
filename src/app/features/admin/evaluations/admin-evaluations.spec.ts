@@ -32,7 +32,7 @@ describe('AdminEvaluations', () => {
   let el: HTMLElement;
   const service = {
     all: vi.fn(),
-    students: vi.fn(),
+    assignable: vi.fn(),
     create: vi.fn(async () => 'new'),
     update: vi.fn(async () => undefined),
     remove: vi.fn(async () => undefined),
@@ -63,7 +63,7 @@ describe('AdminEvaluations', () => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
     service.all.mockResolvedValue([existing]);
-    service.students.mockResolvedValue([
+    service.assignable.mockResolvedValue([
       { uid: 'jose', name: 'José Pérez', email: 'jose@x.co', academy: true, mentorshipIds: [] },
       {
         uid: 'luis',
@@ -201,6 +201,28 @@ describe('AdminEvaluations', () => {
     expect(service.create).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Semana 2', studentIds: [], mentorshipIds: ['m1'] }),
     );
+  });
+
+  it('says which replay start days can be picked, and refuses a day too recent', async () => {
+    // The iPad date picker ignores min/max, so a day after the last one can still be picked.
+    await click('Nueva evaluación');
+    await type('input[type=text]', 'Semana 1');
+    el.querySelector<HTMLInputElement>('.student-list input')!.click();
+    [...el.querySelectorAll<HTMLInputElement>('input[name=start]')][1].click();
+    await fixture.whenStable();
+    const date = el.querySelector<HTMLInputElement>('input[type=date]')!;
+    expect(date.parentElement!.textContent).toContain('el replay necesita 30 días de mercado');
+    expect(el.querySelector('form')!.noValidate).toBe(true);
+    await type(
+      'input[type=date]',
+      date.max.replace(/^\d{4}/, (y) => String(Number(y) + 1)),
+    );
+    await submit();
+    expect(message()).toContain('Esa fecha no está disponible');
+    expect(service.create).not.toHaveBeenCalled();
+    await type('input[type=date]', date.max);
+    await submit();
+    expect(service.create).toHaveBeenCalled();
   });
 
   it('checks the time limit and window', async () => {

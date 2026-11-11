@@ -785,7 +785,7 @@
       @if (openFree()) {
         <p class="muted close-to-start">{{ t.closeToStart }}</p>
       } @else {
-        <form class="setup" (submit)="$event.preventDefault(); start()">
+        <form class="setup" novalidate (submit)="$event.preventDefault(); start()">
           <label>
             {{ t.market }}
             <select [value]="symbol()" (change)="symbol.set($any($event.target).value)">
@@ -853,6 +853,7 @@
                   [value]="startDate()"
                   (input)="startDate.set($any($event.target).value)"
                 />
+                <small class="muted">{{ t.startRange(startRange().from, startRange().to) }}</small>
               }
             </fieldset>
             <label class="check">

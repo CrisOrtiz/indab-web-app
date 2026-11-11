@@ -38,6 +38,8 @@ export interface StudentOption {
   academy: boolean;
   /** The student's mentorships. */
   mentorshipIds: string[];
+  /** Set for trainers and admins offered alongside students (see `assignable()`). */
+  role?: 'trainer' | 'admin';
 }
 
 /** A trainer or admin, who can lead a mentorship. */
@@ -198,8 +200,31 @@ export class EvaluationService {
     return (await this.directory()).students;
   }
 
+  /**
+   * Who a practice evaluation can be given to: students (as `students()`) and also trainers and
+   * admins, who have academy access by role and can take it to try it out (Cris, 2026-11-11).
+   */
+  async assignable(): Promise<StudentOption[]> {
+    const { students, staff } = await this.directory();
+    const people: StudentOption[] = [
+      ...students,
+      ...staff.map(({ uid, name, role, email, mentorshipIds }) => ({
+        uid,
+        name,
+        email,
+        academy: true,
+        mentorshipIds,
+        role,
+      })),
+    ];
+    return people.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+  }
+
   /** Students (as `students()`) and the trainers and admins, by name, from one read. */
-  async directory(): Promise<{ students: StudentOption[]; staff: StaffOption[] }> {
+  async directory(): Promise<{
+    students: StudentOption[];
+    staff: (StaffOption & { email: string; mentorshipIds: string[] })[];
+  }> {
     const [users, enrollments] = await this.loading.track(
       Promise.all([
         getDocs(collection(this.firestore, 'users')),
@@ -229,6 +254,8 @@ export class EvaluationService {
           uid: profile.uid,
           name,
           role: profile.role as StaffOption['role'],
+          email: profile.email ?? '',
+          mentorshipIds: profile.mentorshipIds ?? [],
         })),
     };
   }

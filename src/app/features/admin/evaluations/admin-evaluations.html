@@ -28,7 +28,7 @@
   }
 
   @if (form(); as f) {
-    <form class="evaluation-form" (submit)="$event.preventDefault(); save()">
+    <form class="evaluation-form" novalidate (submit)="$event.preventDefault(); save()">
       <h2>{{ editing() ? t.editTitle : cloning() ? t.cloneTitle : t.newTitle }}</h2>
       @if (cloning()) {
         <p class="muted clone-hint">{{ t.cloneHint }}</p>
@@ -125,6 +125,7 @@
             [value]="f.startDate"
             (input)="patch({ startDate: $any($event.target).value })"
           />
+          <small class="muted">{{ t.startRange(startRange().from, startRange().to) }}</small>
         }
         <span class="muted">{{ t.sameStart }}</span>
       </fieldset>

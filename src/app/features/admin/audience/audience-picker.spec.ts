@@ -79,4 +79,39 @@ describe('AudiencePicker', () => {
     await fixture.whenStable();
     expect(picker.studentIds()).toEqual(['luis']);
   });
+
+  it('offers trainers and admins too when given, marked with their role', async () => {
+    fixture = TestBed.createComponent(AudiencePicker);
+    fixture.componentRef.setInput('students', [
+      ...students,
+      {
+        uid: 'cris',
+        name: 'Cris',
+        email: 'c@x.co',
+        academy: true,
+        mentorshipIds: [],
+        role: 'admin',
+      },
+    ]);
+    fixture.componentRef.setInput('mentorships', mentorships);
+    fixture.componentRef.setInput('studentIds', ['cris']);
+    fixture.componentRef.setInput('mentorshipIds', []);
+    el = fixture.nativeElement;
+    await fixture.whenStable();
+    const cris = [...el.querySelectorAll('.student-list label')].at(-1)!;
+    expect(cris.textContent).toContain('Cris');
+    expect(cris.querySelector('.badge')?.textContent?.trim()).toBe('Administrador');
+    expect(el.querySelectorAll('legend')[1].textContent).toContain(
+      'Estudiantes, entrenadores y administradores elegidos uno a uno (1)',
+    );
+    expect(total()).toBe('En total: 1 persona');
+  });
+
+  it('speaks of students only when no staff are offered', async () => {
+    await render([], []);
+    expect(el.querySelectorAll('legend')[1].textContent).toContain(
+      'Estudiantes elegidos uno a uno',
+    );
+    expect(el.querySelector('.student-list .badge')).toBeNull();
+  });
 });
