@@ -746,6 +746,8 @@ export const pt: Messages = {
     riskReward: 'Risco / retorno',
     marketCaps: 'MERCADO',
     hint: 'Toque no + ao lado do preço para adicionar uma ordem e arraste a linha dela, o TP e o SL. Seta para a direita → próximo candle.',
+    hintLive:
+      'Toque no + ao lado do preço para adicionar uma ordem e arraste a linha dela, o TP e o SL.',
     balance: 'Saldo',
     equity: 'Patrimônio',
     openPnl: 'P/L aberto',
@@ -896,6 +898,23 @@ export const pt: Messages = {
     extraTimeGiven: (minutes: number) => `A equipe te deu ${minutes} minutos a mais.`,
     attemptReset:
       'A equipe reiniciou sua tentativa nesta avaliação. Você pode começá-la de novo pela lista.',
+    mode: 'Modo',
+    modeReplay: 'Replay: um trecho do passado, no seu ritmo',
+    modeLive: 'Ao vivo: o mercado de agora, em tempo real',
+    liveIntro:
+      'Você opera ouro com os candles do mercado enquanto se formam, sem pausa nem velocidade. Se sair, suas posições e ordens continuam como em uma corretora: stop loss e take profit são executados mesmo sem você e ao voltar você vê o resultado.',
+    marketClosed:
+      'O mercado de ouro está fechado agora. Abre de domingo 18:00 a sexta 17:00 (horário de Nova York), com uma pausa diária das 17:00 às 18:00.',
+    liveNoData: 'O mercado acabou de abrir e ainda não há candles. Tente de novo em um minuto.',
+    beginLive: 'Começar ao vivo',
+    livePractice: 'Prática ao vivo',
+    liveSummary: (instrument: string) => `${instrument} · operado ao vivo`,
+    liveStatus: {
+      connecting: 'Conectando ao mercado…',
+      live: 'Candles do mercado em tempo real.',
+      reconnecting: 'A conexão com o mercado caiu. Reconectando…',
+      closed: 'Mercado fechado: os candles voltam quando abrir. Suas ordens continuam ativas.',
+    },
     live: 'Ao vivo',
     liveHint:
       'O gráfico avança sozinho com o relógio: não dá para pausar nem adiantar. Se você sair, o mercado continua e ao voltar você o vê onde estiver.',

@@ -365,7 +365,7 @@ Limits: anyone who can watch can screen-record or film the screen, and anyone wi
 read the frame's address; only restricted sharing at the source (or a paid video host with
 signed URLs) makes that address useless to others.
 
-## Trading practice (chart replay)
+## Trading practice (chart replay and live)
 
 `/academy/practice` replays real historical candles bar by bar. For now the only market is
 gold, through Binance Futures' XAUUSDT perpetual (listed January 2026), which follows spot
@@ -425,6 +425,24 @@ TradingView's app: tap or click each point, or on a phone drag the crosshair and
 drawing to select it, drag its handles or body to adjust it, and recolor or delete it from its bar. A Statistics tab, the end screen and the admin
 review show the session's win rate, profit factor, average win and loss, maximum drawdown and
 equity curve.
+
+### Live trading
+
+Free practice can also run **live** ("En vivo", Cris 2026-11-11): instead of a replay, the chart
+shows today's bars up to now and then follows the market minute by minute through Binance's
+public futures WebSocket (`wss://fstream.binance.com/market/ws/xauusdt@kline_1m`, free, no key,
+opened by each student's browser; Binance moved kline streams under `/market` in 2026). The
+forming candle updates a few times a second; orders fill and stops trigger on the price path
+between updates, never on prices from before an order was placed. There is no play, step or
+speed, dates are shown, and live sessions cannot start while gold is closed. The stream
+reconnects by itself (and before Binance's 24-hour cut) and fetches the minutes it missed.
+Like a broker, positions and orders keep running while the student is away: on coming back
+(a reload, another device, or closing it from the list) the page loads the minutes since and
+settles what filled or hit a stop meanwhile. Sessions are marked `live: true`; the rules only
+accept it on free practice starting within a few minutes of now. Where a live session is goes to
+Firestore only when the page goes away or something other than the minute changes, so a session
+left open all day does not spend the free write quota. Only gold is live: USD/JPY and NASDAQ
+need a licensed (paid) real-time source.
 
 Sessions and orders are written to Firestore as they happen; admins review them at
 `/admin/practice`, where each session's trades are drawn on its candles (fetched again from

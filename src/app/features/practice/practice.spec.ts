@@ -1,60 +1,19 @@
-import { Component, input, model, output, signal } from '@angular/core';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 import { AuthService } from '../../core/auth/auth.service';
-import { Candle, OrderType } from '../../core/models/practice';
+import { Candle } from '../../core/models/practice';
 import { HISTORY_BARS, MarketDataService, REPLAY_BARS } from './market-data.service';
 import { Practice, QUICK_ERROR_MS, SESSIONS_PAGE_SIZE, formatCountdown } from './practice';
 import { PracticeService } from './practice.service';
 import { EvaluationService } from '../evaluations/evaluation.service';
 import { ServerClock } from './server-clock';
 import { Evaluation } from '../../core/models/evaluation';
-import {
-  LevelMove,
-  LevelRemove,
-  LevelsMove,
-  OrderAt,
-  OrderDraft,
-  ReplayChart,
-} from './replay-chart';
+import { LevelMove, ReplayChart } from './replay-chart';
 import { SessionReview } from './session-review';
 import { quietNotifications } from '../notifications/testing';
-import { quietChartSettings } from './testing';
-
-// The real chart needs a canvas; the page only passes it data.
-@Component({ selector: 'app-replay-chart', template: '<ng-content />' })
-class FakeChart {
-  readonly candles = input<Candle[]>([]);
-  readonly trades = input<unknown[]>([]);
-  readonly hideDates = input(false);
-  readonly barSeconds = input(0);
-  readonly draft = input<OrderDraft | null>(null);
-  readonly trading = input(false);
-  readonly lots = input(0);
-  readonly focusTrade = input<string | null>(null);
-  readonly startTime = input<number | null>(null);
-  readonly indicators = input<readonly string[] | null>(null);
-  readonly indicatorsChange = output<string[]>();
-  readonly news = input<readonly unknown[]>([]);
-  readonly newsMode = input<unknown>('full');
-  readonly showNews = input(true);
-  readonly showNewsChange = output<boolean>();
-  readonly indicatorConfigs = input<unknown>(null);
-  readonly indicatorConfigsChange = output<unknown>();
-  readonly levelMoved = output<LevelMove>();
-  readonly levelsMoved = output<LevelsMove>();
-  readonly levelRemoved = output<LevelRemove>();
-  readonly levelAdded = output<LevelRemove>();
-  readonly draftDiscarded = output<void>();
-  readonly draftTypeChanged = output<OrderType>();
-  readonly tradeClosed = output<string>();
-  readonly symbol = input('');
-  readonly draftSubmitted = output<void>();
-  readonly lotsChanged = output<string>();
-  readonly orderAt = output<OrderAt>();
-  readonly drawings = model<unknown[]>([]);
-}
+import { FakeChart, quietChartSettings } from './testing';
 
 /**
  * A fake Binance: 100 before the replay start, then every minute of the k-th 15-minute bar at

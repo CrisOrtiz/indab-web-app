@@ -156,6 +156,37 @@ label {
   font-size: 0.85rem;
 }
 
+/* Live trading: the stream's state under the toolbar (connecting, reconnecting, closed). */
+.live-status {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+
+  &.reconnecting,
+  &.closed {
+    color: var(--color-danger);
+    font-weight: 600;
+  }
+}
+
+/* The live option in the setup and the live tag in the sessions list. */
+.live-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-down);
+  }
+}
+
+.live-intro {
+  margin: 0;
+}
+
 /* Timeframe buttons, first in the chart's top bar as in TradingView. */
 .timeframes {
   display: flex;

@@ -78,6 +78,12 @@ export const HISTORY_BARS = 1000;
 /** How far a replay can run: it is fed one-minute candles, a chunk at a time. */
 export const REPLAY_DAYS = 30;
 
+/**
+ * Most chunks of one-minute candles a live session loads to catch up after time away: about
+ * 40 days of gold's open hours.
+ */
+export const LIVE_MAX_CHUNKS = 40;
+
 /** Most klines one request returns, on both Binance markets. */
 const PAGE = 1000;
 /** Requests one load may make to skip a closed market (a weekend of minutes is three). */
@@ -178,6 +184,41 @@ export class MarketDataService {
   ): Promise<Candle[]> {
     const work = this.forward(symbol, interval, startTime, limit);
     return background ? work : this.loading.track(work);
+  }
+
+  /**
+   * Every one-minute candle from `startTime` up to now, the one still forming included (live
+   * trading), at most `maxChunks` requests of `REPLAY_BARS`; with the page loader.
+   */
+  loadMinutesSince(
+    symbol: string,
+    startTime: number,
+    maxChunks = LIVE_MAX_CHUNKS,
+  ): Promise<Candle[]> {
+    return this.loading.track(this.minutesSince(symbol, startTime, maxChunks));
+  }
+
+  /** The minutes since `startTime` without the page loader (the live stream catching up). */
+  catchUpMinutes(symbol: string, startTime: number): Promise<Candle[]> {
+    return this.minutesSince(symbol, startTime, LIVE_MAX_CHUNKS);
+  }
+
+  private async minutesSince(
+    symbol: string,
+    startTime: number,
+    maxChunks: number,
+  ): Promise<Candle[]> {
+    const all: Candle[] = [];
+    let from = startTime;
+    for (let chunk = 0; chunk < maxChunks; chunk++) {
+      const more = await this.forward(symbol, '1m', from, REPLAY_BARS);
+      all.push(...more);
+      if (more.length < REPLAY_BARS) {
+        break;
+      }
+      from = (more.at(-1)!.time + 60) * 1000;
+    }
+    return all;
   }
 
   /** The last `limit` candles that open before `endTime`, with the page loader. */

@@ -9,6 +9,10 @@ export class BarBuilder {
   private readonly bars: Candle[] = [];
   /** Index of the next minute to fold in. */
   private next: number;
+  /** Index of the first minute of the last bar. */
+  private barFrom: number;
+  /** The last minute folded in, to notice it changed in place (a live minute still forming). */
+  private lastMinute: Candle | undefined;
 
   /** `from`: index of the first minute that belongs to the replay. */
   constructor(
@@ -16,13 +20,21 @@ export class BarBuilder {
     private readonly from: number,
   ) {
     this.next = from;
+    this.barFrom = from;
   }
 
-  /** The bars made of `minutes[from..to]`. Returns a new array each time. */
+  /**
+   * The bars made of `minutes[from..to]`. Returns a new array each time. When the last minute
+   * was replaced (live trading updates the minute still forming), its bar is built again.
+   */
   build(minutes: Candle[], to: number): Candle[] {
     if (to < this.next - 1) {
       this.bars.length = 0;
       this.next = this.from;
+      this.barFrom = this.from;
+    } else if (to === this.next - 1 && to >= this.from && minutes[to] !== this.lastMinute) {
+      this.bars.pop();
+      this.next = this.barFrom;
     }
     for (; this.next <= to; this.next++) {
       const m = minutes[this.next];
@@ -40,8 +52,10 @@ export class BarBuilder {
       } else {
         const { open, high, low, close } = m;
         this.bars.push({ time, open, high, low, close, ...withVolume(m.volume ?? 0, m.volume) });
+        this.barFrom = this.next;
       }
     }
+    this.lastMinute = minutes[to];
     return [...this.bars];
   }
 }

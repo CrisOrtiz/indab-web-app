@@ -767,6 +767,8 @@ export const es = {
     riskReward: 'Riesgo / beneficio',
     marketCaps: 'MERCADO',
     hint: 'Toca el + junto al precio para añadir una orden y arrastra sus líneas, el TP y el SL. Flecha derecha → siguiente vela.',
+    hintLive:
+      'Toca el + junto al precio para añadir una orden y arrastra sus líneas, el TP y el SL.',
     balance: 'Saldo',
     equity: 'Patrimonio',
     openPnl: 'P/L abierto',
@@ -918,6 +920,23 @@ export const es = {
     extraTimeGiven: (minutes: number) => `El staff te dio ${minutes} minutos más.`,
     attemptReset:
       'El staff reinició tu intento de esta evaluación. Puedes comenzarla de nuevo desde la lista.',
+    mode: 'Modo',
+    modeReplay: 'Replay: un tramo del pasado, a tu ritmo',
+    modeLive: 'En vivo: el mercado de ahora, en tiempo real',
+    liveIntro:
+      'Operas el oro con las velas del mercado tal como se forman, sin pausa ni velocidad. Si sales, tus posiciones y órdenes siguen como en un bróker: los SL y TP se ejecutan aunque no estés y al volver ves el resultado.',
+    marketClosed:
+      'El mercado del oro está cerrado ahora. Abre de domingo 18:00 a viernes 17:00 (hora de Nueva York), con una pausa diaria de 17:00 a 18:00.',
+    liveNoData: 'El mercado acaba de abrir y aún no hay velas. Intenta de nuevo en un minuto.',
+    beginLive: 'Empezar en vivo',
+    livePractice: 'Práctica en vivo',
+    liveSummary: (instrument: string) => `${instrument} · operado en vivo`,
+    liveStatus: {
+      connecting: 'Conectando con el mercado…',
+      live: 'Velas del mercado en tiempo real.',
+      reconnecting: 'Se perdió la conexión con el mercado. Reconectando…',
+      closed: 'Mercado cerrado: las velas vuelven cuando abra. Tus órdenes siguen activas.',
+    },
     live: 'En vivo',
     liveHint:
       'El gráfico avanza solo con el reloj: no se puede pausar ni adelantar. Si sales, el mercado sigue y al volver lo ves donde va.',

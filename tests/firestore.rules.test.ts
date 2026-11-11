@@ -636,6 +636,24 @@ describe('trading practice', () => {
     await assertFails(create({ grade: 'A' }));
   });
 
+  it('accepts a live session only as free practice starting now', async () => {
+    const minute = Math.floor(Date.now() / 60_000) * 60_000;
+    const live = (extra: Record<string, unknown> = {}) =>
+      session('enrolled', { live: true, replayStart: minute, ...extra });
+    await assertSucceeds(setDoc(sessionRef('enrolled', 'live'), live()));
+    await assertFails(setDoc(sessionRef('enrolled', 'live2'), live({ live: false })));
+    // It starts on the market of now, not on a replay of the past or the future.
+    await assertFails(
+      setDoc(sessionRef('enrolled', 'live3'), live({ replayStart: minute - 3_600_000 })),
+    );
+    await assertFails(
+      setDoc(sessionRef('enrolled', 'live4'), live({ replayStart: minute + 3_600_000 })),
+    );
+    await assertFails(
+      setDoc(sessionRef('enrolled', 'live5'), live({ evaluationId: 'e1', durationMinutes: 30 })),
+    );
+  });
+
   it('accepts sessions on every practice timeframe', async () => {
     for (const interval of ['1m', '3m', '5m', '15m', '1h', '4h']) {
       await assertSucceeds(
