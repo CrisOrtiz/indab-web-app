@@ -242,6 +242,7 @@
                 <app-rubric-form
                   [studentName]="row.name"
                   [initial]="row.rubric"
+                  [journaled]="!!row.journaled"
                   [busy]="ratingBusy()"
                   (saved)="saveRubric(ev, $event)"
                   (cancelled)="rating.set(null)"
@@ -319,4 +320,30 @@
       }
     </ul>
   }
+
+  <dialog
+    #publishConfirm
+    class="confirm"
+    aria-labelledby="publish-confirm-title"
+    aria-describedby="publish-confirm-text"
+    (click)="publishBackdrop($event)"
+  >
+    @if (unratedPublish(); as pending) {
+      <h2 id="publish-confirm-title">{{ t.publishUnrated.title }}</h2>
+      <p id="publish-confirm-text">{{ t.publishUnrated.text(pending.names.length) }}</p>
+      <ul class="unrated">
+        @for (name of pending.names; track $index) {
+          <li>{{ name }}</li>
+        }
+      </ul>
+      <div class="confirm-actions">
+        <button type="button" class="btn" autofocus (click)="closePublishConfirm('rate')">
+          {{ t.publishUnrated.rate }}
+        </button>
+        <button type="button" class="btn btn-outline" (click)="closePublishConfirm('publish')">
+          {{ t.publishUnrated.publish }}
+        </button>
+      </div>
+    }
+  </dialog>
 </section>

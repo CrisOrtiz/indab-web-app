@@ -3,7 +3,7 @@ import { PracticeSession, PracticeTrade } from '../../core/models/practice';
 import { shownStatus } from '../practice/resume';
 import { SessionStats, sessionStats } from '../practice/stats';
 import { DisciplineMark, disciplineMarks } from './discipline';
-import { IndabScore, Verdict, indabScore } from './score';
+import { IndabScore, Verdict, hasJournal, indabScore } from './score';
 
 /**
  * A score as a row shows it: worked out from the trades and rubric, or saved. Grades saved
@@ -39,6 +39,8 @@ export interface EvaluationStanding {
   rubric: SavedRubricScores | null;
   /** Faults and good habits of its trades, when they were loaded. */
   marks: DisciplineMark[] | null;
+  /** Closed trades with a journal entry, when the trades were loaded (the mentor rates it). */
+  journaled: number | null;
   /** The INDAB score: worked out when the trades and rubric are loaded, else the saved one. */
   score: ShownScore | null;
 }
@@ -90,7 +92,14 @@ export function evaluationStandings(
               failedBy: saved.failedBy ?? [],
             }
           : null;
-    return { session: s, stats, rubric, marks: list ? disciplineMarks(list) : null, score };
+    return {
+      session: s,
+      stats,
+      rubric,
+      marks: list ? disciplineMarks(list) : null,
+      journaled: list ? list.filter((t) => t.status === 'closed' && hasJournal(t)).length : null,
+      score,
+    };
   });
   // Scored attempts first: passed, failed, then unrated, each by score; the rest by P/L, then
   // fewer trades.
@@ -104,7 +113,7 @@ export function evaluationStandings(
       byName(nameOf(a.session), nameOf(b.session)),
   );
   const ranked: EvaluationStanding[] = rows.map(
-    ({ session: s, stats, rubric, marks, score }, i) => ({
+    ({ session: s, stats, rubric, marks, journaled, score }, i) => ({
       rank: i + 1,
       uid: s.uid,
       name: s.userName,
@@ -119,6 +128,7 @@ export function evaluationStandings(
       stats,
       rubric,
       marks,
+      journaled,
       score,
     }),
   );
@@ -141,6 +151,7 @@ export function evaluationStandings(
       stats: null,
       rubric: null,
       marks: null,
+      journaled: null,
       score: null,
     }));
   return [...ranked, ...missing];

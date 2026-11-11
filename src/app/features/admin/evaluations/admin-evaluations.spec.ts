@@ -422,10 +422,11 @@ describe('AdminEvaluations', () => {
     expect(form().textContent).toContain('Elige una nota en cada criterio.');
     expect(service.saveRubric).not.toHaveBeenCalled();
 
-    [3, 5, 2, 4].forEach((value, i) => pick(i + 1, value));
+    // One of the trades has its reason written: the journal is rated 1 to 10.
+    [3, 5, 2, 8].forEach((value, i) => pick(i + 1, value));
     service.rubrics.mockResolvedValue(
       new Map([
-        ['jose', { scores: { plan: 4, context: 3, management: 5, emotions: 2, journal: 4 } }],
+        ['jose', { scores: { plan: 4, context: 3, management: 5, emotions: 2, journal: 8 } }],
       ]),
     );
     form().dispatchEvent(new Event('submit'));
@@ -435,19 +436,19 @@ describe('AdminEvaluations', () => {
       context: 3,
       management: 5,
       emotions: 2,
-      journal: 4,
+      journal: 8,
     });
     expect(message()).toContain('Se guardó la rúbrica de José Pérez.');
     expect(el.querySelector('form.rubric')).toBeNull();
-    expect(el.querySelector('.results tbody')?.textContent).toContain('3.6 / 5');
-    // 4 R + 2 R = 100, full risk and discipline marks, rubric 3.6 = 65, one of two trades with
-    // its reason = 50 journal: score 86.3, passed, saved for the students' ranking.
+    expect(el.querySelector('.results tbody')?.textContent).toContain('3.5 / 5');
+    // 4 R + 2 R = 100, full risk and discipline marks, rubric 3.5 = 62.5, one of two trades with
+    // its reason rated 8 = 40 journal: score 84.6, passed, saved for the students' ranking.
     const score = el.querySelector('.results tbody td.score')!;
-    expect(score.textContent).toContain('86.3');
+    expect(score.textContent).toContain('84.6');
     expect(score.textContent).toContain('Aprobado');
     expect(service.saveGrade).toHaveBeenCalledWith('e1', 'jose', {
-      score: 86.3,
-      parts: { result: 100, risk: 100, discipline: 100, rubric: 65, journal: 50 },
+      score: 84.6,
+      parts: { result: 100, risk: 100, discipline: 100, rubric: 62.5, journal: 40 },
       verdict: 'passed',
       failedBy: [],
     });
@@ -507,8 +508,35 @@ describe('AdminEvaluations', () => {
     expect(labels()[0]).toBe('Ocultar resultados');
   });
 
+  it('warns before publishing while some attempts have no rubric', async () => {
+    practice.evaluationSessions.mockResolvedValue([{ uid: 'jose' }, { uid: 'luis' }]);
+    service.rubrics.mockResolvedValue(new Map([['jose', { scores: {} }]]));
+    await click('Publicar resultados');
+    expect(service.setResultsPublished).not.toHaveBeenCalled();
+    const dialog = el.querySelector('dialog.confirm')!;
+    expect(dialog.textContent).toContain('Hay evaluaciones sin calificar');
+    expect([...dialog.querySelectorAll('.unrated li')].map((li) => li.textContent!.trim())).toEqual(
+      ['Luis Díaz'],
+    );
+    // Grading first opens the results instead.
+    await click('Calificar primero');
+    expect(service.setResultsPublished).not.toHaveBeenCalled();
+    expect(el.querySelector('dialog.confirm h2')).toBeNull();
+    expect(practice.evaluationSessions).toHaveBeenCalledTimes(2);
+
+    await click('Publicar resultados');
+    await click('Publicar igual');
+    expect(service.setResultsPublished).toHaveBeenCalledWith('e1', true);
+  });
+
   it('publishes the results and deletes after confirming', async () => {
     practice.evaluationSessions.mockResolvedValue([{ uid: 'jose' }, { uid: 'luis' }]);
+    service.rubrics.mockResolvedValue(
+      new Map([
+        ['jose', { scores: {} }],
+        ['luis', { scores: {} }],
+      ]),
+    );
     await click('Publicar resultados');
     expect(service.setResultsPublished).toHaveBeenCalledWith('e1', true);
     await fixture.whenStable();

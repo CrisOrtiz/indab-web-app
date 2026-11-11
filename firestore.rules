@@ -672,7 +672,8 @@ service cloud.firestore {
 
       allow delete: if isStaff();
 
-      // The mentor's 1-5 rating of a student's attempt on fixed criteria: written by staff,
+      // The mentor's 1-5 rating of a student's attempt on fixed criteria (and 1-10 on its trade
+      // journal): written by staff,
       // read by the student once the results are published.
       match /rubrics/{uid} {
         function score(value) {
@@ -694,7 +695,11 @@ service cloud.firestore {
           && score(request.resource.data.scores.context)
           && score(request.resource.data.scores.management)
           && score(request.resource.data.scores.emotions)
-          && score(request.resource.data.scores.journal)
+          // The journal's quality, 1 to 10, only when the student wrote one (Cris, 2026-11-11).
+          && (!('journal' in request.resource.data.scores)
+            || (request.resource.data.scores.journal is int
+              && request.resource.data.scores.journal >= 1
+              && request.resource.data.scores.journal <= 10))
           && request.resource.data.by == request.auth.uid
           && request.resource.data.byName is string && request.resource.data.byName.size() <= 120
           && request.resource.data.updatedAt == request.time;

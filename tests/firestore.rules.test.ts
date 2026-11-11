@@ -1428,10 +1428,10 @@ describe('evaluations', () => {
     await assertFails(deleteDoc(ref('admin')));
   });
 
-  it('let staff rate an attempt 1 to 5, which the student reads once results are out', async () => {
+  it('let staff rate an attempt 1 to 5 (journal 1 to 10), which the student reads once results are out', async () => {
     const ref = (uid: string | null, student = 'enrolled') =>
       doc(as(uid), `evaluations/e1/rubrics/${student}`);
-    const scores = { plan: 4, context: 2, management: 5, emotions: 3, journal: 4 };
+    const scores = { plan: 4, context: 2, management: 5, emotions: 3, journal: 8 };
     const rubric = (by: string, extra: Record<string, unknown> = {}) => ({
       uid: 'enrolled',
       scores,
@@ -1450,6 +1450,18 @@ describe('evaluations', () => {
     await assertFails(
       setDoc(ref('trainer'), rubric('trainer', { scores: { ...scores, plan: 0 } })),
     );
+    // The journal is rated 1 to 10, and left out when the student wrote none.
+    await assertSucceeds(
+      setDoc(ref('trainer'), rubric('trainer', { scores: { ...scores, journal: 10 } })),
+    );
+    await assertFails(
+      setDoc(ref('trainer'), rubric('trainer', { scores: { ...scores, journal: 11 } })),
+    );
+    await assertFails(
+      setDoc(ref('trainer'), rubric('trainer', { scores: { ...scores, journal: 7.5 } })),
+    );
+    const { journal: _none, ...withoutJournal } = scores;
+    await assertSucceeds(setDoc(ref('trainer'), rubric('trainer', { scores: withoutJournal })));
     await assertFails(
       setDoc(ref('trainer'), rubric('trainer', { scores: { ...scores, luck: 5 } })),
     );

@@ -59,6 +59,22 @@ label {
   color: var(--color-error);
 }
 
+/* Before an order is sent: what to keep in mind, in amber, without blocking it. */
+.order-warnings {
+  margin: 0;
+  padding: 8px 10px 8px 26px;
+  border: 1px solid var(--color-warning);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+
+  li + li {
+    margin-top: 4px;
+  }
+}
+
 .message {
   padding: 10px 14px;
   border: 1px solid var(--color-error);

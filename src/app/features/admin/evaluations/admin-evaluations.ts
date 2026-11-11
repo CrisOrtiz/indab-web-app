@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { I18n } from '../../../core/i18n/i18n.service';
 import { ActionsMenu, MenuAction } from '../../../shared/actions-menu/actions-menu';
@@ -399,9 +399,69 @@ export class AdminEvaluations {
     }
   }
 
+  /** The evaluation about to be published while some attempts have no rubric yet, and who. */
+  protected readonly unratedPublish = signal<{ evaluation: Evaluation; names: string[] } | null>(
+    null,
+  );
+  private readonly publishConfirm =
+    viewChild.required<ElementRef<HTMLDialogElement>>('publishConfirm');
+
+  /**
+   * Publishes the results, or takes them back. Before publishing, the mentor is warned about
+   * the students who took it and have no rubric yet (Cris, 2026-11-11): their score would show
+   * without the mentor's part.
+   */
   protected async togglePublished(evaluation: Evaluation): Promise<void> {
+    if (!evaluation.resultsPublished) {
+      const [sessions, rubrics] = await Promise.all([
+        this.practice.evaluationSessions(evaluation.id).catch(() => []),
+        this.service.rubrics(evaluation.id).catch(() => new Map<string, EvaluationRubric>()),
+      ]);
+      const unrated = sessions.filter((s) => !rubrics.has(s.uid));
+      if (unrated.length) {
+        this.unratedPublish.set({ evaluation, names: unrated.map((s) => this.nameOf(s.uid)) });
+        const dialog = this.publishConfirm().nativeElement;
+        if (dialog.showModal) {
+          dialog.showModal();
+        } else {
+          // Browsers (and test DOMs) without modal dialogs still show it.
+          dialog.setAttribute('open', '');
+        }
+        return;
+      }
+    }
+    await this.setPublished(evaluation, !evaluation.resultsPublished);
+  }
+
+  /** Closes the "some have no rubric" warning; `publish` publishes all the same. */
+  protected async closePublishConfirm(choice: 'publish' | 'rate' | 'cancel'): Promise<void> {
+    const pending = this.unratedPublish();
+    const dialog = this.publishConfirm().nativeElement;
+    if (dialog.close) {
+      dialog.close();
+    } else {
+      dialog.removeAttribute('open');
+    }
+    this.unratedPublish.set(null);
+    if (!pending) {
+      return;
+    }
+    if (choice === 'publish') {
+      await this.setPublished(pending.evaluation, true);
+    } else if (choice === 'rate' && this.selected() !== pending.evaluation.id) {
+      await this.toggleResults(pending.evaluation);
+    }
+  }
+
+  /** A click on the dimmed backdrop (the dialog element itself) publishes nothing. */
+  protected publishBackdrop(event: MouseEvent): void {
+    if (event.target === this.publishConfirm().nativeElement) {
+      void this.closePublishConfirm('cancel');
+    }
+  }
+
+  private async setPublished(evaluation: Evaluation, published: boolean): Promise<void> {
     const t = this.i18n.messages().evaluations;
-    const published = !evaluation.resultsPublished;
     try {
       await this.service.setResultsPublished(evaluation.id, published);
       if (published) {

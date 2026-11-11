@@ -138,7 +138,7 @@
                 <span>{{ t.buyCaps }}</span>
               </button>
               @if (quickError(); as message) {
-                <p class="quick-error" role="alert">{{ message }}</p>
+                <p class="quick-error" [class.warn]="quickWarn()" role="alert">{{ message }}</p>
               }
             </div>
             @if (r.openTrades().length + r.pendingOrders().length; as open) {
@@ -279,6 +279,13 @@
               </dl>
             }
 
+            @if (ticketWarnings().length) {
+              <ul class="order-warnings" [attr.aria-label]="t.orderWarnings.label">
+                @for (warning of ticketWarnings(); track warning.kind) {
+                  <li>{{ warningText(warning) }}</li>
+                }
+              </ul>
+            }
             @if (orderError(); as message) {
               <p class="order-error" role="alert">{{ message }}</p>
             }

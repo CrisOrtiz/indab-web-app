@@ -840,7 +840,7 @@ export const en: Messages = {
       tipStop:
         'Set a stop loss and take profit on every trade. Removing or widening the stop loss costs discipline points on that trade.',
       tipRisk:
-        'Risk 1 to 2% of the account per trade and no more than 3% across the trades you have open.',
+        'Do not risk more than 15% of the account, on one trade or across the trades you have open: above that costs risk points.',
       tipDiscipline:
         'These cost discipline points: moving the stop further against you, raising risk after a loss, jumping back in right after losing, averaging down, holding a buy and a sell at once and leaving positions open at the end. Moving the stop to break-even adds points.',
       tipLoss: (limit: number) =>
@@ -848,12 +848,22 @@ export const en: Messages = {
       tipFail:
         'A stop out means "Not passed"; your score and every detail are kept so you can see what happened.',
       tipMin: (trades: number) =>
-        `Close at least ${trades} trades; with fewer you are left "Not rated".`,
+        trades === 1
+          ? 'Close at least one trade; with none you are left "Not rated".'
+          : `Close at least ${trades} trades; with fewer you are left "Not rated".`,
       tipJournal:
-        'Write in the journal why you entered each trade (setup, zone, confirmation). You can write or fix it until the evaluation ends.',
+        'Write in the journal why you entered each trade (setup, zone, confirmation). Without it that part is 0; with it, your mentor rates its quality from 1 to 10. You can fix it until the evaluation ends.',
       read: 'I read the instructions and I am ready',
       start: 'Start now',
       cancel: 'Not now',
+    },
+    orderWarnings: {
+      label: 'Order warnings',
+      risk: (pct: string, allowed: string) =>
+        `This order risks ${pct} of the account, more than ${allowed}.`,
+      noStop: 'This order has no stop loss.',
+      flip: 'You just lost in the opposite direction: is this a planned entry or revenge?',
+      costsPoints: 'In the evaluation it costs points.',
     },
     journal: {
       title: 'Trade journal',
@@ -1135,6 +1145,10 @@ export const en: Messages = {
           hint: 'Followed the plan without overtrading or trading on impulse.',
         },
       },
+      journalScale:
+        'From 1 to 10: their entry reasons are clear and match what they did. Worth 10% of the score.',
+      noJournal: 'No journal written: this part stays at 0.',
+      journalScore: (value: number) => `${value} / 10`,
       missing: 'Pick a score on each criterion.',
       save: 'Save rubric',
       saved: (name: string) => `Saved the rubric for ${name}.`,
@@ -1146,7 +1160,7 @@ export const en: Messages = {
     score: {
       column: 'INDAB score',
       how: (passing: number) =>
-        `INDAB score (0 to 100) = 25% result in R + 25% risk control + 15% discipline + 25% mentor rubric + 10% trade journal. ${passing} passes; a stop out does not pass (the score is kept), losing more than 40% costs risk points, and fewer than 2 trades leave it not rated. Attempts without a rubric yet follow, by profit.`,
+        `INDAB score (0 to 100) = 25% result in R + 25% risk control + 15% discipline + 25% mentor rubric + 10% trade journal. ${passing} passes; a stop out does not pass (the score is kept), losing more than 40% costs risk points, and no closed trades leave it not rated. Attempts without a rubric yet follow, by profit.`,
       missing: 'No rubric yet',
       parts: (
         result: string,
@@ -1164,7 +1178,10 @@ export const en: Messages = {
         removedStop: 'removed the stop loss',
       },
       failedBecause: (reasons: string) => `Not passed: ${reasons}`,
-      unratedHint: (trades: number) => `Needs at least ${trades} closed trades.`,
+      unratedHint: (trades: number) =>
+        trades === 1
+          ? 'Needs at least one closed trade.'
+          : `Needs at least ${trades} closed trades.`,
     },
     resultsView: 'What to show',
     viewRanking: 'Ranking',
@@ -1262,6 +1279,15 @@ export const en: Messages = {
     deleteFailed: 'The evaluation could not be deleted.',
     published: (title: string) => `Students can now see the ranking of ${title}.`,
     unpublished: (title: string) => `Students no longer see the ranking of ${title}.`,
+    publishUnrated: {
+      title: 'Some attempts are not graded',
+      text: (count: number) =>
+        count === 1
+          ? 'This student took the evaluation and has no rubric from you yet. If you publish now, they will see their score without the mentor part (25%).'
+          : `These ${count} students took the evaluation and have no rubric from you yet. If you publish now, they will see their score without the mentor part (25%).`,
+      rate: 'Grade first',
+      publish: 'Publish anyway',
+    },
     resultsFailed: 'The results could not be loaded.',
     loadFailed:
       'The evaluations could not be loaded. Check that your account is a trainer or administrator.',

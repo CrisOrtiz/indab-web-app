@@ -966,6 +966,33 @@ describe('Practice page', () => {
     expect(submitLabel()).toBe('Comprar 4.00 XAUUSDT MERCADO');
   });
 
+  it('warns before an order risks more than 15 %, has no stop loss or turns after a loss', async () => {
+    await start();
+    const warnings = () =>
+      [...el.querySelectorAll('.order-warnings li')].map((li) => li.textContent!.trim());
+    expect(warnings()).toEqual(['Esta orden no tiene stop loss.']);
+    await toggle('Stop loss');
+    expect(warnings()).toEqual([]);
+    // 10 USD a unit on 4 units of 200 = 20 %.
+    chart().lotsChanged.emit('0.04');
+    await fixture.whenStable();
+    await setLevel('stop loss', '90');
+    expect(warnings()).toEqual(['Esta orden arriesga 20% de la cuenta, más del 15%.']);
+
+    // A one-click sell has no stop: the box under it says so, in amber.
+    await pressed('.quick-sell');
+    expect(el.querySelector('.quick-error.warn')?.textContent).toBe(
+      'Esta orden no tiene stop loss.',
+    );
+    await click('Siguiente vela');
+    await click('Cerrar');
+    // It lost: buying right after is a turn around.
+    await setLevel('stop loss', '99.9');
+    expect(warnings()).toEqual([
+      'Acabas de perder en la dirección contraria: ¿es una entrada planeada o una revancha?',
+    ]);
+  });
+
   it('drops a trade that could not be logged', async () => {
     await start();
     practice.openTrade.mockRejectedValueOnce(new Error('denied'));
@@ -1041,7 +1068,7 @@ describe('Practice page', () => {
 
     await pressed('.quick-buy');
     expect(el.textContent).toContain('Posiciones (3)');
-    expect(el.querySelector('.quick-error')).toBeNull();
+    expect(el.querySelector('.quick-error:not(.warn)')).toBeNull();
     // The chart says how many trades are live; a tap opens their list.
     const count = el.querySelector<HTMLButtonElement>('.open-count')!;
     expect(count.querySelector('.count')!.textContent!.trim()).toBe('4');
@@ -1070,7 +1097,7 @@ describe('Practice page', () => {
     await pressed('.quick-buy');
     expect(practice.openTrade).toHaveBeenCalledTimes(5);
     expect(el.textContent).toContain('Posiciones (4)');
-    expect(el.querySelector('.quick-error')).toBeNull();
+    expect(el.querySelector('.quick-error:not(.warn)')).toBeNull();
   });
 
   it('hides the one-click refusal after a few seconds', async () => {

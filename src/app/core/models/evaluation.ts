@@ -83,14 +83,19 @@ export interface EvaluationAdjustment {
  * What the mentor rates on each attempt, from 1 to 5 (Cris, 2026-11-11): only what a person
  * can judge, since risk and stops are scored from the trades.
  */
-export const RUBRIC_CRITERIA = ['plan', 'context', 'management', 'emotions', 'journal'] as const;
+export const RUBRIC_CRITERIA = ['plan', 'context', 'management', 'emotions'] as const;
 export type RubricCriterion = (typeof RUBRIC_CRITERIA)[number];
-export type RubricScores = Record<RubricCriterion, number>;
+/**
+ * Highest score the mentor gives the trade journal's quality (Cris, 2026-11-11: 1 to 10, kept
+ * apart from the 1-5 criteria and only when the student wrote one; without it the part is 0).
+ */
+export const JOURNAL_SCALE_MAX = 10;
+export type RubricScores = Record<RubricCriterion, number> & { journal?: number };
 /** Criteria of rubrics saved before 2026-11-11, still shown on those. */
 export const LEGACY_RUBRIC_CRITERIA = ['risk', 'stops', 'discipline'] as const;
 export type AnyRubricCriterion = RubricCriterion | (typeof LEGACY_RUBRIC_CRITERIA)[number];
-/** A saved rubric's scores: today's criteria, or the ones it was saved with. */
-export type SavedRubricScores = Partial<Record<AnyRubricCriterion, number>>;
+/** A saved rubric's scores: today's criteria (and journal 1-10), or the ones it was saved with. */
+export type SavedRubricScores = Partial<Record<AnyRubricCriterion, number>> & { journal?: number };
 
 /** The criteria a saved rubric has, in the order they are shown. */
 export function rubricCriteria(scores: SavedRubricScores): AnyRubricCriterion[] {
@@ -112,7 +117,7 @@ export interface EvaluationRubric {
   updatedAt: Timestamp;
 }
 
-/** A rubric's average, 1 to 5, over the criteria it has. */
+/** A rubric's average, 1 to 5, over the 1-5 criteria it has (the journal's 1-10 apart). */
 export function rubricAverage(scores: SavedRubricScores): number {
   const values = rubricCriteria(scores).map((c) => scores[c]!);
   return values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 1;

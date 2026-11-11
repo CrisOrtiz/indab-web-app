@@ -111,6 +111,12 @@
                 <strong>{{ rubric.scores[criterion] }} / 5</strong>
               </li>
             }
+            @if (rubric.scores.journal; as journal) {
+              <li>
+                <span>{{ tr.criteria.journal.label }}</span>
+                <strong>{{ tr.journalScore(journal) }}</strong>
+              </li>
+            }
           </ul>
           <p class="muted">{{ tr.by(rubric.byName) }}</p>
         </section>

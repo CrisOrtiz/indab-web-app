@@ -858,7 +858,7 @@ export const es = {
       tipStop:
         'Pon stop loss y take profit en cada operación. Quitar o alejar el stop loss resta puntos de disciplina en esa operación.',
       tipRisk:
-        'Arriesga de 1 a 2 % de la cuenta por operación y no más de 3 % sumando las que tengas abiertas.',
+        'No arriesgues más del 15 % de la cuenta, ni en una operación ni sumando las que tengas abiertas: por encima resta puntos de riesgo.',
       tipDiscipline:
         'Restan puntos de disciplina: alejar el stop en contra, subir el riesgo tras una pérdida, volver a entrar enseguida tras perder, promediar en contra, abrir compra y venta a la vez y dejar posiciones abiertas al final. Mover el stop a breakeven suma.',
       tipLoss: (limit: number) =>
@@ -866,12 +866,22 @@ export const es = {
       tipFail:
         'Un stop out te deja «No aprobado»; tu nota y todo el detalle se conservan para que veas qué pasó.',
       tipMin: (trades: number) =>
-        `Cierra al menos ${trades} operaciones; con menos quedas «Sin evaluar».`,
+        trades === 1
+          ? 'Cierra al menos una operación; sin ninguna quedas «Sin evaluar».'
+          : `Cierra al menos ${trades} operaciones; con menos quedas «Sin evaluar».`,
       tipJournal:
-        'Escribe en la bitácora por qué entraste en cada operación (setup, zona, confirmación). Puedes hacerlo o corregirlo hasta que termine la evaluación.',
+        'Escribe en la bitácora por qué entraste en cada operación (setup, zona, confirmación). Sin bitácora esa parte queda en 0; si la escribes, tu mentor califica su calidad de 1 a 10. Puedes corregirla hasta que termine la evaluación.',
       read: 'Leí las instrucciones y estoy listo',
       start: 'Empezar ahora',
       cancel: 'Ahora no',
+    },
+    orderWarnings: {
+      label: 'Avisos de la orden',
+      risk: (pct: string, allowed: string) =>
+        `Esta orden arriesga ${pct} de la cuenta, más del ${allowed}.`,
+      noStop: 'Esta orden no tiene stop loss.',
+      flip: 'Acabas de perder en la dirección contraria: ¿es una entrada planeada o una revancha?',
+      costsPoints: 'En la evaluación resta puntos.',
     },
     journal: {
       title: 'Bitácora',
@@ -1153,6 +1163,10 @@ export const es = {
           hint: 'Siguió su plan sin sobreoperar ni operar por impulso.',
         },
       },
+      journalScale:
+        'De 1 a 10: sus motivos de entrada son claros y coinciden con lo que hizo. Vale el 10 % de la nota.',
+      noJournal: 'No escribió bitácora: esta parte queda en 0.',
+      journalScore: (value: number) => `${value} / 10`,
       missing: 'Elige una nota en cada criterio.',
       save: 'Guardar rúbrica',
       saved: (name: string) => `Se guardó la rúbrica de ${name}.`,
@@ -1164,7 +1178,7 @@ export const es = {
     score: {
       column: 'Nota INDAB',
       how: (passing: number) =>
-        `Nota INDAB (0 a 100) = 25 % resultado en R + 25 % control de riesgo + 15 % disciplina + 25 % rúbrica del mentor + 10 % bitácora. Se aprueba con ${passing}; un stop out no aprueba (la nota se conserva), perder más del 40 % resta puntos de riesgo, y con menos de 2 operaciones queda sin evaluar. Quien aún no tiene rúbrica se ordena después, por ganancia.`,
+        `Nota INDAB (0 a 100) = 25 % resultado en R + 25 % control de riesgo + 15 % disciplina + 25 % rúbrica del mentor + 10 % bitácora. Se aprueba con ${passing}; un stop out no aprueba (la nota se conserva), perder más del 40 % resta puntos de riesgo, y sin operaciones cerradas queda sin evaluar. Quien aún no tiene rúbrica se ordena después, por ganancia.`,
       missing: 'Falta rúbrica',
       parts: (
         result: string,
@@ -1182,7 +1196,10 @@ export const es = {
         removedStop: 'quitó el stop loss',
       },
       failedBecause: (reasons: string) => `No aprobado por: ${reasons}`,
-      unratedHint: (trades: number) => `Necesita al menos ${trades} operaciones cerradas.`,
+      unratedHint: (trades: number) =>
+        trades === 1
+          ? 'Necesita al menos una operación cerrada.'
+          : `Necesita al menos ${trades} operaciones cerradas.`,
     },
     resultsView: 'Qué mostrar',
     viewRanking: 'Ranking',
@@ -1280,6 +1297,15 @@ export const es = {
     deleteFailed: 'No se pudo eliminar la evaluación.',
     published: (title: string) => `Los estudiantes ya ven el ranking de ${title}.`,
     unpublished: (title: string) => `Los estudiantes ya no ven el ranking de ${title}.`,
+    publishUnrated: {
+      title: 'Hay evaluaciones sin calificar',
+      text: (count: number) =>
+        count === 1
+          ? 'Este estudiante presentó la evaluación y aún no tiene tu rúbrica. Si publicas ahora, verá su nota sin la parte del mentor (25 %).'
+          : `Estos ${count} estudiantes presentaron la evaluación y aún no tienen tu rúbrica. Si publicas ahora, verán su nota sin la parte del mentor (25 %).`,
+      rate: 'Calificar primero',
+      publish: 'Publicar igual',
+    },
     resultsFailed: 'No se pudieron cargar los resultados.',
     loadFailed:
       'No se pudieron cargar las evaluaciones. Verifica que tu cuenta sea entrenador o administrador.',

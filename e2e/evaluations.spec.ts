@@ -125,6 +125,10 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
   await expect(row).toContainText('0.00');
   await page.getByRole('button', { name: 'Acciones: Evaluación semanal' }).click();
   await page.getByRole('menuitem', { name: 'Publicar resultados' }).click();
+  // José has no rubric yet: the trainer is warned first and publishes all the same.
+  const warning = page.getByRole('dialog', { name: 'Hay evaluaciones sin calificar' });
+  await expect(warning).toContainText('José Pérez');
+  await warning.getByRole('button', { name: 'Publicar igual' }).click();
   await expect(page.getByRole('status')).toContainText('Los estudiantes ya ven el ranking');
 
   await signOut(page);
@@ -317,18 +321,22 @@ test('a mentor rates an attempt and the student sees the INDAB score and the rub
     'Lectura de contexto',
     'Manejo de la operación',
     'Control emocional',
-    'Calidad de la bitácora',
   ]) {
     await page
       .getByRole('radiogroup', { name: criterion })
       .getByRole('radio', { name: '4' })
       .click();
   }
+  // José wrote a reason on one trade: the journal is rated 1 to 10.
+  await page
+    .getByRole('radiogroup', { name: 'Calidad de la bitácora' })
+    .getByRole('radio', { name: '8', exact: true })
+    .click();
   await page.getByRole('button', { name: 'Guardar rúbrica' }).click();
   await expect(page.getByRole('status')).toContainText('Se guardó la rúbrica de José Pérez.');
-  // Result 1.2 R + 3 R = 92; risk 5 % on one trade = -30 and -20 for open risk = 50;
-  // discipline 100; rubric 4 = 75; one of two trades journaled = 50: 74.3, passed.
-  await expect(results.locator('td.score')).toContainText('74.3');
+  // Result 1.2 R + 3 R = 92; risk 5 % is within 15 % = 100; discipline 100; rubric 4 = 75;
+  // one of two trades journaled, rated 8 = 40: 85.8, passed.
+  await expect(results.locator('td.score')).toContainText('85.8');
   await expect(results.locator('td.score')).toContainText('Aprobado');
   await expect(results).toContainText('4.0 / 5');
 
@@ -345,10 +353,11 @@ test('a mentor rates an attempt and the student sees the INDAB score and the rub
   await page.getByRole('link', { name: 'Ranking de evaluaciones' }).click();
   const ranking = page.locator('table.ranking');
   await expect(ranking.locator('thead')).toContainText('Nota INDAB');
-  await expect(ranking.locator('td.score')).toContainText('74.3');
+  await expect(ranking.locator('td.score')).toContainText('85.8');
   await expect(ranking.locator('td.score')).toContainText('Aprobado');
   const rubric = page.locator('section.rubric');
   await expect(rubric).toContainText('Rúbrica de tu mentor');
   await expect(rubric).toContainText('4.0 / 5');
+  await expect(rubric).toContainText('8 / 10');
   await expect(rubric).toContainText('Calificó Tomás Trainer');
 });
