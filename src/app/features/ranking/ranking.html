@@ -26,7 +26,7 @@
       @if (results(); as rows) {
         @let hasScores = scored(rows);
         @let ts = i18n.messages().evaluations.score;
-        <p class="muted">{{ hasScores ? ts.how : t.evaluationHow }}</p>
+        <p class="muted">{{ hasScores ? ts.how(passing()) : t.evaluationHow }}</p>
         <table class="ranking">
           <thead>
             <tr>
@@ -105,10 +105,16 @@
             }}</span>
           </h2>
           <ul>
-            @for (criterion of criteria; track criterion) {
+            @for (criterion of criteriaOf(rubric.scores); track criterion) {
               <li>
                 <span>{{ tr.criteria[criterion].label }}</span>
                 <strong>{{ rubric.scores[criterion] }} / 5</strong>
+              </li>
+            }
+            @if (rubric.scores.journal; as journal) {
+              <li>
+                <span>{{ tr.criteria.journal.label }}</span>
+                <strong>{{ tr.journalScore(journal) }}</strong>
               </li>
             }
           </ul>

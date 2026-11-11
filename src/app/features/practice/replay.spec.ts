@@ -379,6 +379,18 @@ describe('Replay', () => {
     expect(replay.modify('m', { stopLoss: 99, takeProfit: null, lots: 3 }).quantity).toBe(100);
   });
 
+  it('keeps a journal entry on any order that was not cancelled', () => {
+    const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 2, 10_000);
+    replay.open('a', order());
+    replay.open('b', order({ orderType: 'limit', price: 95 }));
+    expect(replay.annotate('a', 'Rechazo en soporte').journal).toBe('Rechazo en soporte');
+    expect(replay.annotate('b', 'Espero el retroceso').journal).toBe('Espero el retroceso');
+    replay.close('a');
+    expect(replay.annotate('a', 'Corrijo al cerrar').journal).toBe('Corrijo al cerrar');
+    replay.cancel('b');
+    expect(() => replay.annotate('b', 'Tarde')).toThrow();
+  });
+
   it('cancels pending orders, by hand or when the replay ends', () => {
     const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 2, 10_000);
     replay.open('a', order({ orderType: 'stop', price: 105 }));

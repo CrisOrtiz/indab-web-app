@@ -641,6 +641,8 @@ export const pt: Messages = {
     noFilled: 'Nenhuma ordem desta sessão foi executada.',
     result: 'Resultado',
     stillOpen: 'Ainda aberta',
+    journal: 'Diário',
+    noJournal: 'Sem motivo de entrada.',
   },
 
   trading: {
@@ -840,21 +842,46 @@ export const pt: Messages = {
       end: 'Quando o tempo acaba ela é entregue sozinha: as ordens pendentes são canceladas e as posições abertas fecham no último preço.',
       warnings: 'Avisaremos quando faltarem 5 minutos e 1 minuto.',
       gradeTitle: 'Como é avaliada',
-      grade:
-        'Nota INDAB de 0 a 100: 30% resultado em R (o que você ganhou dividido pelo que arriscou até o stop), 25% controle de risco, 15% disciplina e 30% rubrica do seu mentor. Você é aprovado com 70.',
+      grade: (passing: number) =>
+        `Nota INDAB de 0 a 100: 25% resultado em R (o que você ganhou dividido pelo que arriscou até o stop), 25% controle de risco, 15% disciplina, 25% rubrica do seu mentor e 10% diário de operações. Você é aprovado com ${passing}.`,
       tipStop:
-        'Coloque stop loss e take profit em cada operação. Tirar o stop loss antes de fechar deixa você «Não aprovado».',
+        'Coloque stop loss e take profit em cada operação. Tirar ou afastar o stop loss tira pontos de disciplina nessa operação.',
       tipRisk:
-        'Arrisque de 1 a 2% da conta por operação e no máximo 3% somando as que estiverem abertas.',
+        'Não arrisque mais de 15% da conta, nem em uma operação nem somando as que estiverem abertas: acima disso perde pontos de risco.',
       tipDiscipline:
         'Tiram pontos de disciplina: afastar o stop contra você, aumentar o risco depois de uma perda, entrar de novo logo após perder, fazer preço médio contra, abrir compra e venda ao mesmo tempo e deixar posições abertas no final. Mover o stop para o breakeven soma.',
-      tipFail: (limit: number) =>
-        `Um stop out ou perder mais de ${limit}% da conta deixa você «Não aprovado», mesmo com nota boa.`,
+      tipLoss: (limit: number) =>
+        `Se a conta perder mais de ${limit}% tira pontos de risco, mas você ainda pode se recuperar.`,
+      tipFail:
+        'Um stop out deixa você «Não aprovado»; sua nota e todo o detalhe são mantidos para você ver o que aconteceu.',
       tipMin: (trades: number) =>
-        `Feche pelo menos ${trades} operações; com menos você fica «Sem avaliação».`,
+        trades === 1
+          ? 'Feche pelo menos uma operação; sem nenhuma você fica «Sem avaliação».'
+          : `Feche pelo menos ${trades} operações; com menos você fica «Sem avaliação».`,
+      tipJournal:
+        'Escreva no diário por que você entrou em cada operação (setup, zona, confirmação). Sem diário essa parte fica em 0; com ele, seu mentor avalia a qualidade de 1 a 10. Você pode corrigir até a avaliação terminar.',
       read: 'Li as instruções e estou pronto',
       start: 'Começar agora',
       cancel: 'Agora não',
+    },
+    orderWarnings: {
+      label: 'Avisos da ordem',
+      risk: (pct: string, allowed: string) =>
+        `Esta ordem arrisca ${pct} da conta, mais de ${allowed}.`,
+      noStop: 'Esta ordem não tem stop loss.',
+      flip: 'Você acabou de perder na direção contrária: é uma entrada planejada ou vingança?',
+      costsPoints: 'Na avaliação perde pontos.',
+    },
+    journal: {
+      title: 'Diário de operações',
+      hint: 'Anote por que você entrou em cada operação: ajuda a revisar suas decisões.',
+      hintGraded: (min: number) =>
+        `Escreva por que você entrou em cada operação (pelo menos ${min} letras). Conta para sua nota e você pode corrigir até a avaliação terminar.`,
+      placeholder: 'Setup, zona, confirmação…',
+      save: 'Salvar',
+      trade: (n: number) => `Operação ${n}`,
+      pending: 'Ordem pendente',
+      missing: 'Falta o motivo de entrada.',
     },
     dismissWarning: 'Fechar aviso',
     warnFive: 'Faltam 5 minutos de avaliação.',
@@ -1082,6 +1109,10 @@ export const pt: Messages = {
     description: 'Instruções (opcional)',
     market: 'Mercado',
     duration: 'Tempo limite (minutos)',
+    passingScore: 'Nota de aprovação',
+    passingScoreHint: 'Nota INDAB mínima para aprovar, de 0 a 100.',
+    passingScoreRange: 'A nota de aprovação deve ser um número inteiro de 0 a 100.',
+    passesWith: (score: number) => `aprova com ${score}`,
     rubric: {
       rate: 'Avaliar com rubrica',
       column: 'Rubrica',
@@ -1105,11 +1136,27 @@ export const pt: Messages = {
           label: 'Leitura de contexto',
           hint: 'Leu tendência, estrutura e notícias antes de operar.',
         },
+        management: {
+          label: 'Gestão da operação',
+          hint: 'Conduziu bem a posição aberta: parciais, breakeven, saída na hora certa.',
+        },
+        emotions: {
+          label: 'Controle emocional',
+          hint: 'Operou com calma, sem medo nem euforia, e aceitou as perdas.',
+        },
+        journal: {
+          label: 'Qualidade do diário',
+          hint: 'Os motivos de entrada são claros e batem com o que fez.',
+        },
         discipline: {
           label: 'Disciplina',
           hint: 'Seguiu o plano sem operar demais nem por impulso.',
         },
       },
+      journalScale:
+        'De 1 a 10: os motivos de entrada são claros e batem com o que fez. Vale 10% da nota.',
+      noJournal: 'Não escreveu diário: esta parte fica em 0.',
+      journalScore: (value: number) => `${value} / 10`,
       missing: 'Escolha uma nota em cada critério.',
       save: 'Salvar rubrica',
       saved: (name: string) => `A rubrica de ${name} foi salva.`,
@@ -1120,10 +1167,18 @@ export const pt: Messages = {
     },
     score: {
       column: 'Nota INDAB',
-      how: 'Nota INDAB (0 a 100) = 30% resultado em R + 25% controle de risco + 15% disciplina + 30% rubrica do mentor. Aprova com 70; um stop out, perder mais de 5% ou tirar o stop loss não aprovam, e com menos de 2 operações fica sem avaliação. Quem ainda não tem rubrica vem depois, por lucro.',
+      how: (passing: number) =>
+        `Nota INDAB (0 a 100) = 25% resultado em R + 25% controle de risco + 15% disciplina + 25% rubrica do mentor + 10% diário. Aprova com ${passing}; um stop out não aprova (a nota é mantida), perder mais de 40% tira pontos de risco, e sem operações fechadas fica sem avaliação. Quem ainda não tem rubrica vem depois, por lucro.`,
       missing: 'Sem rubrica',
-      parts: (result: string, risk: string, discipline: string, rubric: string) =>
-        `Resultado ${result} · Risco ${risk} · Disciplina ${discipline} · Rubrica ${rubric}`,
+      parts: (
+        result: string,
+        risk: string,
+        discipline: string,
+        rubric: string,
+        journal: string | null,
+      ) =>
+        `Resultado ${result} · Risco ${risk} · Disciplina ${discipline} · Rubrica ${rubric}` +
+        (journal === null ? '' : ` · Diário ${journal}`),
       verdicts: { passed: 'Aprovado', failed: 'Não aprovado', unrated: 'Sem avaliação' },
       failedBy: {
         stopOut: 'stop out',
@@ -1131,7 +1186,10 @@ export const pt: Messages = {
         removedStop: 'tirou o stop loss',
       },
       failedBecause: (reasons: string) => `Não aprovado por: ${reasons}`,
-      unratedHint: (trades: number) => `Precisa de pelo menos ${trades} operações fechadas.`,
+      unratedHint: (trades: number) =>
+        trades === 1
+          ? 'Precisa de pelo menos uma operação fechada.'
+          : `Precisa de pelo menos ${trades} operações fechadas.`,
     },
     resultsView: 'O que mostrar',
     viewRanking: 'Ranking',
@@ -1229,6 +1287,15 @@ export const pt: Messages = {
     deleteFailed: 'Não foi possível excluir a avaliação.',
     published: (title: string) => `Os alunos já veem o ranking de ${title}.`,
     unpublished: (title: string) => `Os alunos não veem mais o ranking de ${title}.`,
+    publishUnrated: {
+      title: 'Há avaliações sem nota',
+      text: (count: number) =>
+        count === 1
+          ? 'Este aluno fez a avaliação e ainda não tem sua rubrica. Se publicar agora, verá a nota sem a parte do mentor (25%).'
+          : `Estes ${count} alunos fizeram a avaliação e ainda não têm sua rubrica. Se publicar agora, verão a nota sem a parte do mentor (25%).`,
+      rate: 'Avaliar primeiro',
+      publish: 'Publicar mesmo assim',
+    },
     resultsFailed: 'Não foi possível carregar os resultados.',
     loadFailed:
       'Não foi possível carregar as avaliações. Verifique se sua conta é de treinador ou administrador.',

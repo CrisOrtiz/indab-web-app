@@ -3,7 +3,7 @@ import { filledTrades } from '../practice/trade-boxes';
 
 /**
  * Habits a trading school marks down, found in a session's trades (Cris, 2026-11-11). Each
- * costs discipline points (`FAULT_PENALTY`); `removedStop` also fails the evaluation.
+ * costs discipline points (`FAULT_PENALTY`) on the trade where it happened.
  */
 export const FAULT_KINDS = [
   'removedStop',

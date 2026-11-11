@@ -207,6 +207,8 @@ describe('PracticeService', () => {
     });
     await service.updateLevels('s1', { ...trade, status: 'open', stopLoss: 104, takeProfit: 90 });
     expect(updateDoc).toHaveBeenLastCalledWith(ref, { stopLoss: 104, takeProfit: 90 });
+    await service.saveJournal('s1', { ...trade, journal: 'Ruptura y retesteo' });
+    expect(updateDoc).toHaveBeenLastCalledWith(ref, { journal: 'Ruptura y retesteo' });
 
     await service.fillOrder('s1', { ...pending, status: 'open', entryPrice: 98.5, entryTime: 11 });
     expect(updateDoc).toHaveBeenLastCalledWith(ref, {

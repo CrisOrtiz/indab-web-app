@@ -633,8 +633,9 @@ service cloud.firestore {
     match /evaluations/{evaluationId} {
       function validEvaluation(data) {
         return data.keys().hasOnly(['title', 'description', 'symbol', 'replayStart', 'hideDates',
-            'news', 'startingBalance', 'durationMinutes', 'pace', 'opensAt', 'closesAt', 'studentIds',
-            'mentorshipIds', 'resultsPublished', 'createdBy', 'createdAt', 'updatedAt'])
+            'news', 'startingBalance', 'durationMinutes', 'pace', 'passingScore', 'opensAt',
+            'closesAt', 'studentIds', 'mentorshipIds', 'resultsPublished', 'createdBy', 'createdAt',
+            'updatedAt'])
           && data.title is string && data.title.size() > 0 && data.title.size() <= 120
           && data.description is string && data.description.size() <= 2000
           && data.symbol is string && data.symbol.size() <= 20
@@ -646,6 +647,9 @@ service cloud.firestore {
           && (!('pace' in data) || data.pace in [1, 60, 900])
           // How the chart shows economic news during attempts (missing: revealed at their time).
           && (!('news' in data) || data.news in ['reveal', 'impact', 'off'])
+          // The INDAB score that passes (missing: 70).
+          && (!('passingScore' in data)
+            || (data.passingScore is int && data.passingScore >= 0 && data.passingScore <= 100))
           && data.opensAt is timestamp && data.closesAt is timestamp
           && data.closesAt > data.opensAt
           && data.studentIds is list && data.studentIds.size() <= 500
@@ -668,7 +672,8 @@ service cloud.firestore {
 
       allow delete: if isStaff();
 
-      // The mentor's 1-5 rating of a student's attempt on fixed criteria: written by staff,
+      // The mentor's 1-5 rating of a student's attempt on fixed criteria (and 1-10 on its trade
+      // journal): written by staff,
       // read by the student once the results are published.
       match /rubrics/{uid} {
         function score(value) {
@@ -683,13 +688,18 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['uid', 'scores', 'by', 'byName', 'updatedAt'])
           && request.resource.data.uid == uid
           && request.resource.data.scores is map
-          && request.resource.data.scores.keys().hasOnly(['plan', 'risk', 'stops', 'context',
-            'discipline'])
+          // Today's criteria (2026-11-11); rubrics saved before keep their own until rated again.
+          && request.resource.data.scores.keys().hasOnly(['plan', 'context', 'management',
+            'emotions', 'journal'])
           && score(request.resource.data.scores.plan)
-          && score(request.resource.data.scores.risk)
-          && score(request.resource.data.scores.stops)
           && score(request.resource.data.scores.context)
-          && score(request.resource.data.scores.discipline)
+          && score(request.resource.data.scores.management)
+          && score(request.resource.data.scores.emotions)
+          // The journal's quality, 1 to 10, only when the student wrote one (Cris, 2026-11-11).
+          && (!('journal' in request.resource.data.scores)
+            || (request.resource.data.scores.journal is int
+              && request.resource.data.scores.journal >= 1
+              && request.resource.data.scores.journal <= 10))
           && request.resource.data.by == request.auth.uid
           && request.resource.data.byName is string && request.resource.data.byName.size() <= 120
           && request.resource.data.updatedAt == request.time;
@@ -714,11 +724,13 @@ service cloud.firestore {
             'updatedAt'])
           && points(request.resource.data.score)
           && request.resource.data.parts is map
-          && request.resource.data.parts.keys().hasOnly(['result', 'risk', 'discipline', 'rubric'])
+          && request.resource.data.parts.keys().hasOnly(['result', 'risk', 'discipline', 'rubric',
+            'journal'])
           && points(request.resource.data.parts.result)
           && points(request.resource.data.parts.risk)
           && points(request.resource.data.parts.discipline)
           && points(request.resource.data.parts.rubric)
+          && points(request.resource.data.parts.journal)
           && request.resource.data.verdict in ['passed', 'failed', 'unrated']
           && request.resource.data.failedBy is list
           && request.resource.data.failedBy.size() <= 3
@@ -1039,6 +1051,11 @@ service cloud.firestore {
           return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
         }
 
+        // The trade journal: why the student entered, one short text.
+        function validJournal(value) {
+          return value is string && value.size() <= 280;
+        }
+
         allow read: if isStaff() || (signedIn() && session().uid == request.auth.uid);
 
         // Placed by the session's owner while the session is active: a market order opens at
@@ -1049,7 +1066,8 @@ service cloud.firestore {
           && inTime(0)
           && request.resource.data.keys().hasOnly(['uid', 'side', 'orderType', 'orderPrice',
             'placedTime', 'quantity', 'entryPrice', 'entryTime', 'stopLoss', 'takeProfit',
-            'initialStopLoss', 'status', 'openedAt'])
+            'initialStopLoss', 'journal', 'status', 'openedAt'])
+          && validJournal(request.resource.data.get('journal', ''))
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.side in ['long', 'short']
           && isPrice(request.resource.data.quantity)
@@ -1112,6 +1130,12 @@ service cloud.firestore {
             && changes(['status', 'closedAt'])
             && request.resource.data.status == 'cancelled'
             && request.resource.data.closedAt == request.time)
+          // Until the session ends (Cris, 2026-11-11), any order's journal entry is written or
+          // rewritten, even after it closed...
+          || (session().status == 'active'
+            && resource.data.status in ['pending', 'open', 'closed']
+            && changes(['journal'])
+            && validJournal(request.resource.data.journal))
           // An open trade moves its stop loss or take profit; its entry never changes...
           || (resource.data.status == 'open'
             && changes(['stopLoss', 'takeProfit'])

@@ -45,13 +45,20 @@ describe('EvaluationBriefing', () => {
     expect(text).toContain('Empiezas con 200 USD y apalancamiento 1:200');
     expect(text).toContain('No verás la fecha del gráfico');
     expect(text).toContain('5 minutos y 1 minuto');
-    expect(text).toContain('30\u00a0% rúbrica de tu mentor');
+    expect(text).toContain('25\u00a0% rúbrica de tu mentor y 10\u00a0% bitácora');
+    expect(text).toContain('Apruebas con 70.');
+    expect(text).toContain('Escribe en la bitácora por qué entraste');
 
     expect(button('Empezar ahora').disabled).toBe(true);
     el.querySelector<HTMLInputElement>('.read input')!.click();
     await fixture.whenStable();
     button('Empezar ahora').click();
     expect(started).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells the evaluation's own passing score", async () => {
+    const { el } = await render(evaluation({ passingScore: 60 }));
+    expect(el.textContent).toContain('Apruebas con 60.');
   });
 
   it('says when the student picks the speed, and can be put off', async () => {

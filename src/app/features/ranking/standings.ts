@@ -1,16 +1,17 @@
-import { EvaluationGrade, EvaluationRubric, RubricScores } from '../../core/models/evaluation';
+import { EvaluationGrade, EvaluationRubric, SavedRubricScores } from '../../core/models/evaluation';
 import { PracticeSession, PracticeTrade } from '../../core/models/practice';
 import { shownStatus } from '../practice/resume';
 import { SessionStats, sessionStats } from '../practice/stats';
 import { DisciplineMark, disciplineMarks } from './discipline';
-import { IndabScore, Verdict, indabScore } from './score';
+import { IndabScore, Verdict, hasJournal, indabScore } from './score';
 
 /**
  * A score as a row shows it: worked out from the trades and rubric, or saved. Grades saved
  * before verdicts existed have no parts in today's shape and no verdict.
  */
 export type ShownScore = Omit<IndabScore, 'parts' | 'verdict'> & {
-  parts: IndabScore['parts'] | null;
+  /** Grades saved before the journal counted have no `journal` part. */
+  parts: (Omit<IndabScore['parts'], 'journal'> & { journal?: number }) | null;
   verdict: Verdict | null;
 };
 
@@ -35,9 +36,11 @@ export interface EvaluationStanding {
   /** How the attempt traded (drawdown, risk...), when its trades were loaded. */
   stats: SessionStats | null;
   /** The mentor's rubric, when staff loaded it and the attempt was rated. */
-  rubric: RubricScores | null;
+  rubric: SavedRubricScores | null;
   /** Faults and good habits of its trades, when they were loaded. */
   marks: DisciplineMark[] | null;
+  /** Closed trades with a journal entry, when the trades were loaded (the mentor rates it). */
+  journaled: number | null;
   /** The INDAB score: worked out when the trades and rubric are loaded, else the saved one. */
   score: ShownScore | null;
 }
@@ -48,6 +51,8 @@ export interface StandingExtras {
   rubrics?: Map<string, EvaluationRubric>;
   /** Saved scores, for those who cannot read trades and rubrics (students). */
   grades?: Map<string, EvaluationGrade>;
+  /** The evaluation's passing score (`passingScoreOf`). */
+  passingScore?: number;
 }
 
 const byName = (a: { name: string }, b: { name: string }) =>
@@ -69,7 +74,7 @@ export function evaluationStandings(
   sessions: PracticeSession[],
   students: { uid: string; name: string }[] = [],
   now = Date.now(),
-  { trades, rubrics, grades }: StandingExtras = {},
+  { trades, rubrics, grades, passingScore }: StandingExtras = {},
 ): EvaluationStanding[] {
   const rows = sessions.map((s) => {
     const list = trades?.get(s.id);
@@ -78,7 +83,7 @@ export function evaluationStandings(
     const saved = grades?.get(s.uid);
     const score: ShownScore | null =
       list && rubric
-        ? indabScore(list, s.startingBalance, rubric)
+        ? indabScore(list, s.startingBalance, rubric, passingScore)
         : saved
           ? {
               score: saved.score,
@@ -87,7 +92,14 @@ export function evaluationStandings(
               failedBy: saved.failedBy ?? [],
             }
           : null;
-    return { session: s, stats, rubric, marks: list ? disciplineMarks(list) : null, score };
+    return {
+      session: s,
+      stats,
+      rubric,
+      marks: list ? disciplineMarks(list) : null,
+      journaled: list ? list.filter((t) => t.status === 'closed' && hasJournal(t)).length : null,
+      score,
+    };
   });
   // Scored attempts first: passed, failed, then unrated, each by score; the rest by P/L, then
   // fewer trades.
@@ -101,7 +113,7 @@ export function evaluationStandings(
       byName(nameOf(a.session), nameOf(b.session)),
   );
   const ranked: EvaluationStanding[] = rows.map(
-    ({ session: s, stats, rubric, marks, score }, i) => ({
+    ({ session: s, stats, rubric, marks, journaled, score }, i) => ({
       rank: i + 1,
       uid: s.uid,
       name: s.userName,
@@ -116,6 +128,7 @@ export function evaluationStandings(
       stats,
       rubric,
       marks,
+      journaled,
       score,
     }),
   );
@@ -138,6 +151,7 @@ export function evaluationStandings(
       stats: null,
       rubric: null,
       marks: null,
+      journaled: null,
       score: null,
     }));
   return [...ranked, ...missing];

@@ -19,6 +19,7 @@ const standing = (i: number, status: EvaluationStanding['status']): EvaluationSt
   stats: null,
   rubric: null,
   marks: null,
+  journaled: null,
   score: null,
 });
 
@@ -166,7 +167,7 @@ describe('EvaluationResults', () => {
     // An unrated attempt shows no score.
     expect(unrated.textContent).not.toContain('90');
     expect(unrated.textContent).toContain('Sin evaluar');
-    expect(unrated.title).toContain('Necesita al menos 2 operaciones cerradas.');
+    expect(unrated.title).toContain('Necesita al menos una operación cerrada.');
   });
 
   it('says when nobody took the evaluation', async () => {

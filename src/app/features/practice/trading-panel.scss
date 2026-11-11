@@ -68,6 +68,10 @@
     line-height: 1.35;
     box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
     animation: dropdown-in 0.15s ease-out;
+
+    &.warn {
+      background: var(--color-warning);
+    }
   }
 
   .quick-size {

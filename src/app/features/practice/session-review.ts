@@ -12,7 +12,7 @@ import { HISTORY_BARS, MarketDataService, intervalMs } from './market-data.servi
 import { priceDigits } from './practice-format';
 import { PracticeService } from './practice.service';
 import { LOT_SIZE } from './replay';
-import { ReplayChart } from './replay-chart';
+import { Drawing, ReplayChart } from './replay-chart';
 import { SessionStatsPanel } from './session-stats';
 import { filledTrades } from './trade-boxes';
 import { TradeNavigator } from './trade-navigator';
@@ -68,6 +68,13 @@ export class SessionReview {
   /** The trade the navigator and the chart show. */
   protected readonly selected = signal<string | null>(null);
   protected readonly filled = computed(() => filledTrades(this.trades() ?? []));
+  /**
+   * What the student drew on the chart, as it was when the session ended (kept with where it
+   * was left), so the review shows how they read the market (Cris, 2026-11-11).
+   */
+  protected readonly drawings = computed(
+    () => (this.session().resume?.drawings ?? []) as Drawing[],
+  );
   /** Where the mentors' notes on this session go. */
   protected readonly noteTarget = computed<NoteTarget>(() => {
     const session = this.session();

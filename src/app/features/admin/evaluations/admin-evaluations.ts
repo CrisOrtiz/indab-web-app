@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { I18n } from '../../../core/i18n/i18n.service';
 import { ActionsMenu, MenuAction } from '../../../shared/actions-menu/actions-menu';
@@ -6,6 +6,8 @@ import { Icon } from '../../../shared/icon/icon';
 import { LocalDatePipe } from '../../../core/i18n/local-date.pipe';
 import {
   DEFAULT_PACE,
+  DEFAULT_PASSING_SCORE,
+  passingScoreOf,
   EVALUATION_PACES,
   Evaluation,
   EvaluationAdjustment,
@@ -52,6 +54,8 @@ interface EvaluationForm {
   durationMinutes: number;
   /** Market minutes per real minute: the attempt runs by the clock at this pace. */
   pace: number;
+  /** The INDAB score that passes, 0 to 100. */
+  passingScore: number;
   /** yyyy-mm-ddTHH:mm, local time. */
   opensAt: string;
   closesAt: string;
@@ -103,6 +107,7 @@ export class AdminEvaluations {
   protected readonly maxDuration = MAX_DURATION;
   protected readonly newsChoices = EVALUATION_NEWS;
   protected readonly paces = EVALUATION_PACES;
+  protected readonly passingScoreOf = passingScoreOf;
   /** "2 d 12 h": the market time an attempt covers at the form's pace and time limit. */
   protected readonly covered = (pace: number, minutes: number) =>
     formatElapsed(marketCovered(pace, minutes));
@@ -222,6 +227,7 @@ export class AdminEvaluations {
       news: EVALUATION_NEWS[0],
       durationMinutes: 60,
       pace: DEFAULT_PACE,
+      passingScore: DEFAULT_PASSING_SCORE,
       opensAt: toLocalInput(opens, this.zones.zone()),
       closesAt: toLocalInput(new Date(opens.getTime() + 7 * DAY), this.zones.zone()),
       studentIds: [],
@@ -242,6 +248,7 @@ export class AdminEvaluations {
       news: evaluation.news ?? EVALUATION_NEWS[0],
       durationMinutes: evaluation.durationMinutes,
       pace: evaluation.pace ?? DEFAULT_PACE,
+      passingScore: passingScoreOf(evaluation),
       opensAt: toLocalInput(evaluation.opensAt.toDate(), this.zones.zone()),
       closesAt: toLocalInput(evaluation.closesAt.toDate(), this.zones.zone()),
       studentIds: [...evaluation.studentIds],
@@ -271,6 +278,7 @@ export class AdminEvaluations {
       news: evaluation.news ?? EVALUATION_NEWS[0],
       durationMinutes: evaluation.durationMinutes,
       pace: evaluation.pace ?? DEFAULT_PACE,
+      passingScore: passingScoreOf(evaluation),
       opensAt: toLocalInput(opens, this.zones.zone()),
       closesAt: toLocalInput(new Date(opens.getTime() + length), this.zones.zone()),
       studentIds: [],
@@ -302,11 +310,14 @@ export class AdminEvaluations {
     const opensAt = fromLocalInput(form.opensAt, this.zones.zone());
     const closesAt = fromLocalInput(form.closesAt, this.zones.zone());
     const duration = Math.round(Number(form.durationMinutes));
+    const passingScore = Number(form.passingScore);
     let problem: string | null = null;
     if (!form.title.trim()) {
       problem = t.titleRequired;
     } else if (!(duration >= MIN_DURATION && duration <= MAX_DURATION)) {
       problem = t.durationRange(MIN_DURATION, MAX_DURATION);
+    } else if (!(Number.isInteger(passingScore) && passingScore >= 0 && passingScore <= 100)) {
+      problem = t.passingScoreRange;
     } else if (isNaN(opensAt.getTime()) || isNaN(closesAt.getTime()) || closesAt <= opensAt) {
       problem = t.windowInvalid;
     } else if (!form.randomStart && !form.startDate) {
@@ -341,6 +352,7 @@ export class AdminEvaluations {
       startingBalance: base?.startingBalance ?? STARTING_BALANCE,
       durationMinutes: duration,
       pace: (EVALUATION_PACES as readonly number[]).includes(form.pace) ? form.pace : DEFAULT_PACE,
+      passingScore,
       opensAt,
       closesAt,
       studentIds: form.studentIds,
@@ -387,9 +399,69 @@ export class AdminEvaluations {
     }
   }
 
+  /** The evaluation about to be published while some attempts have no rubric yet, and who. */
+  protected readonly unratedPublish = signal<{ evaluation: Evaluation; names: string[] } | null>(
+    null,
+  );
+  private readonly publishConfirm =
+    viewChild.required<ElementRef<HTMLDialogElement>>('publishConfirm');
+
+  /**
+   * Publishes the results, or takes them back. Before publishing, the mentor is warned about
+   * the students who took it and have no rubric yet (Cris, 2026-11-11): their score would show
+   * without the mentor's part.
+   */
   protected async togglePublished(evaluation: Evaluation): Promise<void> {
+    if (!evaluation.resultsPublished) {
+      const [sessions, rubrics] = await Promise.all([
+        this.practice.evaluationSessions(evaluation.id).catch(() => []),
+        this.service.rubrics(evaluation.id).catch(() => new Map<string, EvaluationRubric>()),
+      ]);
+      const unrated = sessions.filter((s) => !rubrics.has(s.uid));
+      if (unrated.length) {
+        this.unratedPublish.set({ evaluation, names: unrated.map((s) => this.nameOf(s.uid)) });
+        const dialog = this.publishConfirm().nativeElement;
+        if (dialog.showModal) {
+          dialog.showModal();
+        } else {
+          // Browsers (and test DOMs) without modal dialogs still show it.
+          dialog.setAttribute('open', '');
+        }
+        return;
+      }
+    }
+    await this.setPublished(evaluation, !evaluation.resultsPublished);
+  }
+
+  /** Closes the "some have no rubric" warning; `publish` publishes all the same. */
+  protected async closePublishConfirm(choice: 'publish' | 'rate' | 'cancel'): Promise<void> {
+    const pending = this.unratedPublish();
+    const dialog = this.publishConfirm().nativeElement;
+    if (dialog.close) {
+      dialog.close();
+    } else {
+      dialog.removeAttribute('open');
+    }
+    this.unratedPublish.set(null);
+    if (!pending) {
+      return;
+    }
+    if (choice === 'publish') {
+      await this.setPublished(pending.evaluation, true);
+    } else if (choice === 'rate' && this.selected() !== pending.evaluation.id) {
+      await this.toggleResults(pending.evaluation);
+    }
+  }
+
+  /** A click on the dimmed backdrop (the dialog element itself) publishes nothing. */
+  protected publishBackdrop(event: MouseEvent): void {
+    if (event.target === this.publishConfirm().nativeElement) {
+      void this.closePublishConfirm('cancel');
+    }
+  }
+
+  private async setPublished(evaluation: Evaluation, published: boolean): Promise<void> {
     const t = this.i18n.messages().evaluations;
-    const published = !evaluation.resultsPublished;
     try {
       await this.service.setResultsPublished(evaluation.id, published);
       if (published) {
@@ -455,7 +527,11 @@ export class AdminEvaluations {
       if (this.selected() === evaluation.id) {
         this.attempts.set(sessions);
         this.adjustments.set(adjustments);
-        const standings = evaluationStandings(sessions, students, Date.now(), { trades, rubrics });
+        const standings = evaluationStandings(sessions, students, Date.now(), {
+          trades,
+          rubrics,
+          passingScore: passingScoreOf(evaluation),
+        });
         this.standings.set(standings);
         void this.syncGrades(evaluation.id, standings, grades);
       }
@@ -567,7 +643,7 @@ export class AdminEvaluations {
         before.score !== score.score ||
         before.verdict !== score.verdict ||
         (before.failedBy ?? []).join() !== score.failedBy.join() ||
-        (['result', 'risk', 'discipline', 'rubric'] as const).some(
+        (['result', 'risk', 'discipline', 'rubric', 'journal'] as const).some(
           (part) => before.parts[part] !== score.parts![part],
         )
       );

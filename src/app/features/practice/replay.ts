@@ -437,6 +437,15 @@ export class Replay {
     return this.settle(id, this.current().close, reason);
   }
 
+  /** Writes the journal entry (why it was entered) of an order, until the session ends. */
+  annotate(id: string, journal: string): PracticeTrade {
+    const trade = this.find(id);
+    if (trade.status === 'cancelled') {
+      throw new Error(`Order ${id} was cancelled`);
+    }
+    return this.replace({ ...trade, journal });
+  }
+
   /** Forgets an order that was never logged. */
   discard(id: string): void {
     this._trades.update((trades) => trades.filter((t) => t.id !== id));

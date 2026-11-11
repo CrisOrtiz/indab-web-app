@@ -15,7 +15,7 @@ import { Mentorship, membersOf } from '../../../core/models/mentorship';
 import { MentorshipFilter } from '../audience/mentorship-filter';
 import { Pager } from '../../../shared/pager/pager';
 import { pageCount, pageOf } from '../../../shared/pager/cursor-pages';
-import { rubricAverage } from '../../../core/models/evaluation';
+import { DEFAULT_PASSING_SCORE, rubricAverage } from '../../../core/models/evaluation';
 import { faultsOf } from '../../ranking/discipline';
 import { scoreDetails } from '../../ranking/score-details';
 import { EvaluationStanding, ShownScore } from '../../ranking/standings';
@@ -79,7 +79,7 @@ export const RESULTS_PAGE_SIZE = 20;
       </button>
     </div>
     @if (view() === 'ranking') {
-      <p class="muted score-how">{{ t.score.how }}</p>
+      <p class="muted score-how">{{ t.score.how(passingScore()) }}</p>
     }
     <table class="users results">
       <thead>
@@ -293,6 +293,8 @@ export class EvaluationResults {
   /** Students with their mentorships and the mentorships to filter by; none hides the filter. */
   readonly students = input<{ uid: string; mentorshipIds: string[] }[]>([]);
   readonly mentorships = input<Mentorship[]>([]);
+  /** The INDAB score that passes this evaluation. */
+  readonly passingScore = input(DEFAULT_PASSING_SCORE);
   /** Staff picked "add minutes" or "restart" on an attempt. */
   readonly adjust = output<{ row: EvaluationStanding; kind: 'extraTime' | 'reset' | 'rubric' }>();
 
