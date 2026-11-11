@@ -1,3 +1,5 @@
+import { formatDate } from '@angular/common';
+
 // Names of order types, sides and exit reasons are translated: see `trading` in
 // core/i18n/messages.
 
@@ -41,4 +43,24 @@ export function formatCountdown(ms: number): string {
   const m = Math.floor((total % 3600) / 60);
   const ss = String(total % 60).padStart(2, '0');
   return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
+/** A replay start day range as `<input type="date">` takes it: "YYYY-MM-DD" bounds, in UTC. */
+export interface DayRange {
+  min: string;
+  max: string;
+}
+
+/**
+ * Whether a picked day is inside the range. iPad and iPhone date pickers ignore `min`/`max`,
+ * so the page checks the day itself and says which days are allowed.
+ */
+export function inRange(day: string, range: DayRange): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) && day >= range.min && day <= range.max;
+}
+
+/** The range's first and last days written out in `language` ("3 ene 2026"). */
+export function dayRange(range: DayRange, language: string): { from: string; to: string } {
+  const day = (value: string) => formatDate(`${value}T00:00:00Z`, 'mediumDate', language, 'UTC');
+  return { from: day(range.min), to: day(range.max) };
 }
