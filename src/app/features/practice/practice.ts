@@ -97,6 +97,8 @@ import {
   writeLocalResume,
 } from './resume';
 import { liveMinutes } from './live';
+import { LiveConnection, LiveFeed, LiveFeedStatus } from './live-feed';
+import { goldClosed } from './market-hours';
 import { ServerClock } from './server-clock';
 import { SessionFilterBar } from './session-filters';
 import { SessionTabs } from './session-tabs';
@@ -109,6 +111,8 @@ import { RISK_ALLOWED } from '../ranking/score';
 import { TradeNavigator } from './trade-navigator';
 
 type Phase = 'setup' | 'loading' | 'playing' | 'finished';
+/** Free practice on a replay of the past, or live on the market's candles as they form. */
+export type PracticeMode = 'replay' | 'live';
 type Tab = 'positions' | 'orders' | 'history' | 'stats';
 type LevelField = 'stopLoss' | 'takeProfit';
 
@@ -131,6 +135,14 @@ export const QUICK_ERROR_MS = 6000;
 export const RESUME_SAVE_MS = 15_000;
 /** Other changes to pick up after a reload (drawings, timeframe, speed) go sooner. */
 export const RESUME_CHANGE_MS = 2_000;
+/** The chart of a live session starts on a bar of the longest timeframe, so all line up. */
+const ANCHOR_MS = TIMEFRAMES.at(-1)!.ms;
+
+/** Where a live session's chart starts building bars from minutes: the 4-hour bar of `time`. */
+export function chartAnchor(time: number): number {
+  return Math.floor(time / ANCHOR_MS) * ANCHOR_MS;
+}
+
 /** Active sessions looked up at once: the open ones, and older ones left to close. */
 const OPEN_SESSIONS_MAX = 20;
 
@@ -209,6 +221,7 @@ export class Practice {
   private readonly evaluationService = inject(EvaluationService);
   private readonly serverClock = inject(ServerClock);
   private readonly tabs = inject(SessionTabs);
+  private readonly liveFeed = inject(LiveFeed);
   /** The indicators the user keeps on the chart. */
   protected readonly chartSettings = inject(ChartSettingsService);
   /** Economic news around the chart's bars, while the user keeps them on. */
@@ -242,6 +255,10 @@ export class Practice {
   protected readonly ticketLevels = [...this.levels].reverse();
 
   // Setup
+  /** Free practice on a replay or live (Cris, 2026-11-11). */
+  protected readonly mode = signal<PracticeMode>('replay');
+  /** Spot gold is closed now, so live trading has no candles. */
+  protected readonly marketClosed = computed(() => goldClosed(this.now()));
   protected readonly symbol = signal(INSTRUMENTS[0].symbol);
   protected readonly hideDates = signal(true);
   /** Replay start the student picked (yyyy-mm-dd, UTC), or '' for a random one. */
@@ -307,6 +324,16 @@ export class Practice {
    * the same on every screen, and cannot be paused, stepped or sped up.
    */
   protected readonly live = computed(() => this.evaluation()?.pace != null);
+  /** The session on screen trades the market live, on Binance's stream. */
+  protected readonly realtime = signal(false);
+  /** The live stream's connection. */
+  protected readonly feedStatus = signal<LiveFeedStatus>('connecting');
+  /** What a live session's status line says: the market closed, or the stream's state. */
+  protected readonly liveState = computed<LiveFeedStatus | 'closed' | null>(() =>
+    this.realtime() ? (this.marketClosed() ? 'closed' : this.feedStatus()) : null,
+  );
+  /** No play, step or speed: an evaluation run by the clock, or live trading. */
+  protected readonly clockDriven = computed(() => this.live() || this.realtime());
   protected readonly remaining = computed(() => {
     const deadline = this.deadline();
     return deadline === null ? null : formatCountdown(deadline - this.now());
@@ -498,25 +525,34 @@ export class Practice {
   });
 
   /** Where the running session is, to pick it up after a reload. */
-  private readonly resumeState = computed<SessionResume | null>(() => {
-    const replay = this.replay();
-    if (this.phase() !== 'playing' || !replay) {
-      return null;
-    }
-    return {
-      time: replay.current().time,
-      interval: this.timeframe().interval,
-      hideDates: this.hideDates(),
-      speed: this.speed(),
-      drawings: this.drawings(),
-    };
-  });
+  private readonly resumeState = computed<SessionResume | null>(
+    () => {
+      const replay = this.replay();
+      if (this.phase() !== 'playing' || !replay) {
+        return null;
+      }
+      return {
+        time: replay.current().time,
+        interval: this.timeframe().interval,
+        hideDates: this.hideDates(),
+        speed: this.speed(),
+        drawings: this.drawings(),
+      };
+    },
+    // A live minute changes a few times a second; only a new minute moves where it is.
+    { equal: sameResume },
+  );
 
   private timer?: ReturnType<typeof setInterval>;
   private quickErrorTimer?: ReturnType<typeof setTimeout>;
   private clock?: ReturnType<typeof setInterval>;
   /** Moves a live attempt's replay along with the clock. */
   private liveTimer?: ReturnType<typeof setInterval>;
+  /** Binance's stream feeding a live session, and the clock telling when gold is closed. */
+  private feed?: LiveConnection;
+  private feedClock?: ReturnType<typeof setInterval>;
+  /** Fetching the minutes a dropped stream missed; its own updates wait meanwhile. */
+  private catchingUp = false;
   /** When the live attempt on screen started (ms, server clock). */
   private liveStart = 0;
   /** Minutes staff added to the attempt on screen. */
@@ -567,6 +603,7 @@ export class Practice {
       this.pause();
       clearInterval(this.clock);
       clearInterval(this.liveTimer);
+      this.stopFeed();
       this.tabs.close();
       this.stopWatching();
       clearTimeout(this.quickErrorTimer);
@@ -583,6 +620,9 @@ export class Practice {
     if (this.openFree()) {
       return;
     }
+    if (this.mode() === 'live') {
+      return this.beginLive();
+    }
     const instrument = this.instrument();
     if (!this.randomStart() && this.startDate() && !inRange(this.startDate(), this.dateRange())) {
       const { from, to } = this.startRange();
@@ -594,6 +634,127 @@ export class Practice {
         ? randomReplayStart(instrument)
         : replayStartAt(instrument, Date.parse(`${this.startDate()}T00:00:00Z`));
     return this.begin(replayStart, null);
+  }
+
+  /** Picks replay or live in the setup; live checks whether gold is open now. */
+  protected setMode(mode: PracticeMode): void {
+    this.mode.set(mode);
+    this.now.set(this.serverClock.now());
+  }
+
+  /**
+   * Starts live trading: the chart shows today's bars up to now and then follows Binance's
+   * stream minute by minute. Gold only trades in its hours, so it refuses while it is closed.
+   */
+  private async beginLive(): Promise<void> {
+    const { symbol } = this.instrument();
+    const timeframe = DEFAULT_TIMEFRAME;
+    const user = this.auth.user();
+    if (!user) {
+      return;
+    }
+    const t = this.i18n.messages().practice;
+    this.error.set(null);
+    this.phase.set('loading');
+    try {
+      await this.serverClock.sync();
+      const now = this.serverClock.now();
+      this.now.set(now);
+      if (goldClosed(now)) {
+        throw new Error(t.marketClosed);
+      }
+      const anchor = chartAnchor(now);
+      // The minute before the anchor is the replay's one bar of history, as in a replay.
+      const [minutes, history] = await Promise.all([
+        this.market.loadMinutesSince(symbol, anchor - MINUTE, 1),
+        this.loadHistory(symbol, timeframe, anchor),
+      ]);
+      if (minutes.length < 2) {
+        throw new Error(t.liveNoData);
+      }
+      const replay = new Replay(minutes, 1, STARTING_BALANCE, true);
+      replay.resume([], minutes.at(-1)!.time);
+      const sessionId = await this.practice.startSession({
+        uid: user.uid,
+        userName: this.auth.profile()?.displayName || user.email || user.uid,
+        symbol,
+        interval: timeframe.interval,
+        replayStart: Math.floor(now / MINUTE) * MINUTE,
+        startingBalance: replay.startingBalance,
+        live: true,
+      });
+      this.hideDates.set(false);
+      this.enter(sessionId, replay, anchor, timeframe, history, null, [], true);
+    } catch (e) {
+      const message = (e as Error).message;
+      this.error.set(
+        message === t.marketClosed || message === t.liveNoData ? message : t.startFailed,
+      );
+      this.phase.set('setup');
+    }
+  }
+
+  /** Follows Binance's stream for the live session on screen. */
+  private startFeed(symbol: string): void {
+    this.stopFeed();
+    this.feedStatus.set('connecting');
+    this.now.set(this.serverClock.now());
+    this.feedClock = setInterval(() => this.now.set(this.serverClock.now()), 1000);
+    this.feed = this.liveFeed.connect(symbol, {
+      candle: (candle) => this.onLiveCandle(candle),
+      opened: () => void this.catchUpLive(),
+      status: (status) => this.feedStatus.set(status),
+    });
+  }
+
+  private stopFeed(): void {
+    this.feed?.close();
+    this.feed = undefined;
+    clearInterval(this.feedClock);
+    this.feedClock = undefined;
+  }
+
+  /** A live update: the chart moves, orders fill and stops trigger on it. */
+  private onLiveCandle(candle: Candle): void {
+    const replay = this.replay();
+    if (!replay || !this.realtime() || this.catchingUp || this.phase() !== 'playing') {
+      return;
+    }
+    const result = replay.tick(candle);
+    if (result) {
+      this.record(replay, result.filled, result.closed);
+    }
+  }
+
+  /**
+   * The stream (re)connected: fetches the minutes since the last one shown, which it did not
+   * send while it was down (or before it first opened), and settles orders on them.
+   */
+  private async catchUpLive(): Promise<void> {
+    const replay = this.replay();
+    if (!replay || !this.realtime() || this.catchingUp) {
+      return;
+    }
+    this.catchingUp = true;
+    try {
+      const from = replay.candles.at(-1)!.time * 1000;
+      const minutes = await this.market.catchUpMinutes(this.symbol(), from);
+      if (this.replay() !== replay || this.phase() !== 'playing') {
+        return;
+      }
+      const filled: PracticeTrade[] = [];
+      const closed: PracticeTrade[] = [];
+      for (const minute of minutes) {
+        const result = replay.tick(minute);
+        filled.push(...(result?.filled ?? []));
+        closed.push(...(result?.closed ?? []));
+      }
+      this.record(replay, filled, closed);
+    } catch {
+      // The stream itself goes on; the next drop tries again.
+    } finally {
+      this.catchingUp = false;
+    }
   }
 
   /** Shows the instructions before the student's one attempt at an evaluation. */
@@ -680,7 +841,9 @@ export class Practice {
     history: Candle[],
     evaluation: Evaluation | null,
     drawings: Drawing[],
+    live = false,
   ): void {
+    this.stopFeed();
     this.builders = new Map();
     this.histories.set({ [timeframe.interval]: history });
     this.timeframe.set(timeframe);
@@ -698,8 +861,12 @@ export class Practice {
     this.notice.set(null);
     this.lastResume = null;
     this.resumeSaved = true;
+    this.realtime.set(live);
     this.phase.set('playing');
     this.tabs.open(sessionId);
+    if (live) {
+      this.startFeed(this.symbol());
+    }
   }
 
   /**
@@ -737,8 +904,10 @@ export class Practice {
     this.pause();
     clearInterval(this.clock);
     clearInterval(this.liveTimer);
+    this.stopFeed();
     clearTimeout(this.resumeTimer);
     this.tabs.close();
+    this.realtime.set(false);
     this.stopWatching();
     clearLocalResume(sessionId);
     this.deadline.set(null);
@@ -906,12 +1075,14 @@ export class Practice {
     this.saveResumeNow();
     clearInterval(this.clock);
     clearInterval(this.liveTimer);
+    this.stopFeed();
     this.tabs.close();
     this.stopWatching();
     this.deadline.set(null);
     this.focused.set(null);
     this.evaluation.set(null);
     this.replay.set(null);
+    this.realtime.set(false);
     this.sessionId.set(null);
     this.error.set(null);
     this.resumed.set(false);
@@ -951,6 +1122,18 @@ export class Practice {
     const saved = pickResume(session.resume, readLocalResume(session.id));
     const trades = await this.practice.sessionTrades(session.id);
     const replay = await this.rebuild(session, saved, trades);
+    if (session.live) {
+      // The market went on while it was left: orders filled and stops hit since are kept.
+      const filled: PracticeTrade[] = [];
+      const hit: PracticeTrade[] = [];
+      while (!replay.atEnd()) {
+        const result = replay.step()!;
+        filled.push(...result.filled);
+        hit.push(...result.closed);
+      }
+      await Promise.all(filled.map((trade) => this.practice.fillOrder(session.id, trade)));
+      await Promise.all(hit.map((trade) => this.practice.closeTrade(session.id, trade)));
+    }
     const { cancelled, closed } = replay.closeAll('sessionEnd');
     await Promise.all([
       ...cancelled.map((order) => this.practice.cancelOrder(session.id, order)),
@@ -975,6 +1158,9 @@ export class Practice {
     saved: SessionResume | null,
     trades: PracticeTrade[],
   ): Promise<Replay> {
+    if (session.live) {
+      return this.rebuildLive(session, saved, trades);
+    }
     const minutes = await this.market.loadCandles(
       session.symbol,
       '1m',
@@ -996,6 +1182,28 @@ export class Practice {
   }
 
   /**
+   * A live session's replay from the 4-hour bar it was left in up to now, at the minute it was
+   * left on: the page then settles what happened since, as a broker would have.
+   */
+  private async rebuildLive(
+    session: PracticeSession,
+    saved: SessionResume | null,
+    trades: PracticeTrade[],
+  ): Promise<Replay> {
+    const time = resumeTime(session.replayStart, saved, trades);
+    const minutes = await this.market.loadMinutesSince(
+      session.symbol,
+      chartAnchor(time * 1000) - MINUTE,
+    );
+    if (minutes.length < 2) {
+      throw new Error('Not enough data');
+    }
+    const replay = new Replay(minutes, 1, session.startingBalance, true);
+    replay.resume(trades, time);
+    return replay;
+  }
+
+  /**
    * Rebuilds a session as it was left: its trades, the bar it was on, the timeframe, speed,
    * drawings and, for an evaluation, the time left. The replay waits paused.
    */
@@ -1008,25 +1216,40 @@ export class Practice {
     }
     const saved = pickResume(session.resume, readLocalResume(session.id));
     const timeframe = TIMEFRAMES.find((tf) => tf.interval === saved?.interval) ?? DEFAULT_TIMEFRAME;
-    const [trades, history] = await Promise.all([
-      this.practice.sessionTrades(session.id),
-      this.loadHistory(session.symbol, timeframe, session.replayStart),
-    ]);
+    const live = session.live === true;
+    let trades: PracticeTrade[];
+    let history: Candle[];
+    let anchor = session.replayStart;
+    if (live) {
+      trades = await this.practice.sessionTrades(session.id);
+      anchor = chartAnchor(resumeTime(session.replayStart, saved, trades) * 1000);
+      history = await this.loadHistory(session.symbol, timeframe, anchor);
+    } else {
+      [trades, history] = await Promise.all([
+        this.practice.sessionTrades(session.id),
+        this.loadHistory(session.symbol, timeframe, session.replayStart),
+      ]);
+    }
     const replay = await this.rebuild(session, saved, trades);
     this.symbol.set(session.symbol);
-    this.hideDates.set(evaluation?.hideDates ?? saved?.hideDates ?? true);
+    this.hideDates.set(live ? false : (evaluation?.hideDates ?? saved?.hideDates ?? true));
     if (saved && SPEEDS.includes(saved.speed)) {
       this.speed.set(saved.speed);
     }
     this.enter(
       session.id,
       replay,
-      session.replayStart,
+      anchor,
       timeframe,
       history,
       evaluation,
       (saved?.drawings ?? []) as Drawing[],
+      live,
     );
+    if (live) {
+      // Live: what the market did while the student was away, up to now.
+      this.advance(replay, () => true);
+    }
     this.openSessions.update((all) => all.filter((s) => s.id !== session.id));
     this.resumed.set(true);
     const deadline = attemptDeadline(session);
@@ -1068,6 +1291,11 @@ export class Practice {
       previous.hideDates === state.hideDates &&
       previous.drawings === state.drawings;
     this.resumeSaved = false;
+    if (onlyMoved && this.realtime()) {
+      // Live, the minute moves by itself for hours: it is saved when the page goes away (and
+      // with the trades, which say where it was too), not every few seconds of the day's quota.
+      return;
+    }
     const due = Date.now() + (onlyMoved ? RESUME_SAVE_MS : RESUME_CHANGE_MS);
     if (this.resumeTimer && this.resumeDue <= due) {
       return;
@@ -1151,7 +1379,7 @@ export class Practice {
    */
   protected step(): void {
     const replay = this.replay();
-    if (!replay || this.phase() !== 'playing' || this.live()) {
+    if (!replay || this.phase() !== 'playing' || this.clockDriven()) {
       return;
     }
     this.resumed.set(false);
@@ -1175,12 +1403,7 @@ export class Practice {
       closed.push(...result.closed);
       filled.push(...result.filled);
     }
-    // Fills go first: an order can fill and close within the same bar.
-    filled.forEach((trade) => this.persist((id) => this.practice.fillOrder(id, trade)));
-    closed.forEach((trade) => this.persistClose(trade));
-    if (filled.length && !closed.length) {
-      this.persist((sessionId) => this.practice.updateSummary(sessionId, this.summary(replay)));
-    }
+    this.record(replay, filled, closed);
     if (replay.finished()) {
       void this.finish();
     } else if (replay.candles.length - 1 - replay.cursor() < PREFETCH_MINUTES) {
@@ -1188,8 +1411,18 @@ export class Practice {
     }
   }
 
+  /** Saves the orders filled and the trades closed by the candles just shown. */
+  private record(replay: Replay, filled: PracticeTrade[], closed: PracticeTrade[]): void {
+    // Fills go first: an order can fill and close within the same bar.
+    filled.forEach((trade) => this.persist((id) => this.practice.fillOrder(id, trade)));
+    closed.forEach((trade) => this.persistClose(trade));
+    if (filled.length && !closed.length) {
+      this.persist((sessionId) => this.practice.updateSummary(sessionId, this.summary(replay)));
+    }
+  }
+
   protected togglePlay(): void {
-    if (this.live()) {
+    if (this.clockDriven()) {
       return;
     }
     if (this.playing()) {
@@ -1201,7 +1434,7 @@ export class Practice {
   }
 
   protected setSpeed(speed: number): void {
-    if (this.live()) {
+    if (this.clockDriven()) {
       return;
     }
     this.speed.set(speed);
@@ -1611,6 +1844,7 @@ export class Practice {
     this.pause();
     clearInterval(this.clock);
     clearInterval(this.liveTimer);
+    this.stopFeed();
     this.tabs.close();
     this.stopWatching();
     clearTimeout(this.resumeTimer);
@@ -1650,6 +1884,7 @@ export class Practice {
   }
 
   protected reset(): void {
+    this.realtime.set(false);
     this.focused.set(null);
     this.evaluation.set(null);
     this.replay.set(null);
@@ -1756,7 +1991,7 @@ export class Practice {
   protected onKey(event: KeyboardEvent): void {
     const target = event.target;
     const typing = target instanceof Element && target.closest('input, select, textarea');
-    if (event.key === 'ArrowRight' && !typing && !this.live()) {
+    if (event.key === 'ArrowRight' && !typing && !this.clockDriven()) {
       event.preventDefault();
       this.step();
     }
@@ -1765,7 +2000,7 @@ export class Practice {
   /** Fetches the next chunk of one-minute candles, up to `REPLAY_DAYS` after the start. */
   private async loadMinutes(): Promise<void> {
     const replay = this.replay();
-    if (!replay || this.loadingMinutes || replay.hasAllCandles()) {
+    if (!replay || this.loadingMinutes || replay.hasAllCandles() || this.realtime()) {
       return;
     }
     this.loadingMinutes = true;
@@ -1897,6 +2132,20 @@ export class Practice {
       this.history.first().catch(() => this.historyFailed.set(true));
     }
   }
+}
+
+/** Whether two saved positions are the same (a live minute's new price is not a move). */
+function sameResume(a: SessionResume | null, b: SessionResume | null): boolean {
+  return (
+    a === b ||
+    (!!a &&
+      !!b &&
+      a.time === b.time &&
+      a.interval === b.interval &&
+      a.hideDates === b.hideDates &&
+      a.speed === b.speed &&
+      a.drawings === b.drawings)
+  );
 }
 
 /** A stop loss or take profit at the default distance from `reference`, on the right side. */

@@ -416,3 +416,55 @@ describe('Replay', () => {
     expect(replay.trades()).toEqual([]);
   });
 });
+
+describe('Replay.tick (live trading)', () => {
+  /** A live replay on its last candle, the minute at 120 s still forming at 100. */
+  const live = () => {
+    const replay = new Replay(series(candle(120, 100, 100, 100, 100)), 1, 200, true);
+    replay.resume([], 120);
+    return replay;
+  };
+
+  it('updates the forming minute in place and appends the next one', () => {
+    const replay = live();
+    replay.tick(candle(120, 100, 101, 99.5, 100.5));
+    expect(replay.candles).toHaveLength(3);
+    expect(replay.current()).toEqual(candle(120, 100, 101, 99.5, 100.5));
+    replay.tick(candle(180, 100.5, 100.6, 100.4, 100.6));
+    expect(replay.candles).toHaveLength(4);
+    expect(replay.current().time).toBe(180);
+    expect(replay.finished()).toBe(false);
+  });
+
+  it('keeps the minute open and its high and low growing, ignoring older candles', () => {
+    const replay = live();
+    replay.tick(candle(120, 99, 103, 98, 101));
+    replay.tick(candle(120, 99, 102, 99, 102));
+    expect(replay.current()).toEqual(candle(120, 100, 103, 98, 102));
+    expect(replay.tick(candle(60, 1, 1, 1, 1))).toBeNull();
+  });
+
+  it('fills an order placed in the minute only on prices after it', () => {
+    const replay = live();
+    // The minute dipped to 98 before the order was placed at 100.
+    replay.tick(candle(120, 100, 100, 98, 100));
+    replay.open('buy', order({ orderType: 'limit', price: 99 }));
+    // Back up to 100.5 without a new low: the old dip does not fill it.
+    expect(replay.tick(candle(120, 100, 100.5, 98, 100.5))!.filled).toEqual([]);
+    // The price falls back through 99 (the minute's low is still the old dip).
+    const { filled } = replay.tick(candle(120, 100, 100.5, 98, 98.9))!;
+    expect(filled.map((t) => [t.id, t.entryPrice])).toEqual([['buy', 99]]);
+  });
+
+  it('closes a position at its stop loss on a live move', () => {
+    const replay = live();
+    replay.open('long', order({ stopLoss: 99 }));
+    const { closed } = replay.tick(candle(120, 100, 100, 98.9, 99.1))!;
+    expect(closed.map((t) => [t.exitReason, t.exitPrice])).toEqual([['stopLoss', 99]]);
+  });
+
+  it('does nothing while the replay is not on its last candle', () => {
+    const replay = new Replay(series(candle(3, 100, 100, 100, 100)), 1, 200, true);
+    expect(replay.tick(candle(3, 100, 105, 100, 105))).toBeNull();
+  });
+});

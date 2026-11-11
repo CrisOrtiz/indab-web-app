@@ -28,7 +28,7 @@ import { CursorPage } from '../../shared/pager/cursor-pages';
 
 export type NewPracticeSession = Pick<
   PracticeSession,
-  'uid' | 'userName' | 'symbol' | 'interval' | 'replayStart' | 'startingBalance'
+  'uid' | 'userName' | 'symbol' | 'interval' | 'replayStart' | 'startingBalance' | 'live'
 >;
 
 export type SessionSummary = Pick<PracticeSession, 'balance' | 'pnl' | 'tradeCount'>;

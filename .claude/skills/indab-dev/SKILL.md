@@ -365,6 +365,17 @@ Module notes:
   = `reveal` (impact only until the replay reaches the release, then name and figures, never the
   date); evaluations pick `reveal` | `impact` | `off` (`Evaluation.news`). Pages read it with
   `NewsService.feed`; specs get a quiet one from `quietChartSettings()` (`newsEvents`).
+  Live trading (Cris, 2026-11-11, README "Live trading"): free practice in mode "En vivo" runs on
+  Binance's kline WebSocket (`LiveFeed`, `live-feed.ts`, URL under `/market/ws/`), not a replay.
+  The session has `live: true` and `replayStart` = the minute it started; the page's
+  `replayStart` is then the chart anchor (`chartAnchor`, the 4-hour bar of the minute shown) so
+  history and built bars line up. `Replay.tick` updates the forming minute in place (settling on
+  the move since the last update only) and `BarBuilder` rebuilds a bar whose last minute was
+  replaced. No transport (`clockDriven`), dates shown, refused while `goldClosed`. Resuming or
+  closing a live session loads the minutes since it was left (`loadMinutesSince`) and settles
+  them, as a broker would; a reconnect fetches what the stream missed (`catchUpMinutes`).
+  `resume` of a live session is saved to Firestore only on leaving or on changes other than the
+  minute (write quota). Mock the stream in e2e with `page.routeWebSocket`.
   Cris wants exactly XAU/USD, USD/JPY and NASDAQ: only gold (XAUUSDT) is live, the others
   wait for a data source licensed for display to students. Never bundle or serve data whose
   license is personal use only (e.g. Dukascopy). A new timeframe must also be added to the

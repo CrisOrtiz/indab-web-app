@@ -38,6 +38,13 @@ export interface TradeLevels {
   lots?: number;
 }
 
+/** What one candle (or one live update) did: the orders it filled and the trades it closed. */
+export interface StepResult {
+  candle: Candle;
+  filled: PracticeTrade[];
+  closed: PracticeTrade[];
+}
+
 const round = (value: number, decimals: number) => {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
@@ -310,18 +317,53 @@ export class Replay {
     this._cursor.set(cursor);
   }
 
-  /**
-   * Shows the next candle, fills the pending orders it reaches and closes the trades whose
-   * stop loss or take profit it hits. An order filled on this candle is checked for its
-   * stops from the next candle on. If equity then falls below `STOP_OUT_LEVEL` of the margin
-   * in use, every position is closed at the close (stop out), as a broker would.
-   */
-  step(): { candle: Candle; filled: PracticeTrade[]; closed: PracticeTrade[] } | null {
+  /** Shows the next candle and settles the orders and trades it reaches (`settleOn`). */
+  step(): StepResult | null {
     if (this.atEnd()) {
       return null;
     }
     this._cursor.update((i) => i + 1);
-    const candle = this.current();
+    return this.settleOn(this.current());
+  }
+
+  /**
+   * Live trading: Binance's newest one-minute candle, sent a few times a second while it forms.
+   * The same minute updates the last candle in place; a later one is appended and shown. Orders
+   * fill and stops trigger only on the price path since the previous update (from its close to
+   * the new close, through a new high or low the minute reached meanwhile), never on prices from
+   * before an order was placed. Older candles, or a replay not on its last candle, are ignored.
+   */
+  tick(candle: Candle): StepResult | null {
+    const last = this.candles.at(-1)!;
+    if (candle.time < last.time || !this.atEnd()) {
+      return null;
+    }
+    if (candle.time === last.time) {
+      const high = Math.max(candle.high, last.high);
+      const low = Math.min(candle.low, last.low);
+      const move: Candle = {
+        time: candle.time,
+        open: last.close,
+        high: high > last.high ? high : Math.max(last.close, candle.close),
+        low: low < last.low ? low : Math.min(last.close, candle.close),
+        close: candle.close,
+      };
+      const merged: Candle = { ...candle, open: last.open, high, low };
+      this._candles.update((list) => [...list.slice(0, -1), merged]);
+      return { ...this.settleOn(move), candle: merged };
+    }
+    this._candles.update((list) => [...list, candle]);
+    this._cursor.set(this.candles.length - 1);
+    return this.settleOn(candle);
+  }
+
+  /**
+   * Fills the pending orders `candle` reaches and closes the trades whose stop loss or take
+   * profit it hits. An order filled on it is checked for its stops from the next one on. If
+   * equity then falls below `STOP_OUT_LEVEL` of the margin in use, every position is closed at
+   * the close (stop out), as a broker would.
+   */
+  private settleOn(candle: Candle): StepResult {
     const closed: PracticeTrade[] = [];
     for (const trade of this.openTrades()) {
       const hit = stopHit(trade, candle);

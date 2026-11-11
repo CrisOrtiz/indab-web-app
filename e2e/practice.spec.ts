@@ -1,4 +1,4 @@
-import { Locator, expect, test } from '@playwright/test';
+import { Locator, WebSocketRoute, expect, test } from '@playwright/test';
 import { createUser, listDocuments, resetEmulators, setDocument } from './emulators';
 import { endSession, nav, signIn, signOut } from './helpers';
 import { mockMarket, mockWavyMarket } from './market';
@@ -880,4 +880,88 @@ test('the chart shows the economic news of the replayed days, revealing them on 
   await chart.getByRole('button', { name: '1 noticia, impacto alto' }).click();
   await expect(card).toContainText('Nonfarm Payrolls');
   await expect(card).toContainText('151K');
+});
+
+test('a student trades gold live on the candles as they form', async ({ page }) => {
+  // Binance as of now: flat at 4000 up to the minute still forming, and its stream on demand.
+  const minute = Math.floor(Date.now() / 60_000) * 60;
+  await page.route(/fapi\.binance\.com\/fapi\/v1\/klines/, (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    const seconds = { '1m': 60, '15m': 900, '1h': 3600, '4h': 14400 }[params.get('interval')!]!;
+    const limit = Number(params.get('limit'));
+    const times = params.has('endTime')
+      ? Array.from(
+          { length: limit },
+          (_, i) =>
+            Math.ceil((Number(params.get('endTime')) + 1) / 1000 / seconds) * seconds -
+            (limit - i) * seconds,
+        )
+      : Array.from(
+          { length: limit },
+          (_, i) =>
+            Math.ceil(Number(params.get('startTime')) / 1000 / seconds) * seconds + i * seconds,
+        ).filter((time) => time <= minute);
+    const json = times.map((time) => [time * 1000, '4000', '4000', '4000', '4000', '1', 0, '1', 5]);
+    return route.fulfill({ json, headers: { 'Access-Control-Allow-Origin': '*' } });
+  });
+  let stream: WebSocketRoute | null = null;
+  await page.routeWebSocket(/fstream\.binance\.com\/market\/ws\/xauusdt@kline_1m/, (ws) => {
+    stream = ws;
+  });
+  const send = (price: number) =>
+    stream!.send(
+      JSON.stringify({
+        e: 'kline',
+        s: 'XAUUSDT',
+        k: {
+          t: minute * 1000,
+          i: '1m',
+          o: '4000',
+          h: `${price}`,
+          l: '4000',
+          c: `${price}`,
+          v: '3',
+          n: 9,
+          x: false,
+        },
+      }),
+    );
+
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await page.getByLabel(/En vivo: el mercado de ahora/).check();
+  const start = page.getByRole('button', { name: 'Empezar en vivo' });
+  if (await page.getByText('El mercado del oro está cerrado ahora').isVisible()) {
+    // Gold's weekend or daily break: live trading waits for the market.
+    await expect(start).toBeDisabled();
+    return;
+  }
+  await start.click();
+  await expect(page.getByText('Velas del mercado en tiempo real.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Siguiente vela' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Comprar 0.01 lotes a mercado' }).click();
+  await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
+
+  send(4010);
+  await expect(page.locator('.market .price')).toHaveText('4,010.00');
+  await expect(page.locator('.open-count .pnl')).toHaveText('+10.00 USD');
+  const [session] = await listDocuments('practiceSessions');
+  expect(session?.['live']).toBe(true);
+
+  // A reload picks it up live, with the position still open.
+  await page.reload();
+  await expect(page.getByText('Retomaste tu sesión donde la dejaste')).toBeVisible();
+  await expect(page.getByText('Velas del mercado en tiempo real.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
+  send(4005);
+  await expect(page.locator('.market .price')).toHaveText('4,005.00');
+
+  await endSession(page);
+  await expect(page.getByRole('heading', { name: 'Sesión terminada' })).toBeVisible();
+  await expect(page.getByText('operado en vivo')).toBeVisible();
+  await page.getByRole('button', { name: 'Nueva práctica' }).click();
+  await expect(page.locator('table.trades .live-badge')).toHaveText('En vivo');
+  await expect
+    .poll(async () => (await listDocuments('practiceSessions'))[0]?.['status'])
+    .toBe('finished');
 });

@@ -206,4 +206,37 @@ describe('MarketDataService', () => {
     await tracked;
     expect(loading.busy()).toBe(false);
   });
+
+  it('loads every minute up to now for live trading, a chunk of 1000 at a time', async () => {
+    const minute = 60_000;
+    // Wednesday 11 November 2026, 23:00 UTC (after gold's daily break); the data ends 1200
+    // minutes later (now), before the next break.
+    const from = Date.UTC(2026, 10, 11, 23);
+    const end = from + 1200 * minute;
+    const fetch = vi.fn(async (url: string) => {
+      const params = new URL(url).searchParams;
+      const start = Number(params.get('startTime'));
+      const limit = Number(params.get('limit'));
+      const count = Math.max(0, Math.min(limit, (end - start) / minute));
+      const rows = Array.from({ length: count }, (_, i) => [
+        start + i * minute,
+        '1',
+        '1',
+        '1',
+        '1',
+        '1',
+        0,
+        '1',
+        3,
+      ]);
+      return new Response(JSON.stringify(rows));
+    });
+    vi.stubGlobal('fetch', fetch);
+    const candles = await service.loadMinutesSince('XAUUSDT', from);
+    expect(candles).toHaveLength(1200);
+    expect(candles[1000].time).toBe(from / 1000 + 1000 * 60);
+    // One chunk at most: the first 1000.
+    expect(await service.catchUpMinutes('XAUUSDT', end - 3 * minute)).toHaveLength(3);
+    expect(await service.loadMinutesSince('XAUUSDT', from, 1)).toHaveLength(1000);
+  });
 });

@@ -33,6 +33,20 @@ describe('BarBuilder', () => {
     expect(new BarBuilder(300, 1).build(traded, 7).map((bar) => bar.volume)).toEqual([15, 13]);
   });
 
+  it('builds the last bar again when its last minute changes in place (live)', () => {
+    const builder = new BarBuilder(300, 1);
+    const live = minutes.slice(0, 8);
+    const before = builder.build(live, 7);
+    expect(before.at(-1)).toEqual({ time: 6300, open: 104, high: 107, low: 103, close: 106 });
+    live[7] = { ...live[7], high: 120, close: 118 };
+    const after = builder.build(live, 7);
+    expect(after.at(-1)).toEqual({ time: 6300, open: 104, high: 120, low: 103, close: 118 });
+    // The completed bar before it is untouched.
+    expect(after[0]).toBe(before[0]);
+    // The same minute again changes nothing.
+    expect(builder.build(live, 7).at(-1)).toEqual(after.at(-1));
+  });
+
   it('starts over if asked for fewer minutes than it has', () => {
     const builder = new BarBuilder(60, 1);
     builder.build(minutes, 5);

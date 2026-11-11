@@ -750,6 +750,7 @@ export const en: Messages = {
     riskReward: 'Risk / reward',
     marketCaps: 'MARKET',
     hint: 'Tap the + next to the price to add an order, then drag its line, TP and SL. Right arrow → next bar.',
+    hintLive: 'Tap the + next to the price to add an order, then drag its line, TP and SL.',
     balance: 'Balance',
     equity: 'Equity',
     openPnl: 'Open P/L',
@@ -903,6 +904,23 @@ export const en: Messages = {
     extraTimeGiven: (minutes: number) => `Staff gave you ${minutes} more minutes.`,
     attemptReset:
       'Staff restarted your attempt at this evaluation. You can start it again from the list.',
+    mode: 'Mode',
+    modeReplay: 'Replay: a stretch of the past, at your pace',
+    modeLive: "Live: today's market, in real time",
+    liveIntro:
+      "You trade gold on the market's candles as they form, with no pause or speed. If you leave, your positions and orders keep going as at a broker: stop losses and take profits trigger while you are away and you see the outcome when you come back.",
+    marketClosed:
+      'The gold market is closed right now. It opens from Sunday 18:00 to Friday 17:00 (New York time), with a daily break from 17:00 to 18:00.',
+    liveNoData: 'The market just opened and there are no candles yet. Try again in a minute.',
+    beginLive: 'Start live',
+    livePractice: 'Live practice',
+    liveSummary: (instrument: string) => `${instrument} · traded live`,
+    liveStatus: {
+      connecting: 'Connecting to the market…',
+      live: 'Market candles in real time.',
+      reconnecting: 'Lost the connection to the market. Reconnecting…',
+      closed: 'Market closed: candles come back when it opens. Your orders stay active.',
+    },
     live: 'Live',
     liveHint:
       'The chart moves on its own with the clock: it cannot be paused or skipped. If you leave, the market goes on and you see it where it is when you come back.',

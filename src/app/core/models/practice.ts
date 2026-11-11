@@ -61,6 +61,12 @@ export interface PracticeSession {
   extraMinutes?: number;
   /** Where the replay was left while active. */
   resume?: SessionResume;
+  /**
+   * Live trading (Cris, 2026-11-11): the session runs on the market's candles as they form
+   * (Binance's stream), not on a replay. `replayStart` is then the minute it started. Missing
+   * on replays.
+   */
+  live?: boolean;
 }
 
 /**

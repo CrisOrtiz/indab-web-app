@@ -34,7 +34,7 @@ rules_version = '2';
 //   examSubmissions/{examId}_{uid}_{n}   a student's attempt n, saved as they answer until handed in
 //   examGrades/{submissionId}            points per question set by staff; the student reads it once
 //                                        the form's results are published
-//   practiceSessions/{id}                chart-replay practice by a student with academy access;
+//   practiceSessions/{id}                chart-replay (or live) practice by a student with academy access;
 //                                        owner writes while active (with where the replay is, so
 //                                        a reload picks it up), trainers and admins read all.
 //                                        Free sessions have evaluationId null; an evaluation attempt
@@ -952,13 +952,23 @@ service cloud.firestore {
           && evaluation(data.evaluationId).resultsPublished == true;
       }
 
+      // Live trading on the market's candles as they form: free practice only, starting now
+      // (replayStart is the minute it started, by a clock a few minutes off at most).
+      function validLive(data) {
+        return !('live' in data)
+          || (data.live == true
+            && data.evaluationId == null
+            && data.replayStart > request.time.toMillis() - 600000
+            && data.replayStart < request.time.toMillis() + 300000);
+      }
+
       allow read: if isOwner(resource.data.uid) || isStaff()
         || (hasAcademyAccess() && publishedAttempt(resource.data));
 
       allow create: if hasAcademyAccess()
         && request.resource.data.keys().hasOnly(['uid', 'userName', 'symbol', 'interval',
           'replayStart', 'startingBalance', 'balance', 'pnl', 'tradeCount', 'status', 'startedAt',
-          'evaluationId', 'durationMinutes'])
+          'evaluationId', 'durationMinutes', 'live'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.userName is string
         && request.resource.data.userName.size() <= 120
@@ -972,6 +982,7 @@ service cloud.firestore {
         && request.resource.data.tradeCount == 0
         && request.resource.data.status == 'active'
         && request.resource.data.startedAt == request.time
+        && validLive(request.resource.data)
         && ((request.resource.data.evaluationId == null
             && !('durationMinutes' in request.resource.data))
           || (request.resource.data.evaluationId is string
