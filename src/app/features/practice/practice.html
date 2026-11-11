@@ -533,6 +533,12 @@
             </table>
           }
         }
+        <app-trade-journal
+          [trades]="r.trades()"
+          [graded]="!!evaluation()"
+          [focus]="journalFocus()"
+          (saved)="saveJournal($event.trade, $event.journal)"
+        />
       }
     }
 

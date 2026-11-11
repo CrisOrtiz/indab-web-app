@@ -641,6 +641,8 @@ export const pt: Messages = {
     noFilled: 'Nenhuma ordem desta sessão foi executada.',
     result: 'Resultado',
     stillOpen: 'Ainda aberta',
+    journal: 'Diário',
+    noJournal: 'Sem motivo de entrada.',
   },
 
   trading: {
@@ -829,8 +831,8 @@ export const pt: Messages = {
       end: 'Quando o tempo acaba ela é entregue sozinha: as ordens pendentes são canceladas e as posições abertas fecham no último preço.',
       warnings: 'Avisaremos quando faltarem 5 minutos e 1 minuto.',
       gradeTitle: 'Como é avaliada',
-      grade:
-        'Nota INDAB de 0 a 100: 30% resultado em R (o que você ganhou dividido pelo que arriscou até o stop), 25% controle de risco, 15% disciplina e 30% rubrica do seu mentor. Você é aprovado com 70.',
+      grade: (passing: number) =>
+        `Nota INDAB de 0 a 100: 25% resultado em R (o que você ganhou dividido pelo que arriscou até o stop), 25% controle de risco, 15% disciplina, 25% rubrica do seu mentor e 10% diário de operações. Você é aprovado com ${passing}.`,
       tipStop:
         'Coloque stop loss e take profit em cada operação. Tirar o stop loss antes de fechar deixa você «Não aprovado».',
       tipRisk:
@@ -841,9 +843,22 @@ export const pt: Messages = {
         `Um stop out ou perder mais de ${limit}% da conta deixa você «Não aprovado», mesmo com nota boa.`,
       tipMin: (trades: number) =>
         `Feche pelo menos ${trades} operações; com menos você fica «Sem avaliação».`,
+      tipJournal:
+        'Escreva no diário por que você entrou em cada operação (setup, zona, confirmação). Você pode escrever ou corrigir até a avaliação terminar.',
       read: 'Li as instruções e estou pronto',
       start: 'Começar agora',
       cancel: 'Agora não',
+    },
+    journal: {
+      title: 'Diário de operações',
+      hint: 'Anote por que você entrou em cada operação: ajuda a revisar suas decisões.',
+      hintGraded: (min: number) =>
+        `Escreva por que você entrou em cada operação (pelo menos ${min} letras). Conta para sua nota e você pode corrigir até a avaliação terminar.`,
+      placeholder: 'Setup, zona, confirmação…',
+      save: 'Salvar',
+      trade: (n: number) => `Operação ${n}`,
+      pending: 'Ordem pendente',
+      missing: 'Falta o motivo de entrada.',
     },
     dismissWarning: 'Fechar aviso',
     warnFive: 'Faltam 5 minutos de avaliação.',
@@ -1071,6 +1086,10 @@ export const pt: Messages = {
     description: 'Instruções (opcional)',
     market: 'Mercado',
     duration: 'Tempo limite (minutos)',
+    passingScore: 'Nota de aprovação',
+    passingScoreHint: 'Nota INDAB mínima para aprovar, de 0 a 100.',
+    passingScoreRange: 'A nota de aprovação deve ser um número inteiro de 0 a 100.',
+    passesWith: (score: number) => `aprova com ${score}`,
     rubric: {
       rate: 'Avaliar com rubrica',
       column: 'Rubrica',
@@ -1094,6 +1113,18 @@ export const pt: Messages = {
           label: 'Leitura de contexto',
           hint: 'Leu tendência, estrutura e notícias antes de operar.',
         },
+        management: {
+          label: 'Gestão da operação',
+          hint: 'Conduziu bem a posição aberta: parciais, breakeven, saída na hora certa.',
+        },
+        emotions: {
+          label: 'Controle emocional',
+          hint: 'Operou com calma, sem medo nem euforia, e aceitou as perdas.',
+        },
+        journal: {
+          label: 'Qualidade do diário',
+          hint: 'Os motivos de entrada são claros e batem com o que fez.',
+        },
         discipline: {
           label: 'Disciplina',
           hint: 'Seguiu o plano sem operar demais nem por impulso.',
@@ -1109,10 +1140,18 @@ export const pt: Messages = {
     },
     score: {
       column: 'Nota INDAB',
-      how: 'Nota INDAB (0 a 100) = 30% resultado em R + 25% controle de risco + 15% disciplina + 30% rubrica do mentor. Aprova com 70; um stop out, perder mais de 5% ou tirar o stop loss não aprovam, e com menos de 2 operações fica sem avaliação. Quem ainda não tem rubrica vem depois, por lucro.',
+      how: (passing: number) =>
+        `Nota INDAB (0 a 100) = 25% resultado em R + 25% controle de risco + 15% disciplina + 25% rubrica do mentor + 10% diário. Aprova com ${passing}; um stop out, perder mais de 5% ou tirar o stop loss não aprovam, e com menos de 2 operações fica sem avaliação. Quem ainda não tem rubrica vem depois, por lucro.`,
       missing: 'Sem rubrica',
-      parts: (result: string, risk: string, discipline: string, rubric: string) =>
-        `Resultado ${result} · Risco ${risk} · Disciplina ${discipline} · Rubrica ${rubric}`,
+      parts: (
+        result: string,
+        risk: string,
+        discipline: string,
+        rubric: string,
+        journal: string | null,
+      ) =>
+        `Resultado ${result} · Risco ${risk} · Disciplina ${discipline} · Rubrica ${rubric}` +
+        (journal === null ? '' : ` · Diário ${journal}`),
       verdicts: { passed: 'Aprovado', failed: 'Não aprovado', unrated: 'Sem avaliação' },
       failedBy: {
         stopOut: 'stop out',

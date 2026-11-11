@@ -6,6 +6,8 @@ import { Icon } from '../../../shared/icon/icon';
 import { LocalDatePipe } from '../../../core/i18n/local-date.pipe';
 import {
   DEFAULT_PACE,
+  DEFAULT_PASSING_SCORE,
+  passingScoreOf,
   EVALUATION_PACES,
   Evaluation,
   EvaluationAdjustment,
@@ -52,6 +54,8 @@ interface EvaluationForm {
   durationMinutes: number;
   /** Market minutes per real minute: the attempt runs by the clock at this pace. */
   pace: number;
+  /** The INDAB score that passes, 0 to 100. */
+  passingScore: number;
   /** yyyy-mm-ddTHH:mm, local time. */
   opensAt: string;
   closesAt: string;
@@ -103,6 +107,7 @@ export class AdminEvaluations {
   protected readonly maxDuration = MAX_DURATION;
   protected readonly newsChoices = EVALUATION_NEWS;
   protected readonly paces = EVALUATION_PACES;
+  protected readonly passingScoreOf = passingScoreOf;
   /** "2 d 12 h": the market time an attempt covers at the form's pace and time limit. */
   protected readonly covered = (pace: number, minutes: number) =>
     formatElapsed(marketCovered(pace, minutes));
@@ -222,6 +227,7 @@ export class AdminEvaluations {
       news: EVALUATION_NEWS[0],
       durationMinutes: 60,
       pace: DEFAULT_PACE,
+      passingScore: DEFAULT_PASSING_SCORE,
       opensAt: toLocalInput(opens, this.zones.zone()),
       closesAt: toLocalInput(new Date(opens.getTime() + 7 * DAY), this.zones.zone()),
       studentIds: [],
@@ -242,6 +248,7 @@ export class AdminEvaluations {
       news: evaluation.news ?? EVALUATION_NEWS[0],
       durationMinutes: evaluation.durationMinutes,
       pace: evaluation.pace ?? DEFAULT_PACE,
+      passingScore: passingScoreOf(evaluation),
       opensAt: toLocalInput(evaluation.opensAt.toDate(), this.zones.zone()),
       closesAt: toLocalInput(evaluation.closesAt.toDate(), this.zones.zone()),
       studentIds: [...evaluation.studentIds],
@@ -271,6 +278,7 @@ export class AdminEvaluations {
       news: evaluation.news ?? EVALUATION_NEWS[0],
       durationMinutes: evaluation.durationMinutes,
       pace: evaluation.pace ?? DEFAULT_PACE,
+      passingScore: passingScoreOf(evaluation),
       opensAt: toLocalInput(opens, this.zones.zone()),
       closesAt: toLocalInput(new Date(opens.getTime() + length), this.zones.zone()),
       studentIds: [],
@@ -302,11 +310,14 @@ export class AdminEvaluations {
     const opensAt = fromLocalInput(form.opensAt, this.zones.zone());
     const closesAt = fromLocalInput(form.closesAt, this.zones.zone());
     const duration = Math.round(Number(form.durationMinutes));
+    const passingScore = Number(form.passingScore);
     let problem: string | null = null;
     if (!form.title.trim()) {
       problem = t.titleRequired;
     } else if (!(duration >= MIN_DURATION && duration <= MAX_DURATION)) {
       problem = t.durationRange(MIN_DURATION, MAX_DURATION);
+    } else if (!(Number.isInteger(passingScore) && passingScore >= 0 && passingScore <= 100)) {
+      problem = t.passingScoreRange;
     } else if (isNaN(opensAt.getTime()) || isNaN(closesAt.getTime()) || closesAt <= opensAt) {
       problem = t.windowInvalid;
     } else if (!form.randomStart && !form.startDate) {
@@ -341,6 +352,7 @@ export class AdminEvaluations {
       startingBalance: base?.startingBalance ?? STARTING_BALANCE,
       durationMinutes: duration,
       pace: (EVALUATION_PACES as readonly number[]).includes(form.pace) ? form.pace : DEFAULT_PACE,
+      passingScore,
       opensAt,
       closesAt,
       studentIds: form.studentIds,
@@ -455,7 +467,11 @@ export class AdminEvaluations {
       if (this.selected() === evaluation.id) {
         this.attempts.set(sessions);
         this.adjustments.set(adjustments);
-        const standings = evaluationStandings(sessions, students, Date.now(), { trades, rubrics });
+        const standings = evaluationStandings(sessions, students, Date.now(), {
+          trades,
+          rubrics,
+          passingScore: passingScoreOf(evaluation),
+        });
         this.standings.set(standings);
         void this.syncGrades(evaluation.id, standings, grades);
       }
@@ -567,7 +583,7 @@ export class AdminEvaluations {
         before.score !== score.score ||
         before.verdict !== score.verdict ||
         (before.failedBy ?? []).join() !== score.failedBy.join() ||
-        (['result', 'risk', 'discipline', 'rubric'] as const).some(
+        (['result', 'risk', 'discipline', 'rubric', 'journal'] as const).some(
           (part) => before.parts[part] !== score.parts![part],
         )
       );

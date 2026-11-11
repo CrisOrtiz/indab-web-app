@@ -648,6 +648,8 @@ export const en: Messages = {
     noFilled: 'No order in this session was filled.',
     result: 'Result',
     stillOpen: 'Still open',
+    journal: 'Journal',
+    noJournal: 'No entry reason.',
   },
 
   trading: {
@@ -833,8 +835,8 @@ export const en: Messages = {
       end: 'When time is up it is handed in: pending orders are cancelled and open positions close at the last price.',
       warnings: 'We will warn you when 5 minutes and 1 minute are left.',
       gradeTitle: 'How it is graded',
-      grade:
-        "INDAB score from 0 to 100: 30% result in R (what you made divided by what you risked to your stop), 25% risk control, 15% discipline and 30% your mentor's rubric. You pass with 70.",
+      grade: (passing: number) =>
+        `INDAB score from 0 to 100: 25% result in R (what you made divided by what you risked to your stop), 25% risk control, 15% discipline, 25% your mentor's rubric and 10% trade journal. You pass with ${passing}.`,
       tipStop:
         'Set a stop loss and take profit on every trade. Removing the stop loss before closing means "Not passed".',
       tipRisk:
@@ -845,9 +847,22 @@ export const en: Messages = {
         `A stop out or losing more than ${limit}% of the account means "Not passed", even with a good score.`,
       tipMin: (trades: number) =>
         `Close at least ${trades} trades; with fewer you are left "Not rated".`,
+      tipJournal:
+        'Write in the journal why you entered each trade (setup, zone, confirmation). You can write or fix it until the evaluation ends.',
       read: 'I read the instructions and I am ready',
       start: 'Start now',
       cancel: 'Not now',
+    },
+    journal: {
+      title: 'Trade journal',
+      hint: 'Note why you entered each trade: it helps you review your decisions.',
+      hintGraded: (min: number) =>
+        `Write why you entered each trade (at least ${min} characters). It counts for your grade and you can fix it until the evaluation ends.`,
+      placeholder: 'Setup, zone, confirmation…',
+      save: 'Save',
+      trade: (n: number) => `Trade ${n}`,
+      pending: 'Pending order',
+      missing: 'Entry reason missing.',
     },
     dismissWarning: 'Dismiss warning',
     warnFive: '5 minutes of the evaluation left.',
@@ -1074,6 +1089,10 @@ export const en: Messages = {
     description: 'Instructions (optional)',
     market: 'Market',
     duration: 'Time limit (minutes)',
+    passingScore: 'Passing score',
+    passingScoreHint: 'Lowest INDAB score that passes, 0 to 100.',
+    passingScoreRange: 'The passing score must be a whole number from 0 to 100.',
+    passesWith: (score: number) => `passes with ${score}`,
     rubric: {
       rate: 'Rate with rubric',
       column: 'Rubric',
@@ -1097,6 +1116,18 @@ export const en: Messages = {
           label: 'Reading the context',
           hint: 'Read trend, structure and news before trading.',
         },
+        management: {
+          label: 'Trade management',
+          hint: 'Handled the open position well: partials, break-even, exiting on time.',
+        },
+        emotions: {
+          label: 'Emotional control',
+          hint: 'Traded calmly, without fear or euphoria, and accepted losses.',
+        },
+        journal: {
+          label: 'Journal quality',
+          hint: 'Their entry reasons are clear and match what they did.',
+        },
         discipline: {
           label: 'Discipline',
           hint: 'Followed the plan without overtrading or trading on impulse.',
@@ -1112,10 +1143,18 @@ export const en: Messages = {
     },
     score: {
       column: 'INDAB score',
-      how: 'INDAB score (0 to 100) = 30% result in R + 25% risk control + 15% discipline + 30% mentor rubric. 70 passes; a stop out, losing more than 5% or removing the stop loss do not pass, and fewer than 2 trades leave it not rated. Attempts without a rubric yet follow, by profit.',
+      how: (passing: number) =>
+        `INDAB score (0 to 100) = 25% result in R + 25% risk control + 15% discipline + 25% mentor rubric + 10% trade journal. ${passing} passes; a stop out, losing more than 5% or removing the stop loss do not pass, and fewer than 2 trades leave it not rated. Attempts without a rubric yet follow, by profit.`,
       missing: 'No rubric yet',
-      parts: (result: string, risk: string, discipline: string, rubric: string) =>
-        `Result ${result} · Risk ${risk} · Discipline ${discipline} · Rubric ${rubric}`,
+      parts: (
+        result: string,
+        risk: string,
+        discipline: string,
+        rubric: string,
+        journal: string | null,
+      ) =>
+        `Result ${result} · Risk ${risk} · Discipline ${discipline} · Rubric ${rubric}` +
+        (journal === null ? '' : ` · Journal ${journal}`),
       verdicts: { passed: 'Passed', failed: 'Not passed', unrated: 'Not rated' },
       failedBy: {
         stopOut: 'stop out',

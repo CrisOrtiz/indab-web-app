@@ -1,6 +1,11 @@
 import { Component, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { I18n } from '../../../core/i18n/i18n.service';
-import { RUBRIC_CRITERIA, RubricCriterion, RubricScores } from '../../../core/models/evaluation';
+import {
+  RUBRIC_CRITERIA,
+  RubricCriterion,
+  RubricScores,
+  SavedRubricScores,
+} from '../../../core/models/evaluation';
 
 /** Scores 1 to 5 a mentor picks from. */
 const SCALE = [1, 2, 3, 4, 5] as const;
@@ -95,17 +100,20 @@ export class RubricForm {
   protected readonly i18n = inject(I18n);
 
   readonly studentName = input.required<string>();
-  /** The rubric saved before, if any. */
-  readonly initial = input<RubricScores | null>(null);
+  /** The rubric saved before, if any (one with older criteria keeps the ones still asked). */
+  readonly initial = input<SavedRubricScores | null>(null);
   readonly busy = input(false);
   readonly saved = output<RubricScores>();
   readonly cancelled = output<void>();
 
   protected readonly criteria = RUBRIC_CRITERIA;
   protected readonly scale = SCALE;
-  protected readonly scores = linkedSignal<Partial<RubricScores>>(() => ({
-    ...(this.initial() ?? {}),
-  }));
+  protected readonly scores = linkedSignal<Partial<RubricScores>>(() => {
+    const initial = this.initial() ?? {};
+    return Object.fromEntries(
+      RUBRIC_CRITERIA.filter((c) => initial[c]).map((c) => [c, initial[c]]),
+    ) as Partial<RubricScores>;
+  });
   protected readonly incomplete = signal(false);
 
   protected pick(criterion: RubricCriterion, value: number): void {

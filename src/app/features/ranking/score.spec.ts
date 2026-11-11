@@ -1,5 +1,12 @@
 import { PracticeTrade } from '../../core/models/practice';
-import { indabScore, resultPoints, riskPoints, rubricPoints, tradingRecord } from './score';
+import {
+  indabScore,
+  journalPoints,
+  resultPoints,
+  riskPoints,
+  rubricPoints,
+  tradingRecord,
+} from './score';
 
 /** A closed long from 100 that risks 2 USD a unit to its stop at 98. */
 const closed = (pnl: number, extra: Partial<PracticeTrade> = {}) =>
@@ -20,7 +27,7 @@ const closed = (pnl: number, extra: Partial<PracticeTrade> = {}) =>
 /** The same trade an hour later. */
 const later = (pnl: number, extra: Partial<PracticeTrade> = {}) =>
   closed(pnl, { entryTime: 3600, exitTime: 3660, ...extra });
-const all = (n: number) => ({ plan: n, risk: n, stops: n, context: n, discipline: n });
+const all = (n: number) => ({ plan: n, context: n, management: n, emotions: n, journal: n });
 
 describe('INDAB score', () => {
   it('gives 50 result points at 0 R, 0 and 100 at -5 R and +5 R', () => {
@@ -74,16 +81,32 @@ describe('INDAB score', () => {
     expect(rubricPoints(all(5))).toBe(100);
   });
 
-  it('weighs 30 % result, 25 % risk, 15 % discipline and 30 % rubric, and passes at 70', () => {
-    // +4 and +2 on 2 risked = 3 R = 80; no faults; rubric 4 = 75.
-    const score = indabScore([closed(4), later(2)], 200, all(4));
+  it('counts the share of closed trades with a reason written in the journal', () => {
+    const why = { journal: 'Rechazo en soporte H1' };
+    expect(journalPoints([])).toBe(0);
+    expect(journalPoints([closed(4, why), later(2)])).toBe(50);
+    // Too short to count.
+    expect(journalPoints([closed(4, why), later(2, { journal: ' compra ' })])).toBe(50);
+    expect(journalPoints([closed(4, why), later(2, why)])).toBe(100);
+  });
+
+  it('weighs 25 % result, 25 % risk, 15 % discipline, 25 % rubric and 10 % journal', () => {
+    const why = { journal: 'Ruptura y retesteo' };
+    // +4 and +2 on 2 risked = 3 R = 80; no faults; rubric 5 = 100; both journaled = 100.
+    const score = indabScore([closed(4, why), later(2, why)], 200, all(5));
     expect(score).toEqual({
-      score: 86.5,
-      parts: { result: 80, risk: 100, discipline: 100, rubric: 75 },
+      score: 95,
+      parts: { result: 80, risk: 100, discipline: 100, rubric: 100, journal: 100 },
       verdict: 'passed',
       failedBy: [],
     });
-    expect(indabScore([closed(4), later(2)], 200, all(1)).verdict).toBe('failed');
+    // Rubric 1: 70, which passes at the default 70 but not at an evaluation's 75.
+    expect(indabScore([closed(4, why), later(2, why)], 200, all(1)).verdict).toBe('passed');
+    expect(indabScore([closed(4, why), later(2, why)], 200, all(1), 75).verdict).toBe('failed');
+  });
+
+  it('averages rubrics saved with the criteria before 2026-11-11', () => {
+    expect(rubricPoints({ plan: 5, risk: 5, stops: 5, context: 5, discipline: 1 })).toBe(80);
   });
 
   it('leaves attempts with fewer than 2 closed trades unrated', () => {

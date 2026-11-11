@@ -1,10 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
-import { RubricScores } from '../../../core/models/evaluation';
+import { SavedRubricScores } from '../../../core/models/evaluation';
 import { RubricForm } from './rubric-form';
 
 describe('RubricForm', () => {
-  const render = async (initial: RubricScores | null) => {
+  const render = async (initial: SavedRubricScores | null) => {
     const fixture = TestBed.createComponent(RubricForm);
     fixture.componentRef.setInput('studentName', 'Ana');
     fixture.componentRef.setInput('initial', initial);
@@ -24,22 +24,53 @@ describe('RubricForm', () => {
   it('starts from the saved rubric and saves the change', async () => {
     const { fixture, el, saved, checked } = await render({
       plan: 4,
-      risk: 3,
-      stops: 5,
-      context: 2,
-      discipline: 4,
+      context: 3,
+      management: 5,
+      emotions: 2,
+      journal: 4,
     });
     expect(checked()).toEqual(['4', '3', '5', '2', '4']);
     el.querySelectorAll('.scale')[1].querySelectorAll<HTMLButtonElement>('button')[4].click();
     await fixture.whenStable();
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
-    expect(saved).toHaveBeenCalledWith({ plan: 4, risk: 5, stops: 5, context: 2, discipline: 4 });
+    expect(saved).toHaveBeenCalledWith({
+      plan: 4,
+      context: 5,
+      management: 5,
+      emotions: 2,
+      journal: 4,
+    });
+  });
+
+  it('keeps only the criteria still asked from a rubric saved before', async () => {
+    const { fixture, el, saved, checked } = await render({
+      plan: 4,
+      risk: 3,
+      stops: 5,
+      context: 2,
+      discipline: 4,
+    });
+    expect(checked()).toEqual(['4', '2', null, null, null]);
+    expect(el.textContent).toContain('Control emocional');
+    expect(el.textContent).not.toContain('Respeto de SL y TP');
+    [2, 3, 4].forEach((i) =>
+      el.querySelectorAll('.scale')[i].querySelectorAll<HTMLButtonElement>('button')[2].click(),
+    );
+    await fixture.whenStable();
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    expect(saved).toHaveBeenCalledWith({
+      plan: 4,
+      context: 2,
+      management: 3,
+      emotions: 3,
+      journal: 3,
+    });
   });
 
   it('asks for every criterion and can be cancelled', async () => {
     const { fixture, el, saved, cancelled, checked } = await render(null);
     expect(checked()).toEqual([null, null, null, null, null]);
-    expect(el.textContent).toContain('Disciplina');
+    expect(el.textContent).toContain('Calidad de la bitácora');
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
     await fixture.whenStable();
     expect(el.querySelector('[role="alert"]')?.textContent).toContain('Elige una nota');

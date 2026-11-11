@@ -1,13 +1,23 @@
-import { RubricScores, rubricAverage } from '../../core/models/evaluation';
+import {
+  DEFAULT_PASSING_SCORE,
+  SavedRubricScores,
+  rubricAverage,
+} from '../../core/models/evaluation';
 import { PracticeTrade } from '../../core/models/practice';
 import { SessionStats, sessionStats } from '../practice/stats';
 import { DisciplineMark, disciplineMarks, disciplinePoints, riskUsd } from './discipline';
 
 /**
- * Weights of the INDAB score (Cris, 2026-11-11): result in R, risk control, discipline and the
- * mentor's rubric. The trade journal (planned next) is to take 10 of them.
+ * Weights of the INDAB score (Cris, 2026-11-11): result in R, risk control, discipline, the
+ * mentor's rubric and the trade journal.
  */
-export const SCORE_WEIGHTS = { result: 0.3, risk: 0.25, discipline: 0.15, rubric: 0.3 } as const;
+export const SCORE_WEIGHTS = {
+  result: 0.25,
+  risk: 0.25,
+  discipline: 0.15,
+  rubric: 0.25,
+  journal: 0.1,
+} as const;
 
 /** A result of this many R (either way) maps to 100 or 0 points; 0 R is 50. */
 export const R_SPAN = 5;
@@ -23,8 +33,8 @@ export const NO_STOP_PENALTY = 20;
 export const LOSS_LIMIT = 0.05;
 /** Fewer closed trades than this leave an attempt unrated. */
 export const MIN_TRADES = 2;
-/** The score that passes. */
-export const PASSING_SCORE = 70;
+/** A journal entry this long (characters, trimmed) counts as written. */
+export const JOURNAL_MIN_LENGTH = 10;
 
 /** Passed, failed (by score or a rule in `failedBy`), or too few trades to rate. */
 export type Verdict = 'passed' | 'failed' | 'unrated';
@@ -34,7 +44,7 @@ export type FailRule = 'stopOut' | 'lossLimit' | 'removedStop';
 /** The parts of an attempt's INDAB score, each 0 to 100, the weighted total and the verdict. */
 export interface IndabScore {
   score: number;
-  parts: { result: number; risk: number; discipline: number; rubric: number };
+  parts: { result: number; risk: number; discipline: number; rubric: number; journal: number };
   verdict: Verdict;
   failedBy: FailRule[];
 }
@@ -126,8 +136,22 @@ export function riskPoints(record: Pick<TradingRecord, 'stats' | 'maxOpenRiskPct
   );
 }
 
+/** Journal: the share of closed trades with a written reason for the entry, 0 to 100. */
+export function journalPoints(trades: PracticeTrade[]): number {
+  const closed = trades.filter((t) => t.status === 'closed');
+  if (!closed.length) {
+    return 0;
+  }
+  const written = closed.filter((t) => hasJournal(t)).length;
+  return (written / closed.length) * 100;
+}
+
+/** Whether a trade has a journal entry long enough to count. */
+export const hasJournal = (t: PracticeTrade) =>
+  (t.journal ?? '').trim().length >= JOURNAL_MIN_LENGTH;
+
 /** The mentor's rubric: 0 points for all 1s, 100 for all 5s. */
-export function rubricPoints(scores: RubricScores): number {
+export function rubricPoints(scores: SavedRubricScores): number {
   return clamp(((rubricAverage(scores) - 1) / 4) * 100);
 }
 
@@ -145,7 +169,8 @@ export function failRules(record: TradingRecord): FailRule[] {
 export function indabScore(
   trades: PracticeTrade[],
   startingBalance: number,
-  rubric: RubricScores,
+  rubric: SavedRubricScores,
+  passingScore = DEFAULT_PASSING_SCORE,
 ): IndabScore {
   const record = tradingRecord(trades, startingBalance);
   const parts = {
@@ -153,19 +178,21 @@ export function indabScore(
     risk: oneDecimal(riskPoints(record)),
     discipline: oneDecimal(disciplinePoints(record.marks)),
     rubric: oneDecimal(rubricPoints(rubric)),
+    journal: oneDecimal(journalPoints(trades)),
   };
   const score = oneDecimal(
     SCORE_WEIGHTS.result * parts.result +
       SCORE_WEIGHTS.risk * parts.risk +
       SCORE_WEIGHTS.discipline * parts.discipline +
-      SCORE_WEIGHTS.rubric * parts.rubric,
+      SCORE_WEIGHTS.rubric * parts.rubric +
+      SCORE_WEIGHTS.journal * parts.journal,
   );
   const failedBy = failRules(record);
   const verdict: Verdict = failedBy.length
     ? 'failed'
     : record.stats.trades < MIN_TRADES
       ? 'unrated'
-      : score >= PASSING_SCORE
+      : score >= passingScore
         ? 'passed'
         : 'failed';
   return { score, parts, verdict, failedBy };

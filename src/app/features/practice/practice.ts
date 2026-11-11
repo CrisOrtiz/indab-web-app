@@ -101,6 +101,7 @@ import { SessionTabs } from './session-tabs';
 import { SessionReview } from './session-review';
 import { SessionStatsPanel } from './session-stats';
 import { filledTrades } from './trade-boxes';
+import { TradeJournal } from './trade-journal';
 import { TradeNavigator } from './trade-navigator';
 
 type Phase = 'setup' | 'loading' | 'playing' | 'finished';
@@ -173,6 +174,7 @@ const TIME_WARNINGS = [5, 1];
     SessionFilterBar,
     SessionReview,
     SessionStatsPanel,
+    TradeJournal,
     TradeNavigator,
   ],
   providers: [SessionTabs],
@@ -272,6 +274,8 @@ export class Practice {
   protected readonly evaluations = signal<EvaluationCard[]>([]);
   /** The evaluation being taken, if this session is an attempt. */
   protected readonly evaluation = signal<Evaluation | null>(null);
+  /** The trade just placed, whose journal entry gets the focus. */
+  protected readonly journalFocus = signal<string | null>(null);
   /** When the attempt's time runs out (ms), by this device's clock. */
   protected readonly deadline = signal<number | null>(null);
   /** The evaluation whose instructions are shown before its attempt starts. */
@@ -1223,6 +1227,8 @@ export class Practice {
     this.placing.set(true);
     try {
       await this.practice.openTrade(sessionId, uid, trade);
+      // Its journal entry is next: why it was entered.
+      this.journalFocus.set(trade.id);
       return trade;
     } catch {
       replay.discard(trade.id);
@@ -1231,6 +1237,21 @@ export class Practice {
     } finally {
       this.placing.set(false);
     }
+  }
+
+  /** Saves why a trade was entered (its journal entry); allowed until the session ends. */
+  protected saveJournal(trade: PracticeTrade, journal: string): void {
+    const replay = this.replay();
+    if (!replay) {
+      return;
+    }
+    let annotated: PracticeTrade;
+    try {
+      annotated = replay.annotate(trade.id, journal);
+    } catch {
+      return;
+    }
+    this.persist((id) => this.practice.saveJournal(id, annotated), trade);
   }
 
   protected closeTrade(trade: PracticeTrade): void {

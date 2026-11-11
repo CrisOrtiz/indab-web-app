@@ -38,12 +38,18 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
     .getByLabel('Ritmo del examen')
     .selectOption({ label: 'Tiempo real (1 min por minuto)' });
   await expect(page.getByText('cubre 20 min de mercado')).toBeVisible();
+  await page.getByLabel('Nota de aprobación').fill('75');
   await page.getByRole('checkbox', { name: /José Pérez/ }).check();
   await page.getByRole('button', { name: 'Guardar evaluación' }).click();
   await expect(page.getByRole('status')).toContainText('Se guardó la evaluación');
   await expect(page.getByRole('heading', { name: /Evaluación semanal/ })).toContainText('Abierta');
   const [evaluation] = await listDocuments('evaluations');
-  expect(evaluation).toMatchObject({ durationMinutes: 20, pace: 1, studentIds: [joseUid] });
+  expect(evaluation).toMatchObject({
+    durationMinutes: 20,
+    pace: 1,
+    passingScore: 75,
+    studentIds: [joseUid],
+  });
 
   // Luis is not assigned: he sees no evaluation.
   await signOut(page);
@@ -61,6 +67,7 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
   // The instructions come first, and the attempt starts once they are read.
   const briefing = page.getByRole('dialog', { name: 'Antes de empezar: Evaluación semanal' });
   await expect(briefing).toContainText('Tienes un solo intento de 20 minutos');
+  await expect(briefing).toContainText('Apruebas con 75.');
   await expect(briefing.getByRole('button', { name: 'Empezar ahora' })).toBeDisabled();
   await briefing.getByRole('checkbox', { name: 'Leí las instrucciones y estoy listo' }).check();
   await briefing.getByRole('button', { name: 'Empezar ahora' }).click();
@@ -69,11 +76,18 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
   await page.getByRole('spinbutton', { name: /Lotes \(tamaño/ }).fill('0.01');
   await page.getByRole('button', { name: 'Comprar 0.01 XAUUSDT MERCADO' }).click();
   await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
-  // A reload mid-attempt picks it up again, position and clock included.
+  // The journal asks why it was entered; it counts for the grade.
+  const journal = page.getByRole('region', { name: 'Bitácora' });
+  await expect(journal).toContainText('Falta el motivo de entrada.');
+  await journal.getByLabel(/Operación 1/).fill('Rechazo en soporte de H1');
+  await journal.getByRole('button', { name: 'Guardar' }).click();
+  await expect(journal).not.toContainText('Falta el motivo de entrada.');
+  // A reload mid-attempt picks it up again, position, journal and clock included.
   await page.reload();
   await expect(page.getByText('Retomaste tu sesión donde la dejaste')).toBeVisible();
   await expect(page.locator('.evaluation-bar')).toContainText(/Quedan 1\d:\d\d/);
   await expect(page.getByRole('button', { name: 'Posiciones (1)' })).toBeVisible();
+  await expect(journal.getByLabel(/Operación 1/)).toHaveValue('Rechazo en soporte de H1');
   // It runs by the clock: nothing to step, pause or speed up.
   await expect(page.getByText('En vivo', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Siguiente vela' })).toHaveCount(0);
@@ -263,6 +277,7 @@ test('a mentor rates an attempt and the student sees the INDAB score and the rub
     stopLoss: 3990,
     takeProfit: 4020,
     initialStopLoss: 3990,
+    journal: 'Rechazo del soporte diario con vela envolvente',
     status: 'closed',
     exitPrice: 4012,
     exitTime: 1_770_000_600,
@@ -299,10 +314,10 @@ test('a mentor rates an attempt and the student sees the INDAB score and the rub
   await page.getByRole('menuitem', { name: 'Calificar con rúbrica' }).click();
   for (const criterion of [
     'Plan de entrada',
-    'Gestión de riesgo',
-    'Respeto de SL y TP',
     'Lectura de contexto',
-    'Disciplina',
+    'Manejo de la operación',
+    'Control emocional',
+    'Calidad de la bitácora',
   ]) {
     await page
       .getByRole('radiogroup', { name: criterion })
@@ -312,8 +327,8 @@ test('a mentor rates an attempt and the student sees the INDAB score and the rub
   await page.getByRole('button', { name: 'Guardar rúbrica' }).click();
   await expect(page.getByRole('status')).toContainText('Se guardó la rúbrica de José Pérez.');
   // Result 1.2 R + 3 R = 92; risk 5 % on one trade = -30 and -20 for open risk = 50;
-  // discipline 100; rubric 4 = 75: 77.6, passed.
-  await expect(results.locator('td.score')).toContainText('77.6');
+  // discipline 100; rubric 4 = 75; one of two trades journaled = 50: 74.3, passed.
+  await expect(results.locator('td.score')).toContainText('74.3');
   await expect(results.locator('td.score')).toContainText('Aprobado');
   await expect(results).toContainText('4.0 / 5');
 
@@ -330,7 +345,7 @@ test('a mentor rates an attempt and the student sees the INDAB score and the rub
   await page.getByRole('link', { name: 'Ranking de evaluaciones' }).click();
   const ranking = page.locator('table.ranking');
   await expect(ranking.locator('thead')).toContainText('Nota INDAB');
-  await expect(ranking.locator('td.score')).toContainText('77.6');
+  await expect(ranking.locator('td.score')).toContainText('74.3');
   await expect(ranking.locator('td.score')).toContainText('Aprobado');
   const rubric = page.locator('section.rubric');
   await expect(rubric).toContainText('Rúbrica de tu mentor');

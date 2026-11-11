@@ -82,6 +82,19 @@
           </select>
           <small class="muted">{{ t.covers(covered(f.pace, f.durationMinutes || 0)) }}</small>
         </label>
+        <label>
+          {{ t.passingScore }}
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            required
+            [value]="f.passingScore"
+            (input)="patch({ passingScore: +$any($event.target).value })"
+          />
+          <small class="muted">{{ t.passingScoreHint }}</small>
+        </label>
       </div>
       <fieldset>
         <legend>{{ t.start }}</legend>
@@ -200,7 +213,7 @@
             {{ tr.instruments[ev.symbol] ?? ev.symbol }} ·
             {{ ev.replayStart | localDate: 'd MMM y, HH:mm' }} ·
             {{ t.minutes(ev.durationMinutes) }} · {{ ev.pace ? t.paces[ev.pace] : t.freeSpeed }} ·
-            {{ t.studentCount(assigned(ev).length) }}
+            {{ t.passesWith(passingScoreOf(ev)) }} · {{ t.studentCount(assigned(ev).length) }}
           </p>
           @if (ev.mentorshipIds?.length) {
             <p class="muted">
@@ -222,6 +235,7 @@
                 [standings]="rows"
                 [students]="students()"
                 [mentorships]="mentorships()"
+                [passingScore]="passingScoreOf(ev)"
                 (adjust)="startAdjust($event.row, $event.kind)"
               />
               @if (rating(); as row) {

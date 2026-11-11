@@ -1,4 +1,4 @@
-import { EvaluationGrade, EvaluationRubric, RubricScores } from '../../core/models/evaluation';
+import { EvaluationGrade, EvaluationRubric, SavedRubricScores } from '../../core/models/evaluation';
 import { PracticeSession, PracticeTrade } from '../../core/models/practice';
 import { shownStatus } from '../practice/resume';
 import { SessionStats, sessionStats } from '../practice/stats';
@@ -10,7 +10,8 @@ import { IndabScore, Verdict, indabScore } from './score';
  * before verdicts existed have no parts in today's shape and no verdict.
  */
 export type ShownScore = Omit<IndabScore, 'parts' | 'verdict'> & {
-  parts: IndabScore['parts'] | null;
+  /** Grades saved before the journal counted have no `journal` part. */
+  parts: (Omit<IndabScore['parts'], 'journal'> & { journal?: number }) | null;
   verdict: Verdict | null;
 };
 
@@ -35,7 +36,7 @@ export interface EvaluationStanding {
   /** How the attempt traded (drawdown, risk...), when its trades were loaded. */
   stats: SessionStats | null;
   /** The mentor's rubric, when staff loaded it and the attempt was rated. */
-  rubric: RubricScores | null;
+  rubric: SavedRubricScores | null;
   /** Faults and good habits of its trades, when they were loaded. */
   marks: DisciplineMark[] | null;
   /** The INDAB score: worked out when the trades and rubric are loaded, else the saved one. */
@@ -48,6 +49,8 @@ export interface StandingExtras {
   rubrics?: Map<string, EvaluationRubric>;
   /** Saved scores, for those who cannot read trades and rubrics (students). */
   grades?: Map<string, EvaluationGrade>;
+  /** The evaluation's passing score (`passingScoreOf`). */
+  passingScore?: number;
 }
 
 const byName = (a: { name: string }, b: { name: string }) =>
@@ -69,7 +72,7 @@ export function evaluationStandings(
   sessions: PracticeSession[],
   students: { uid: string; name: string }[] = [],
   now = Date.now(),
-  { trades, rubrics, grades }: StandingExtras = {},
+  { trades, rubrics, grades, passingScore }: StandingExtras = {},
 ): EvaluationStanding[] {
   const rows = sessions.map((s) => {
     const list = trades?.get(s.id);
@@ -78,7 +81,7 @@ export function evaluationStandings(
     const saved = grades?.get(s.uid);
     const score: ShownScore | null =
       list && rubric
-        ? indabScore(list, s.startingBalance, rubric)
+        ? indabScore(list, s.startingBalance, rubric, passingScore)
         : saved
           ? {
               score: saved.score,

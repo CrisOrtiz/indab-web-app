@@ -122,12 +122,12 @@ describe('evaluationStandings', () => {
         ]),
       },
     );
-    // Bea: result 2 R = 70, risk 100, discipline 100, rubric 100 = 91, passed.
-    // Ana: 4 R = 90, 100, 100, rubric 0 = 67, failed. Dee: one trade, unrated. Carla: no rubric.
+    // No journal. Bea: result 2 R = 70, risk 100, discipline 100, rubric 100 = 82.5, passed.
+    // Ana: 4 R = 90, 100, 100, rubric 0 = 62.5, failed. Dee: one trade, unrated. Carla: no rubric.
     expect(rows.map((r) => [r.rank, r.name, r.score?.score ?? null, r.score?.verdict])).toEqual([
-      [1, 'Bea', 91, 'passed'],
-      [2, 'Ana', 67, 'failed'],
-      [3, 'Dee', 97, 'unrated'],
+      [1, 'Bea', 82.5, 'passed'],
+      [2, 'Ana', 62.5, 'failed'],
+      [3, 'Dee', 87.5, 'unrated'],
       [4, 'Carla', null, undefined],
     ]);
     expect(rows[0].marks).toEqual([]);

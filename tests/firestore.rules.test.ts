@@ -924,6 +924,28 @@ describe('trading practice', () => {
     await assertFails(updateDoc(tradeRef('enrolled'), { stopLoss: 47000 }));
   });
 
+  it('keeps a journal entry on each trade until the session ends', async () => {
+    await assertSucceeds(
+      setDoc(tradeRef('enrolled', 'j1'), trade('enrolled', { journal: 'Rechazo en soporte H1' })),
+    );
+    await assertFails(
+      setDoc(tradeRef('enrolled', 'j2'), trade('enrolled', { journal: 'x'.repeat(281) })),
+    );
+    await assertFails(setDoc(tradeRef('enrolled', 'j2'), trade('enrolled', { journal: 5 })));
+    await assertSucceeds(updateDoc(tradeRef('enrolled'), { journal: 'Ruptura y retesteo' }));
+    await assertFails(updateDoc(tradeRef('other'), { journal: 'No es mío' }));
+    await assertFails(updateDoc(tradeRef('enrolled'), { journal: 'Y muevo', stopLoss: 1 }));
+    await assertSucceeds(updateDoc(tradeRef('enrolled'), close()));
+    // Still while the session runs, even closed...
+    await assertSucceeds(updateDoc(tradeRef('enrolled'), { journal: 'Escrito al cerrar' }));
+    await assertFails(updateDoc(tradeRef('enrolled'), { journal: 'Y cambio el P/L', pnl: 1 }));
+    // ...but not once it is finished.
+    await assertSucceeds(
+      updateDoc(sessionRef('enrolled'), { status: 'finished', endedAt: serverTimestamp() }),
+    );
+    await assertFails(updateDoc(tradeRef('enrolled'), { journal: 'Escrito después' }));
+  });
+
   it('closes a trade on a margin stop out', async () => {
     await assertSucceeds(setDoc(tradeRef('enrolled', 't2'), trade('enrolled')));
     await assertSucceeds(updateDoc(tradeRef('enrolled', 't2'), close({ exitReason: 'stopOut' })));
@@ -1132,6 +1154,17 @@ describe('evaluations', () => {
     await assertSucceeds(create('n2', { news: 'impact' }));
     await assertSucceeds(create('n3', { news: 'off' }));
     await assertFails(create('n4', { news: 'full' }));
+  });
+
+  it('take a passing score from 0 to 100, or none for 70', async () => {
+    const create = (id: string, extra: Record<string, unknown>) =>
+      setDoc(evalRef('trainer', id), evaluation(extra));
+    await assertSucceeds(create('s1', { passingScore: 70 }));
+    await assertSucceeds(create('s2', { passingScore: 0 }));
+    await assertSucceeds(create('s3', { passingScore: 100 }));
+    await assertFails(create('s4', { passingScore: 101 }));
+    await assertFails(create('s5', { passingScore: 65.5 }));
+    await assertFails(create('s6', { passingScore: '70' }));
   });
 
   it('keep their author when edited', async () => {
@@ -1398,7 +1431,7 @@ describe('evaluations', () => {
   it('let staff rate an attempt 1 to 5, which the student reads once results are out', async () => {
     const ref = (uid: string | null, student = 'enrolled') =>
       doc(as(uid), `evaluations/e1/rubrics/${student}`);
-    const scores = { plan: 4, risk: 3, stops: 5, context: 2, discipline: 4 };
+    const scores = { plan: 4, context: 2, management: 5, emotions: 3, journal: 4 };
     const rubric = (by: string, extra: Record<string, unknown> = {}) => ({
       uid: 'enrolled',
       scores,
@@ -1412,7 +1445,7 @@ describe('evaluations', () => {
     await assertFails(setDoc(ref('trainer'), rubric('admin')));
     await assertFails(setDoc(ref('trainer', 'other'), rubric('trainer')));
     await assertFails(
-      setDoc(ref('trainer'), rubric('trainer', { scores: { ...scores, risk: 6 } })),
+      setDoc(ref('trainer'), rubric('trainer', { scores: { ...scores, emotions: 6 } })),
     );
     await assertFails(
       setDoc(ref('trainer'), rubric('trainer', { scores: { ...scores, plan: 0 } })),
@@ -1420,7 +1453,16 @@ describe('evaluations', () => {
     await assertFails(
       setDoc(ref('trainer'), rubric('trainer', { scores: { ...scores, luck: 5 } })),
     );
-    await assertFails(setDoc(ref('trainer'), rubric('trainer', { scores: { plan: 4, risk: 3 } })));
+    await assertFails(
+      setDoc(ref('trainer'), rubric('trainer', { scores: { plan: 4, context: 3 } })),
+    );
+    // The criteria before 2026-11-11 are no longer written.
+    await assertFails(
+      setDoc(
+        ref('trainer'),
+        rubric('trainer', { scores: { plan: 4, risk: 3, stops: 5, context: 2, discipline: 4 } }),
+      ),
+    );
     await assertFails(setDoc(ref('trainer'), rubric('trainer', { grade: 'A' })));
     await assertFails(setDoc(ref('enrolled'), rubric('enrolled')));
 
@@ -1436,7 +1478,7 @@ describe('evaluations', () => {
   it('show the INDAB scores staff save to assigned students once results are out', async () => {
     const ref = (uid: string | null, student = 'enrolled') =>
       doc(as(uid), `evaluations/e1/grades/${student}`);
-    const parts = { result: 60, risk: 80, discipline: 85, rubric: 77.5 };
+    const parts = { result: 60, risk: 80, discipline: 85, rubric: 77.5, journal: 50 };
     const grade = (by: string, extra: Record<string, unknown> = {}) => ({
       score: 71.5,
       parts,

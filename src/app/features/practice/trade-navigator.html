@@ -106,6 +106,10 @@
           <dd>{{ t.stillOpen }}</dd>
         </div>
       }
+      <div class="journal">
+        <dt>{{ t.journal }}</dt>
+        <dd [class.muted]="!trade.journal">{{ trade.journal || t.noJournal }}</dd>
+      </div>
     </dl>
   }
 </nav>

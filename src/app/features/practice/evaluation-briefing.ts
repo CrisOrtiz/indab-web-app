@@ -9,7 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { I18n } from '../../core/i18n/i18n.service';
-import { Evaluation } from '../../core/models/evaluation';
+import { Evaluation, passingScoreOf } from '../../core/models/evaluation';
 import { formatElapsed } from './bars';
 import { marketCovered } from './live';
 import { LOSS_LIMIT, MIN_TRADES } from '../ranking/score';
@@ -56,13 +56,14 @@ import { LEVERAGE, STARTING_BALANCE, STOP_OUT_LEVEL } from './replay';
       </ul>
 
       <h3>{{ t.gradeTitle }}</h3>
-      <p>{{ t.grade }}</p>
+      <p>{{ t.grade(passing(ev)) }}</p>
       <ul>
         <li>{{ t.tipStop }}</li>
         <li>{{ t.tipRisk }}</li>
         <li>{{ t.tipDiscipline }}</li>
         <li>{{ t.tipFail(lossLimit) }}</li>
         <li>{{ t.tipMin(minTrades) }}</li>
+        <li>{{ t.tipJournal }}</li>
       </ul>
 
       <label class="read">
@@ -166,6 +167,7 @@ export class EvaluationBriefing {
   protected readonly stopOut = STOP_OUT_LEVEL * 100;
   protected readonly lossLimit = Math.round(LOSS_LIMIT * 100);
   protected readonly minTrades = MIN_TRADES;
+  protected readonly passing = passingScoreOf;
   private readonly startButton = viewChild<ElementRef<HTMLButtonElement>>('start');
 
   constructor() {

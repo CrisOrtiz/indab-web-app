@@ -1,13 +1,14 @@
 import { DecimalPipe, PercentPipe } from '@angular/common';
-import { Component, LOCALE_ID, inject, signal } from '@angular/core';
+import { Component, LOCALE_ID, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { I18n } from '../../core/i18n/i18n.service';
 import {
   Evaluation,
   EvaluationRubric,
-  RUBRIC_CRITERIA,
+  passingScoreOf,
   rubricAverage,
+  rubricCriteria,
 } from '../../core/models/evaluation';
 import { EvaluationService } from '../evaluations/evaluation.service';
 import { PracticeService } from '../practice/practice.service';
@@ -37,7 +38,11 @@ export class Ranking {
   protected readonly error = signal<string | null>(null);
   /** The signed-in student's rubric for the selected evaluation, once published. */
   protected readonly myRubric = signal<EvaluationRubric | null>(null);
-  protected readonly criteria = RUBRIC_CRITERIA;
+  protected readonly criteriaOf = rubricCriteria;
+  /** The passing score of the evaluation shown. */
+  protected readonly passing = computed(() =>
+    passingScoreOf(this.evaluations()?.find((e) => e.id === this.selected())),
+  );
   protected readonly average = rubricAverage;
 
   constructor() {

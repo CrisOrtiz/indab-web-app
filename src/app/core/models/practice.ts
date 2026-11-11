@@ -104,6 +104,11 @@ export interface PracticeTrade {
   takeProfit: number | null;
   /** The stop loss the order was placed with (never changes), to measure its risk. */
   initialStopLoss?: number | null;
+  /**
+   * The trade journal: why the student entered (setup, zone, confirmation), written or
+   * corrected at any time until the session ends (Cris, 2026-11-11).
+   */
+  journal?: string;
   status: TradeStatus;
   openedAt?: Timestamp;
   filledAt?: Timestamp;
