@@ -165,17 +165,34 @@
           </app-replay-chart>
 
           <!-- Working on the order panel shows its order on the chart. -->
-          <aside class="ticket" [attr.aria-label]="t.ticket" (focusin)="drafting.set(true)">
+          <aside
+            class="ticket"
+            [class.editing]="editing() !== null"
+            [attr.aria-label]="t.ticket"
+            (focusin)="drafting.set(true)"
+            #ticket
+          >
             <div class="ticket-head">
               <strong>{{ symbol() }}</strong>
               <span class="muted">1:{{ leverage }}</span>
             </div>
+            @if (editingTrade(); as edited) {
+              <div class="edit-banner" role="status">
+                <strong>{{
+                  edited.status === 'open'
+                    ? t.editingPosition(edited.side === 'long' ? tr.long : tr.short)
+                    : t.editingOrder(tr.orderLabel(edited.side, edited.orderType))
+                }}</strong>
+                <span>{{ edited.status === 'open' ? t.editPositionHint : t.editOrderHint }}</span>
+              </div>
+            }
             <div class="sides" role="group" [attr.aria-label]="t.direction">
               <button
                 type="button"
                 class="side sell"
                 [class.selected]="side() === 'short'"
                 [attr.aria-pressed]="side() === 'short'"
+                [disabled]="editing() !== null"
                 (click)="setSide('short')"
               >
                 <span>{{ tr.sell }}</span>
@@ -186,6 +203,7 @@
                 class="side buy"
                 [class.selected]="side() === 'long'"
                 [attr.aria-pressed]="side() === 'long'"
+                [disabled]="editing() !== null"
                 (click)="setSide('long')"
               >
                 <span>{{ tr.buy }}</span>
@@ -199,6 +217,7 @@
                   type="button"
                   [class.selected]="orderType() === type"
                   [attr.aria-pressed]="orderType() === type"
+                  [disabled]="editing() !== null"
                   (click)="pickOrderType(type)"
                 >
                   {{ tr.orderTypes[type] }}
@@ -206,7 +225,7 @@
               }
             </div>
 
-            @if (orderType() !== 'market') {
+            @if (orderType() !== 'market' && !editingOpen()) {
               <label>
                 <span class="field-name">{{ t.orderPrice }}</span>
                 <input
@@ -225,18 +244,21 @@
                   [min]="lotStep"
                   [step]="lotStep"
                   [value]="lots()"
+                  [disabled]="editingOpen()"
                   (input)="lots.set(+$any($event.target).value)"
                 />
                 <span class="muted">{{ t.margin((margin() | number: '1.2-2') ?? '') }}</span>
               </span>
             </label>
-            <div class="fractions" role="group" [attr.aria-label]="t.fractions">
-              @for (f of fractions; track f) {
-                <button type="button" (click)="useFraction(f)">
-                  {{ f === 1 ? t.max : (f | percent) }}
-                </button>
-              }
-            </div>
+            @if (!editingOpen()) {
+              <div class="fractions" role="group" [attr.aria-label]="t.fractions">
+                @for (f of fractions; track f) {
+                  <button type="button" (click)="useFraction(f)">
+                    {{ f === 1 ? t.max : (f | percent) }}
+                  </button>
+                }
+              </div>
+            }
             <dl class="facts">
               <dt>{{ t.freeMargin }}</dt>
               <dd>{{ r.available() | number: '1.2-2' }} USD</dd>
@@ -282,18 +304,29 @@
             @if (orderError(); as message) {
               <p class="order-error" role="alert">{{ message }}</p>
             }
-            <button
-              type="button"
-              class="submit"
-              [class.buy]="side() === 'long'"
-              [class.sell]="side() === 'short'"
-              [disabled]="placing()"
-              (click)="openTrade()"
-            >
-              <strong>{{ side() === 'long' ? tr.buy : tr.sell }}</strong>
-              <span>{{ submitDetail() }}</span>
-            </button>
-            <p class="muted hint">{{ t.hint }}</p>
+            @if (editing()) {
+              <div class="edit-actions">
+                <button type="button" class="btn btn-outline" (click)="stopEditing()">
+                  {{ t.cancelEdit }}
+                </button>
+                <button type="button" class="btn save-edit" (click)="saveEdit()">
+                  {{ t.saveChanges }}
+                </button>
+              </div>
+            } @else {
+              <button
+                type="button"
+                class="submit"
+                [class.buy]="side() === 'long'"
+                [class.sell]="side() === 'short'"
+                [disabled]="placing()"
+                (click)="openTrade()"
+              >
+                <strong>{{ side() === 'long' ? tr.buy : tr.sell }}</strong>
+                <span>{{ submitDetail() }}</span>
+              </button>
+              <p class="muted hint">{{ t.hint }}</p>
+            }
           </aside>
         </div>
 
@@ -378,7 +411,7 @@
               </thead>
               <tbody>
                 @for (o of r.pendingOrders(); track o.id) {
-                  <tr>
+                  <tr [class.editing]="editing()?.id === o.id">
                     <td
                       [attr.data-label]="t.order"
                       [class.up]="o.side === 'long'"
@@ -403,6 +436,14 @@
                       }}
                     </td>
                     <td class="row-actions">
+                      <button
+                        type="button"
+                        class="btn btn-outline small"
+                        [attr.aria-label]="t.editOrder(tr.orderLabel(o.side, o.orderType))"
+                        (click)="startEdit(o, ticket)"
+                      >
+                        {{ t.edit }}
+                      </button>
                       <button type="button" class="btn btn-outline small" (click)="cancelOrder(o)">
                         {{ t.cancel }}
                       </button>
@@ -470,7 +511,7 @@
               </thead>
               <tbody>
                 @for (trade of r.openTrades(); track trade.id) {
-                  <tr>
+                  <tr [class.editing]="editing()?.id === trade.id">
                     <td
                       [attr.data-label]="t.position"
                       [class.up]="trade.side === 'long'"
@@ -515,6 +556,16 @@
                       {{ signed(openPnl(r, trade)) }}
                     </td>
                     <td class="row-actions">
+                      <button
+                        type="button"
+                        class="btn btn-outline small"
+                        [attr.aria-label]="
+                          t.editPosition(trade.side === 'long' ? tr.long : tr.short)
+                        "
+                        (click)="startEdit(trade, ticket)"
+                      >
+                        {{ t.edit }}
+                      </button>
                       <button
                         type="button"
                         class="btn btn-outline small"

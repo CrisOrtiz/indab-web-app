@@ -203,6 +203,7 @@ describe('PracticeService', () => {
       takeProfit: null,
       orderPrice: 98,
       entryPrice: 98,
+      quantity: trade.quantity,
     });
     await service.updateLevels('s1', { ...trade, status: 'open', stopLoss: 104, takeProfit: 90 });
     expect(updateDoc).toHaveBeenLastCalledWith(ref, { stopLoss: 104, takeProfit: 90 });

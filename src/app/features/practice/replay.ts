@@ -29,11 +29,13 @@ export interface OpenTradeInput {
   takeProfit: number | null;
 }
 
-/** New stop loss / take profit for a trade, and the price of a pending order. */
+/** New stop loss / take profit for a trade, and the price and size of a pending order. */
 export interface TradeLevels {
   stopLoss: number | null;
   takeProfit: number | null;
   orderPrice?: number | null;
+  /** New size in lots; only a pending order changes it. */
+  lots?: number;
 }
 
 const round = (value: number, decimals: number) => {
@@ -165,6 +167,11 @@ export function validateOrderPrice(
   return null;
 }
 
+/** Whether `lots` is a whole number of lot steps, at least one. */
+function validLots(lots: number): boolean {
+  return lots >= LOT_STEP && Math.abs(lots / LOT_STEP - Math.round(lots / LOT_STEP)) <= 1e-6;
+}
+
 /** Returns an error message if the order is invalid, or null if it is fine. */
 export function validateOrder(
   input: OpenTradeInput,
@@ -172,10 +179,7 @@ export function validateOrder(
   available: number,
   t: OrderMessages = es.orderErrors,
 ): string | null {
-  if (
-    !(input.lots >= LOT_STEP) ||
-    Math.abs(input.lots / LOT_STEP - Math.round(input.lots / LOT_STEP)) > 1e-6
-  ) {
+  if (!validLots(input.lots)) {
     return t.lotStep(LOT_STEP);
   }
   const market = input.orderType === 'market';
@@ -373,9 +377,9 @@ export class Replay {
   }
 
   /**
-   * Moves the stop loss and take profit of a pending order or open trade, and the price of a
-   * pending order. Throws the validation message, in the language of `t`, if the new levels
-   * are invalid.
+   * Moves the stop loss and take profit of a pending order or open trade, and the price and
+   * size of a pending order (an open trade keeps its entry and size). Throws the validation
+   * message, in the language of `t`, if the new levels are invalid.
    */
   modify(id: string, levels: TradeLevels, t: OrderMessages = es.orderErrors): PracticeTrade {
     const trade = this.find(id);
@@ -384,10 +388,29 @@ export class Replay {
     let next: PracticeTrade;
     if (trade.status === 'pending') {
       const orderPrice = levels.orderPrice ?? trade.orderPrice;
-      error =
+      const lots = levels.lots ?? tradeLots(trade);
+      error = validLots(lots) ? null : t.lotStep(LOT_STEP);
+      if (!error && orderPrice! > 0) {
+        // The order's own reserved margin is freed by the change; refuse only a bigger need.
+        const before = marginFor(tradeLots(trade), trade.entryPrice);
+        const after = marginFor(lots, orderPrice!);
+        const free = round(this.available() + before, 2);
+        if (after > before && after > free) {
+          const most = maxLots(free, orderPrice!);
+          error = t.margin(after.toFixed(2), free.toFixed(2), most ? most.toFixed(2) : null);
+        }
+      }
+      error ??=
         validateOrderPrice(trade.side, trade.orderType, orderPrice, current, t) ??
         validateLevels(trade.side, orderPrice!, levels.stopLoss, levels.takeProfit, 'order', t);
-      next = { ...trade, ...levels, orderPrice, entryPrice: orderPrice! };
+      next = {
+        ...trade,
+        stopLoss: levels.stopLoss,
+        takeProfit: levels.takeProfit,
+        orderPrice,
+        entryPrice: orderPrice!,
+        quantity: round(lots * LOT_SIZE, 6),
+      };
     } else if (trade.status === 'open') {
       error = validateLevels(trade.side, current, levels.stopLoss, levels.takeProfit, 'current', t);
       next = { ...trade, stopLoss: levels.stopLoss, takeProfit: levels.takeProfit };

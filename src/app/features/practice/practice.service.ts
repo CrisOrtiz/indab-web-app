@@ -182,6 +182,7 @@ export class PracticeService {
     if (trade.status === 'pending') {
       levels['orderPrice'] = trade.orderPrice;
       levels['entryPrice'] = trade.entryPrice;
+      levels['quantity'] = trade.quantity;
     }
     return updateDoc(doc(this.trades(sessionId), trade.id), levels);
   }

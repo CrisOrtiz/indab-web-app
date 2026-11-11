@@ -839,7 +839,10 @@ describe('trading practice', () => {
       }),
     );
     await assertFails(updateDoc(order, { orderPrice: 49700 }));
-    await assertFails(updateDoc(order, { quantity: 5 }));
+    // Its size too (edited from the order panel), never to nothing.
+    await assertSucceeds(updateDoc(order, { quantity: 5 }));
+    await assertFails(updateDoc(order, { quantity: 0 }));
+    await assertFails(updateDoc(order, { quantity: '5' }));
     await assertFails(
       updateDoc(order, {
         status: 'closed',
@@ -867,6 +870,8 @@ describe('trading practice', () => {
       }),
     );
     await assertFails(updateDoc(order, { status: 'cancelled', closedAt: serverTimestamp() }));
+    // Once filled, its size is fixed.
+    await assertFails(updateDoc(order, { quantity: 2 }));
 
     await assertSucceeds(setDoc(tradeRef('enrolled', 'p2'), limitOrder('enrolled')));
     await assertSucceeds(

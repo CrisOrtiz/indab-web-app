@@ -122,6 +122,7 @@
 }
 
 .ticket {
+  scroll-margin-top: calc(var(--header-height, 64px) + 16px);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -366,4 +367,47 @@
     opacity: 0.6;
     cursor: wait;
   }
+}
+
+/* Editing a placed order or position: the ticket says which, and saves instead of placing. */
+.ticket.editing {
+  border-color: var(--color-buy);
+  box-shadow: 0 0 0 1px var(--color-buy);
+
+  .side:disabled,
+  .tabs button:disabled {
+    cursor: not-allowed;
+  }
+
+  .side:disabled:not(.selected),
+  .tabs button:disabled:not(.selected) {
+    opacity: 0.45;
+  }
+}
+
+.edit-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--color-buy);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  font-size: 0.85rem;
+
+  span {
+    color: var(--color-muted);
+  }
+}
+
+.edit-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.save-edit {
+  border-color: var(--color-buy);
+  background: var(--color-buy);
+  color: #fff;
 }

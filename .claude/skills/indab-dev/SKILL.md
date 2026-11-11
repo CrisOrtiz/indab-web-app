@@ -411,6 +411,12 @@ Module notes:
   explains time, pace, account, leaving, the end and the grading; the countdown warns at 5 and
   1 minutes left (`TIME_WARNINGS`). Lines of placed orders/positions moved on the chart wait
   for a ✓ next to their size (↺ undoes; `levelsMoved` saves them together), as in TradingView.
+  They can also be edited from the order panel (Cris, 2026-11-11): "Editar" on a row of
+  Positions/Orders loads it into the ticket (`startEdit`, `editing`), which then shows "Guardar
+  cambios"/"Descartar cambios" instead of Buy/Sell and puts the ticket back afterwards; a pending
+  order changes price, lots (`TradeLevels.lots`, margin checked with its own reserve freed;
+  rules allow `quantity` on pending only) and SL/TP, an open position only SL/TP. The edit ends
+  by itself if the order fills or the trade closes meanwhile (`editEnded`).
 - **Evaluation forms (built)**: questionnaires, separate from chart evaluations.
   `core/models/exam.ts` (types, `suggestScore`, `bestGrade`, `attemptDeadline`),
   `features/exams/exam.service.ts`; staff build them at `/admin/forms`
