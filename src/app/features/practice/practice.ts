@@ -1485,7 +1485,14 @@ export class Practice {
     // Kept here: "Nueva práctica" can clear it while the writes below are still going.
     const evaluation = this.evaluation();
     const { cancelled, closed } = replay.closeAll('sessionEnd');
+    const last = this.lastResume;
+    const unsaved = !this.resumeSaved;
     try {
+      // The drawings stay with the session for its review (Cris, 2026-11-11): the last ones
+      // are saved before it is marked finished. Best effort, as while it ran.
+      if (last && unsaved) {
+        await this.practice.saveResume(sessionId, last).catch(() => undefined);
+      }
       await Promise.all([
         ...cancelled.map((order) => this.practice.cancelOrder(sessionId, order)),
         ...closed.map((trade) => this.practice.closeTrade(sessionId, trade)),

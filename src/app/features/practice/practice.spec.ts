@@ -544,6 +544,25 @@ describe('Practice page', () => {
       expect(localStorage.getItem('indab.practice.s9')).toBeNull();
     });
 
+    it('saves the last drawings before finishing, for the review', async () => {
+      practice.activeSessions.mockResolvedValue([active({ resume })]);
+      await reload();
+      await click('Siguiente vela');
+      const line = { id: 2, kind: 'hline', price: 99 };
+      chart().drawings.set([line]);
+      await fixture.whenStable();
+      practice.saveResume.mockClear();
+      await click('Terminar sesión');
+      await click('Sí, terminar sesión');
+      expect(practice.saveResume).toHaveBeenCalledWith(
+        's9',
+        expect.objectContaining({ drawings: [line] }),
+      );
+      expect(practice.saveResume.mock.invocationCallOrder[0]).toBeLessThan(
+        practice.finishSession.mock.invocationCallOrder[0],
+      );
+    });
+
     it('picks an evaluation up with the time it has left', async () => {
       const ev = evaluation('e1', { replayStart });
       evaluations.get.mockResolvedValue(ev);
