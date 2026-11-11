@@ -125,9 +125,23 @@ describe('EvaluationService', () => {
     expect(await service.directory()).toEqual({
       students,
       staff: [
-        { uid: 'z', name: 'Admin', role: 'admin' },
-        { uid: 't', name: 'Coach', role: 'trainer' },
+        { uid: 'z', name: 'Admin', role: 'admin', email: 'z@x.co', mentorshipIds: [] },
+        { uid: 't', name: 'Coach', role: 'trainer', email: 't@x.co', mentorshipIds: [] },
       ],
     });
+    // Evaluations can also go to trainers and admins, who have academy access by role.
+    expect(await service.assignable()).toEqual([
+      { uid: 'z', name: 'Admin', email: 'z@x.co', academy: true, mentorshipIds: [], role: 'admin' },
+      students[0],
+      students[1],
+      {
+        uid: 't',
+        name: 'Coach',
+        email: 't@x.co',
+        academy: true,
+        mentorshipIds: [],
+        role: 'trainer',
+      },
+    ]);
   });
 });

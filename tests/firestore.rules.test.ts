@@ -1217,6 +1217,20 @@ describe('evaluations', () => {
     await assertFails(setDoc(attemptRef('enrolled'), attempt('enrolled')));
   });
 
+  it('take attempts from trainers and admins assigned to them, as from students', async () => {
+    // Not assigned: staff read every evaluation but only take the ones given to them.
+    await assertFails(setDoc(attemptRef('admin', 'e1_admin'), attempt('admin')));
+    await seed(
+      'evaluations/staff',
+      seeded(evaluation({ studentIds: ['enrolled', 'admin', 'trainer'] })),
+    );
+    for (const uid of ['admin', 'trainer']) {
+      await assertSucceeds(
+        setDoc(attemptRef(uid, `staff_${uid}`), attempt(uid, { evaluationId: 'staff' })),
+      );
+    }
+  });
+
   it('cannot be started outside the window', async () => {
     await seed(
       'evaluations/later',

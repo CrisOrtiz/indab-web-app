@@ -32,7 +32,7 @@ describe('AdminEvaluations', () => {
   let el: HTMLElement;
   const service = {
     all: vi.fn(),
-    students: vi.fn(),
+    assignable: vi.fn(),
     create: vi.fn(async () => 'new'),
     update: vi.fn(async () => undefined),
     remove: vi.fn(async () => undefined),
@@ -63,7 +63,7 @@ describe('AdminEvaluations', () => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
     service.all.mockResolvedValue([existing]);
-    service.students.mockResolvedValue([
+    service.assignable.mockResolvedValue([
       { uid: 'jose', name: 'José Pérez', email: 'jose@x.co', academy: true, mentorshipIds: [] },
       {
         uid: 'luis',

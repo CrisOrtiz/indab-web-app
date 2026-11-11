@@ -681,7 +681,7 @@ export class AdminEvaluations {
     try {
       const [, students, mentorships] = await Promise.all([
         this.reload(),
-        this.service.students(),
+        this.service.assignable(),
         this.mentorshipService.all(),
       ]);
       this.students.set(students);

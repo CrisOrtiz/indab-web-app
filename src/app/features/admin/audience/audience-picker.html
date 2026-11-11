@@ -22,12 +22,14 @@
 </fieldset>
 
 <fieldset>
-  <legend>{{ t.students(studentIds().length) }}</legend>
+  <legend>
+    {{ withStaff() ? t.people(studentIds().length) : t.students(studentIds().length) }}
+  </legend>
   <div class="row">
     <input
       type="search"
-      [placeholder]="t.search"
-      [attr.aria-label]="t.search"
+      [placeholder]="withStaff() ? t.searchPeople : t.search"
+      [attr.aria-label]="withStaff() ? t.searchPeople : t.search"
       [value]="search()"
       (input)="search.set($any($event.target).value)"
     />
@@ -46,6 +48,9 @@
           (change)="toggleStudent(s.uid, $any($event.target).checked)"
         />
         {{ s.name }} <span class="muted">{{ s.email }}</span>
+        @if (s.role) {
+          <span class="badge">{{ roles()[s.role] }}</span>
+        }
         @if (via !== undefined) {
           <span class="badge">{{ t.via(via) }}</span>
         }
@@ -55,4 +60,4 @@
     }
   </div>
 </fieldset>
-<p class="total">{{ t.total(total()) }}</p>
+<p class="total">{{ withStaff() ? t.totalPeople(total()) : t.total(total()) }}</p>
