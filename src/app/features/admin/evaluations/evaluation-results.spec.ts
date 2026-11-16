@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { PracticeTrade } from '../../../core/models/practice';
 import { sessionStats } from '../../practice/stats';
 import { EvaluationStanding } from '../../ranking/standings';
@@ -28,6 +29,7 @@ describe('EvaluationResults', () => {
   let el: HTMLElement;
 
   const render = async (standings: EvaluationStanding[]) => {
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
     fixture = TestBed.createComponent(EvaluationResults);
     fixture.componentRef.setInput('standings', standings);
     el = fixture.nativeElement;
@@ -168,6 +170,17 @@ describe('EvaluationResults', () => {
     expect(unrated.textContent).not.toContain('90');
     expect(unrated.textContent).toContain('Sin evaluar');
     expect(unrated.title).toContain('Necesita al menos una operación cerrada.');
+  });
+
+  it("links each attempt taken to that student's practice", async () => {
+    await render([standing(0, 'finished'), standing(1, 'active'), standing(2, 'notStarted')]);
+    const links = rows().map((r) => r.querySelector<HTMLAnchorElement>('a.view-attempt'));
+    expect(links[0]?.getAttribute('href')).toBe('/academy/practice/sessions/s0');
+    expect(links[0]?.getAttribute('aria-label')).toBe('Ver la práctica de Alumno 01');
+    expect(links[0]?.dataset['tip']).toBe('Ver práctica');
+    expect(links[1]?.getAttribute('href')).toBe('/academy/practice/sessions/s1');
+    // Nothing to open before the student starts.
+    expect(links[2]).toBeNull();
   });
 
   it('says when nobody took the evaluation', async () => {

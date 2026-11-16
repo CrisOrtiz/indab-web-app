@@ -82,6 +82,16 @@ describe('SessionPage', () => {
     expect(el.querySelector('h1')?.textContent).toContain('Final de oro');
     expect(el.textContent).toContain('Ana Pérez');
     expect(el.textContent).toContain('review e1_ana Final de oro');
+    // Back to that evaluation's results, where staff came from.
+    const back = el.querySelector('a.back');
+    expect(back?.getAttribute('href')).toBe('/admin/evaluations?results=e1');
+    expect(back?.textContent).toContain('Volver a los resultados de la evaluación');
+  });
+
+  it('takes staff back to the practice list from a free session', async () => {
+    auth.isStaff.set(true);
+    practice.getSession.mockResolvedValue(session());
+    await render();
     expect(el.querySelector('a.back')?.getAttribute('href')).toBe('/admin/practice');
   });
 

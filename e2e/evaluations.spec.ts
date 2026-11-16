@@ -123,6 +123,13 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
   const row = page.locator('.results tbody tr').first();
   await expect(row).toContainText('José Pérez');
   await expect(row).toContainText('0.00');
+  await expect(page.locator('.results-refresh')).toContainText('En vivo: se actualiza cada 30 s.');
+  // The trainer opens José's practice from the results and comes back to them.
+  await row.getByRole('link', { name: 'Ver la práctica de José Pérez' }).click();
+  await expect(page).toHaveURL(/\/academy\/practice\/sessions\/.+/);
+  await expect(page.getByRole('heading', { name: 'Evaluación semanal' })).toBeVisible();
+  await page.getByRole('link', { name: '← Volver a los resultados de la evaluación' }).click();
+  await expect(page.locator('.results tbody tr').first()).toContainText('José Pérez');
   await page.getByRole('button', { name: 'Acciones: Evaluación semanal' }).click();
   await page.getByRole('menuitem', { name: 'Publicar resultados' }).click();
   // José has no rubric yet: the trainer is warned first and publishes all the same.

@@ -232,6 +232,25 @@
 
           @if (selected() === ev.id) {
             @if (standings(); as rows) {
+              <div class="results-refresh">
+                <span class="muted">
+                  @if (live()) {
+                    <span class="live-dot" aria-hidden="true"></span>
+                    {{ t.autoRefresh(refreshSeconds) }}
+                  }
+                  @if (refreshedAt(); as at) {
+                    {{ t.refreshedAt((at | localDate: 'HH:mm:ss') ?? '') }}
+                  }
+                </span>
+                <button
+                  type="button"
+                  class="btn btn-outline"
+                  [disabled]="refreshing()"
+                  (click)="refreshResults(ev)"
+                >
+                  {{ refreshing() ? t.refreshing : t.refresh }}
+                </button>
+              </div>
               <app-evaluation-results
                 [standings]="rows"
                 [students]="students()"

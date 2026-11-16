@@ -4,7 +4,7 @@ import { vi } from 'vitest';
 import { EvaluationService } from '../../evaluations/evaluation.service';
 import { MentorshipService } from '../../mentorships/mentorship.service';
 import { PracticeService } from '../../practice/practice.service';
-import { AdminEvaluations, toLocalInput } from './admin-evaluations';
+import { AdminEvaluations, RESULTS_REFRESH_MS, toLocalInput } from './admin-evaluations';
 import { quietNotifications } from '../../notifications/testing';
 
 const at = (ms: number) => ({ toMillis: () => ms, toDate: () => new Date(ms) });
@@ -313,7 +313,7 @@ describe('AdminEvaluations', () => {
 
   it('shows the results, with who has not taken it', async () => {
     await click('Ver resultados');
-    expect(practice.evaluationSessions).toHaveBeenCalledWith('e1');
+    expect(practice.evaluationSessions).toHaveBeenCalledWith('e1', false);
     const rows = [...el.querySelectorAll('.results tbody tr')].map((tr) => tr.textContent);
     expect(rows[0]).toContain('José Pérez');
     expect(rows[0]).toContain('12.00');
@@ -330,6 +330,93 @@ describe('AdminEvaluations', () => {
     await fixture.whenStable();
     const names = [...el.querySelectorAll('.results tbody td.name')].map((td) => td.textContent);
     expect(names).toEqual(['Ana Gómez']);
+  });
+
+  it('refreshes the results by itself while the evaluation runs, re-reading only what changed', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      practice.evaluationSessions.mockResolvedValue([
+        {
+          id: 'e1_jose',
+          uid: 'jose',
+          pnl: 12,
+          balance: 212,
+          startingBalance: 200,
+          tradeCount: 3,
+          status: 'active',
+        },
+        {
+          id: 'e1_luis',
+          uid: 'luis',
+          pnl: 0,
+          balance: 200,
+          startingBalance: 200,
+          tradeCount: 0,
+          status: 'active',
+        },
+      ]);
+      await click('Ver resultados');
+      expect(el.querySelector('.results-refresh')?.textContent).toContain(
+        'En vivo: se actualiza cada 30 s.',
+      );
+      expect(el.querySelector('.results-refresh')?.textContent).toContain('Actualizado a las');
+      expect(practice.sessionTrades).toHaveBeenCalledTimes(2);
+
+      // José closes a trade; Luis does not move.
+      practice.evaluationSessions.mockResolvedValue([
+        {
+          id: 'e1_jose',
+          uid: 'jose',
+          pnl: 20,
+          balance: 220,
+          startingBalance: 200,
+          tradeCount: 4,
+          status: 'active',
+        },
+        {
+          id: 'e1_luis',
+          uid: 'luis',
+          pnl: 0,
+          balance: 200,
+          startingBalance: 200,
+          tradeCount: 0,
+          status: 'active',
+        },
+      ]);
+      await vi.advanceTimersByTimeAsync(RESULTS_REFRESH_MS);
+      await fixture.whenStable();
+      expect(practice.evaluationSessions).toHaveBeenLastCalledWith('e1', true);
+      expect(practice.sessionTrades).toHaveBeenCalledTimes(3);
+      expect(practice.sessionTrades).toHaveBeenLastCalledWith('e1_jose', true);
+      // Ratings and adjustments are read once per opening.
+      expect(service.rubrics).toHaveBeenCalledTimes(1);
+      expect(el.querySelector('.results tbody tr')?.textContent).toContain('20.00');
+
+      // "Actualizar" reads everything again.
+      await click('Actualizar');
+      expect(service.rubrics).toHaveBeenCalledTimes(2);
+      expect(practice.sessionTrades).toHaveBeenCalledTimes(5);
+
+      // Hiding the results stops it.
+      await click('Ocultar resultados');
+      const calls = practice.evaluationSessions.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(RESULTS_REFRESH_MS * 2);
+      expect(practice.evaluationSessions).toHaveBeenCalledTimes(calls);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not refresh by itself once the evaluation is over', async () => {
+    service.all.mockResolvedValue([
+      { ...existing, opensAt: at(Date.now() - 7_200_000), closesAt: at(Date.now() - 3_600_000) },
+    ]);
+    fixture = TestBed.createComponent(AdminEvaluations);
+    el = fixture.nativeElement;
+    await fixture.whenStable();
+    await click('Ver resultados');
+    expect(el.querySelector('.results-refresh')?.textContent).not.toContain('En vivo');
+    expect(el.querySelector('.results-refresh')?.textContent).toContain('Actualizado a las');
   });
 
   it('gives an open attempt extra minutes, or restarts an attempt, with a reason', async () => {
@@ -502,7 +589,7 @@ describe('AdminEvaluations', () => {
     await fixture.whenStable();
     await new Promise((r) => setTimeout(r));
     await fixture.whenStable();
-    expect(practice.evaluationSessions).toHaveBeenCalledWith('e1');
+    expect(practice.evaluationSessions).toHaveBeenCalledWith('e1', false);
     expect(el.querySelector('.results')?.textContent).toContain('José Pérez');
   });
 
