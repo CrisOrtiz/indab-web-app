@@ -123,7 +123,7 @@ test('a trainer runs an evaluation and the student takes it once, on the clock',
   const row = page.locator('.results tbody tr').first();
   await expect(row).toContainText('José Pérez');
   await expect(row).toContainText('0.00');
-  await expect(page.locator('.results-refresh')).toContainText('En vivo: se actualiza cada 30 s.');
+  await expect(page.getByRole('button', { name: 'Actualizar resultados' })).toBeVisible();
   // The trainer opens José's practice from the results and comes back to them.
   await row.getByRole('link', { name: 'Ver la práctica de José Pérez' }).click();
   await expect(page).toHaveURL(/\/academy\/practice\/sessions\/.+/);

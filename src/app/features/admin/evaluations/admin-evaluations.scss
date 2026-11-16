@@ -222,7 +222,7 @@
   }
 }
 
-// "Live: refreshes every 30 s · Updated at 14:02:10" and the refresh button, above the results.
+// "Updated at 14:02:10" and the refresh button, above the results.
 .results-refresh {
   display: flex;
   flex-wrap: wrap;
@@ -235,26 +235,5 @@
   .btn {
     padding: 6px 14px;
     font-size: 0.85rem;
-  }
-}
-
-.live-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 4px;
-  border-radius: 50%;
-  background: var(--color-up);
-  vertical-align: middle;
-  animation: live-pulse 1.6s ease-in-out infinite;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
-}
-
-@keyframes live-pulse {
-  50% {
-    opacity: 0.35;
   }
 }

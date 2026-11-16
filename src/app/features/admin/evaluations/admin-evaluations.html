@@ -234,10 +234,6 @@
             @if (standings(); as rows) {
               <div class="results-refresh">
                 <span class="muted">
-                  @if (live()) {
-                    <span class="live-dot" aria-hidden="true"></span>
-                    {{ t.autoRefresh(refreshSeconds) }}
-                  }
                   @if (refreshedAt(); as at) {
                     {{ t.refreshedAt((at | localDate: 'HH:mm:ss') ?? '') }}
                   }
