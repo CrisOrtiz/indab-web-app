@@ -8,8 +8,11 @@ import {
   input,
   output,
   signal,
+  untracked,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { ActionsMenu, MenuAction } from '../../../shared/actions-menu/actions-menu';
+import { Icon } from '../../../shared/icon/icon';
 import { I18n } from '../../../core/i18n/i18n.service';
 import { Mentorship, membersOf } from '../../../core/models/mentorship';
 import { MentorshipFilter } from '../audience/mentorship-filter';
@@ -30,7 +33,7 @@ export const RESULTS_PAGE_SIZE = 20;
  */
 @Component({
   selector: 'app-evaluation-results',
-  imports: [ActionsMenu, DecimalPipe, MentorshipFilter, Pager, PercentPipe],
+  imports: [ActionsMenu, DecimalPipe, Icon, MentorshipFilter, Pager, PercentPipe, RouterLink],
   template: `
     @let t = i18n.messages().evaluations;
     @let tl = i18n.messages().lists;
@@ -198,6 +201,17 @@ export const RESULTS_PAGE_SIZE = 20;
             }
             <td class="row-actions">
               @let actions = menus().get(row.uid) ?? [];
+              @if (row.sessionId) {
+                <a
+                  class="icon-btn small view-attempt"
+                  [routerLink]="['/academy/practice/sessions', row.sessionId]"
+                  [attr.aria-label]="t.viewAttemptOf(row.name)"
+                  [attr.data-tip]="t.viewAttempt"
+                >
+                  <app-icon name="eye" [size]="16" />
+                  <span class="view-label">{{ t.viewAttempt }}</span>
+                </a>
+              }
               @if (actions.length) {
                 <app-actions-menu
                   [actions]="actions"
@@ -280,6 +294,58 @@ export const RESULTS_PAGE_SIZE = 20;
       font-size: 0.85rem;
     }
 
+    // "View practice" sits left of the three-dot menu; its tooltip opens leftwards.
+    .row-actions {
+      white-space: nowrap;
+
+      > * {
+        vertical-align: middle;
+      }
+
+      app-actions-menu {
+        display: inline-block;
+        margin-left: 4px;
+      }
+    }
+
+    .view-label {
+      display: none;
+    }
+
+    // Phones: the row is a card, so the button says what it does, beside the menu.
+    @media (max-width: 720px) {
+      .users td.row-actions {
+        width: auto;
+        justify-content: flex-end;
+
+        &::before {
+          content: none;
+        }
+      }
+
+      .view-attempt.icon-btn {
+        width: auto;
+        gap: 6px;
+        padding: 0 12px;
+
+        &::after {
+          content: none;
+        }
+      }
+
+      .view-label {
+        display: inline;
+        font-size: 0.875rem;
+      }
+    }
+
+    .view-attempt[data-tip]::after {
+      width: max-content;
+      right: 0;
+      left: auto;
+      transform: none;
+    }
+
     td small {
       display: block;
       font-size: 0.75rem;
@@ -351,10 +417,14 @@ export class EvaluationResults {
   );
 
   constructor() {
-    // New results start on the first page.
+    // Refreshed results keep the page shown, unless it no longer exists.
     effect(() => {
-      this.standings();
-      this.page.set(0);
+      const pages = this.pages();
+      untracked(() => {
+        if (this.page() >= pages) {
+          this.page.set(Math.max(0, pages - 1));
+        }
+      });
     });
   }
 

@@ -1,4 +1,12 @@
-import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { I18n } from '../../../core/i18n/i18n.service';
 import { ActionsMenu, MenuAction } from '../../../shared/actions-menu/actions-menu';
@@ -70,6 +78,18 @@ export const MAX_EXTRA_MINUTES = 120;
 const MINUTE = 60_000;
 export const MAX_DURATION = 600;
 const DAY = 24 * 60 * 60 * 1000;
+/**
+ * How often open results reload by themselves while the evaluation runs. Each reload reads the
+ * attempts (one read per student) plus the trades of the attempts that changed, so a class of
+ * 25 costs about 3,000 reads an hour of the free 50,000 a day (Cris, 2026-11-16).
+ */
+export const RESULTS_REFRESH_MS = 30_000;
+/** Grace the rules give an attempt past its deadline to be closed. */
+const CLOSE_GRACE_MS = 2 * MINUTE;
+
+/** What says an attempt's trades may have changed: its summary. */
+const summaryKey = (s: PracticeSession) =>
+  [s.status, s.tradeCount, s.pnl, s.balance, s.extraMinutes ?? 0].join('|');
 
 export { toLocalInput };
 
@@ -145,6 +165,20 @@ export class AdminEvaluations {
   protected readonly rating = signal<EvaluationStanding | null>(null);
   protected readonly ratingBusy = signal(false);
   protected readonly standings = signal<EvaluationStanding[] | null>(null);
+  /** When the shown results were last read, and whether they keep reloading by themselves. */
+  protected readonly refreshedAt = signal<Date | null>(null);
+  protected readonly live = signal(false);
+  protected readonly refreshing = signal(false);
+  protected readonly refreshSeconds = RESULTS_REFRESH_MS / 1000;
+  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Each attempt's trades with the summary they were read at, reused while it stays the same. */
+  private tradeCache = new Map<string, { key: string; trades: PracticeTrade[] }>();
+  /** What only staff change (on this page), read once per opening of the results. */
+  private staffData: {
+    adjustments: EvaluationAdjustment[];
+    rubrics: Map<string, EvaluationRubric>;
+    grades: Map<string, EvaluationGrade>;
+  } | null = null;
 
   protected readonly dateRange = computed(() => {
     const instrument = INSTRUMENTS.find((i) => i.symbol === this.form()?.symbol) ?? INSTRUMENTS[0];
@@ -194,6 +228,11 @@ export class AdminEvaluations {
 
   constructor() {
     void this.load();
+    inject(DestroyRef).onDestroy(() => {
+      // Leaving the page stops the automatic refresh.
+      this.selected.set(null);
+      this.stopRefresh();
+    });
   }
 
   /** Runs an action picked from a card's menu. */
@@ -513,6 +552,7 @@ export class AdminEvaluations {
   protected async toggleResults(evaluation: Evaluation): Promise<void> {
     if (this.selected() === evaluation.id) {
       this.selected.set(null);
+      this.stopRefresh();
       return;
     }
     this.selected.set(evaluation.id);
@@ -521,22 +561,52 @@ export class AdminEvaluations {
     await this.loadResults(evaluation);
   }
 
-  private async loadResults(evaluation: Evaluation): Promise<void> {
+  /** "Actualizar": reads everything again, journals and ratings included. */
+  protected async refreshResults(evaluation: Evaluation): Promise<void> {
+    if (!this.refreshing()) {
+      await this.loadResults(evaluation);
+    }
+  }
+
+  /**
+   * Reads the results. A full load reads everything; a `quiet` one (the automatic refresh)
+   * reads the attempts again, and the trades only of attempts whose summary changed, without
+   * the page loader.
+   */
+  private async loadResults(evaluation: Evaluation, quiet = false): Promise<void> {
+    this.stopRefresh();
+    if (!quiet) {
+      this.tradeCache = new Map();
+      this.staffData = null;
+    }
+    this.refreshing.set(true);
     try {
-      const [sessions, adjustments, rubrics, grades] = await Promise.all([
-        this.practice.evaluationSessions(evaluation.id),
-        this.service.adjustments(evaluation.id).catch(() => []),
-        this.service.rubrics(evaluation.id).catch(() => new Map<string, EvaluationRubric>()),
-        this.service.grades(evaluation.id).catch(() => new Map<string, EvaluationGrade>()),
+      const [sessions, staffData] = await Promise.all([
+        this.practice.evaluationSessions(evaluation.id, quiet),
+        this.staffData ??
+          Promise.all([
+            this.service.adjustments(evaluation.id).catch(() => []),
+            this.service.rubrics(evaluation.id).catch(() => new Map<string, EvaluationRubric>()),
+            this.service.grades(evaluation.id).catch(() => new Map<string, EvaluationGrade>()),
+          ]).then(([adjustments, rubrics, grades]) => ({ adjustments, rubrics, grades })),
       ]);
+      this.staffData = staffData;
+      const { adjustments, rubrics, grades } = staffData;
       const students = this.assigned(evaluation).map((uid) => ({ uid, name: this.nameOf(uid) }));
       // Each attempt's trades, for its statistics; one that fails to load just shows none.
       const trades = new Map<string, PracticeTrade[]>();
       await Promise.all(
         sessions.map(async (s) => {
-          const list = await this.practice.sessionTrades(s.id).catch(() => null);
+          const key = summaryKey(s);
+          const cached = this.tradeCache.get(s.id);
+          if (cached?.key === key) {
+            trades.set(s.id, cached.trades);
+            return;
+          }
+          const list = await this.practice.sessionTrades(s.id, quiet).catch(() => null);
           if (list) {
             trades.set(s.id, list);
+            this.tradeCache.set(s.id, { key, trades: list });
           }
         }),
       );
@@ -549,12 +619,58 @@ export class AdminEvaluations {
           passingScore: passingScoreOf(evaluation),
         });
         this.standings.set(standings);
+        this.refreshedAt.set(new Date());
         void this.syncGrades(evaluation.id, standings, grades);
       }
     } catch {
-      this.standings.set([]);
-      this.message.set({ kind: 'error', text: this.i18n.messages().evaluations.resultsFailed });
+      if (!quiet) {
+        this.standings.set([]);
+        this.message.set({ kind: 'error', text: this.i18n.messages().evaluations.resultsFailed });
+      }
+    } finally {
+      this.refreshing.set(false);
     }
+    this.scheduleRefresh(evaluation);
+  }
+
+  /**
+   * While the evaluation runs (its window is open, or an attempt still has time), the shown
+   * results reload every `RESULTS_REFRESH_MS`; not while the tab is hidden.
+   */
+  private scheduleRefresh(evaluation: Evaluation): void {
+    this.stopRefresh();
+    const now = Date.now();
+    const running =
+      evaluationWindow(evaluation, now) === 'open' ||
+      this.attempts().some(
+        (s) => s.status === 'active' && this.deadlineOf(s) + CLOSE_GRACE_MS > now,
+      );
+    const shown = this.selected() === evaluation.id;
+    this.live.set(shown && running);
+    if (!shown || !running) {
+      return;
+    }
+    this.refreshTimer = setTimeout(() => {
+      if (this.selected() !== evaluation.id) {
+        return;
+      }
+      if (typeof document !== 'undefined' && document.hidden) {
+        this.scheduleRefresh(evaluation);
+        return;
+      }
+      void this.loadResults(evaluation, true);
+    }, RESULTS_REFRESH_MS);
+  }
+
+  private stopRefresh(): void {
+    clearTimeout(this.refreshTimer);
+    this.refreshTimer = undefined;
+  }
+
+  /** When an attempt's time runs out, minutes staff added included. */
+  private deadlineOf(session: PracticeSession): number {
+    const started = session.startedAt?.toMillis() ?? Date.now();
+    return started + ((session.durationMinutes ?? 0) + (session.extraMinutes ?? 0)) * MINUTE;
   }
 
   /** Opens the form to add minutes to an attempt, restart it or rate it. */
@@ -668,6 +784,10 @@ export class AdminEvaluations {
       changed.map((row) =>
         this.service
           .saveGrade(evaluationId, row.uid, row.score as IndabScore)
+          // Remembered, so the automatic refresh does not save it again.
+          .then(() =>
+            saved.set(row.uid, { ...saved.get(row.uid), ...row.score } as EvaluationGrade),
+          )
           .catch(() => undefined),
       ),
     );

@@ -22,9 +22,15 @@ import { SessionReview } from './session-review';
     @let t = i18n.messages().sessionPage;
     @let tp = i18n.messages().practice;
     <section class="container">
-      <a [routerLink]="auth.isStaff() ? '/admin/practice' : '/academy/practice'" class="back">{{
-        auth.isStaff() ? t.backStaff : t.back
-      }}</a>
+      @if (auth.isStaff() && session()?.evaluationId; as evaluationId) {
+        <a routerLink="/admin/evaluations" [queryParams]="{ results: evaluationId }" class="back">{{
+          t.backResults
+        }}</a>
+      } @else {
+        <a [routerLink]="auth.isStaff() ? '/admin/practice' : '/academy/practice'" class="back">{{
+          auth.isStaff() ? t.backStaff : t.back
+        }}</a>
+      }
       @if (loading()) {
         <p class="muted">{{ t.loading }}</p>
       } @else if (session(); as s) {

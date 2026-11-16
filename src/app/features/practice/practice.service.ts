@@ -263,11 +263,13 @@ export class PracticeService {
     return { sessions, trades };
   }
 
-  /** Every attempt at an evaluation (staff, or anyone once its results are published). */
-  async evaluationSessions(evaluationId: string): Promise<PracticeSession[]> {
-    const snapshot = await this.loading.track(
-      getDocs(query(this.sessions, where('evaluationId', '==', evaluationId))),
-    );
+  /**
+   * Every attempt at an evaluation (staff, or anyone once its results are published). `quiet`
+   * skips the page loader, for the results' automatic refresh.
+   */
+  async evaluationSessions(evaluationId: string, quiet = false): Promise<PracticeSession[]> {
+    const read = getDocs(query(this.sessions, where('evaluationId', '==', evaluationId)));
+    const snapshot = await (quiet ? read : this.loading.track(read));
     return snapshot.docs.map((d) => ({ ...(d.data() as PracticeSession), id: d.id }));
   }
 
@@ -356,10 +358,10 @@ export class PracticeService {
     return candidates.filter((_, i) => entries[i] === 0);
   }
 
-  async sessionTrades(sessionId: string): Promise<PracticeTrade[]> {
-    const snapshot = await this.loading.track(
-      getDocs(query(this.trades(sessionId), orderBy('entryTime'))),
-    );
+  /** A session's trades by entry time; `quiet` skips the page loader. */
+  async sessionTrades(sessionId: string, quiet = false): Promise<PracticeTrade[]> {
+    const read = getDocs(query(this.trades(sessionId), orderBy('entryTime')));
+    const snapshot = await (quiet ? read : this.loading.track(read));
     // Trades logged before order types existed were market orders.
     return snapshot.docs.map(
       (d) => ({ orderType: 'market', orderPrice: null, ...d.data(), id: d.id }) as PracticeTrade,
