@@ -1,5 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { vi } from 'vitest';
 import { NewsEvent, NewsMode } from '../../core/models/market-news';
 import { Candle, OrderType, PracticeTrade } from '../../core/models/practice';
@@ -811,9 +812,8 @@ describe('ReplayChart', () => {
     expect(
       el.querySelector('.tools button[aria-label="Herramientas de dibujo"]')!.textContent,
     ).toContain('Línea horizontal');
-    // Clicks on the price scale or the RSI pane do not draw.
+    // Clicks on the price scale do not draw.
     await press(800, 400);
-    await press(0, 450);
     expect(lw.series.createPriceLine).not.toHaveBeenCalled();
     await press(0, 400);
     expect(lw.series.createPriceLine).toHaveBeenLastCalledWith(
@@ -853,6 +853,102 @@ describe('ReplayChart', () => {
     expect(el.querySelector('svg.shapes')).toBeNull();
     await openMenu('Herramientas de dibujo');
     expect(item('Borrar dibujos').disabled).toBe(true);
+  });
+
+  it('draws in the RSI pane too, clipped to it, and keeps those drawings off the candles', async () => {
+    const r = await render();
+    const { fixture, host, el } = r;
+    const { pick, press, handles } = drawing(r);
+    host.candles.set(Array.from({ length: 30 }, (_, i) => c(i + 1)));
+    await fixture.whenStable();
+    const chart = fixture.debugElement.query(By.directive(ReplayChart))
+      .componentInstance as ReplayChart;
+    /** The newest drawing's main line, as [x1, y1, x2, y2], and the top of its pane. */
+    const newest = () => {
+      const clip = [...el.querySelectorAll('svg.shapes svg.pane-clip')].at(-1)!;
+      const l = clip.querySelector('line')!;
+      return {
+        line: ['x1', 'y1', 'x2', 'y2'].map((a) => Number(l.getAttribute(a))),
+        top: Number(clip.getAttribute('y')),
+      };
+    };
+
+    // The candles' pane is 420 px tall; the RSI's starts below it and its separator.
+    await pick('Línea de tendencia');
+    await press(10, 450);
+    // The second point stays in the RSI pane even if the click lands on the candles.
+    await press(50, 300);
+    expect(newest()).toEqual({ line: [10, 450, 50, 421], top: 421 });
+    expect(chart.drawings().at(-1)).toMatchObject({ kind: 'trend', pane: 'rsi14' });
+    // A tap on it selects it.
+    await press(300, 200);
+    expect(handles()).toHaveLength(0);
+    await press(30, 436);
+    expect(handles()).toHaveLength(2);
+
+    // A horizontal line there is a level across the pane, not a price line of the candles.
+    await pick('Línea horizontal');
+    await press(100, 470);
+    expect(newest().line).toEqual([0, 470, 700, 470]);
+    expect(lw.series.createPriceLine).not.toHaveBeenCalled();
+    // 470 px is 49 px down the RSI pane, value 500 - 49.
+    expect(chart.drawings().at(-1)).toMatchObject({ kind: 'level', pane: 'rsi14' });
+    expect((chart.drawings().at(-1) as { points: { price: number }[] }).points[0].price).toBe(451);
+
+    // Positions and measures need prices: they only go on the candles.
+    const count = chart.drawings().length;
+    await pick('Posición larga');
+    await press(100, 470);
+    await press(150, 460);
+    expect(chart.drawings()).toHaveLength(count);
+    await press(100, 300);
+    await press(150, 250);
+    expect(chart.drawings()).toHaveLength(count + 1);
+    expect(chart.drawings().at(-1)).not.toHaveProperty('pane');
+
+    // With the RSI off its drawings wait, and come back with it.
+    const shown = () => el.querySelectorAll('svg.shapes svg.pane-clip').length;
+    expect(shown()).toBe(3);
+    host.indicators.set(['ema100']);
+    await fixture.whenStable();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await fixture.whenStable();
+    expect(shown()).toBe(1);
+    host.indicators.set(['rsi14']);
+    await fixture.whenStable();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await fixture.whenStable();
+    expect(shown()).toBe(3);
+  });
+
+  it('puts drawing points past the last candle, on the bars still to come', async () => {
+    const r = await render();
+    const { fixture, host, el } = r;
+    const { pick, press } = drawing(r);
+    host.candles.set(Array.from({ length: 30 }, (_, i) => c(i + 1)));
+    await fixture.whenStable();
+    const chart = fixture.debugElement.query(By.directive(ReplayChart))
+      .componentInstance as ReplayChart;
+    const line = () => {
+      const l = [...el.querySelectorAll('svg.shapes line.trend')].at(-1)!;
+      return ['x1', 'y1', 'x2', 'y2'].map((a) => Number(l.getAttribute(a)));
+    };
+
+    // The last candle (time 30) is at x 290; x 400 is 11 bars of a second later.
+    await pick('Línea de tendencia');
+    await press(250, 300);
+    await press(400, 250);
+    expect(line()).toEqual([250, 300, 400, 250]);
+    expect(chart.drawings().at(-1)).toMatchObject({
+      points: [
+        { time: 26, price: 200 },
+        { time: 41, price: 250 },
+      ],
+    });
+    // The bars come: the point stays on its time.
+    host.candles.set(Array.from({ length: 45 }, (_, i) => c(i + 1)));
+    await fixture.whenStable();
+    expect(line()).toEqual([250, 300, 400, 250]);
   });
 
   it('draws rectangles by dragging and Fibonacci retracements by clicking', async () => {
