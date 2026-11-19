@@ -48,6 +48,12 @@ export interface ShownIndicator {
   config: IndicatorConfig;
 }
 
+/** An indicator pane under the candles: its indicator's id and a series on its price scale. */
+export interface IndicatorPane {
+  id: string;
+  series: ISeriesApi<SeriesType>;
+}
+
 /** An indicator on the chart: its series, and how to feed them the candles shown. */
 interface Drawn {
   series: ISeriesApi<SeriesType>[];
@@ -82,21 +88,29 @@ const data = (points: PlotPoint[], price: boolean): (LineData<Time> | Whitespace
 export class ChartIndicators {
   private drawn: Drawn[] = [];
   private layout = '';
+  private own: IndicatorPane[] = [];
 
   constructor(
     private readonly chart: IChartApi,
     private readonly colors: () => IndicatorColors,
   ) {}
 
-  draw(candles: Candle[], shown: ShownIndicator[]): void {
+  /** Draws the indicators; true when their panes were laid out again. */
+  draw(candles: Candle[], shown: ShownIndicator[]): boolean {
     const layout = JSON.stringify(shown.map(({ indicator, config }) => [indicator.id, config]));
-    if (layout !== this.layout) {
+    const changed = layout !== this.layout;
+    if (changed) {
       this.clear();
       this.layout = layout;
       let pane = 0;
-      this.drawn = shown.map(({ indicator, config }) =>
-        this.build(indicator, config, indicator.pane === 'own' ? ++pane : 0),
-      );
+      this.drawn = shown.map(({ indicator, config }) => {
+        const own = indicator.pane === 'own';
+        const drawn = this.build(indicator, config, own ? ++pane : 0);
+        if (own) {
+          this.own.push({ id: indicator.id, series: drawn.series[0] });
+        }
+        return drawn;
+      });
       // The candles keep most of the chart: one pane under them is as tall as the RSI's always
       // was; several share the rest, each a part of what the candles get.
       const panes = this.chart.panes();
@@ -107,12 +121,19 @@ export class ChartIndicators {
       }
     }
     this.drawn.forEach((d) => d.update(candles));
+    return changed;
+  }
+
+  /** The panes under the candles, from the top: pane 1 is the first one. */
+  panes(): readonly IndicatorPane[] {
+    return this.own;
   }
 
   /** Takes every indicator off the chart. */
   clear(): void {
     this.drawn.flatMap((d) => d.series).forEach((s) => this.chart.removeSeries(s));
     this.drawn = [];
+    this.own = [];
     this.layout = '';
   }
 

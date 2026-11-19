@@ -709,6 +709,58 @@ test('a student draws a Gann box with the mouse and reshapes it', async ({ page 
   await page.screenshot({ path: 'test-results/desk-gann.png' });
 });
 
+test('a student draws in the RSI pane and past the last candle, and a reload keeps it', async ({
+  page,
+}) => {
+  // Tall enough for the whole chart, RSI pane included.
+  await page.setViewportSize({ width: 1280, height: 1200 });
+  await mockWavyMarket(page);
+  await signIn(page, 'jose@indab.test');
+  await page.getByRole('link', { name: 'Práctica de trading' }).click();
+  await page.getByRole('button', { name: 'Comenzar práctica' }).click();
+  await expect(page.getByRole('button', { name: 'Terminar sesión' })).toBeVisible();
+
+  const chart = page.locator('.workspace app-replay-chart');
+  const stage = chart.locator('.stage');
+  const pick = async (tool: string) => {
+    await chart.getByRole('button', { name: 'Herramientas de dibujo' }).click();
+    await page.getByRole('menuitemradio', { name: tool }).click();
+  };
+  await pick('Línea de tendencia');
+  await stage.scrollIntoViewIfNeeded();
+  await settled(stage);
+  const box = (await stage.boundingBox())!;
+  // The RSI pane sits under the candles, above the time scale at the foot of the chart.
+  const rsiY = box.y + box.height - 28 - 55;
+  // Above the tool's hint, which sits at the foot of the chart.
+  await page.mouse.click(box.x + box.width * 0.3, rsiY + 5);
+  await page.mouse.click(box.x + box.width * 0.7, rsiY - 30);
+  const clips = stage.locator('svg.shapes svg.pane-clip');
+  await expect(clips).toHaveCount(1);
+  expect(Number(await clips.first().getAttribute('y'))).toBeGreaterThan(box.height / 2);
+  // A horizontal line there runs across the RSI pane.
+  await pick('Línea horizontal');
+  await page.mouse.click(box.x + box.width * 0.2, rsiY - 10);
+  await expect(clips).toHaveCount(2);
+
+  // A trend line from a candle out into the empty space right of the last one ends where
+  // clicked. The chart leaves 8 empty bars there; the price scale is about 65 px wide.
+  const futureX = box.width - 80;
+  await pick('Línea de tendencia');
+  await page.mouse.click(box.x + box.width * 0.4, box.y + box.height * 0.45);
+  await page.mouse.click(box.x + futureX, box.y + box.height * 0.2);
+  await expect(clips).toHaveCount(3);
+  const tip = () => clips.last().locator('line.trend').getAttribute('x2').then(Number);
+  await expect.poll(tip).toBeGreaterThan(futureX - 6);
+  await stage.screenshot({ path: 'test-results/drawings-desk.png' });
+
+  // A reload puts them all back where they were.
+  await page.reload();
+  await expect(clips).toHaveCount(3);
+  await expect.poll(tip).toBeGreaterThan(futureX - 6);
+  expect(Number(await clips.first().getAttribute('y'))).toBeGreaterThan(box.height / 2);
+});
+
 test("the chart keeps each student's indicators for their next sessions", async ({ page }) => {
   await signIn(page, 'jose@indab.test');
   await page.getByRole('link', { name: 'Práctica de trading' }).click();

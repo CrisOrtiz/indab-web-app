@@ -290,211 +290,224 @@
   @if (shapes().length || cursor()?.touch) {
     <svg class="shapes" aria-hidden="true">
       @for (shape of shapes(); track shape.id) {
-        <g [attr.stroke]="shape.color" [attr.fill]="shape.color">
-          @if (shape.position; as position) {
-            <rect
-              class="profit"
-              [attr.x]="shape.left"
-              [attr.y]="position.profit.top"
-              [attr.width]="shape.right - shape.left"
-              [attr.height]="position.profit.height"
-            />
-            <rect
-              class="loss"
-              [attr.x]="shape.left"
-              [attr.y]="position.loss.top"
-              [attr.width]="shape.right - shape.left"
-              [attr.height]="position.loss.height"
-            />
-            <line
-              class="entry"
-              [attr.x1]="shape.left"
-              [attr.x2]="shape.right"
-              [attr.y1]="position.entryY"
-              [attr.y2]="position.entryY"
-            />
-            @for (label of position.labels; track label.key) {
-              <text
-                class="measure-text"
-                [class.up]="label.up"
-                [class.down]="!label.up"
-                [attr.x]="shape.left + 4"
-                [attr.y]="label.y"
-              >
-                {{ label.text }}
+        <!-- Each drawing is clipped to its pane: the candles' or an indicator's. -->
+        <svg
+          class="pane-clip"
+          x="0"
+          [attr.y]="shape.clip.top"
+          width="100%"
+          [attr.height]="shape.clip.height"
+        >
+          <g
+            [attr.transform]="'translate(0,' + -shape.clip.top + ')'"
+            [attr.stroke]="shape.color"
+            [attr.fill]="shape.color"
+          >
+            @if (shape.position; as position) {
+              <rect
+                class="profit"
+                [attr.x]="shape.left"
+                [attr.y]="position.profit.top"
+                [attr.width]="shape.right - shape.left"
+                [attr.height]="position.profit.height"
+              />
+              <rect
+                class="loss"
+                [attr.x]="shape.left"
+                [attr.y]="position.loss.top"
+                [attr.width]="shape.right - shape.left"
+                [attr.height]="position.loss.height"
+              />
+              <line
+                class="entry"
+                [attr.x1]="shape.left"
+                [attr.x2]="shape.right"
+                [attr.y1]="position.entryY"
+                [attr.y2]="position.entryY"
+              />
+              @for (label of position.labels; track label.key) {
+                <text
+                  class="measure-text"
+                  [class.up]="label.up"
+                  [class.down]="!label.up"
+                  [attr.x]="shape.left + 4"
+                  [attr.y]="label.y"
+                >
+                  {{ label.text }}
+                </text>
+              }
+              <text class="measure-text" [attr.x]="shape.left + 4" [attr.y]="position.entryY - 4">
+                {{ position.ratio }}
               </text>
-            }
-            <text class="measure-text" [attr.x]="shape.left + 4" [attr.y]="position.entryY - 4">
-              {{ position.ratio }}
-            </text>
-          } @else if (shape.range; as range) {
-            <rect
-              class="range"
-              [attr.x]="shape.left"
-              [attr.y]="shape.top"
-              [attr.width]="shape.right - shape.left"
-              [attr.height]="shape.bottom - shape.top"
-            />
-            <line
-              class="trend"
-              [attr.x1]="shape.segment[0].x"
-              [attr.y1]="shape.segment[0].y"
-              [attr.x2]="shape.segment[1].x"
-              [attr.y2]="shape.segment[1].y"
-            />
-            <polygon class="head" [attr.points]="shape.head" />
-            <text
-              class="measure-text range-text"
-              [attr.x]="(shape.left + shape.right) / 2"
-              [attr.y]="range.y"
-            >
-              {{ range.text }}
-            </text>
-          } @else {
-            @switch (shape.kind) {
-              @case ('vprofile') {
-                <rect
-                  class="profile-range"
-                  [attr.x]="shape.left"
-                  [attr.y]="shape.top"
-                  [attr.width]="shape.right - shape.left"
-                  [attr.height]="shape.bottom - shape.top"
-                />
-                @if (shape.profile; as profile) {
-                  @for (row of profile.rows; track $index) {
-                    <rect
-                      class="vp-up"
-                      [class.outside]="!row.value"
-                      [attr.x]="shape.left"
-                      [attr.y]="row.top"
-                      [attr.width]="row.up"
-                      [attr.height]="row.height"
-                    />
-                    <rect
-                      class="vp-down"
-                      [class.outside]="!row.value"
-                      [attr.x]="shape.left + row.up"
-                      [attr.y]="row.top"
-                      [attr.width]="row.down"
-                      [attr.height]="row.height"
-                    />
+            } @else if (shape.range; as range) {
+              <rect
+                class="range"
+                [attr.x]="shape.left"
+                [attr.y]="shape.top"
+                [attr.width]="shape.right - shape.left"
+                [attr.height]="shape.bottom - shape.top"
+              />
+              <line
+                class="trend"
+                [attr.x1]="shape.segment[0].x"
+                [attr.y1]="shape.segment[0].y"
+                [attr.x2]="shape.segment[1].x"
+                [attr.y2]="shape.segment[1].y"
+              />
+              <polygon class="head" [attr.points]="shape.head" />
+              <text
+                class="measure-text range-text"
+                [attr.x]="(shape.left + shape.right) / 2"
+                [attr.y]="range.y"
+              >
+                {{ range.text }}
+              </text>
+            } @else {
+              @switch (shape.kind) {
+                @case ('vprofile') {
+                  <rect
+                    class="profile-range"
+                    [attr.x]="shape.left"
+                    [attr.y]="shape.top"
+                    [attr.width]="shape.right - shape.left"
+                    [attr.height]="shape.bottom - shape.top"
+                  />
+                  @if (shape.profile; as profile) {
+                    @for (row of profile.rows; track $index) {
+                      <rect
+                        class="vp-up"
+                        [class.outside]="!row.value"
+                        [attr.x]="shape.left"
+                        [attr.y]="row.top"
+                        [attr.width]="row.up"
+                        [attr.height]="row.height"
+                      />
+                      <rect
+                        class="vp-down"
+                        [class.outside]="!row.value"
+                        [attr.x]="shape.left + row.up"
+                        [attr.y]="row.top"
+                        [attr.width]="row.down"
+                        [attr.height]="row.height"
+                      />
+                    }
+                    @if (profile.pocY !== null) {
+                      <line
+                        class="poc"
+                        [attr.x1]="shape.left"
+                        [attr.x2]="shape.right"
+                        [attr.y1]="profile.pocY"
+                        [attr.y2]="profile.pocY"
+                      />
+                    }
                   }
-                  @if (profile.pocY !== null) {
+                }
+                @case ('elliott') {
+                  <ng-container *ngTemplateOutlet="wave; context: { $implicit: shape }" />
+                }
+                @case ('abc') {
+                  <ng-container *ngTemplateOutlet="wave; context: { $implicit: shape }" />
+                }
+                @case ('rect') {
+                  <rect
+                    class="rect"
+                    [attr.x]="shape.left"
+                    [attr.y]="shape.top"
+                    [attr.width]="shape.right - shape.left"
+                    [attr.height]="shape.bottom - shape.top"
+                  />
+                }
+                @case ('gann') {
+                  <rect
+                    class="gann-box"
+                    [attr.x]="shape.left"
+                    [attr.y]="shape.top"
+                    [attr.width]="shape.right - shape.left"
+                    [attr.height]="shape.bottom - shape.top"
+                  />
+                  @for (level of shape.levels; track level.ratio) {
                     <line
-                      class="poc"
+                      class="gann"
                       [attr.x1]="shape.left"
                       [attr.x2]="shape.right"
-                      [attr.y1]="profile.pocY"
-                      [attr.y2]="profile.pocY"
+                      [attr.y1]="level.y"
+                      [attr.y2]="level.y"
+                    />
+                    <text class="gann-text start" [attr.x]="shape.left - 10" [attr.y]="level.y + 4">
+                      {{ level.ratio }}
+                    </text>
+                    <text class="gann-text" [attr.x]="shape.right + 10" [attr.y]="level.y + 4">
+                      {{ level.ratio }}
+                    </text>
+                  }
+                }
+                @case ('fib') {
+                  <line
+                    class="fib-move"
+                    [attr.x1]="shape.a.x"
+                    [attr.y1]="shape.a.y"
+                    [attr.x2]="shape.b.x"
+                    [attr.y2]="shape.b.y"
+                  />
+                  @for (level of shape.levels; track level.ratio) {
+                    <line
+                      class="fib"
+                      [attr.x1]="shape.left"
+                      [attr.x2]="shape.right"
+                      [attr.y1]="level.y"
+                      [attr.y2]="level.y"
+                      [attr.stroke]="level.color ?? shape.color"
+                    />
+                    <text
+                      class="fib-text"
+                      [attr.x]="shape.left + 4"
+                      [attr.y]="level.y - 3"
+                      [attr.fill]="level.color ?? shape.color"
+                    >
+                      {{ level.ratio }}
+                    </text>
+                  }
+                }
+                @default {
+                  <line
+                    class="trend"
+                    [class.channel-line]="!!shape.parallel"
+                    [attr.x1]="shape.segment[0].x"
+                    [attr.y1]="shape.segment[0].y"
+                    [attr.x2]="shape.segment[1].x"
+                    [attr.y2]="shape.segment[1].y"
+                  />
+                  @if (shape.head; as head) {
+                    <polygon class="head" [attr.points]="head" />
+                  }
+                  @if (shape.parallel; as parallel) {
+                    <polygon
+                      class="channel"
+                      [attr.points]="polygon(shape.a, shape.b, parallel[1], parallel[0])"
+                    />
+                    <line
+                      class="trend channel-line"
+                      [attr.x1]="parallel[0].x"
+                      [attr.y1]="parallel[0].y"
+                      [attr.x2]="parallel[1].x"
+                      [attr.y2]="parallel[1].y"
+                    />
+                    <line
+                      class="channel-middle"
+                      [attr.x1]="shape.a.x"
+                      [attr.y1]="(shape.a.y + parallel[0].y) / 2"
+                      [attr.x2]="shape.b.x"
+                      [attr.y2]="(shape.b.y + parallel[1].y) / 2"
                     />
                   }
                 }
               }
-              @case ('elliott') {
-                <ng-container *ngTemplateOutlet="wave; context: { $implicit: shape }" />
-              }
-              @case ('abc') {
-                <ng-container *ngTemplateOutlet="wave; context: { $implicit: shape }" />
-              }
-              @case ('rect') {
-                <rect
-                  class="rect"
-                  [attr.x]="shape.left"
-                  [attr.y]="shape.top"
-                  [attr.width]="shape.right - shape.left"
-                  [attr.height]="shape.bottom - shape.top"
-                />
-              }
-              @case ('gann') {
-                <rect
-                  class="gann-box"
-                  [attr.x]="shape.left"
-                  [attr.y]="shape.top"
-                  [attr.width]="shape.right - shape.left"
-                  [attr.height]="shape.bottom - shape.top"
-                />
-                @for (level of shape.levels; track level.ratio) {
-                  <line
-                    class="gann"
-                    [attr.x1]="shape.left"
-                    [attr.x2]="shape.right"
-                    [attr.y1]="level.y"
-                    [attr.y2]="level.y"
-                  />
-                  <text class="gann-text start" [attr.x]="shape.left - 10" [attr.y]="level.y + 4">
-                    {{ level.ratio }}
-                  </text>
-                  <text class="gann-text" [attr.x]="shape.right + 10" [attr.y]="level.y + 4">
-                    {{ level.ratio }}
-                  </text>
-                }
-              }
-              @case ('fib') {
-                <line
-                  class="fib-move"
-                  [attr.x1]="shape.a.x"
-                  [attr.y1]="shape.a.y"
-                  [attr.x2]="shape.b.x"
-                  [attr.y2]="shape.b.y"
-                />
-                @for (level of shape.levels; track level.ratio) {
-                  <line
-                    class="fib"
-                    [attr.x1]="shape.left"
-                    [attr.x2]="shape.right"
-                    [attr.y1]="level.y"
-                    [attr.y2]="level.y"
-                    [attr.stroke]="level.color ?? shape.color"
-                  />
-                  <text
-                    class="fib-text"
-                    [attr.x]="shape.left + 4"
-                    [attr.y]="level.y - 3"
-                    [attr.fill]="level.color ?? shape.color"
-                  >
-                    {{ level.ratio }}
-                  </text>
-                }
-              }
-              @default {
-                <line
-                  class="trend"
-                  [class.channel-line]="!!shape.parallel"
-                  [attr.x1]="shape.segment[0].x"
-                  [attr.y1]="shape.segment[0].y"
-                  [attr.x2]="shape.segment[1].x"
-                  [attr.y2]="shape.segment[1].y"
-                />
-                @if (shape.head; as head) {
-                  <polygon class="head" [attr.points]="head" />
-                }
-                @if (shape.parallel; as parallel) {
-                  <polygon
-                    class="channel"
-                    [attr.points]="polygon(shape.a, shape.b, parallel[1], parallel[0])"
-                  />
-                  <line
-                    class="trend channel-line"
-                    [attr.x1]="parallel[0].x"
-                    [attr.y1]="parallel[0].y"
-                    [attr.x2]="parallel[1].x"
-                    [attr.y2]="parallel[1].y"
-                  />
-                  <line
-                    class="channel-middle"
-                    [attr.x1]="shape.a.x"
-                    [attr.y1]="(shape.a.y + parallel[0].y) / 2"
-                    [attr.x2]="shape.b.x"
-                    [attr.y2]="(shape.b.y + parallel[1].y) / 2"
-                  />
-                }
-              }
             }
-          }
-          @if (shape.id === 0 && anchors().length) {
-            <circle class="anchor-dot" [attr.cx]="shape.a.x" [attr.cy]="shape.a.y" r="4" />
-          }
-        </g>
+            @if (shape.id === 0 && anchors().length) {
+              <circle class="anchor-dot" [attr.cx]="shape.a.x" [attr.cy]="shape.a.y" r="4" />
+            }
+          </g>
+        </svg>
       }
       @if (cursor(); as c) {
         @if (c.touch) {

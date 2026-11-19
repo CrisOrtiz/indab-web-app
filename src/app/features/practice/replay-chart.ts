@@ -30,7 +30,7 @@ import {
   createChart,
   createSeriesMarkers,
 } from 'lightweight-charts';
-import type { TickMarkType } from 'lightweight-charts';
+import type { SeriesType, TickMarkType } from 'lightweight-charts';
 import { I18n } from '../../core/i18n/i18n.service';
 import { ThemeService } from '../../core/theme/theme.service';
 import { TimeZoneService } from '../../core/time-zone/time-zone.service';
@@ -39,7 +39,7 @@ import '../../core/i18n/local-date.pipe';
 import { Candle, OrderType, PracticeTrade, TradeSide } from '../../core/models/practice';
 import { NewsEvent, NewsMode } from '../../core/models/market-news';
 import { NewsMark, newsMarks } from './news-marks';
-import { ChartIndicators, ShownIndicator } from './chart-indicators';
+import { ChartIndicators, IndicatorPane, ShownIndicator } from './chart-indicators';
 import {
   DEFAULT_INDICATORS,
   INDICATORS,
@@ -200,11 +200,16 @@ export type Tool =
 /** Width of the news card (px), as in chart-studies.scss. */
 const NEWS_CARD_WIDTH = 280;
 
-/** Drawings on the overlay: every tool but the horizontal line, which is a price line. */
-type ShapeKind = Exclude<Tool, 'hline'>;
+/**
+ * Drawings on the overlay: every tool but the horizontal line, which is a price line of the
+ * candles. In an indicator's pane a horizontal line is drawn on the overlay too, as a `level`.
+ */
+type ShapeKind = Exclude<Tool, 'hline'> | 'level';
 export interface ShapeDrawing {
   id: number;
   kind: ShapeKind;
+  /** The indicator whose pane it is drawn in (its id, as `rsi14`); the candles' when absent. */
+  pane?: string;
   /** One point (horizontal ray, vertical line) or two: the ends, corners or move. */
   points: ChartPoint[];
   color: string;
@@ -221,6 +226,17 @@ export interface ChartPoint {
 interface Pixel {
   x: number;
   y: number;
+}
+
+/** A pane drawings go in, in pixels of the stage: the candles' or an indicator's. */
+interface Frame {
+  /** The indicator's id; undefined for the candles. */
+  pane: string | undefined;
+  top: number;
+  width: number;
+  height: number;
+  /** A series on the pane's price scale, to turn prices (or values) into heights. */
+  scale: Pick<ISeriesApi<SeriesType>, 'priceToCoordinate' | 'coordinateToPrice'>;
 }
 
 /**
@@ -242,6 +258,8 @@ interface PlacedShape {
   id: number;
   kind: ShapeKind;
   color: string;
+  /** The pane it is drawn in, which clips it. */
+  clip: { top: number; height: number };
   /** The drawing's points. */
   pixels: Pixel[];
   a: Pixel;
@@ -396,6 +414,10 @@ const DRAWING_COLOR = DRAWING_COLORS[0];
 /** Id of the drawing shown while its second point is being placed. */
 const PREVIEW_ID = 0;
 const RSI_PANE_HEIGHT = 110;
+/** Height (px) of the separator lightweight-charts puts between panes. */
+const PANE_SEPARATOR = 1;
+/** Tools that measure prices or volume, which only the candles' pane has. */
+const CANDLES_ONLY: ReadonlySet<Tool> = new Set(['long', 'short', 'range', 'vprofile']);
 /** Fewest bars a finished replay is shown across, so a short one keeps some history. */
 const MIN_REPLAY_VIEW = 60;
 /** Length (px) of an arrow's head. */
@@ -508,7 +530,9 @@ function formatPercent(value: number, of: number, signed = false): string {
  * Drawings work as in TradingView's app: a click or tap puts each point, and on a phone the
  * finger can also drag a crosshair to the point and let go, so it does not hide the spot. A
  * drawing being placed follows the cursor. A tap selects a drawing: its handles adjust it, a
- * drag moves it, and a bar recolors or deletes it.
+ * drag moves it, and a bar recolors or deletes it. Lines, shapes, Fibonacci and waves also go
+ * in an indicator's pane (the RSI's), clipped to it and hidden while the indicator is off, and
+ * points may go past the last candle, on the bars still to come (Cris, 2026-11-19).
  */
 @Component({
   selector: 'app-replay-chart',
@@ -660,8 +684,11 @@ export class ReplayChart {
   protected readonly cursorPrice = computed(() => {
     const cursor = this.cursor();
     this.shapes();
-    const price = cursor?.touch ? this.series?.coordinateToPrice(cursor.y) : null;
-    return price ? roundPrice(price) : null;
+    const frame = cursor?.touch ? this.placingFrame() : null;
+    const price = frame ? frame.scale.coordinateToPrice(cursor!.y - frame.top) : null;
+    return price !== null && Number.isFinite(price) && (frame?.pane || price > 0)
+      ? roundPrice(price)
+      : null;
   });
   protected readonly zones = signal<Zone[]>([]);
   protected readonly boxes = signal<PlacedBox[]>([]);
@@ -724,6 +751,8 @@ export class ReplayChart {
     offset?: number;
   };
   private gesture?: Gesture;
+  /** The pane of the drawing being placed: an indicator's id, or undefined for the candles. */
+  private drawPane: string | undefined;
   private drawn: Candle[] = [];
   private indicatorLines?: ChartIndicators;
   private colors = { up: '', down: '', text: '', muted: '', candleUp: '', candleDown: '' };
@@ -932,6 +961,7 @@ export class ReplayChart {
     this.toolMenu.set(null);
     this.tool.update((current) => (current === tool ? null : tool));
     this.anchors.set([]);
+    this.drawPane = undefined;
     this.cursor.set(null);
     this.selected.set(null);
   }
@@ -1699,23 +1729,33 @@ export class ReplayChart {
 
   /** One drawing in pixels: its lines, handles and, for measures, their labels. */
   private placeShape(d: ShapeDrawing): PlacedShape | null {
-    const series = this.series!;
+    // A drawing in the pane of an indicator that is off waits for it to come back.
+    const frame = this.frameOf(d.pane);
+    if (!frame) {
+      return null;
+    }
     const pixels: Pixel[] = [];
     for (const point of d.points) {
-      const pixel = this.toPixel(point);
+      const pixel = this.toPixel(point, frame);
       if (!pixel) {
         return null;
       }
       pixels.push(pixel);
     }
+    /** Height of a price (or value) in the drawing's pane. */
+    const yOf = (price: number) => {
+      const y = frame.scale.priceToCoordinate(price);
+      return y === null ? null : y + frame.top;
+    };
     const a = pixels[0];
     const b = pixels[1] ?? a;
-    const pane = this.pane() ?? { width: 0, height: 0 };
+    const pane = frame;
     const tr = untracked(this.i18n.messages).chart;
     const shape: PlacedShape = {
       id: d.id,
       kind: d.kind,
       color: d.color,
+      clip: { top: frame.top, height: frame.height },
       pixels,
       a,
       b,
@@ -1744,16 +1784,26 @@ export class ReplayChart {
         shape.segment = [a, { x: Math.max(a.x, pane.width), y: a.y }];
         shape.handles = [{ key: 'a', ...a, timeOf: 0, priceOf: 0 }];
         break;
+      case 'level':
+        // A horizontal line across an indicator's pane, moved up and down by its handle.
+        shape.segment = [
+          { x: 0, y: a.y },
+          { x: pane.width, y: a.y },
+        ];
+        shape.handles = [{ key: 'a', ...a, timeOf: 0, priceOf: 0 }];
+        break;
       case 'vline':
         shape.segment = [
-          { x: a.x, y: 0 },
-          { x: a.x, y: pane.height },
+          { x: a.x, y: pane.top },
+          { x: a.x, y: pane.top + pane.height },
         ];
-        shape.handles = [{ key: 'a', x: a.x, y: pane.height / 2, timeOf: 0, priceOf: null }];
+        shape.handles = [
+          { key: 'a', x: a.x, y: pane.top + pane.height / 2, timeOf: 0, priceOf: null },
+        ];
         break;
       case 'channel': {
         // The offset is a price distance; the price scale is linear, so it is one height.
-        const dy = (series.priceToCoordinate(d.points[0].price + (d.offset ?? 0)) ?? a.y) - a.y;
+        const dy = (yOf(d.points[0].price + (d.offset ?? 0)) ?? a.y) - a.y;
         const parallel: [Pixel, Pixel] = [
           { x: a.x, y: a.y + dy },
           { x: b.x, y: b.y + dy },
@@ -1779,7 +1829,7 @@ export class ReplayChart {
         shape.levels = FIB_LEVELS.map(({ ratio, color }) => {
           const [pa, pb] = d.points;
           const price = roundPrice(pb.price + (pa.price - pb.price) * ratio);
-          return { ratio, price, y: series.priceToCoordinate(price) ?? 0, color };
+          return { ratio, price, y: yOf(price) ?? 0, color };
         });
         break;
       case 'gann':
@@ -1788,7 +1838,7 @@ export class ReplayChart {
         shape.levels = GANN_LEVELS.map((ratio) => {
           const [pa, pb] = d.points;
           const price = roundPrice(pa.price + (pb.price - pa.price) * ratio);
-          return { ratio, price, y: series.priceToCoordinate(price) ?? 0, color: null };
+          return { ratio, price, y: yOf(price) ?? 0, color: null };
         });
         break;
       case 'long':
@@ -1796,7 +1846,7 @@ export class ReplayChart {
         const entry = d.points[0].price;
         const target = d.points[1].price;
         const stop = d.stop ?? entry;
-        const stopY = series.priceToCoordinate(stop) ?? a.y;
+        const stopY = yOf(stop) ?? a.y;
         const reward = Math.abs(target - entry);
         const risk = Math.abs(entry - stop);
         const band = (y: number) => ({ top: Math.min(a.y, y), height: Math.abs(a.y - y) });
@@ -1865,7 +1915,7 @@ export class ReplayChart {
       case 'range': {
         const [from, to] = d.points;
         const change = to.price - from.price;
-        const bars = this.indexAt(to.time) - this.indexAt(from.time);
+        const bars = Math.round(this.logicalAt(to.time) - this.logicalAt(from.time));
         const middle = (shape.left + shape.right) / 2;
         shape.segment = [
           { x: middle, y: a.y },
@@ -1954,19 +2004,29 @@ export class ReplayChart {
     const tool = untracked(this.tool);
     const anchors = untracked(this.anchors);
     const cursor = untracked(this.cursor);
-    const point = cursor && this.toPoint(cursor);
+    const frame = this.placingFrame();
+    const point = cursor && frame && this.toPoint(cursor, frame);
     if (!tool || tool === 'hline' || !point || (POINTS[tool] > 1 && !anchors.length)) {
       return null;
     }
-    return this.build(tool, [...anchors, point], PREVIEW_ID);
+    return this.build(tool, [...anchors, point], PREVIEW_ID, frame);
   }
 
-  /** A drawing of `tool` through `points`; a channel of two points is still a line. */
-  private build(tool: ShapeKind, points: ChartPoint[], id: number): ShapeDrawing {
+  /**
+   * A drawing of `tool` through `points` in `frame`; a channel of two points is still a line,
+   * and a horizontal line in an indicator's pane is a level.
+   */
+  private build(tool: Tool, points: ChartPoint[], id: number, frame: Frame): ShapeDrawing {
     const color = DRAWING_COLOR;
+    // Firestore refuses undefined values, so the candles' drawings have no pane at all.
+    const pane = frame.pane ? { pane: frame.pane } : {};
+    if (tool === 'hline') {
+      return { id, kind: 'level', points: points.slice(0, 1), color, ...pane };
+    }
     if (tool === 'channel') {
       const [a, b = a, c] = points;
-      return { id, kind: tool, points: [a, b], color, offset: c ? this.offsetOf(a, b, c) : 0 };
+      const offset = c ? this.offsetOf(a, b, c, frame) : 0;
+      return { id, kind: tool, points: [a, b], color, offset, ...pane };
     }
     if (tool === 'long' || tool === 'short') {
       const [entry, end] = points;
@@ -1983,49 +2043,77 @@ export class ReplayChart {
         stop: move >= 0 ? mirror : end.price,
       };
     }
-    return { id, kind: tool, points: points.slice(0, POINTS[tool]), color };
+    return { id, kind: tool, points: points.slice(0, POINTS[tool]), color, ...pane };
   }
 
   /** Price distance from the line through `a` and `b` to `c`, at `c`'s bar. */
-  private offsetOf(a: ChartPoint, b: ChartPoint, c: ChartPoint): number {
-    const [pa, pb, pc] = [a, b, c].map((p) => this.toPixel(p));
+  private offsetOf(a: ChartPoint, b: ChartPoint, c: ChartPoint, frame: Frame): number {
+    const [pa, pb, pc] = [a, b, c].map((p) => this.toPixel(p, frame));
     if (!pa || !pb || !pc || pa.x === pb.x) {
       return roundPrice(c.price - a.price);
     }
     const y = pa.y + ((pb.y - pa.y) * (pc.x - pa.x)) / (pb.x - pa.x);
-    const price = this.series!.coordinateToPrice(y);
+    const price = frame.scale.coordinateToPrice(y - frame.top);
     return price === null ? 0 : roundPrice(c.price - price);
   }
 
-  private toPixel(point: ChartPoint): Pixel | null {
+  private toPixel(point: ChartPoint, frame: Frame): Pixel | null {
     const x = this.timeToX(point.time);
-    const y = this.series!.priceToCoordinate(point.price);
-    return x === null || y === null ? null : { x, y };
+    const y = frame.scale.priceToCoordinate(point.price);
+    return x === null || y === null ? null : { x, y: y + frame.top };
   }
 
-  /** The bar and price at a pixel of the candles' pane. */
-  private toPoint(pixel: Pixel): ChartPoint | null {
+  /**
+   * The bar and price at a pixel of `frame`: a price of the candles, or a value of the
+   * indicator (which may be zero or negative, as the MACD's).
+   */
+  private toPoint(pixel: Pixel, frame: Frame): ChartPoint | null {
     const time = this.xToTime(pixel.x);
-    const price = this.series?.coordinateToPrice(pixel.y);
-    return time === null || !price || price <= 0 ? null : { time, price: roundPrice(price) };
+    const price = frame.scale.coordinateToPrice(pixel.y - frame.top);
+    if (time === null || price === null || !Number.isFinite(price)) {
+      return null;
+    }
+    if (!frame.pane && price <= 0) {
+      return null;
+    }
+    return { time, price: price ? roundPrice(price) : 0 };
   }
 
-  /** Time of the bar at x; past either end of the candles, the first or last one. */
+  /**
+   * Time of the bar at x. Past the last candle, the time of a bar still to come, one bar
+   * apart, so drawings reach into the future as in TradingView; before the first, the first.
+   */
   private xToTime(x: number): number | null {
     const logical = this.chart?.timeScale().coordinateToLogical(x);
     if (logical === null || logical === undefined || !this.drawn.length) {
       return null;
     }
-    const index = Math.min(this.drawn.length - 1, Math.max(0, Math.round(logical)));
-    return this.drawn[index].time;
+    const last = this.drawn.length - 1;
+    const index = Math.max(0, Math.round(logical));
+    const step = untracked(this.barSeconds);
+    if (index > last && step > 0) {
+      return this.drawn[last].time + (index - last) * step;
+    }
+    return this.drawn[Math.min(last, index)].time;
   }
 
-  /** X of the bar a time falls in; times outside the candles stick to the first or last. */
+  /** X of the bar a time falls in, or of a bar still to come; earlier times stick to the first. */
   private timeToX(time: number): number | null {
     if (!this.drawn.length || !this.chart) {
       return null;
     }
-    return this.chart.timeScale().logicalToCoordinate(this.indexAt(time) as Logical);
+    return this.chart.timeScale().logicalToCoordinate(this.logicalAt(time) as Logical);
+  }
+
+  /** Logical index of a time: its bar's, or past the last candle, one bar each `barSeconds`. */
+  private logicalAt(time: number): number {
+    const last = this.drawn.length - 1;
+    const step = untracked(this.barSeconds);
+    const lastTime = this.drawn[last]?.time;
+    if (lastTime !== undefined && time > lastTime && step > 0) {
+      return last + Math.floor((time - lastTime) / step);
+    }
+    return this.indexAt(time);
   }
 
   /** Index of the bar a time falls in; times outside the candles stick to the first or last. */
@@ -2077,7 +2165,10 @@ export class ReplayChart {
   }
 
   private drawIndicators(candles: Candle[], shown: ShownIndicator[]): void {
-    this.indicatorLines?.draw(candles, shown);
+    if (this.indicatorLines?.draw(candles, shown)) {
+      // Panes came or went: drawings move with theirs once the chart has laid them out.
+      requestAnimationFrame(() => this.layoutLabels());
+    }
   }
 
   /** Maps a time to the start of its bar. */
@@ -2093,16 +2184,77 @@ export class ReplayChart {
       : null;
   }
 
-  private inPane(p: Pixel): boolean {
-    const pane = this.pane();
-    return !!pane && p.x >= 0 && p.x <= pane.width && p.y >= 0 && p.y <= pane.height;
+  /**
+   * The panes drawings go in, from the top: the candles' and each indicator's below them.
+   * Their heights come from the chart; where each starts, from the page when it is laid out.
+   */
+  private frames(): Frame[] {
+    const chart = this.chart;
+    const series = this.series;
+    if (!chart || !series) {
+      return [];
+    }
+    const width = chart.timeScale().width();
+    const own: readonly IndicatorPane[] = this.indicatorLines?.panes() ?? [];
+    const panes = chart.panes();
+    const first = panes[0]?.getHTMLElement?.()?.getBoundingClientRect();
+    const frames: Frame[] = [];
+    let top = 0;
+    panes.forEach((pane, i) => {
+      const height = pane.getHeight();
+      const box = i > 0 ? pane.getHTMLElement?.()?.getBoundingClientRect() : undefined;
+      const at = box?.height && first ? box.top - first.top : top;
+      const indicator = i > 0 ? own[i - 1] : undefined;
+      if (i === 0 || indicator) {
+        frames.push({
+          pane: indicator?.id,
+          top: at,
+          width,
+          height,
+          scale: indicator?.series ?? series,
+        });
+      }
+      top = at + height + PANE_SEPARATOR;
+    });
+    return frames;
   }
 
-  private clampToPane(p: Pixel): Pixel {
-    const pane = this.pane() ?? { width: 0, height: 0 };
+  /** The pane of a drawing: the candles' (no id) or the indicator's, if it is on. */
+  private frameOf(pane: string | undefined): Frame | undefined {
+    return this.frames().find((f) => f.pane === pane);
+  }
+
+  /** The pane under a pixel, if any (not the scales nor the separators). */
+  private frameAt(p: Pixel): Frame | undefined {
+    return this.frames().find(
+      (f) => p.x >= 0 && p.x <= f.width && p.y >= f.top && p.y <= f.top + f.height,
+    );
+  }
+
+  /** The pane of the drawing being placed. */
+  private placingFrame(): Frame | undefined {
+    return this.frameOf(this.drawPane) ?? this.frameOf(undefined);
+  }
+
+  /**
+   * Where the next point of the current tool goes for the pointer at `p`: inside the pane of
+   * the drawing's first point, or before it, of the pane under the pointer that takes the tool.
+   */
+  private aim(p: Pixel): Pixel {
+    const tool = untracked(this.tool);
+    if (!untracked(this.anchors).length) {
+      const under = this.frameAt(p);
+      if (under && (!under.pane || !tool || !CANDLES_ONLY.has(tool))) {
+        this.drawPane = under.pane;
+      }
+    }
+    const frame = this.placingFrame();
+    if (!frame) {
+      return p;
+    }
     return {
-      x: Math.min(pane.width, Math.max(0, p.x)),
-      y: Math.min(pane.height, Math.max(0, p.y)),
+      x: Math.min(frame.width, Math.max(0, p.x)),
+      y: Math.min(frame.top + frame.height, Math.max(frame.top, p.y)),
     };
   }
 
@@ -2111,7 +2263,7 @@ export class ReplayChart {
     const reach = touch ? TOUCH_GRAB_DISTANCE : GRAB_DISTANCE;
     const selected = untracked(this.selected);
     const shapes = untracked(this.shapes)
-      .filter((s) => s.id !== PREVIEW_ID)
+      .filter((s) => s.id !== PREVIEW_ID && p.y >= s.clip.top && p.y <= s.clip.top + s.clip.height)
       .reverse()
       .sort((s, t) => Number(t.id === selected) - Number(s.id === selected));
     return shapes.find((s) => {
@@ -2122,7 +2274,7 @@ export class ReplayChart {
           insideChannel(p, s.segment, s.parallel)
         );
       }
-      if (['trend', 'ray', 'extended', 'arrow', 'hray', 'vline'].includes(s.kind)) {
+      if (['trend', 'ray', 'extended', 'arrow', 'hray', 'vline', 'level'].includes(s.kind)) {
         return distanceToSegment(p, ...s.segment) <= reach;
       }
       if (s.wave) {
@@ -2146,8 +2298,10 @@ export class ReplayChart {
     // With a mouse, the press puts the first point (a drag then draws the whole shape); on a
     // phone it waits for the finger to lift, from where the crosshair was.
     const anchored = untracked(this.anchors).length > 0;
-    if (!touch && !anchored && POINTS[tool] > 1) {
-      const point = this.toPoint(p);
+    p = this.aim(p);
+    const frame = this.placingFrame();
+    if (!touch && !anchored && POINTS[tool] > 1 && frame) {
+      const point = this.toPoint(p, frame);
       if (point) {
         this.anchors.set([point]);
       }
@@ -2192,7 +2346,7 @@ export class ReplayChart {
       // A finger moves the crosshair by as much as it moves, from where it was.
       const { from } = gesture.place;
       const at = gesture.touch ? { x: from.x + dx, y: from.y + dy } : p;
-      this.cursor.set({ ...this.clampToPane(at), touch: gesture.touch });
+      this.cursor.set({ ...this.aim(at), touch: gesture.touch });
       return true;
     }
     if (gesture.edit && gesture.moved) {
@@ -2207,7 +2361,7 @@ export class ReplayChart {
       this.release();
       // A tap puts the point where it lands; a drag where the crosshair ends.
       const cursor = untracked(this.cursor);
-      const at = gesture.touch && gesture.moved && cursor ? cursor : this.clampToPane(p);
+      const at = gesture.touch && gesture.moved && cursor ? cursor : this.aim(p);
       this.placePoint(gesture, at);
     } else if (gesture.edit) {
       this.release();
@@ -2224,8 +2378,17 @@ export class ReplayChart {
   /** Puts a point of the drawing of the current tool at `at`. */
   private placePoint(gesture: Gesture, at: Pixel): void {
     const tool = untracked(this.tool);
-    const point = this.toPoint(at);
-    if (!tool || !point) {
+    const frame = this.placingFrame();
+    const point = frame && this.toPoint(at, frame);
+    if (!tool || !frame || !point) {
+      return;
+    }
+    if (tool === 'hline' && frame.pane) {
+      // In an indicator's pane, a level on the overlay; on the candles, a price line.
+      const id = this.newDrawingId();
+      this.drawings.update((list) => [...list, this.build(tool, [point], id, frame)]);
+      this.pick(null);
+      this.selected.set(id);
       return;
     }
     if (tool === 'hline') {
@@ -2270,7 +2433,7 @@ export class ReplayChart {
       points.splice(0, 2, ...points.slice(0, 2).sort((p, q) => p.time - q.time));
     }
     const id = this.newDrawingId();
-    this.drawings.update((list) => [...list, this.build(tool, points, id)]);
+    this.drawings.update((list) => [...list, this.build(tool, points, id, frame)]);
     this.pick(null);
     this.selected.set(id);
   }
@@ -2278,10 +2441,14 @@ export class ReplayChart {
   /** The drawing being edited, moved by (dx, dy) pixels: one handle's coordinates, or all. */
   private reshape(edit: NonNullable<Gesture['edit']>, dx: number, dy: number): ShapeDrawing {
     const { drawing, from, handle } = edit;
+    const frame = this.frameOf(drawing.pane);
+    if (!frame) {
+      return drawing;
+    }
     if (handle?.level) {
       // A channel's width or a position's stop: by the price the handle moved.
-      const was = this.series!.coordinateToPrice(handle.y);
-      const now = this.series!.coordinateToPrice(handle.y + dy);
+      const was = frame.scale.coordinateToPrice(handle.y - frame.top);
+      const now = frame.scale.coordinateToPrice(handle.y - frame.top + dy);
       if (was === null || now === null) {
         return drawing;
       }
@@ -2291,10 +2458,10 @@ export class ReplayChart {
     const points = drawing.points.map((point, i) => {
       const moveX = !handle || handle.timeOf === i;
       const moveY = !handle || handle.priceOf === i;
-      const next = this.toPoint({
-        x: from[i].x + (moveX ? dx : 0),
-        y: from[i].y + (moveY ? dy : 0),
-      });
+      const next = this.toPoint(
+        { x: from[i].x + (moveX ? dx : 0), y: from[i].y + (moveY ? dy : 0) },
+        frame,
+      );
       return {
         time: moveX && next ? next.time : point.time,
         price: moveY && next ? next.price : point.price,
@@ -2389,15 +2556,20 @@ export class ReplayChart {
       'pointerdown',
       (event) => {
         const p = at(event);
-        if (untracked(this.tool)) {
-          // Only the candles' pane takes drawings, not the scales or the RSI pane.
-          if (this.inPane(p)) {
+        const tool = untracked(this.tool);
+        if (tool) {
+          // The panes take drawings (the candles' and the indicators'), not the scales. The
+          // next point of a drawing goes in the pane of its first; position and measure
+          // tools only on the candles.
+          const frame = this.frameAt(p);
+          const anchored = untracked(this.anchors).length > 0;
+          if (frame && (anchored || !frame.pane || !CANDLES_ONLY.has(tool))) {
             this.startPlacing(p, event);
           }
           return;
         }
         const touch = event.pointerType === 'touch';
-        const shape = this.inPane(p) ? this.shapeAt(p, touch) : undefined;
+        const shape = this.frameAt(p) ? this.shapeAt(p, touch) : undefined;
         if (shape && shape.id === untracked(this.selected)) {
           this.startEdit(shape, null, event);
           return;
@@ -2433,7 +2605,7 @@ export class ReplayChart {
           const tool = untracked(this.tool);
           if (tool && event.pointerType !== 'touch') {
             // A mouse leads the drawing being placed.
-            this.cursor.set({ ...this.clampToPane(at(event)), touch: false });
+            this.cursor.set({ ...this.aim(at(event)), touch: false });
           }
           const shape = tool ? undefined : this.shapeAt(at(event), false);
           stage.style.cursor = tool
